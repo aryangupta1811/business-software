@@ -15,4 +15,24 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Stack-specific entries are added once the stack is chosen
+# Node / TypeScript (ADR 0002)
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.vite/
+.turbo/
+*.log
+
+# Test output (ADR 0013)
+playwright-report/
+test-results/
+
+# Terraform (ADR 0011) — keep .terraform.lock.hcl committed
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+!*.tfvars.example

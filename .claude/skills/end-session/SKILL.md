@@ -11,7 +11,8 @@ End this work session. The next session starts with no memory of this chat. Anyt
 3. **`docs/PROGRESS.md`.** Tick finished tasks. Update "Current focus", "Next step" and "Last updated" (today's date).
 4. **`docs/HANDOFF.md`.** Overwrite it with this session: what was done, what is half-done (with file names), the exact next step, and what to watch out for. Keep the format already in the file.
 5. **Journal.** If a phase task finished, add to `docs/journal/phase-N.md`: what was built, choices vs alternatives (link ADRs), mistakes and what I learned, and interview questions I can now answer.
-6. **`CLAUDE.md`.** If anything there is now wrong (e.g. run/test commands), fix it. Keep it short.
-7. Show me a short list of what changed in the docs and wait for my OK.
-8. Commit everything with a clear message. Don't push; remind me to run `git push`.
-9. Print a 3-line summary I can paste into my notes.
+6. **Interview log.** Make sure `docs/journal/INTERVIEW_LOG.md` has an entry for everything notable this session (decisions, concepts, errors, bugs and their fixes, useful commands, gotchas), however small. Add what's missing, add new Question bank items and Glossary terms, and update the Pitch and Numbers if they changed.
+7. **`CLAUDE.md`.** If anything there is now wrong (e.g. run/test commands), fix it. Keep it short.
+8. Show me a short list of what changed in the docs and wait for my OK.
+9. Commit everything with a clear message. Don't push; remind me to run `git push`.
+10. Print a 3-line summary I can paste into my notes.

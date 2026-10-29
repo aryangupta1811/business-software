@@ -36,7 +36,9 @@ Not decided. Raised by Claude while importing.
 - **Medical costing vs billing order.** Decision 4 says oldest-stock-first costing; decision 5 says the batch expiring soonest is sold first. These can be different batches. Simplest consistent rule: profit uses the purchase price of the batch actually sold. Confirm.
 - Which units come built in (kg, g, litre, ml, piece, box, dozen, bag, foot, metre)? Can owners add their own?
 - Excel import: what happens to rows with errors (skip and report, or stop)?
+- **Inter-state branch transfers (#13).** Under GST, branches with different GSTINs count as separate taxable persons, so moving stock to a branch in another state is a supply that needs a tax invoice (IGST), not just a stock movement. Within one GSTIN it is only a stock movement (with a delivery challan for transport). How should the app handle the inter-state case? (Raised in the kickoff session.)
 
 ## Change log
 
 - 2026-10-29 — Created from the planning chat on claude.ai.
+- 2026-10-29 — Kickoff session: added the open question on inter-state branch transfers. No decided point changed.

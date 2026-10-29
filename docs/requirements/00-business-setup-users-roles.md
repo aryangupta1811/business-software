@@ -69,7 +69,9 @@ Not decided. Raised by Claude while importing.
 - Can one staff member work in more than one branch?
 - When a staff member leaves, their login is deactivated, never deleted (zero data loss). Confirm.
 - How does the owner reset a forgotten password, given there is no phone app (email OTP, SMS OTP)?
+- #18 says the shop uses one shared counter computer; #22 says several counters can bill at the same time. Claude's reading: each counter computer is shared by staff, and a shop can have more than one counter. Confirm. (Raised in the kickoff session.)
 
 ## Change log
 
 - 2026-10-29 — Created from the planning chat on claude.ai.
+- 2026-10-29 — Kickoff session: added the open question on #18 vs #22. No decided point changed.

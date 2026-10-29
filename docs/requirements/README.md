@@ -6,7 +6,7 @@ Imported from the planning chat on claude.ai (29 Oct 2026). **This folder is now
 
 | # | Module | Status | File |
 | --- | --- | --- | --- |
-| — | Product overview (brief, scope, non-functional requirements, open questions) | DECIDED, with PROPOSED and OPEN parts | `product-overview.md` |
+| — | Product overview (brief, scope, non-functional requirements, architecture questions) | DECIDED (2026-10-29 kickoff) | `product-overview.md` |
 | 00 | Business setup, users & roles | DECIDED | `00-business-setup-users-roles.md` |
 | 01 | Items & inventory | DECIDED | `01-items-inventory.md` |
 | 02 | Billing & GST | DRAFT | `02-billing-gst.md` |

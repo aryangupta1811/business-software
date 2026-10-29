@@ -1,6 +1,6 @@
 # Product overview
 
-**Status:** DECIDED, except sections marked DRAFT, PROPOSED or OPEN
+**Status:** DECIDED (non-functional requirements confirmed and architecture questions answered in the kickoff session, 2026-10-29)
 **Source:** planning chat on claude.ai, 29 Oct 2026
 
 ## In one line
@@ -62,7 +62,7 @@ Full detail is in `00-business-setup-users-roles.md`. Summary:
 
 ## Non-functional requirements
 
-**PROPOSED by Claude when importing — confirm in the kickoff session.**
+**DECIDED 2026-10-29.** Proposed by Claude when importing, confirmed by the owner in the kickoff session, with measurable targets added below.
 
 1. **Zero data loss (top priority).**
    - Business records are never hard-deleted: bills, payments, stock movements, udhaar entries, attendance, salary. Mistakes are fixed by cancelling or reversing, with a reason.
@@ -77,28 +77,44 @@ Full detail is in `00-business-setup-users-roles.md`. Summary:
 6. **Security.** Passwords, owner auto-lock, owner password for permission changes.
 7. **English and Hindi** throughout the app.
 
+**Measurable targets** (added 2026-10-29):
+
+- Max data lost in a disaster (RPO): **5 minutes**. Max time to recover (RTO): **1 hour**. Checked by a monthly restore drill.
+- The database itself refuses to delete business records, and the entry log is append-only (ADR 0007).
+- A bill is never saved twice, even if the network drops mid-save (ADRs 0001, 0007).
+- Money is stored as whole paise; no floating-point numbers (ADR 0008).
+- A scanned item appears on the bill in **under 200 ms**; a bill saves in **under 1 second**.
+- Security: HTTPS everywhere, Argon2id password hashing, rate-limited logins, no secrets in git (ADR 0009).
+
 ## Open questions that shape the architecture
 
-**OPEN — answer these in the kickoff session, before choosing the tech stack.**
+**ANSWERED 2026-10-29** in the kickoff session. Each answer links its ADR in `docs/decisions/`.
 
 1. **Offline billing.** If the shop's internet drops, must billing keep working?
    This is the biggest architecture decision. Offline billing means data is stored on the counter computer and synced later. That is much more complex, and syncing is exactly where data loss and stock mismatches happen.
    Options: (a) online only, (b) offline billing that syncs later, (c) online first, offline added later.
+   **Answer:** (c) online first, confirmed by the owner ("v1 runs online"). v1 needs internet; a dropped connection never loses or duplicates a bill; the data is designed so offline can be added later. → ADR 0001
 2. **WhatsApp.** The official WhatsApp Business API needs a verified business and charges per message. For a portfolio: a real integration with a test number, or a mock that shows the flow?
+   **Answer:** a real WhatsApp Cloud API integration using Meta's free test number, sent through an outbox, plus an in-app Outbox page and a log-only sender for local use. → ADR 0010
 3. **AI assistant.** Which AI model/provider, and what monthly cost limit?
+   **Answer:** the Claude API (owner's choice), answering only through permission-checked tools. The model and monthly cap are chosen at the start of Phase 3. A Claude subscription does not include API access: the app needs a Claude Console API key, billed separately. → ADR 0015
 4. **Hosting budget.** How much can be spent per month? Free tiers and student credits change what's possible.
+   **Answer:** ₹0 (owner, 2026-10-29). Everything runs locally until the cloud stage in Phase 1. Then an AWS Free plan account (up to $200 credits over 6 months, no charges possible), timed to placement season, running one EC2 server + RDS. The only cost that can't be zero is a few dollars of Claude API credit in Phase 3. → ADRs 0011, 0015
 5. **Printing.** Thermal receipt printer (58/80 mm), A4 invoices, or both?
+   **Answer:** both: an 80 mm receipt (58 mm as a setting) and A4, printed from the browser with kiosk printing; PDFs rendered by headless Chromium so Hindi displays correctly. → ADR 0014
 6. **Demo data.** A portfolio needs a realistic demo shop with months of sales, staff and udhaar, so the dashboard and AI have something to show. Generate it how?
+   **Answer:** a seed script with a fixed random seed that runs through the app's own services, starting at the end of Phase 1, plus a one-click demo login. → ADR 0016
 
 ## Suggested build phases
 
-**DRAFT — finalize in the kickoff session.**
+**DECIDED 2026-10-29.** Session-sized tasks, with the DevOps stages woven in, are in `docs/PROGRESS.md`.
 
 - **Phase 0 — Foundations:** tech stack, architecture, walking skeleton, Docker, CI.
 - **Phase 1 — Core selling:** Modules 00, 01, 02, 03. The entry log records actions from the very first feature (Module 00 decided that every action is recorded against the logged-in person).
 - **Phase 2 — Running the business:** Modules 04, 05, 06 (viewer screen), 07, 08, chosen ideas from `ideas-backlog.md`.
 - **Phase 3 — AI assistant:** Module 09. It comes last because it is only as good as the data under it.
 - **DevOps** is woven through every phase (see `docs/devops/DEVOPS_PLAN.md`).
+- **Demo data** starts at the end of Phase 1 and grows each phase, so the dashboard and AI are built on realistic numbers (ADR 0016).
 
 ## Glossary
 
@@ -121,3 +137,9 @@ Full detail is in `00-business-setup-users-roles.md`. Summary:
 | Batch | A group of stock bought together, with its own expiry date and cost |
 | Average cost | Profit is calculated using the average purchase price of the stock |
 | Financial year | April to March in India; invoice numbering restarts every April |
+
+## Change log
+
+- 2026-10-29 — Created from the planning chat on claude.ai.
+- 2026-10-29 — Kickoff session: non-functional requirements confirmed, with measurable targets; the six architecture questions answered (ADRs 0001, 0010, 0011, 0014, 0015, 0016); build phases decided, with demo data starting at the end of Phase 1.
+- 2026-10-29 — Owner: hosting budget is ₹0 (AWS Free plan), not the ₹1,000/month first proposed; v1 runs online. ADR 0011 redesigned before it was committed.

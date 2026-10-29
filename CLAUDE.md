@@ -24,8 +24,14 @@ Read files when a task needs them. Don't load everything at once.
 | `docs/requirements/product-overview.md` | Original brief, scope, non-functional requirements, open questions | Architecture or cross-module work |
 | `docs/requirements/NN-*.md` | One file per module | Only the module being worked on |
 | `docs/decisions/` | Architecture Decision Records (ADRs) | Before proposing any tech choice |
+| `docs/architecture.md` | How the system fits together, with diagrams | Any code or infra work |
 | `docs/devops/DEVOPS_PLAN.md` | DevOps & cloud roadmap | DevOps / infra work |
 | `docs/journal/` | Build journal per phase, for interviews | End of each phase |
+| `docs/journal/INTERVIEW_LOG.md` | Running interview-prep record of every decision, concept, bug and gotcha | Add to it during every session |
+
+## Stack
+
+TypeScript monorepo (pnpm): React + Vite web app, NestJS modular monolith (api + worker), PostgreSQL + Drizzle with Row-Level Security, Docker Compose locally, GitHub Actions CI/CD, AWS Mumbai Free plan (one EC2 server + RDS, ₹0 budget) via Terraform. Reasons: `docs/architecture.md` and ADRs 0001–0016.
 
 ## Rules
 
@@ -34,15 +40,16 @@ Read files when a task needs them. Don't load everything at once.
 3. **DRAFT modules are not built until finalized** with `/finalize-module NN`.
 4. **Every tech decision gets an ADR** (`/record-decision`). Don't reopen an accepted ADR unless I ask; if new information suggests changing one, raise it with me.
 5. **Plan before code.** For any feature, propose a short plan and wait for my OK.
-6. **Small steps, frequent commits.** Commit after each working step with a clear message. Never force-push, rewrite git history, or delete anything under `docs/` without asking.
+6. **Small steps, frequent commits.** Commit after each working step with a clear message. Never force-push, rewrite git history, or delete anything under `docs/` without asking. No AI attribution in commits or PRs: no `Co-Authored-By: Claude` lines, no "Generated with Claude Code".
 7. **Zero data loss** is the top non-functional requirement (see `product-overview.md`). Business records are never hard-deleted. Nothing destructive — dropping data, destructive migrations, deleting cloud resources — runs without my explicit OK and a fresh backup.
 8. **Quality bar.** The frontend must look designed, not like a generic template. The backend: no bugs, no unnecessary code, and tests for every business rule (GST math, stock, udhaar balances, salary and advances).
 9. **One task per session.** When the task is done, or `/context` shows the window getting full, run `/end-session`.
-10. Keep this file under 150 lines. Details go in `docs/`.
+10. **Interview log.** Whenever we make a decision, learn a concept, hit an error, fix a bug or discover a gotcha, however small, add an entry to `docs/journal/INTERVIEW_LOG.md` in the same session, in its format. Update its Pitch and Numbers when the project grows.
+11. Keep this file under 150 lines. Details go in `docs/`.
 
 ## Commands
 
-Fill these in once the stack is chosen.
+Filled in by task P0.2 (monorepo scaffold).
 
 - Run: TBD
 - Test: TBD

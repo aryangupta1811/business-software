@@ -23,10 +23,11 @@
 
 ## Questions to settle
 
-- Are the owner's own actions logged too?
+- Are the owner's own actions logged too? `00` #20 (DECIDED) already says every action is recorded against the person logged in, which suggests yes. Confirm at `/finalize-module 06`.
 - How long are logs kept?
 - Which patterns count as "unusual", and who sees the flags?
 
 ## Change log
 
 - 2026-10-29 — Draft created from the planning chat on claude.ai.
+- 2026-10-29 — Kickoff session: noted that `00` #20 already answers the owner-logging question.

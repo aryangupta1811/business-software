@@ -1,8 +1,8 @@
 # Progress
 
-**Current focus:** Phase 0 — foundations (stack and architecture chosen; walking skeleton next)
-**Next step:** Owner does P0.0 laptop setup; next session: P0.1 Git workflow, then P0.2 monorepo scaffold (plan first)
-**Last updated:** 2026-10-29
+**Current focus:** Phase 0 — foundations (Git workflow done; walking skeleton next)
+**Next step:** Owner merges the P0.1 pull request; next session: P0.2 monorepo scaffold (plan first)
+**Last updated:** 2026-10-30
 
 Each task below is sized for **one session**. DevOps stages (from `docs/devops/DEVOPS_PLAN.md`) are woven in where they're first needed. Tasks for DRAFT modules are provisional: re-cut them after `/finalize-module NN`.
 
@@ -31,13 +31,13 @@ Each task below is sized for **one session**. DevOps stages (from `docs/devops/D
 - [x] Write `docs/architecture.md` with diagrams (2026-10-29)
 - [x] Break Phases 1–3 into one-session tasks (2026-10-29)
 - [x] Start `docs/journal/INTERVIEW_LOG.md` (2026-10-29)
-- [ ] **P0.0 Laptop setup** (owner, before the next session): move the repo out of OneDrive; `wsl --install` in an admin PowerShell, then restart; Docker Desktop (WSL 2 backend), checked with `docker run hello-world`; pnpm (`npm install -g pnpm`); VS Code extensions (ESLint, Prettier, Tailwind CSS IntelliSense, Docker); apply for the GitHub Student Developer Pack. Already installed (checked 2026-10-29): Git 2.56, GitHub CLI 2.103, Node 24.18 (LTS), VS Code; 24 GB RAM, 49 GB free on C:. **Later, at DevOps stage 4:** AWS CLI v2 (the existing `aws` in `Python311\Scripts` is a broken old pip install, so remove it) and Terraform.
-- [ ] **P0.1 Git workflow** (DevOps stage 1): move the repo out of OneDrive; branch protection on `main`; PR template; commit message convention (Conventional Commits); `.gitattributes` forcing LF line endings (git warned "LF will be replaced by CRLF"); confirm no secrets in git. *Owner does the GitHub settings with Claude's steps.* Branch protection on a **private** repo needs GitHub Pro, which is free with the GitHub Student Developer Pack, so apply for it first. Alternatively, make the repo public after a secrets check: recruiters need to see it anyway, and public repos get branch protection free (ADR 0012). Owner's choice.
+- [x] **P0.0 Laptop setup** (owner, done 2026-10-30; Student Pack applied, awaiting approval): move the repo out of OneDrive; `wsl --install` in an admin PowerShell, then restart; Docker Desktop (WSL 2 backend), checked with `docker run hello-world`; pnpm (`npm install -g pnpm`); VS Code extensions (ESLint, Prettier, Tailwind CSS IntelliSense, Docker); apply for the GitHub Student Developer Pack. Already installed (checked 2026-10-29): Git 2.56, GitHub CLI 2.103, Node 24.18 (LTS), VS Code; 24 GB RAM, 49 GB free on C:. **Later, at DevOps stage 4:** AWS CLI v2 (the existing `aws` in `Python311\Scripts` is a broken old pip install, so remove it) and Terraform.
+- [x] **P0.1 Git workflow** (DevOps stage 1, done 2026-10-30, ADR 0017): `.gitattributes` forcing LF; PR template; GitHub flow + Conventional Commits in `docs/devops/git-workflow.md`; full-history gitleaks scan (no leaks) and a personal-data check, then the repo was made **public**; `protect-main` ruleset (PR required, squash only, no force-push or deletion, no bypass); secret scanning, push protection and Dependabot alerts on; commits use the GitHub noreply email; `gh` logged in. Verified through the GitHub API.
 - [ ] **P0.2 Monorepo scaffold:** pnpm workspaces (`apps/web`, `apps/api`, `packages/shared`), strict TypeScript, ESLint + Prettier, Vitest with one passing test, first `packages/shared` money helper written test-first. Fill in Run/Test/Lint in `CLAUDE.md`.
 - [ ] **P0.3 Database + Docker Compose** (DevOps stage 2): PostgreSQL in Docker Compose, Drizzle + first migration, migration and runtime database roles, a Testcontainers integration test.
 - [ ] **P0.4 API skeleton:** NestJS app with `/health` and one endpoint that reads from the database; `api` and `worker` entry points; Dockerfile; runs in Compose.
 - [ ] **P0.5 Web skeleton:** React + Vite app shell calling the API; English/Hindi switch with i18next; `docker compose up` starts everything.
-- [ ] **P0.6 CI** (DevOps stage 3): GitHub Actions running lint, type-check, unit and integration tests, and builds on every push/PR; status badge in a new README.
+- [ ] **P0.6 CI** (DevOps stage 3): GitHub Actions running lint, type-check, unit and integration tests, and builds on every push/PR; a Conventional Commits check on PR titles; a gitleaks secrets scan; then make CI a required status check in the `protect-main` ruleset (ADR 0017); status badge in a new README.
 - [ ] **P0.7 Design system:** visual direction, colour and type tokens (Latin + Devanagari), spacing, restyled base components, keyboard-shortcut framework. *Ask the owner for visual preferences.*
 - [ ] Phase 0 journal (`docs/journal/phase-0.md`)
 

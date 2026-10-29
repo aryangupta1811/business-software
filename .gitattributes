@@ -1,0 +1,5 @@
+# Line endings: LF in the repo and in every working folder, on every OS.
+# The code runs in Linux containers and Linux CI, where CRLF breaks shell
+# scripts. This overrides each machine's core.autocrlf setting.
+# Git detects binary files (images, fonts, .xlsx) by itself and leaves them alone.
+* text=auto eol=lf

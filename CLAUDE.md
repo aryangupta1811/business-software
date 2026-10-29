@@ -26,12 +26,13 @@ Read files when a task needs them. Don't load everything at once.
 | `docs/decisions/` | Architecture Decision Records (ADRs) | Before proposing any tech choice |
 | `docs/architecture.md` | How the system fits together, with diagrams | Any code or infra work |
 | `docs/devops/DEVOPS_PLAN.md` | DevOps & cloud roadmap | DevOps / infra work |
+| `docs/devops/git-workflow.md` | Branches, commit messages, PRs, secrets, GitHub settings | Unsure about a branch name, commit message or PR |
 | `docs/journal/` | Build journal per phase, for interviews | End of each phase |
 | `docs/journal/INTERVIEW_LOG.md` | Running interview-prep record of every decision, concept, bug and gotcha | Add to it during every session |
 
 ## Stack
 
-TypeScript monorepo (pnpm): React + Vite web app, NestJS modular monolith (api + worker), PostgreSQL + Drizzle with Row-Level Security, Docker Compose locally, GitHub Actions CI/CD, AWS Mumbai Free plan (one EC2 server + RDS, ₹0 budget) via Terraform. Reasons: `docs/architecture.md` and ADRs 0001–0016.
+TypeScript monorepo (pnpm): React + Vite web app, NestJS modular monolith (api + worker), PostgreSQL + Drizzle with Row-Level Security, Docker Compose locally, GitHub Actions CI/CD, AWS Mumbai Free plan (one EC2 server + RDS, ₹0 budget) via Terraform. Reasons: `docs/architecture.md` and ADRs 0001–0017.
 
 ## Rules
 
@@ -40,12 +41,13 @@ TypeScript monorepo (pnpm): React + Vite web app, NestJS modular monolith (api +
 3. **DRAFT modules are not built until finalized** with `/finalize-module NN`.
 4. **Every tech decision gets an ADR** (`/record-decision`). Don't reopen an accepted ADR unless I ask; if new information suggests changing one, raise it with me.
 5. **Plan before code.** For any feature, propose a short plan and wait for my OK.
-6. **Small steps, frequent commits.** Commit after each working step with a clear message. Never force-push, rewrite git history, or delete anything under `docs/` without asking. No AI attribution in commits or PRs: no `Co-Authored-By: Claude` lines, no "Generated with Claude Code".
+6. **Small steps, frequent commits.** One branch and one pull request per task; `main` only changes through a squash-merged PR. Commit after each working step with a Conventional Commit message (`docs/devops/git-workflow.md`). Never force-push, rewrite git history, or delete anything under `docs/` without asking. No AI attribution in commits or PRs: no `Co-Authored-By: Claude` lines, no "Generated with Claude Code".
 7. **Zero data loss** is the top non-functional requirement (see `product-overview.md`). Business records are never hard-deleted. Nothing destructive — dropping data, destructive migrations, deleting cloud resources — runs without my explicit OK and a fresh backup.
 8. **Quality bar.** The frontend must look designed, not like a generic template. The backend: no bugs, no unnecessary code, and tests for every business rule (GST math, stock, udhaar balances, salary and advances).
 9. **One task per session.** When the task is done, or `/context` shows the window getting full, run `/end-session`.
 10. **Interview log.** Whenever we make a decision, learn a concept, hit an error, fix a bug or discover a gotcha, however small, add an entry to `docs/journal/INTERVIEW_LOG.md` in the same session, in its format. Update its Pitch and Numbers when the project grows.
-11. Keep this file under 150 lines. Details go in `docs/`.
+11. **The repo is public.** Never commit secrets, personal data (phone numbers, personal emails, ID numbers, home paths) or real customer data. Real values go in `.env` (git-ignored); personal notes in `CLAUDE.local.md`. Scan staged changes before committing (`docs/devops/git-workflow.md`, Secrets).
+12. Keep this file under 150 lines. Details go in `docs/`.
 
 ## Commands
 

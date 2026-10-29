@@ -13,10 +13,10 @@ Overwritten at the end of every session. Older handoffs are in git history: `git
 - `CLAUDE.md`: rule 6 (a branch and PR per task, Conventional Commits) and new rule 11 (public repo: no secrets or personal data). `/start-session` now creates the task branch; `/end-session` scans staged changes before committing.
 - `gh` CLI logged in (device flow; the code is printed in the terminal, not sent to the phone).
 
-**Half-done:** branch `chore/p0.1-git-workflow` (3 commits) is committed but not pushed or merged.
+**Half-done:** PR #1 (`chore/p0.1-git-workflow`), the project's first pull request, is open. `gh pr create --fill` gave it the branch name as its title, so the title and description are fixed on GitHub before the squash merge.
 
 **Next step:**
-1. Owner: `git push origin HEAD:main` (should be **rejected** with `GH013`, proving protection works) → `git push -u origin HEAD` → `gh pr create --fill` → squash-merge on GitHub → `git switch main`, `git pull`, `git branch -D chore/p0.1-git-workflow`.
+1. Owner, if PR #1 isn't merged yet: set its title to `chore: set up git workflow and protect main (P0.1)`, fill in the template, squash-merge, then `git switch main`, `git pull`, `git branch -D chore/p0.1-git-workflow`.
 2. Next session: `/start-session` → **P0.2 monorepo scaffold**. It's the first code: write a short implementation plan (`superpowers:writing-plans`) and get the owner's OK before writing code (`CLAUDE.md` rule 5).
 
 **Watch out for:**

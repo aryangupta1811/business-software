@@ -11,8 +11,10 @@ git switch main && git pull           # start from the latest main
 git switch -c feat/p1.7-items         # one branch per task
 # ...work; commit after each working step...
 git push -u origin HEAD               # first push of the branch
-gh pr create --fill                   # or open the link that git push prints
+gh pr create --web                    # opens the PR form with the template loaded
 ```
+
+In the form, give the PR a Conventional Commit title (it becomes the commit on `main`) and fill in the template. Don't use `gh pr create --fill`: with more than one commit it titles the PR with the branch name and skips the template.
 
 On GitHub: wait for CI to pass (from P0.6), read the diff once more, then **Squash and merge**. GitHub deletes the branch on the server. Then, locally:
 

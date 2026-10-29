@@ -365,6 +365,12 @@ Entry format:
 - **Say it in an interview:** "CLI tools log in with the OAuth device flow: the code is generated on the device and approved in a browser session I already trust."
 - **Follow-ups to expect:** Device flow vs the normal browser redirect flow? (Redirect needs the app to receive a callback; a CLI or TV can't, so it polls GitHub until I approve.)
 
+### 2026-10-30 — `gh pr create --fill` named my first PR after the branch `#github` `#gotcha`
+- **What happened:** Opened PR #1 with `gh pr create --fill`. With more than one commit on the branch, `--fill` used the branch name ("chore/p0.1 git workflow") as the title and a list of commits as the description, skipping the PR template. With squash merges that title would have become the commit message on `main`, breaking the Conventional Commits rule on the very first merge. Fixed the title and description on GitHub before merging, and switched the docs to `gh pr create --web`, which opens GitHub's form with the template loaded.
+- **Why / what I learned:** Read what a tool's convenience flag actually does before putting it in a workflow. Looking at the PR before merging is exactly what the PR step is for.
+- **Say it in an interview:** "With squash merges, the PR title *is* the commit message on main, so I treat the title as part of the change."
+- **Follow-ups to expect:** How would you enforce PR titles automatically? (A CI check on the title; planned for P0.6.)
+
 ### 2026-10-30 — `.gitattributes` beats `core.autocrlf` `#git` `#gotcha`
 - **What happened:** Found the cause of the "LF will be replaced by CRLF" warning: Git for Windows sets `core.autocrlf=true` in its system config. Added `.gitattributes` with `* text=auto eol=lf`. `git ls-files --eol` showed all 46 files were already LF, so `git add --renormalize .` changed nothing.
 - **Why / what I learned:** `core.autocrlf` is a per-machine setting, so every clone could behave differently. `.gitattributes` is committed, so the rule travels with the repo and wins over local settings. `text=auto` lets Git skip binary files.

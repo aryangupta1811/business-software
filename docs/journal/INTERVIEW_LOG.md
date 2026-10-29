@@ -66,6 +66,12 @@ Short answers; the Log entry has the full story.
   A: RPO is how much data you can lose (5 minutes, thanks to point-in-time restore). RTO is how long recovery takes (1 hour, checked by a monthly restore drill). → `product-overview.md` NFR 1
 - **Q: Why did you test against a real database instead of mocks?**
   A: The bugs I care about (locks, concurrency, Row-Level Security) only exist in the real database. Testcontainers starts a throwaway PostgreSQL for each test run. → ADR 0013
+- **Q: What's your branching and merge strategy?**
+  A: GitHub flow. Each task is a short-lived branch, merged into a protected `main` by pull request. I squash-merge, so each PR becomes one Conventional Commit on `main`: history reads like a changelog, and one `git revert` undoes a whole feature. → ADR 0017
+- **Q: Merge commit vs squash vs rebase?**
+  A: A merge commit keeps every commit plus an extra merge commit, so history branches. Rebase replays every commit on top of `main`: linear, but work-in-progress commits land too. Squash turns the branch into one commit: linear and clean, and the details stay in the PR. → ADR 0017
+- **Q: How do you keep secrets out of git?**
+  A: Secrets live in environment variables, and `.gitignore` blocks `.env` files and keys. GitHub push protection rejects pushes containing known token formats. I scanned the full history with gitleaks before making the repo public, and CI runs it on every PR. If a secret ever leaks, I revoke it first, because deleting the commit doesn't remove the copies. → ADR 0017
 
 ---
 
@@ -79,8 +85,12 @@ Terms I learned on this project, in one line each.
 | ADR | Architecture Decision Record: a short file explaining one technical choice and why |
 | Argon2id | A deliberately slow password-hashing algorithm, recommended by OWASP |
 | CI / CD | Continuous Integration (test every change automatically) / Continuous Deployment (ship every green change automatically) |
+| Conventional Commits | Commit messages shaped `type(scope): summary`, e.g. `fix(gst): round CGST and SGST separately` |
 | CSRF | A trick where another site makes your browser send a request with your cookies; blocked with SameSite cookies + tokens |
+| Device flow | OAuth login for CLIs and TVs: the device shows a short code, you approve it in a browser where you're logged in |
+| Docker daemon | The background engine that builds and runs containers; the `docker` command only sends it requests |
 | FEFO | First Expiry, First Out: sell the batch that expires soonest |
+| GitHub flow | `main` is always deployable; every change is a short-lived branch merged by pull request |
 | httpOnly cookie | A cookie JavaScript can't read, so a script injected into the page can't steal the session |
 | IaC | Infrastructure as Code: cloud resources created from code files (Terraform) instead of clicking in a console |
 | Idempotency key | A unique ID sent with a request so repeating it has the same effect as sending it once |
@@ -89,9 +99,12 @@ Terms I learned on this project, in one line each.
 | ORM | A library that maps database tables to code (Drizzle here) |
 | Outbox pattern | Write "send this message" into the database in the same transaction, send it later from a worker |
 | PITR | Point-in-time restore: rebuild the database as it was at any second in the retention window |
+| Push protection | GitHub rejects a `git push` that contains a known secret format, before it reaches the repo |
 | RLS | Row-Level Security: PostgreSQL policies that decide which rows a query is allowed to see |
 | RPO / RTO | Recovery Point Objective (max data you can lose) / Recovery Time Objective (max time to recover) |
+| Ruleset | GitHub's rules for branches (require a PR, block force-push…), the newer form of branch protection |
 | SPA | Single-page app: the browser loads the app once and then only exchanges data with the server |
+| Squash merge | All of a pull request's commits combined into one commit on `main` |
 | Tenant | One customer business in a multi-tenant system |
 | Text shaping | Turning letters into correctly joined glyphs; Hindi (Devanagari) needs it for conjuncts like क्ष |
 
@@ -147,7 +160,7 @@ Entry format:
 
 ### 2026-10-29 — The project folder is inside OneDrive `#gotcha` `#git`
 - **What happened:** Noticed the repo sits in a OneDrive-synced Desktop folder.
-- **Why / what I learned:** OneDrive syncing files while git writes them can corrupt `.git`, and `node_modules` (tens of thousands of files) slows sync badly. GitHub is the backup, not OneDrive. Plan: move it to e.g. `C:\Users\18ary\projects\business-software`.
+- **Why / what I learned:** OneDrive syncing files while git writes them can corrupt `.git`, and `node_modules` (tens of thousands of files) slows sync badly. GitHub is the backup, not OneDrive. Plan: move it to a plain `projects` folder in my user folder, outside OneDrive.
 - **Say it in an interview:** (small, but shows care) "I kept the repo out of cloud-sync folders: git is the version control, GitHub is the backup."
 - **Follow-ups to expect:** —
 
@@ -318,3 +331,45 @@ Entry format:
 - **Why / what I learned:** Reading requirements critically before coding is cheaper than fixing code later.
 - **Say it in an interview:** "I review requirements for contradictions first; it's the cheapest bug to fix."
 - **Follow-ups to expect:** —
+
+### 2026-10-30 — "failed to connect to the docker API" `#devops` `#gotcha`
+- **What happened:** The first `docker` command of the session failed with `failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine`. Docker Desktop wasn't running. Started it and waited until `docker info` answered (about a minute).
+- **Why / what I learned:** Docker is client–server. The `docker` command is only a client that sends requests to the Docker engine (the daemon). On Windows the engine runs inside a WSL 2 Linux VM that Docker Desktop starts. No engine, nobody to answer.
+- **Say it in an interview:** "The Docker CLI is just an API client; the daemon does the work. The same CLI can drive a remote engine through `DOCKER_HOST`."
+- **Follow-ups to expect:** Why do Linux containers need a Linux kernel on Windows? Container vs virtual machine?
+
+### 2026-10-30 — Scanned the whole git history for secrets before going public `#security` `#git` `#devops` → ADR 0017
+- **What happened:** Ran gitleaks over every commit (`--log-opts="--all"`) inside Docker, so nothing had to be installed. It scanned 5 commits, not 3, because the 10-29 history rewrite left the old commits under `refs/original/` (`git filter-branch` keeps a backup there). No leaks. Also searched all history for emails and phone numbers: none.
+- **Why / what I learned:** Git keeps everything ever committed. A secret removed in a later commit is still in history, and making a repo public publishes all of it. If a secret leaks, revoke it first: deleting the commit doesn't remove clones, forks or GitHub's copies.
+- **Say it in an interview:** "Before going public I scanned the full history, not just the current files. Now GitHub push protection blocks known token formats at `git push`, and gitleaks runs in CI."
+- **Follow-ups to expect:** How do you remove a secret from history? (Rotate it first; then `git filter-repo`, force-push, and ask GitHub to purge cached views.) Push protection vs gitleaks? (Push protection matches known provider token formats with few false alarms; gitleaks adds broader patterns and runs anywhere, including CI.)
+
+### 2026-10-30 — My commit email becomes public `#github` `#security` `#gotcha`
+- **What happened:** Every commit stores the author's name and email, and on a public repo anyone can read them (add `.patch` to a commit's URL). Mine used my personal Gmail. Switched this repo to GitHub's noreply address (`144018864+aryangupta1811@users.noreply.github.com`) and turned on *Block command line pushes that expose my email*. The 3 commits already on GitHub keep the Gmail, because GitHub keeps old commits reachable by ID even after a rewrite.
+- **Why / what I learned:** Bots scrape public commits for email addresses. Privacy choices are cheapest before publishing. GitHub links a commit to a profile by matching its email to one on the account, and the noreply address counts.
+- **Say it in an interview:** "Commit metadata is public data, so I commit with GitHub's noreply address."
+- **Follow-ups to expect:** Author vs committer? How would you sign commits? (GPG or SSH signing, shown as "Verified".)
+
+### 2026-10-30 — Secret scanners don't find personal data `#security` `#git`
+- **What happened:** Once the repo was public, I asked for a check that nothing private gets committed. gitleaks scanned the staged changes and all 6 commits: no secrets. But gitleaks only knows secret formats (API keys, tokens, private keys), so a separate `git grep` searched for emails, phone numbers, Aadhaar/PAN/GSTIN numbers and home-folder paths. The first run of the search found nothing, although an old `C:\…` home-folder path in this log should have matched: the pattern's backslashes had been mangled on the way to `git grep`. Run exactly as documented, it caught that path, which I then removed. Both checks are now steps in `/end-session` and a rule in `CLAUDE.md`.
+- **Why / what I learned:** Secrets (credentials) and personal data (PII) are different problems that need different tools. Automated checks at several points (before commit, at push, in CI) catch more than relying on memory. And a check that has never caught anything proves nothing: test it on a known bad example first, like a test that must fail before it passes.
+- **Say it in an interview:** "I check for secrets and personal data separately, before every commit; push protection and CI are the safety nets behind that."
+- **Follow-ups to expect:** What's PII? How would you handle real customer data in a demo? (Never; demo data is generated with made-up values.)
+
+### 2026-10-30 — `gh auth login`: the code is in the terminal, not on my phone `#github` `#security` `#gotcha`
+- **What happened:** GitHub's "Authorize your device" page asked for an 8-character code, and I waited for it on my phone. It never comes there: `gh` prints it in the terminal ("First copy your one-time code: XXXX-XXXX"), and the browser had opened on top of it. Fix: `gh auth login --hostname github.com --git-protocol https --web --clipboard` copies the code to the clipboard.
+- **Why / what I learned:** This is the OAuth device flow (RFC 8628), used by CLIs and smart TVs that can't show a login page. The device asks GitHub for a short code; I type it in a browser where I'm already logged in; GitHub links the two and gives the device a token. The page warns "never use a code sent by someone else" because entering an attacker's code would log *their* device into my account (device-code phishing).
+- **Say it in an interview:** "CLI tools log in with the OAuth device flow: the code is generated on the device and approved in a browser session I already trust."
+- **Follow-ups to expect:** Device flow vs the normal browser redirect flow? (Redirect needs the app to receive a callback; a CLI or TV can't, so it polls GitHub until I approve.)
+
+### 2026-10-30 — `.gitattributes` beats `core.autocrlf` `#git` `#gotcha`
+- **What happened:** Found the cause of the "LF will be replaced by CRLF" warning: Git for Windows sets `core.autocrlf=true` in its system config. Added `.gitattributes` with `* text=auto eol=lf`. `git ls-files --eol` showed all 46 files were already LF, so `git add --renormalize .` changed nothing.
+- **Why / what I learned:** `core.autocrlf` is a per-machine setting, so every clone could behave differently. `.gitattributes` is committed, so the rule travels with the repo and wins over local settings. `text=auto` lets Git skip binary files.
+- **Say it in an interview:** "Line-ending policy lives in the repo, not in each developer's config."
+- **Follow-ups to expect:** What breaks with CRLF on Linux? (`/bin/sh^M: bad interpreter` in shell scripts.)
+
+### 2026-10-30 — Git workflow: GitHub flow, squash merges, Conventional Commits, protected `main` `#git` `#github` `#devops` → ADR 0017
+- **What happened:** Decided: one task = one branch = one PR; squash merge only; Conventional Commits for commits and PR titles; a ruleset on `main` that requires a PR, blocks force-push and deletion, requires linear history and lets nobody bypass. Made the repo public instead of waiting for the Student Pack: protection and secret scanning are free on public repos, and recruiters need to see it anyway. Added a PR template with the project's checklist. Afterwards, checked the result through GitHub's API rather than trusting the web page: the ruleset is active and reports `current_user_can_bypass: never`, and secret scanning turned out to be still off, so it was switched on with `gh api -X PATCH`.
+- **Why / what I learned:** GitHub flow fits deploy-on-merge; Git Flow's release branches are for versioned software. Two gotchas: GitHub won't let you approve your own PR, so a solo repo needs 0 required approvals (the PR is a CI gate and a self-review); and after a squash merge `git branch -d` says "not fully merged", because the branch's commits got new IDs on `main`, so delete with `-D` once the PR is merged.
+- **Say it in an interview:** "`main` is protected even from me. Everything lands through a PR, squash-merged as one Conventional Commit, so the history reads like a changelog."
+- **Follow-ups to expect:** Trunk-based development vs GitHub flow? (Trunk-based merges tiny changes into `main` many times a day, often behind feature flags; GitHub flow is the same idea with a PR per change.) How do you ship a hotfix? (Same flow: a `fix/` branch and a fast PR.)

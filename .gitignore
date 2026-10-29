@@ -1,0 +1,18 @@
+# Secrets — never commit these
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Personal Claude Code instructions
+CLAUDE.local.md
+.claude/settings.local.json
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Stack-specific entries are added once the stack is chosen

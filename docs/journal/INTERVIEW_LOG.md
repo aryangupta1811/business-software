@@ -34,7 +34,8 @@ Update this as the project grows.
 | Largest exact amount in JavaScript | ≈ ₹90 lakh crore in paise (2^53) | ADR 0008 |
 | Business types in v1 | 5 | Module 00 |
 | Modules | 10 (00–09) | `docs/requirements/` |
-| ADRs written at kickoff | 16 | `docs/decisions/` |
+| ADRs | 17 (16 at kickoff) | `docs/decisions/` |
+| Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
 
 ---
 
@@ -72,6 +73,8 @@ Short answers; the Log entry has the full story.
   A: A merge commit keeps every commit plus an extra merge commit, so history branches. Rebase replays every commit on top of `main`: linear, but work-in-progress commits land too. Squash turns the branch into one commit: linear and clean, and the details stay in the PR. → ADR 0017
 - **Q: How do you keep secrets out of git?**
   A: Secrets live in environment variables, and `.gitignore` blocks `.env` files and keys. GitHub push protection rejects pushes containing known token formats. I scanned the full history with gitleaks before making the repo public, and CI runs it on every PR. If a secret ever leaks, I revoke it first, because deleting the commit doesn't remove the copies. → ADR 0017
+- **Q: How does a command-line tool log in to GitHub without your password?**
+  A: The OAuth device flow. The tool gets a short code from GitHub, I approve that code in a browser where I'm already logged in, and the tool receives a token. Only enter codes your own device generated: entering someone else's code logs their device into your account.
 
 ---
 

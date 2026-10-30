@@ -9,15 +9,26 @@ describe('describeError', () => {
   // Drizzle wraps the real reason (say, a wrong password) in `cause`.
   it('follows the cause chain, one line', () => {
     const inner = new Error('password authentication failed for user "app_owner"');
-    const outer = new Error('Failed query: CREATE SCHEMA IF NOT EXISTS "drizzle"\nparams: ', {
+    const outer = new Error('Failed query: CREATE SCHEMA IF NOT EXISTS "drizzle"', {
       cause: inner,
     });
     expect(describeError(outer)).toBe(
-      'Failed query: CREATE SCHEMA IF NOT EXISTS "drizzle" params: → password authentication failed for user "app_owner"',
+      'Failed query: CREATE SCHEMA IF NOT EXISTS "drizzle" → password authentication failed for user "app_owner"',
     );
   });
 
-  // pg puts the whole client, password included, on its error objects.
+  // Drizzle appends the query's values, which will be customers' phone numbers and tokens.
+  it("drops a failed query's parameter values", () => {
+    const error = new Error(
+      'Failed query: select * from sessions where token = $1\nparams: fake-session-token',
+    );
+    const described = describeError(error);
+    expect(described).toBe('Failed query: select * from sessions where token = $1');
+    expect(described).not.toContain('fake-session-token');
+  });
+
+  // Error objects can carry more than a message: pg-pool attaches the client, whose
+  // (hidden) password some serializers print.
   it('uses messages only, never other fields', () => {
     const error = Object.assign(new Error('connection lost'), {
       client: { password: 's3cretpw' },

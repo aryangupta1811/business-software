@@ -1,6 +1,7 @@
 /**
  * One log line for an error: its message and the messages of its causes, nothing else.
- * Never log the error object itself: pg's errors carry the connection password.
+ * Never log the error object itself: pg-pool attaches the client to some errors, and
+ * serializers that read hidden properties would print its password.
  */
 export function describeError(error: unknown): string {
   const messages: string[] = [];
@@ -13,7 +14,9 @@ export function describeError(error: unknown): string {
       );
       break;
     }
-    messages.push(current.message.replace(/\s+/g, ' ').trim());
+    // Drizzle appends the query's values after "params:"; they can be customers' data.
+    const [message = ''] = current.message.split('\nparams:');
+    messages.push(message.replace(/\s+/g, ' ').trim());
     current = current.cause;
   }
   return messages.join(' → ');

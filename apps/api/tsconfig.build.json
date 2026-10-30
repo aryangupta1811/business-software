@@ -1,0 +1,12 @@
+{
+  // Compiles src/ to dist/ for Node, building the workspace packages it references first.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"],
+  "references": [{ "path": "../../packages/db/tsconfig.build.json" }]
+}

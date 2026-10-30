@@ -1,0 +1,12 @@
+{
+  // Compiles src/ to dist/ for Node (pnpm build). Tests are type-checked by tsconfig.json.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": false,
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
+}

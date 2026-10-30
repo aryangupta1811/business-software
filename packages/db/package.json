@@ -13,7 +13,12 @@
       "source": "./src/testing.ts"
     }
   },
+  "files": [
+    "dist",
+    "migrations"
+  ],
   "scripts": {
+    "build": "tsc -b tsconfig.build.json",
     "typecheck": "tsc",
     "test": "vitest run",
     "test:watch": "vitest",

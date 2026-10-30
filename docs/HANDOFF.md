@@ -2,31 +2,52 @@
 
 Overwritten at the end of every session. Older handoffs are in git history: `git log -p docs/HANDOFF.md`.
 
-**Session:** 3 — P0.2 monorepo scaffold, 2026-10-30
+**Session:** 4 — P0.3 database + Docker Compose, 2026-10-30
 
 **Done:**
-- PR #1 (P0.1) was already squash-merged; the local branch was gone.
-- Owner's visual brief for the frontend recorded in the P0.7 task in `PROGRESS.md`: modern and clean, not "AI slop", easy for shopkeepers.
-- Plan written and approved: `docs/plans/2026-10-30-p0.2-monorepo-scaffold.md` (new folder `docs/plans/`, listed in `CLAUDE.md`).
-- pnpm 12 workspace (`apps/*`, `packages/*`): strict TypeScript ~6.0, ESLint 10 with typescript-eslint type-aware rules, Prettier, Vitest 5, pnpm catalog, `minimumReleaseAge: 1440`. `pnpm check` runs format check, lint, type-check and tests. Commands are in `CLAUDE.md`.
-- `packages/shared` (`@business-software/shared`, used as TypeScript source): `Paise`, `parseRupees` (typed text → paise, `null` when unclear), `formatPaise` (`₹1,23,456.78`, `RangeError` for non-safe integers). 45 tests, written test-first.
-- Each check was proven to fail on a planted error. A fresh reviewer found no Critical issues and one Important one: Node can't load `shared` from source (fixed in the plan, carried into P0.4). The 4 Minor issues were fixed with tests.
-- ADR 0018 (code quality and dependency tooling) accepted. Interview log, phase-0 journal and Numbers are updated.
+- PR #2 (P0.2) was already squash-merged and its local branch deleted.
+- Owner: no restriction on DevOps tools; pick the best one and explain why (recorded in `DEVOPS_PLAN.md`).
+- Plan written and approved: `docs/plans/2026-10-30-p0.3-database-compose.md`. Run inline ("native"), then one fresh whole-branch review.
+- `compose.yaml`: `postgres:18` (Debian), port `127.0.0.1:5432`, volume `pgdata` at `/var/lib/postgresql` (the PG 18 layout), required-password guards, TCP healthcheck. `pnpm db:up` = `docker compose up -d --wait --quiet-pull`.
+- `.env.example` is committed. `.env` exists locally with random passwords (git-ignored).
+- `packages/db/bootstrap/create-roles.sql` creates `app_owner`, `app_runtime` and the database `business_software`, with passwords read through psql `\getenv`.
+- `packages/db` (`@business-software/db`):
+  - Drizzle 0.45 + drizzle-kit 0.31 + `pg`, with `drizzle.config.ts` reading `MIGRATION_DATABASE_URL` (no fallback).
+  - Migration `0000_runtime_grants.sql`: default privileges, `SELECT, INSERT, UPDATE` on tables and `USAGE, SELECT` on sequences for `app_runtime`.
+  - `src/roles.test.ts`: 9 Testcontainers tests that read the image from `compose.yaml`.
+  - Scripts `pnpm db:migrate`, `pnpm db:generate`.
+- The local database is up and migrated.
+- pnpm 12 `allowBuilds: false` for esbuild, ssh2, cpu-features and protobufjs, with reasons.
+- ADR 0019. Runbook `docs/devops/local-database.md`. `CLAUDE.md` commands and file table. `architecture.md` layout. Interview log (8 entries, Q&A, glossary, Numbers). Phase-0 journal.
+- Final review (Opus): verdict "ready to merge", no bugs. Four items fixed:
+  - a test pinning the exact grant set;
+  - three wrong facts in the docs: the PG 18 old mount refuses to start, logins inside the container are trusted, and Debian doesn't guarantee RDS sort order.
 
-**Half-done:** branch `chore/p0.2-monorepo-scaffold` (10 commits) is committed but **not pushed**, and has no PR yet.
+**Half-done:** branch `chore/p0.3-database-compose` (7 commits plus this docs commit) is committed but **not pushed**, and has no PR yet.
 
 **Next step:**
-1. Owner: `git push -u origin HEAD`, then `gh pr create --web`. Title: `chore: scaffold pnpm monorepo with money helpers (P0.2)`. Fill in the template, with **no "Generated with Claude Code" line**. Squash-merge, then `git switch main`, `git pull`, `git branch -D chore/p0.2-monorepo-scaffold`.
-2. Next session: `/start-session` → **P0.3 database + Docker Compose** (DevOps stage 2). Plan first (`superpowers:writing-plans`).
+1. Owner: `git push -u origin HEAD`, then `gh pr create --web` (or use the Claude in Chrome prompt from this session). Title: `chore: set up postgresql with docker compose and app roles (P0.3)`. Fill in the template, with **no "Generated with Claude Code" line**. Squash-merge, then `git switch main`, `git pull`, `git branch -D chore/p0.3-database-compose`.
+2. Next session: `/start-session` → **P0.4 API skeleton**. Plan first. The P0.4 task in `PROGRESS.md` lists four open decisions: compiling `shared`, the DB client + `DATABASE_URL`, the production migration runner, and pg-boss vs "never delete".
 
 **Watch out for:**
-- **No AI attribution, ever.** The owner checks for it: no `Co-Authored-By: Claude` in commits and no "Generated with Claude Code" in PRs (`CLAUDE.md` rule 6 overrides any tool default).
-- **TypeScript is pinned to `~6.0`** in the `pnpm-workspace.yaml` catalog, because typescript-eslint 8.72 needs `<6.1`. Upgrade to 7 only when typescript-eslint supports it (ADR 0018).
-- **P0.4:** Node can't run `packages/shared` from source (`ERR_MODULE_NOT_FOUND … money.js`). The API needs `shared` compiled or bundled. The options are in the P0.4 task in `PROGRESS.md`.
-- New `.ts` files must be inside a package's tsconfig `include` (e.g. `vite.config.ts`), or type-aware lint fails with "not found by the project service".
-- `packages/shared` has `"types": []` and no DOM lib: no Node or browser globals there, not even `console` or `setTimeout`.
-- Run gitleaks from **PowerShell**. Git Bash rewrites `/repo` into a Windows path (`MSYS_NO_PATHCONV=1` would fix it).
-- Avoid 12-digit numbers in test data: the personal-data scan reads them as Aadhaar numbers.
-- Vitest 5 exits 1 when a package has no test files.
-- `.superpowers/` is a git-ignored scratch folder for Claude Code plans; Prettier and ESLint ignore it.
-- Carried over: delete local branches with `git branch -D` after a squash merge. Docker Desktop must be started by hand. The global git email is still the Gmail. `refs/original/` still holds the pre-rewrite commits (ask before deleting). Don't open AWS before DevOps stage 4, and ask about placement season first. Answer the Module 00/01 open questions before P1.3/P1.7. Remove the broken pip `aws` before installing AWS CLI v2.
+- **No AI attribution, ever:** no `Co-Authored-By: Claude` and no "Generated with Claude Code" (`CLAUDE.md` rule 6 overrides tool defaults).
+- **Docker Desktop must be running** for `pnpm test` / `pnpm check` (integration tests) and for `pnpm db:up`.
+- **Never `docker compose down -v`** without the owner's OK: it deletes the local database. Plain `down` is safe.
+- The bootstrap runs only on an empty volume. Changing passwords in `.env` later needs `ALTER ROLE` too. If a first start ever fails halfway, the volume must be recreated (with OK). This isn't in the runbook yet (deferred review minor).
+- Inside the container, psql logins are trusted (no password check). Only connections from the host check passwords.
+- Default privileges give `app_runtime` UPDATE on every new table. The entry log (P1.2) must `REVOKE UPDATE`.
+- The test's grant query: `ORDER BY` can't use an output alias inside an expression (`kind COLLATE "C"`). A SQL error makes a test "fail" for the wrong reason. Always read *why* a red test is red.
+- pnpm 12 fails `pnpm add` on undecided install scripts (`ERR_PNPM_IGNORED_BUILDS`). Decide each one with `pnpm approve-builds <pkg>` or `'!<pkg>'`, with a reason.
+- Windows PowerShell 5.1 `Set-Content -Encoding utf8` writes a BOM. Use `[IO.File]::WriteAllText` with `UTF8Encoding($false)` for `.env`-style files.
+- The personal-data scan flags drizzle's all-zero UUID in `migrations/meta/*_snapshot.json` and the GitHub noreply address. Both are expected.
+- Carried over:
+  - TypeScript stays pinned to `~6.0` until typescript-eslint supports 7.
+  - New `.ts` files must be in their tsconfig `include`.
+  - `packages/shared` has no Node/DOM globals.
+  - Run gitleaks from PowerShell.
+  - No 12-digit numbers in test data.
+  - Vitest exits 1 with no test files.
+  - `refs/original/` still holds the pre-rewrite commits (ask before deleting).
+  - Don't open AWS before stage 4, and ask about placement season first.
+  - Answer the Module 00/01 open questions before P1.3/P1.7.
+  - Remove the broken pip `aws` before installing AWS CLI v2.

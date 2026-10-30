@@ -34,9 +34,11 @@ Update this as the project grows.
 | Largest exact amount in JavaScript | ≈ ₹90 lakh crore in paise (2^53) | ADR 0008 |
 | Business types in v1 | 5 | Module 00 |
 | Modules | 10 (00–09) | `docs/requirements/` |
-| ADRs | 18 (16 at kickoff) | `docs/decisions/` |
+| ADRs | 19 (16 at kickoff) | `docs/decisions/` |
 | Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
-| Automated tests | 45 (money helpers in `packages/shared`, P0.2) | `pnpm test` |
+| Automated tests | 54: 45 unit (money helpers, P0.2) + 9 integration on a real PostgreSQL (roles and grants, P0.3) | `pnpm test` |
+| PostgreSQL version | 18, everywhere (newest RDS supports) | ADR 0005, `compose.yaml` |
+| Integration test run | ~3 s with the image cached, ~22 s on the first run | P0.3 |
 | How long a new package version waits before we install it | 1 day | `pnpm-workspace.yaml` `minimumReleaseAge` |
 
 ---
@@ -83,6 +85,12 @@ Short answers; the Log entry has the full story.
   A: The lockfile pins exact versions and checksums; pnpm blocks dependencies' install scripts unless I approve them; it won't install a version less than a day old, which is when most hijacked releases are caught; Dependabot alerts on known vulnerabilities.
 - **Q: How do you know your checks actually catch problems?**
   A: I planted one deliberate error per check (a type error, a Node-only API in shared code, an `any`, an unawaited promise, bad formatting) and confirmed each command failed. A check that has never failed proves nothing.
+- **Q: What's the difference between an image, a container and a volume?**
+  A: An image is a read-only recipe (PostgreSQL 18 plus everything it needs). A container is a running copy of an image, and it's disposable. A volume is storage kept outside the container, so the data survives when the container is deleted. My database's data lives in a named volume. → ADR 0019
+- **Q: How do you stop a bug in your code from deleting business data?**
+  A: The app logs in as a database role that has no `DELETE` permission. A separate owner role runs migrations. Default privileges give every new table select, insert and update to the app role and nothing more, and an integration test proves delete, truncate, create and drop are all refused. → ADR 0019
+- **Q: How do you make sure local, CI and production run the same database?**
+  A: The PostgreSQL major version is written once, in `compose.yaml`. My integration test reads the image from that file, and Terraform will pin the same major version for RDS. → ADRs 0005, 0019
 - **Q: How does a command-line tool log in to GitHub without your password?**
   A: The OAuth device flow. The tool gets a short code from GitHub, I approve that code in a browser where I'm already logged in, and the tool receives a token. Only enter codes your own device generated: entering someone else's code logs their device into your account.
 
@@ -99,15 +107,22 @@ Terms I learned on this project, in one line each.
 | Argon2id | A deliberately slow password-hashing algorithm, recommended by OWASP |
 | Catalog (pnpm) | One list of dependency versions in `pnpm-workspace.yaml` that every package refers to with `"catalog:"` |
 | CI / CD | Continuous Integration (test every change automatically) / Continuous Deployment (ship every green change automatically) |
+| Container | A running, disposable copy of an image, isolated from the rest of the computer |
 | Conventional Commits | Commit messages shaped `type(scope): summary`, e.g. `fix(gst): round CGST and SGST separately` |
 | CSRF | A trick where another site makes your browser send a request with your cookies; blocked with SameSite cookies + tokens |
+| Database role | A PostgreSQL login (or group) with its own permissions; here `app_owner` runs migrations, `app_runtime` is the app |
+| Default privileges | PostgreSQL rules that grant permissions on tables automatically when they're created later |
 | Device flow | OAuth login for CLIs and TVs: the device shows a short code, you approve it in a browser where you're logged in |
+| Docker Compose | One YAML file describing several containers, their settings and volumes, started with one command |
 | Docker daemon | The background engine that builds and runs containers; the `docker` command only sends it requests |
 | FEFO | First Expiry, First Out: sell the batch that expires soonest |
 | GitHub flow | `main` is always deployable; every change is a short-lived branch merged by pull request |
+| Healthcheck | A command Docker runs repeatedly to decide whether a container is ready, not just started |
 | httpOnly cookie | A cookie JavaScript can't read, so a script injected into the page can't steal the session |
 | IaC | Infrastructure as Code: cloud resources created from code files (Terraform) instead of clicking in a console |
 | Idempotency key | A unique ID sent with a request so repeating it has the same effect as sending it once |
+| Image (Docker) | A read-only package of a program and everything it needs; containers are started from it |
+| Migration | A numbered SQL file that changes the database schema, applied once per database and tracked |
 | Modular monolith | One deployable app split internally into modules with clear boundaries |
 | Monorepo | One git repository holding several packages (here: web app, API, shared code) that are developed together |
 | OIDC | OpenID Connect: lets one system prove its identity to another and get short-lived credentials |
@@ -124,8 +139,10 @@ Terms I learned on this project, in one line each.
 | Supply-chain attack | Attacking an app through something it depends on, e.g. publishing a poisoned version of a popular npm package |
 | TDD | Test-driven development: write a failing test, watch it fail, write the least code that passes, then tidy up |
 | Tenant | One customer business in a multi-tenant system |
+| Testcontainers | A library that starts real throwaway services (here PostgreSQL) in Docker for a test run |
 | Text shaping | Turning letters into correctly joined glyphs; Hindi (Devanagari) needs it for conjuncts like क्ष |
 | Type-aware linting | Lint rules that use the TypeScript compiler's type information, e.g. "this promise is never awaited" |
+| Volume (Docker) | Storage kept outside a container, so data survives when the container is removed |
 | Workspace (pnpm) | The set of packages in a monorepo that pnpm installs and links together |
 
 ---
@@ -459,3 +476,56 @@ Entry format:
 - **Why / what I learned:** Even "just tooling" is a decision with trade-offs (speed vs depth of checks, newest vs supported). Writing it down stops it being re-argued, and records when to revisit it.
 - **Say it in an interview:** "I chose type-aware linting because rules like no-floating-promises catch an unawaited database write, the kind of bug that loses a bill. For the supply chain: a lockfile, blocked install scripts, and a one-day wait on new releases."
 - **Follow-ups to expect:** Why not Biome? When would you switch? (When its type-aware rules cover what we rely on, or lint time becomes a problem.)
+
+### 2026-10-30 — DevOps stage 2: images, containers, volumes and Compose `#devops` `#database`
+- **What happened:** Started PostgreSQL 18 with one command, `pnpm db:up` (`docker compose up -d --wait`). Docker pulled the `postgres:18` image (~55 s the first time), created a named volume `business-software_pgdata` and a container, and waited until its healthcheck passed. To prove the data lives in the volume and not the container, I created a marker table, ran `docker compose down` (which deletes the container), started again, and the row was still there. The owner said any DevOps tool is fine, with no course restrictions.
+- **Why / what I learned:** The image is the recipe; the container is a disposable running copy; the volume is the part that must never be thrown away. `docker compose down` keeps volumes; `down -v` deletes them, which for a database means deleting the data. `--wait` makes the command return only when the service is healthy, so the next command can use it straight away.
+- **Say it in an interview:** "My database runs in Docker Compose with its data in a named volume, so I can delete and recreate the container freely. The same image version runs in my tests and matches RDS."
+- **Follow-ups to expect:** What's the difference between a bind mount and a named volume? (A bind mount maps a host folder, which I use read-only for the bootstrap SQL; a named volume is managed by Docker and is right for database files.)
+
+### 2026-10-30 — PostgreSQL 18 moved its data folder in the Docker image `#devops` `#database` `#gotcha`
+- **What happened:** Before writing `compose.yaml`, I checked the image docs. From PostgreSQL 18, the official image keeps its data in `/var/lib/postgresql/18/docker` and declares the volume at `/var/lib/postgresql`. Most tutorials still mount `/var/lib/postgresql/data`. I mounted the parent folder and checked `show data_directory` → `/var/lib/postgresql/18/docker`. My first write-up claimed the old mount would silently lose data. The final review corrected me: the current image's entrypoint detects a mount at the old path and **refuses to start**, with an explanation (I checked the script). With older images, or a custom `PGDATA`, the mismatch *can* silently put data in an anonymous volume.
+- **Why / what I learned:** Copy-pasted config goes stale when a major version changes. Read the image's release notes, then verify on the running system. And verify your own explanation too: a confident wrong fact in an interview is worse than "I'd check".
+- **Say it in an interview:** "With Postgres 18 the image's data path changed. I mounted the new path and verified the data directory and a restart. The image even refuses to start if you mount the old path, which is a nice fail-loud design."
+- **Follow-ups to expect:** How would you upgrade Postgres 17 data to 18 in Docker? (`pg_dump`/restore or `pg_upgrade` into a new volume, keeping the old volume until the new one is verified.)
+
+### 2026-10-30 — Two database roles, a bootstrap file and default privileges `#database` `#security` → ADR 0019
+- **What happened:** A bootstrap SQL file, run once by an administrator, creates `app_owner` (runs migrations, owns tables) and `app_runtime` (what the app logs in as), plus the database. The first Drizzle migration runs `ALTER DEFAULT PRIVILEGES … GRANT SELECT, INSERT, UPDATE ON TABLES TO app_runtime`, so every future table gets those rights and never `DELETE`. psql's `\getenv` reads the passwords from environment variables, so they're never in git. Chose the `pg` driver (pg-boss uses it too), Drizzle 0.45 stable over the 1.0 release candidate, and the Debian image over Alpine (glibc like RDS, not musl; identical sorting will still need an ICU collation, P1.7).
+- **Why / what I learned:** Table owners and superusers bypass Row-Level Security, so the app must not log in as the owner. Creating roles needs admin rights, which the migration role shouldn't have, so it lives outside migrations. Default privileges make "never grant DELETE" the default instead of something to remember.
+- **Say it in an interview:** "The app's database user physically can't delete rows or change the schema. Migrations use a separate owner role. Grants come from default privileges, so a new table is safe without anyone remembering a GRANT."
+- **Follow-ups to expect:** What about a table that should be insert-only, like an audit log? (Revoke UPDATE on that one table in its migration; P1.2.)
+
+### 2026-10-30 — A healthcheck that says "ready" too early `#devops` `#gotcha`
+- **What happened:** On first start, the Postgres image runs its init scripts (my bootstrap) on a temporary server that listens only on a Unix socket, then restarts. A plain `pg_isready` checks the socket, so it can report ready before the roles and database exist, and a migration run straight after would fail. The healthcheck uses `pg_isready -h 127.0.0.1` (TCP), which only answers after init has finished. Right after the first `pnpm db:up`, logging in as `app_owner` over TCP worked.
+- **Why / what I learned:** "Container started" ≠ "service ready", and "ready" depends on what you check. A healthcheck should test what the next step needs.
+- **Say it in an interview:** "My healthcheck connects over TCP, not the socket, because during first-start initialization the image's temporary server is socket-only. Otherwise `up --wait` could return before my roles exist."
+- **Follow-ups to expect:** Difference between `depends_on` and a healthcheck? (`depends_on` with `condition: service_healthy` waits for the healthcheck; plain `depends_on` only waits for the container to start.)
+
+### 2026-10-30 — Compose guards: required variables and a localhost-only port `#security` `#devops`
+- **What happened:** Passwords are written as `${APP_RUNTIME_PASSWORD:?set APP_RUNTIME_PASSWORD in .env}`. With the variable missing, Compose refuses to start and names it, instead of creating a role with an empty password. The port is published as `127.0.0.1:5432:5432`. Without the IP, Docker listens on every network interface, so anyone on the same Wi-Fi could try to log in. `docker compose port db 5432` → `127.0.0.1:5432`.
+- **Why / what I learned:** Fail loudly on missing config. Publish ports only where they're needed. Docker's port publishing can bypass the firewall rules people expect.
+- **Say it in an interview:** "My compose file refuses to start without its secrets, and the database port is bound to localhost only."
+- **Follow-ups to expect:** Where do secrets go in production? (SSM Parameter Store, read at deploy time; never in the image or the repo.)
+
+### 2026-10-30 — Proving the database refuses: `42501`, not just "an error" `#testing` `#database`
+- **What happened:** The integration test starts a throwaway `postgres:18` with Testcontainers, runs the same bootstrap file and migrations, then creates a table *after* the migrations. Before the grants migration existed, the insert/update test failed with `permission denied for table probe`: red for the right reason. With the migration, all 8 passed. The refusals (delete, truncate, create table, drop table, read migration history) assert SQLSTATE `42501` (insufficient privilege). An unrelated error, such as a misspelt table (`42P01`), would make the test fail instead of passing by accident. Then I planted `DELETE` into the grant: exactly the "refuses delete" test failed. The test reads the image from `compose.yaml`, so tests and local can't drift apart.
+- **Why / what I learned:** A "should fail" test must check *why* it failed. A test that accepts any error passes on typos.
+- **Say it in an interview:** "My tests assert the exact PostgreSQL error code for permission denied, and I planted a DELETE grant to confirm the test catches it."
+- **Follow-ups to expect:** Why create the probe table after migrating? (To prove default privileges cover tables that don't exist yet, which is how real future tables will arrive.)
+
+### 2026-10-30 — Small Windows and pnpm gotchas `#gotcha` `#security`
+- **What happened:** (1) Windows PowerShell 5.1's `Set-Content -Encoding utf8` writes a byte-order mark (BOM). I rewrote `.env` without one, since some `.env` parsers read the BOM as part of the first variable's name. (2) pnpm 12 now *fails* `pnpm add` when dependencies' install scripts are blocked (`ERR_PNPM_IGNORED_BUILDS`). I denied the four explicitly (`allowBuilds: false` for esbuild, ssh2, cpu-features, protobufjs) with reasons in `pnpm-workspace.yaml`, because none is needed here. (3) The personal-data scan matched drizzle's all-zero placeholder UUID in a generated snapshot file: a false positive in a generated file. (4) A bash heredoc with apostrophes in it broke in the Windows shell tool; editing the file directly worked.
+- **Why / what I learned:** Defaults differ between tool versions (PowerShell 5 vs 7, pnpm 10 vs 12). Blocking install scripts is only useful if every exception has a recorded reason.
+- **Say it in an interview:** "pnpm blocks dependency install scripts by default. When it flagged four, I checked what each one does and denied all of them on the record."
+- **Follow-ups to expect:** Why are install scripts dangerous? (They run arbitrary code on your machine at install time, which is how many npm supply-chain attacks work.)
+
+### 2026-10-30 — The review found a test gap, and my first "red" was fake `#testing` `#gotcha` `#process`
+- **What happened:** The final reviewer (a fresh context) checked all five risks from the plan on the live database and found no bugs. It did find gaps:
+  - Deleting the sequence-grant line from migration `0000` would pass every test, because PostgreSQL doesn't check sequence rights for identity columns (it does for `serial`).
+  - A forbidden extra grant like `TRIGGER` would also go unnoticed.
+  - Two "facts" in my notes were wrong: the PG 18 mount claim, and "Debian sorts like RDS".
+
+  I added a test that reads `pg_default_acl` and expects exactly `INSERT,SELECT,UPDATE` on tables and `SELECT,USAGE` on sequences. My first run of the two planted mutations "failed" as hoped, but the test also failed after I restored the file. The query itself was broken (`ORDER BY kind COLLATE "C"`: an output alias can't be used inside an expression), so it failed every time and proved nothing. After fixing the query: green on the real migration, and an `AssertionError` from exactly that test for each mutation. The other 8 tests didn't notice either mutation.
+- **Why / what I learned:** A red test only counts if it's red *for the right reason*. Check the failure message, not just ✗. And behaviour tests can miss configuration that only matters for cases the test doesn't use (identity vs serial), so pin the configuration itself as well.
+- **Say it in an interview:** "A reviewer showed a grant could vanish without any test failing, because identity columns don't check sequence privileges. I added a test that pins the exact grants and confirmed it with planted mutations. The first time, it failed for the wrong reason: a SQL error. I only trust a red test after reading why it's red."
+- **Follow-ups to expect:** Identity vs serial? (Both use a sequence. `serial` is a default calling `nextval`, which checks the caller's sequence rights. Identity is built into the table, so inserting only needs the table's INSERT right.)

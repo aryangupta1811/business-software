@@ -1,4 +1,6 @@
 pnpm-lock.yaml
+# Written by drizzle-kit
+packages/db/migrations/meta/
 *.md
 # Local scratch space for Claude Code plans (git-ignored)
 .superpowers/

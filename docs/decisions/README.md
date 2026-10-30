@@ -24,3 +24,4 @@ Create one with `/record-decision <title>`. Template: `0000-template.md`.
 | [0016](0016-demo-data-seed.md) | Demo data: deterministic seed through the app's services | Accepted | 2026-10-29 |
 | [0017](0017-git-workflow.md) | Git workflow: GitHub flow, squash merges, Conventional Commits, public repo | Accepted | 2026-10-30 |
 | [0018](0018-code-quality-and-dependency-tooling.md) | Code quality and dependency tooling: ESLint + Prettier, pnpm catalogs, supply-chain guards | Accepted | 2026-10-30 |
+| [0019](0019-database-roles-and-local-postgres.md) | Database roles and grants: bootstrap file + default privileges; `pg`, Drizzle 0.45, `postgres:18` locally | Accepted | 2026-10-30 |

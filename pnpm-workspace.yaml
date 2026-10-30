@@ -2,11 +2,22 @@ packages:
   - apps/*
   - packages/*
 
+# Dependencies' install scripts, denied on purpose because nothing needs them:
+# esbuild only re-checks its binary, ssh2/cpu-features are for Docker over SSH
+# (Testcontainers), protobufjs only checks versions. Approve one only with a reason.
+allowBuilds:
+  cpu-features: false
+  esbuild: false
+  protobufjs: false
+  ssh2: false
+
 # One version of each shared tool for the whole repo; packages use "catalog:".
 catalog:
   # ~6.0: typescript-eslint supports TypeScript below 6.1 (not 7.x yet).
   typescript: ~6.0.3
   vitest: ^5.0.5
+  # Matches the Node major we run (24).
+  '@types/node': ^24.19.2
 
 # Don't install a package version until it has been public for a day (in minutes).
 # Hijacked releases are usually caught and pulled within hours.

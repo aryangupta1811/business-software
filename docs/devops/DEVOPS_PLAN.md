@@ -10,7 +10,7 @@ Tools below are **candidates**. The real choice for each stage is made with me a
 
 - Before each stage: what it is, why real teams need it, and what we will build.
 - Use the industry names (CI, CD, IaC, staging, runbook…) and explain them the first time.
-- Ask which DevOps tools I've already covered in my course and prefer those where they fit. If a different tool is the better choice, say so and why.
+- ~~Ask which DevOps tools I've already covered in my course.~~ Answered 2026-10-30: no restriction. Pick the best tool for the job and explain why.
 - When I say "I'll do it", give me the steps and let me type the commands.
 - After each stage: 3–5 interview questions about what we just did, with short answers, added to the phase journal.
 

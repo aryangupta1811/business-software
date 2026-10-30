@@ -95,6 +95,8 @@ apps/
   api/              NestJS: src/main.ts (api), src/worker.ts (worker)   [0004]
 packages/
   shared/           types, Zod schemas, money & GST     [0002, 0008]
+  db/               Drizzle schema, migrations, role bootstrap, DB integration tests   [0005, 0019]
+compose.yaml        local services (PostgreSQL)         [0019]
 infra/
   terraform/        AWS environments                    [0011]
 .github/workflows/  CI/CD                               [0012]

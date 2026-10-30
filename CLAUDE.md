@@ -27,6 +27,7 @@ Read files when a task needs them. Don't load everything at once.
 | `docs/architecture.md` | How the system fits together, with diagrams | Any code or infra work |
 | `docs/plans/` | Implementation plan per code task | When executing that task |
 | `docs/devops/DEVOPS_PLAN.md` | DevOps & cloud roadmap | DevOps / infra work |
+| `docs/devops/local-database.md` | Local PostgreSQL: setup, commands, resets, gotchas | Database or Docker Compose work |
 | `docs/devops/git-workflow.md` | Branches, commit messages, PRs, secrets, GitHub settings | Unsure about a branch name, commit message or PR |
 | `docs/journal/` | Build journal per phase, for interviews | End of each phase |
 | `docs/journal/INTERVIEW_LOG.md` | Running interview-prep record of every decision, concept, bug and gotcha | Add to it during every session |
@@ -56,7 +57,8 @@ Run from the repo root. Node 24+, pnpm 12.
 
 - Install: `pnpm install`
 - Run: none yet (the API comes in P0.4, the web app in P0.5)
-- Test: `pnpm test` (Vitest, every package)
+- Database: `pnpm db:up` (PostgreSQL in Docker Compose), `pnpm db:migrate`, `pnpm db:generate`. First time: copy `.env.example` to `.env` (`docs/devops/local-database.md`)
+- Test: `pnpm test` (Vitest, every package; Docker Desktop must be running for the integration tests)
 - Lint: `pnpm lint` (ESLint with type-aware rules)
 - Type-check: `pnpm typecheck`
 - Format: `pnpm format` (Prettier; `pnpm format:check` only reports)

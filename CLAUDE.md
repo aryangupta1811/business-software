@@ -57,8 +57,8 @@ TypeScript monorepo (pnpm): React + Vite web app, NestJS modular monolith (api +
 Run from the repo root. Node 24+, pnpm 12.
 
 - Install: `pnpm install`
-- Run the API on this computer: `pnpm db:up`, then `pnpm dev` (rebuilds and restarts on save; http://127.0.0.1:3000/api/health)
-- Run everything in containers: `pnpm app:up` (database, migrations, api, worker); stop with `docker compose stop`
+- Run the app on this computer: `pnpm db:up`, then `pnpm dev` (API and web app, both reload on save; open http://127.0.0.1:5173, API at http://127.0.0.1:3000/api/health)
+- Run everything in containers: `pnpm app:up` (database, migrations, api, worker, web at http://127.0.0.1:8080); stop with `docker compose stop`
 - Build: `pnpm build` (TypeScript project references → `dist/`)
 - Database: `pnpm db:up` (PostgreSQL in Docker Compose), `pnpm db:migrate`, `pnpm db:generate`. First time: copy `.env.example` to `.env` (`docs/devops/local-database.md`)
 - Test: `pnpm test` (Vitest, every package; Docker Desktop must be running for the integration tests)

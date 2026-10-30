@@ -34,15 +34,18 @@ Update this as the project grows.
 | Largest exact amount in JavaScript | ≈ ₹90 lakh crore in paise (2^53) | ADR 0008 |
 | Business types in v1 | 5 | Module 00 |
 | Modules | 10 (00–09) | `docs/requirements/` |
-| ADRs | 22 (16 at kickoff) | `docs/decisions/` |
+| ADRs | 23 (16 at kickoff) | `docs/decisions/` |
 | Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
-| Automated tests | 84: 65 unit (45 money helpers, 20 API config, error, process and shutdown) + 19 integration on a real PostgreSQL (roles and grants, database client, health endpoints, worker startup) | `pnpm test` |
+| Automated tests | 118: 65 unit (45 money helpers, 20 API config, error, process and shutdown) + 19 integration on a real PostgreSQL (roles and grants, database client, health endpoints, worker startup) + 34 web (routing, connection badge, the three languages) | `pnpm test` |
+| Interface languages | 3: English, Hindi, Hinglish (`en`, `hi`, `hi-Latn`) | Module 00 #25, ADR 0023 |
+| Web app download | ~103 KB gzipped JavaScript; web image 93 MB (Caddy) | P0.5 |
 | PostgreSQL version | 18, everywhere (newest RDS supports) | ADR 0005, `compose.yaml` |
 | Integration test run | ~3 s with the image cached, ~22 s on the first run | P0.3 |
 | How long a new package version waits before we install it | 1 day | `pnpm-workspace.yaml` `minimumReleaseAge` |
 | API Docker image | 375 MB, of which the app is 40 MB (the rest is `node:24-slim`) | P0.4 |
 | First image build on a slow connection | ~12 minutes (later builds reuse the cached install layer) | P0.4 |
 | Clean stop of api and worker | ~0.7 s, exit code 0 | P0.4 |
+| How often the screen checks the server | every 30 s, 5 s timeout | P0.5, ADR 0001 |
 
 ---
 
@@ -115,10 +118,15 @@ Terms I learned on this project, in one line each.
 | ACID | Transactions are Atomic (all or nothing), Consistent, Isolated (don't see each other's half-work), Durable (survive crashes) |
 | ADR | Architecture Decision Record: a short file explaining one technical choice and why |
 | Argon2id | A deliberately slow password-hashing algorithm, recommended by OWASP |
+| BCP 47 | The standard for language tags: `hi` is Hindi, `hi-Latn` is Hindi written in Latin letters (Hinglish) |
+| BOM | Byte-order mark: invisible bytes at the start of a text file; JSON parsers reject it, and PowerShell 5.1's "utf8" adds it |
+| Cache busting | Putting a hash of a file's content in its name, so a changed file gets a new URL and old copies can be cached forever |
 | Catalog (pnpm) | One list of dependency versions in `pnpm-workspace.yaml` that every package refers to with `"catalog:"` |
 | CI / CD | Continuous Integration (test every change automatically) / Continuous Deployment (ship every green change automatically) |
 | Container | A running, disposable copy of an image, isolated from the rest of the computer |
 | Conventional Commits | Commit messages shaped `type(scope): summary`, e.g. `fix(gst): round CGST and SGST separately` |
+| CDP | Chrome DevTools Protocol: JSON over WebSocket for controlling Chrome; Puppeteer and Playwright are built on it |
+| CSP | Content-Security-Policy: a response header listing where the page may load scripts, styles and data from; anything else is refused |
 | CSRF | A trick where another site makes your browser send a request with your cookies; blocked with SameSite cookies + tokens |
 | Database role | A PostgreSQL login (or group) with its own permissions; here `app_owner` runs migrations, `app_runtime` is the app |
 | Decorator metadata | Type information a compiler attaches to decorated classes; NestJS reads it to know what to inject |
@@ -128,6 +136,7 @@ Terms I learned on this project, in one line each.
 | Docker daemon | The background engine that builds and runs containers; the `docker` command only sends it requests |
 | Exit code 143 | 128 + 15: the process ended because of SIGTERM rather than exiting by itself |
 | Export conditions | Named entry points in a package's `exports` (`source`, `types`, `default`); each tool picks the one it understands |
+| Fast refresh | Vite swapping a changed React component into the running page without a reload, keeping its state |
 | FEFO | First Expiry, First Out: sell the batch that expires soonest |
 | GitHub flow | `main` is always deployable; every change is a short-lived branch merged by pull request |
 | Healthcheck | A command Docker runs repeatedly to decide whether a container is ready, not just started |
@@ -148,12 +157,14 @@ Terms I learned on this project, in one line each.
 | PID 1 / init | The first process in a container; it receives Docker's stop signal. `init: true` adds a tiny init that forwards signals |
 | PITR | Point-in-time restore: rebuild the database as it was at any second in the retention window |
 | Project references | TypeScript's way to build several packages in dependency order, incrementally (`tsc -b`) |
+| Proxy (dev) / reverse proxy | A server that takes the browser's request and forwards it to another server (here `/api` → the API), so the browser sees one origin |
 | Push protection | GitHub rejects a `git push` that contains a known secret format, before it reaches the repo |
 | RLS | Row-Level Security: PostgreSQL policies that decide which rows a query is allowed to see |
 | RPO / RTO | Recovery Point Objective (max data you can lose) / Recovery Time Objective (max time to recover) |
 | Ruleset | GitHub's rules for branches (require a PR, block force-push…), the newer form of branch protection |
 | SIGTERM | The polite "please stop" signal; `docker stop` sends it, then kills the process after 10 s |
 | SPA | Single-page app: the browser loads the app once and then only exchanges data with the server |
+| SPA fallback | The web server answers any unknown path with `index.html`, so the app's router can show the right page after a refresh |
 | Squash merge | All of a pull request's commits combined into one commit on `main` |
 | Supply-chain attack | Attacking an app through something it depends on, e.g. publishing a poisoned version of a popular npm package |
 | TDD | Test-driven development: write a failing test, watch it fail, write the least code that passes, then tidy up |

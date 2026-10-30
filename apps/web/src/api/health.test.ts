@@ -1,5 +1,15 @@
 import { describe, expect, test, vi } from 'vitest';
-import { fetchReadiness } from './health';
+import { fetchReadiness, READINESS_TIMEOUT_MS } from './health';
+
+// packages/db/src/client.ts: the API waits up to this long for a database connection
+// before answering 503.
+const API_DATABASE_CONNECT_TIMEOUT_MS = 5000;
+
+test('waits clearly longer than the API waits for its database', () => {
+  // Otherwise "database down" (a 503 after ~5 s) races the browser's timeout and is
+  // shown as "server down" (found in the P0.5 review: 2 of 5 page loads were wrong).
+  expect(READINESS_TIMEOUT_MS).toBeGreaterThanOrEqual(API_DATABASE_CONNECT_TIMEOUT_MS * 2);
+});
 
 function respond(status: number, body: string) {
   return vi.fn<typeof fetch>().mockResolvedValue(new Response(body, { status }));

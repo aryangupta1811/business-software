@@ -76,7 +76,7 @@ flowchart LR
 - Caching: hashed `/assets/*` files for a year, `index.html` never, so a deploy shows on the next load. Unknown paths get `index.html` (the router decides); missing assets get a 404.
 - A strict Content-Security-Policy and other security headers on every response, errors included.
 - Languages: English, Hindi and Hinglish (`en`, `hi`, `hi-Latn`), chosen in the header and saved in the browser until logins exist (P1.4) [0023].
-- The header checks `/api/health/ready` every 30 s and shows connected, database down or server down [0001].
+- The header checks `/api/health/ready` every 30 s while the tab is visible, and shows connected, database down or server down [0001]. It waits up to 10 s, longer than the API's own 5 s wait for the database, so a database outage isn't mistaken for the server being down.
 
 ## Saving a bill (the most important flow)
 

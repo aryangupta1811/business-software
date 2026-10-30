@@ -1,6 +1,8 @@
 export type Readiness = 'connected' | 'database-down' | 'server-down';
 
-const TIMEOUT_MS = 5000;
+// Longer than the API's own 5 s wait for a database connection, so "database down" (503)
+// arrives before the browser gives up (packages/db/src/client.ts).
+export const READINESS_TIMEOUT_MS = 10_000;
 
 /**
  * Asks the API whether it can serve requests. Never rejects: every failure is a state the
@@ -11,7 +13,7 @@ export async function fetchReadiness(fetchFn: typeof fetch = fetch): Promise<Rea
   try {
     const response = await fetchFn('/api/health/ready', {
       cache: 'no-store',
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(READINESS_TIMEOUT_MS),
     });
     const body = (await response.json()) as { database?: unknown };
     if (response.ok && body.database === 'ok') return 'connected';

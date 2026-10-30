@@ -38,14 +38,14 @@ Update this as the project grows.
 | Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
 | Automated tests | 118: 65 unit (45 money helpers, 20 API config, error, process and shutdown) + 19 integration on a real PostgreSQL (roles and grants, database client, health endpoints, worker startup) + 34 web (routing, connection badge, the three languages) | `pnpm test` |
 | Interface languages | 3: English, Hindi, Hinglish (`en`, `hi`, `hi-Latn`) | Module 00 #25, ADR 0023 |
-| Web app download | ~103 KB gzipped JavaScript; web image 93 MB (Caddy) | P0.5 |
+| Web app download | ~122 KB gzipped JavaScript (383 KB raw); web image 93 MB (Caddy) | P0.5, `vite build` |
 | PostgreSQL version | 18, everywhere (newest RDS supports) | ADR 0005, `compose.yaml` |
 | Integration test run | ~3 s with the image cached, ~22 s on the first run | P0.3 |
 | How long a new package version waits before we install it | 1 day | `pnpm-workspace.yaml` `minimumReleaseAge` |
 | API Docker image | 375 MB, of which the app is 40 MB (the rest is `node:24-slim`) | P0.4 |
 | First image build on a slow connection | ~12 minutes (later builds reuse the cached install layer) | P0.4 |
 | Clean stop of api and worker | ~0.7 s, exit code 0 | P0.4 |
-| How often the screen checks the server | every 30 s, 5 s timeout | P0.5, ADR 0001 |
+| How often the screen checks the server | every 30 s, 10 s timeout (the API waits 5 s for the database) | P0.5, ADR 0001 |
 
 ---
 
@@ -721,3 +721,9 @@ Entry format:
 - **Why / what I learned:** Unit tests ran in jsdom, which has no CSP and no real network. Only a real browser proves the strict CSP doesn't break the built app.
 - **Say it in an interview:** "Component tests run in jsdom, but I also loaded the production build in headless Chrome through Caddy, to prove the strict CSP and the `/api` proxy work and the status badge reacts when I stop the database or the API."
 - **Follow-ups to expect:** What is the Chrome DevTools Protocol? (The JSON-over-WebSocket interface Chrome's DevTools use. Puppeteer and Playwright are built on it.)
+
+### 2026-10-30 — Two 5-second timeouts racing each other `#bug` `#frontend` `#backend`
+- **What happened:** The fresh review stopped the database and loaded the page five times. Twice the badge said "Can't reach the server" instead of "Server is up, but data can't be loaded". The API waits up to 5 s for a database connection before answering 503 (`connectionTimeoutMillis` in `packages/db`), and the browser also gave up at exactly 5 s. Whichever finished first won. I measured it (`curl -w %{time_total}`: 5.005 s, 5.004 s, 3.13 s…), raised the browser's timeout to 10 s, added a test that pins "browser timeout ≥ 2 × the API's database timeout", and re-ran: 6 of 6 correct.
+- **Why / what I learned:** When one timeout sits inside another, the outer one must be clearly longer, or the error you report depends on luck. My own check had passed once by chance, and the reviewer repeated it. A check that can race must be run more than once.
+- **Say it in an interview:** "A status badge sometimes showed the wrong outage because the browser's 5-second timeout raced the API's 5-second database timeout. I made the outer timeout twice the inner one and pinned that with a test."
+- **Follow-ups to expect:** How would you set timeouts across layers? (Each layer's timeout is shorter than the one calling it: database < API < browser < load balancer, so the innermost failure is the one reported.)

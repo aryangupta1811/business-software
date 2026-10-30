@@ -102,7 +102,7 @@ Short answers; the Log entry has the full story.
 - **Q: How do you run database migrations in production?**
   A: A one-shot container from the same image runs them as the schema-owner role, and the app containers start only after it exits successfully. New code never meets an old schema, and the long-running app can't change the schema. → ADR 0021
 - **Q: How do you stop secrets leaking from a public repo?**
-  A: Five places: git (gitignore, gitleaks, push protection), images (secrets only arrive at container start, checked with `docker history`), the browser bundle (never a `VITE_` secret), CI (no secrets for fork PRs) and logs (messages only, since pg's error objects contain the password). → `docs/devops/secrets.md`
+  A: Five places: git (gitignore, gitleaks, push protection), images (secrets only arrive at container start, checked with `docker history`), the browser bundle (never a `VITE_` secret), CI (no secrets for fork PRs) and logs (messages only: pg-pool can attach the client, whose hidden password some serializers print, and Drizzle messages carry query values). → `docs/devops/secrets.md`
 
 ---
 
@@ -648,4 +648,17 @@ Entry format:
 - **Why / what I learned:** A rule ("log messages only") must cover the paths nobody thinks of, like a crash before the app's logger exists. A dependency outage at boot is normal on a server, so the service should wait, not crash-loop. Re-grade review findings by their effect: "Minor" Wi-Fi exposure broke a rule the project already applies to the database port.
 - **Say it in an interview:** "Every process entry point runs inside one wrapper that turns any crash into a single sanitized log line and exit code 1. The worker tolerates the database being down at boot instead of crash-looping."
 - **Follow-ups to expect:** Crash-and-restart vs wait-and-retry? (Crash-restart is fine for real corruption, but for a dependency that's simply not up yet it floods logs and hides the cause. Waiting with a warning says exactly what's wrong.)
+
+### 2026-10-30 — Docker commands I used to check the stack, not just start it `#devops`
+- **What happened:** "It started" proved little. These commands found or ruled out real problems:
+  - `docker compose ps -a`: shows one-shot containers too (`migrate Exited (0)` is success).
+  - `docker inspect <container> --format '{{.RestartCount}}'`: a restart count of 1 exposed the dying worker.
+  - `docker compose logs <service> --no-log-prefix`: the "unsettled top-level await" warning was there.
+  - `docker run --rm <image> sh -c 'id; ls -a /app; env'`: non-root user, no `.env`, no secret variables.
+  - `docker history --no-trunc <image>`: every build instruction, where a leaked `ARG`/`ENV` would show.
+  - `docker compose run --rm --no-deps -e VAR=... migrate`: a one-off run with one setting changed (the wrong-password check).
+  - `docker stop`/`docker start` on single containers: `docker compose start` can start a service's dependencies too, which once hid the "database down at startup" case.
+- **Why / what I learned:** Check the state you care about (restart counts, exit codes, image contents), not the command's success message.
+- **Say it in an interview:** "After bringing the stack up, I check restart counts and exit codes, look inside the image for secrets with `docker history`, and stop the database on purpose to see how the services behave."
+- **Follow-ups to expect:** How would you see why a container keeps restarting? (`docker compose ps -a` for the exit code, `docker logs` for the last lines, `docker inspect` for the restart count and the OOM-killed flag.)
 

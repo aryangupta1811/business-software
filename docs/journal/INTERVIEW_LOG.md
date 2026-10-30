@@ -36,7 +36,7 @@ Update this as the project grows.
 | Modules | 10 (00–09) | `docs/requirements/` |
 | ADRs | 23 (16 at kickoff) | `docs/decisions/` |
 | Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
-| Automated tests | 118: 65 unit (45 money helpers, 20 API config, error, process and shutdown) + 19 integration on a real PostgreSQL (roles and grants, database client, health endpoints, worker startup) + 34 web (routing, connection badge, the three languages) | `pnpm test` |
+| Automated tests | 121: 65 unit (45 money helpers, 20 API config, error, process and shutdown) + 20 integration on a real PostgreSQL (roles and grants, database client, health endpoints and headers, worker startup) + 36 web (routing, connection badge, the three languages, error screen) | `pnpm test` |
 | Interface languages | 3: English, Hindi, Hinglish (`en`, `hi`, `hi-Latn`) | Module 00 #25, ADR 0023 |
 | Web app download | ~122 KB gzipped JavaScript (383 KB raw); web image 93 MB (Caddy) | P0.5, `vite build` |
 | PostgreSQL version | 18, everywhere (newest RDS supports) | ADR 0005, `compose.yaml` |

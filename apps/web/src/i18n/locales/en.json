@@ -14,5 +14,10 @@
   "notFound": {
     "title": "Page not found",
     "home": "Go to home"
+  },
+  "error": {
+    "title": "Something went wrong",
+    "body": "Check the connection, then reload the page.",
+    "reload": "Reload the page"
   }
 }

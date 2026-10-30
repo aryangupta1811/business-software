@@ -14,5 +14,10 @@
   "notFound": {
     "title": "Page nahi mila",
     "home": "Home par jaayein"
+  },
+  "error": {
+    "title": "Kuch gadbad ho gayi",
+    "body": "Connection check karein, phir page dobara load karein.",
+    "reload": "Page dobara load karein"
   }
 }

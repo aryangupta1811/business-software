@@ -22,5 +22,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['src/test/setup.ts'],
+    // Undo vi.stubGlobal (the tests' fake fetch) after each test.
+    unstubGlobals: true,
   },
 });

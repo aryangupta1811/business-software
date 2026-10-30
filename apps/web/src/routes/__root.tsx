@@ -1,4 +1,5 @@
 import { createRootRoute, Link, Outlet } from '@tanstack/react-router';
+import { ConnectionBadge } from '../components/connection-badge';
 
 export const Route = createRootRoute({
   component: AppShell,
@@ -12,6 +13,7 @@ function AppShell() {
         <Link to="/" className="text-lg font-semibold">
           Business Software
         </Link>
+        <ConnectionBadge />
       </header>
       <main className="mx-auto max-w-5xl px-6 py-8">
         <Outlet />

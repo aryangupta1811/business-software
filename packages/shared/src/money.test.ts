@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseRupees } from './money.js';
+import { formatPaise, parseRupees } from './money.js';
 
 describe('parseRupees', () => {
   it.each([
@@ -41,5 +41,24 @@ describe('parseRupees', () => {
     '90071992547409.92',
   ])('refuses %j', (input) => {
     expect(parseRupees(input)).toBeNull();
+  });
+});
+
+describe('formatPaise', () => {
+  it.each([
+    [0, '₹0.00'],
+    [5, '₹0.05'],
+    [12550, '₹125.50'],
+    [12345678, '₹1,23,456.78'],
+    [98765432100, '₹98,76,54,321.00'],
+    [Number.MAX_SAFE_INTEGER, '₹9,00,71,99,25,47,409.91'],
+    [-125000, '-₹1,250.00'],
+    [-0, '₹0.00'],
+  ])('shows %i paise as %s', (paise, text) => {
+    expect(formatPaise(paise)).toBe(text);
+  });
+
+  it.each([12.5, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 53])('throws for %d', (paise) => {
+    expect(() => formatPaise(paise)).toThrow(RangeError);
   });
 });

@@ -48,8 +48,9 @@ ADRs 0006 and 0007 say the app connects as a runtime role that owns no tables, h
 
 ### Docker image
 
-- **`postgres:18`, Debian-based (chosen):** RDS runs on glibc, as Debian does. Alpine's musl sorts text differently, and Hindi item names must sort the same locally and in the cloud. PostgreSQL 18 is the newest major version RDS supports.
-- **`postgres:18-alpine`:** smaller, rejected for the sorting difference.
+- **`postgres:18`, Debian-based (chosen):** the closer match to RDS. It uses glibc like a standard Linux server, and PostgreSQL 18 is the newest major version RDS supports.
+- **`postgres:18-alpine`:** smaller, but it uses musl, whose locale support and text sorting differ from glibc's. Rejected so that local behaviour stays as close to RDS as possible.
+- Neither image *guarantees* the same sort order as RDS: glibc's sorting rules change between versions, and RDS ships its own build. When sorting starts to matter (Hindi item names, P1.7), use an ICU collation, which is versioned and identical everywhere, and verify it on RDS.
 
 ### Where integration tests run
 
@@ -75,6 +76,7 @@ The safety rules from ADRs 0006 and 0007 only hold if the roles are set up exact
 - P1.2's entry-log table must `REVOKE UPDATE` from `app_runtime`.
 - Migrations run locally with `drizzle-kit migrate`. P0.4 decides how production runs them.
 - Upgrade Drizzle to 1.0 once it is stable, with `drizzle-kit up`.
+- Item-name sorting (P1.7) needs an ICU collation decision. The image choice alone doesn't make sorting identical to RDS.
 
 ## Interview note
 

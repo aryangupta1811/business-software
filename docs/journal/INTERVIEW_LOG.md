@@ -36,7 +36,7 @@ Update this as the project grows.
 | Modules | 10 (00–09) | `docs/requirements/` |
 | ADRs | 19 (16 at kickoff) | `docs/decisions/` |
 | Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
-| Automated tests | 53: 45 unit (money helpers, P0.2) + 8 integration on a real PostgreSQL (roles and grants, P0.3) | `pnpm test` |
+| Automated tests | 54: 45 unit (money helpers, P0.2) + 9 integration on a real PostgreSQL (roles and grants, P0.3) | `pnpm test` |
 | PostgreSQL version | 18, everywhere (newest RDS supports) | ADR 0005, `compose.yaml` |
 | Integration test run | ~3 s with the image cached, ~22 s on the first run | P0.3 |
 | How long a new package version waits before we install it | 1 day | `pnpm-workspace.yaml` `minimumReleaseAge` |
@@ -484,13 +484,13 @@ Entry format:
 - **Follow-ups to expect:** What's the difference between a bind mount and a named volume? (A bind mount maps a host folder, which I use read-only for the bootstrap SQL; a named volume is managed by Docker and is right for database files.)
 
 ### 2026-10-30 — PostgreSQL 18 moved its data folder in the Docker image `#devops` `#database` `#gotcha`
-- **What happened:** Before writing `compose.yaml`, I checked the image docs. From PostgreSQL 18, the official image keeps its data in `/var/lib/postgresql/18/docker` and declares the volume at `/var/lib/postgresql`. Most tutorials still mount `/var/lib/postgresql/data`. With 18, that leaves the real data in an anonymous volume that a `compose down` can lose. I mounted the parent folder and checked `show data_directory` → `/var/lib/postgresql/18/docker`.
-- **Why / what I learned:** Copy-pasted config goes stale when a major version changes. Read the release notes of the image, then verify on the running system.
-- **Say it in an interview:** "With Postgres 18 the image's data path changed. The old mount would have silently put my data somewhere a teardown deletes, so I checked the docs, then verified the data directory and a restart."
+- **What happened:** Before writing `compose.yaml`, I checked the image docs. From PostgreSQL 18, the official image keeps its data in `/var/lib/postgresql/18/docker` and declares the volume at `/var/lib/postgresql`. Most tutorials still mount `/var/lib/postgresql/data`. I mounted the parent folder and checked `show data_directory` → `/var/lib/postgresql/18/docker`. My first write-up claimed the old mount would silently lose data. The final review corrected me: the current image's entrypoint detects a mount at the old path and **refuses to start**, with an explanation (I checked the script). With older images, or a custom `PGDATA`, the mismatch *can* silently put data in an anonymous volume.
+- **Why / what I learned:** Copy-pasted config goes stale when a major version changes. Read the image's release notes, then verify on the running system. And verify your own explanation too: a confident wrong fact in an interview is worse than "I'd check".
+- **Say it in an interview:** "With Postgres 18 the image's data path changed. I mounted the new path and verified the data directory and a restart. The image even refuses to start if you mount the old path, which is a nice fail-loud design."
 - **Follow-ups to expect:** How would you upgrade Postgres 17 data to 18 in Docker? (`pg_dump`/restore or `pg_upgrade` into a new volume, keeping the old volume until the new one is verified.)
 
 ### 2026-10-30 — Two database roles, a bootstrap file and default privileges `#database` `#security` → ADR 0019
-- **What happened:** A bootstrap SQL file, run once by an administrator, creates `app_owner` (runs migrations, owns tables) and `app_runtime` (what the app logs in as), plus the database. The first Drizzle migration runs `ALTER DEFAULT PRIVILEGES … GRANT SELECT, INSERT, UPDATE ON TABLES TO app_runtime`, so every future table gets those rights and never `DELETE`. psql's `\getenv` reads the passwords from environment variables, so they're never in git. Chose the `pg` driver (pg-boss uses it too), Drizzle 0.45 stable over the 1.0 release candidate, and the Debian image over Alpine (sorting matches RDS).
+- **What happened:** A bootstrap SQL file, run once by an administrator, creates `app_owner` (runs migrations, owns tables) and `app_runtime` (what the app logs in as), plus the database. The first Drizzle migration runs `ALTER DEFAULT PRIVILEGES … GRANT SELECT, INSERT, UPDATE ON TABLES TO app_runtime`, so every future table gets those rights and never `DELETE`. psql's `\getenv` reads the passwords from environment variables, so they're never in git. Chose the `pg` driver (pg-boss uses it too), Drizzle 0.45 stable over the 1.0 release candidate, and the Debian image over Alpine (glibc like RDS, not musl; identical sorting will still need an ICU collation, P1.7).
 - **Why / what I learned:** Table owners and superusers bypass Row-Level Security, so the app must not log in as the owner. Creating roles needs admin rights, which the migration role shouldn't have, so it lives outside migrations. Default privileges make "never grant DELETE" the default instead of something to remember.
 - **Say it in an interview:** "The app's database user physically can't delete rows or change the schema. Migrations use a separate owner role. Grants come from default privileges, so a new table is safe without anyone remembering a GRANT."
 - **Follow-ups to expect:** What about a table that should be insert-only, like an audit log? (Revoke UPDATE on that one table in its migration; P1.2.)
@@ -518,3 +518,14 @@ Entry format:
 - **Why / what I learned:** Defaults differ between tool versions (PowerShell 5 vs 7, pnpm 10 vs 12). Blocking install scripts is only useful if every exception has a recorded reason.
 - **Say it in an interview:** "pnpm blocks dependency install scripts by default. When it flagged four, I checked what each one does and denied all of them on the record."
 - **Follow-ups to expect:** Why are install scripts dangerous? (They run arbitrary code on your machine at install time, which is how many npm supply-chain attacks work.)
+
+### 2026-10-30 — The review found a test gap, and my first "red" was fake `#testing` `#gotcha` `#process`
+- **What happened:** The final reviewer (a fresh context) checked all five risks from the plan on the live database and found no bugs. It did find gaps:
+  - Deleting the sequence-grant line from migration `0000` would pass every test, because PostgreSQL doesn't check sequence rights for identity columns (it does for `serial`).
+  - A forbidden extra grant like `TRIGGER` would also go unnoticed.
+  - Two "facts" in my notes were wrong: the PG 18 mount claim, and "Debian sorts like RDS".
+
+  I added a test that reads `pg_default_acl` and expects exactly `INSERT,SELECT,UPDATE` on tables and `SELECT,USAGE` on sequences. My first run of the two planted mutations "failed" as hoped, but the test also failed after I restored the file. The query itself was broken (`ORDER BY kind COLLATE "C"`: an output alias can't be used inside an expression), so it failed every time and proved nothing. After fixing the query: green on the real migration, and an `AssertionError` from exactly that test for each mutation. The other 8 tests didn't notice either mutation.
+- **Why / what I learned:** A red test only counts if it's red *for the right reason*. Check the failure message, not just ✗. And behaviour tests can miss configuration that only matters for cases the test doesn't use (identity vs serial), so pin the configuration itself as well.
+- **Say it in an interview:** "A reviewer showed a grant could vanish without any test failing, because identity columns don't check sequence privileges. I added a test that pins the exact grants and confirmed it with planted mutations. The first time, it failed for the wrong reason: a SQL error. I only trust a red test after reading why it's red."
+- **Follow-ups to expect:** Identity vs serial? (Both use a sequence. `serial` is a default calling `nextval`, which checks the caller's sequence rights. Identity is built into the table, so inserting only needs the table's INSERT right.)

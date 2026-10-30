@@ -22,11 +22,12 @@ PostgreSQL 18 runs in Docker Compose (`compose.yaml`). Why it's set up this way:
 ## Connecting with psql
 
 ```powershell
-# As the administrator (inside the container, no password over the socket)
+# As any role; inside the container no password is checked
 docker compose exec db psql -U postgres -d business_software
-# As a specific app role over TCP (as the app does); put the password from .env
-docker compose exec -e PGPASSWORD=<password> db psql -h 127.0.0.1 -U app_runtime -d business_software
+docker compose exec db psql -U app_runtime -d business_software
 ```
+
+The image trusts every connection made from inside the container, even over `127.0.0.1`. Passwords are only checked for connections from outside it, such as the app, `pnpm db:migrate`, or a GUI client on `127.0.0.1:5432`. A wrong password there gets `password authentication failed` (`28P01`).
 
 ## Things to know
 

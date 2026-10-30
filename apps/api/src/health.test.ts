@@ -54,6 +54,11 @@ describe('health endpoints', () => {
       });
     });
 
+    it("doesn't say which framework it runs on", async () => {
+      const response = await fetch(`${baseUrl}/health`);
+      expect(response.headers.get('x-powered-by')).toBeNull();
+    });
+
     it('says it is ready when the database answers', async () => {
       expect(await getJson(`${baseUrl}/health/ready`)).toEqual({
         status: 200,

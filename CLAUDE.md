@@ -25,6 +25,7 @@ Read files when a task needs them. Don't load everything at once.
 | `docs/requirements/NN-*.md` | One file per module | Only the module being worked on |
 | `docs/decisions/` | Architecture Decision Records (ADRs) | Before proposing any tech choice |
 | `docs/architecture.md` | How the system fits together, with diagrams | Any code or infra work |
+| `docs/plans/` | Implementation plan per code task | When executing that task |
 | `docs/devops/DEVOPS_PLAN.md` | DevOps & cloud roadmap | DevOps / infra work |
 | `docs/devops/git-workflow.md` | Branches, commit messages, PRs, secrets, GitHub settings | Unsure about a branch name, commit message or PR |
 | `docs/journal/` | Build journal per phase, for interviews | End of each phase |
@@ -51,8 +52,12 @@ TypeScript monorepo (pnpm): React + Vite web app, NestJS modular monolith (api +
 
 ## Commands
 
-Filled in by task P0.2 (monorepo scaffold).
+Run from the repo root. Node 24+, pnpm 12.
 
-- Run: TBD
-- Test: TBD
-- Lint: TBD
+- Install: `pnpm install`
+- Run: none yet (the API comes in P0.4, the web app in P0.5)
+- Test: `pnpm test` (Vitest, every package)
+- Lint: `pnpm lint` (ESLint with type-aware rules)
+- Type-check: `pnpm typecheck`
+- Format: `pnpm format` (Prettier; `pnpm format:check` only reports)
+- Everything, before a commit: `pnpm check`

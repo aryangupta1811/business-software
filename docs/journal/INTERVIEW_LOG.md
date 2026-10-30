@@ -36,6 +36,8 @@ Update this as the project grows.
 | Modules | 10 (00–09) | `docs/requirements/` |
 | ADRs | 17 (16 at kickoff) | `docs/decisions/` |
 | Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
+| Automated tests | 42 (money helpers in `packages/shared`, P0.2) | `pnpm test` |
+| How long a new package version waits before we install it | 1 day | `pnpm-workspace.yaml` `minimumReleaseAge` |
 
 ---
 
@@ -73,6 +75,14 @@ Short answers; the Log entry has the full story.
   A: A merge commit keeps every commit plus an extra merge commit, so history branches. Rebase replays every commit on top of `main`: linear, but work-in-progress commits land too. Squash turns the branch into one commit: linear and clean, and the details stay in the PR. → ADR 0017
 - **Q: How do you keep secrets out of git?**
   A: Secrets live in environment variables, and `.gitignore` blocks `.env` files and keys. GitHub push protection rejects pushes containing known token formats. I scanned the full history with gitleaks before making the repo public, and CI runs it on every PR. If a secret ever leaks, I revoke it first, because deleting the commit doesn't remove the copies. → ADR 0017
+- **Q: Why a monorepo?**
+  A: The web app and the API share types, validation and money/GST code. In one repo that code lives once in `packages/shared`, and a change to it is checked against both sides in the same pull request. pnpm workspaces link the packages; a catalog keeps tool versions identical across them.
+- **Q: How do you turn a typed "0.29" into paise without floating-point errors?**
+  A: I never multiply the decimal. `0.29 * 100` is `28.999999999999996` in JavaScript. I split the text at the dot and do integer maths on the two parts, and anything that isn't plainly an amount (commas, `₹`, three decimals) is refused rather than guessed. → ADR 0008
+- **Q: How do you defend against a malicious npm package?**
+  A: The lockfile pins exact versions and checksums; pnpm blocks dependencies' install scripts unless I approve them; it won't install a version less than a day old, which is when most hijacked releases are caught; Dependabot alerts on known vulnerabilities.
+- **Q: How do you know your checks actually catch problems?**
+  A: I planted one deliberate error per check (a type error, a Node-only API in shared code, an `any`, an unawaited promise, bad formatting) and confirmed each command failed. A check that has never failed proves nothing.
 - **Q: How does a command-line tool log in to GitHub without your password?**
   A: The OAuth device flow. The tool gets a short code from GitHub, I approve that code in a browser where I'm already logged in, and the tool receives a token. Only enter codes your own device generated: entering someone else's code logs their device into your account.
 
@@ -87,6 +97,7 @@ Terms I learned on this project, in one line each.
 | ACID | Transactions are Atomic (all or nothing), Consistent, Isolated (don't see each other's half-work), Durable (survive crashes) |
 | ADR | Architecture Decision Record: a short file explaining one technical choice and why |
 | Argon2id | A deliberately slow password-hashing algorithm, recommended by OWASP |
+| Catalog (pnpm) | One list of dependency versions in `pnpm-workspace.yaml` that every package refers to with `"catalog:"` |
 | CI / CD | Continuous Integration (test every change automatically) / Continuous Deployment (ship every green change automatically) |
 | Conventional Commits | Commit messages shaped `type(scope): summary`, e.g. `fix(gst): round CGST and SGST separately` |
 | CSRF | A trick where another site makes your browser send a request with your cookies; blocked with SameSite cookies + tokens |
@@ -98,9 +109,11 @@ Terms I learned on this project, in one line each.
 | IaC | Infrastructure as Code: cloud resources created from code files (Terraform) instead of clicking in a console |
 | Idempotency key | A unique ID sent with a request so repeating it has the same effect as sending it once |
 | Modular monolith | One deployable app split internally into modules with clear boundaries |
+| Monorepo | One git repository holding several packages (here: web app, API, shared code) that are developed together |
 | OIDC | OpenID Connect: lets one system prove its identity to another and get short-lived credentials |
 | ORM | A library that maps database tables to code (Drizzle here) |
 | Outbox pattern | Write "send this message" into the database in the same transaction, send it later from a worker |
+| Peer dependency | A package that a plugin needs but expects you to install, in a version range it supports (typescript-eslint needs TypeScript) |
 | PITR | Point-in-time restore: rebuild the database as it was at any second in the retention window |
 | Push protection | GitHub rejects a `git push` that contains a known secret format, before it reaches the repo |
 | RLS | Row-Level Security: PostgreSQL policies that decide which rows a query is allowed to see |
@@ -108,8 +121,12 @@ Terms I learned on this project, in one line each.
 | Ruleset | GitHub's rules for branches (require a PR, block force-push…), the newer form of branch protection |
 | SPA | Single-page app: the browser loads the app once and then only exchanges data with the server |
 | Squash merge | All of a pull request's commits combined into one commit on `main` |
+| Supply-chain attack | Attacking an app through something it depends on, e.g. publishing a poisoned version of a popular npm package |
+| TDD | Test-driven development: write a failing test, watch it fail, write the least code that passes, then tidy up |
 | Tenant | One customer business in a multi-tenant system |
 | Text shaping | Turning letters into correctly joined glyphs; Hindi (Devanagari) needs it for conjuncts like क्ष |
+| Type-aware linting | Lint rules that use the TypeScript compiler's type information, e.g. "this promise is never awaited" |
+| Workspace (pnpm) | The set of packages in a monorepo that pnpm installs and links together |
 
 ---
 
@@ -382,3 +399,45 @@ Entry format:
 - **Why / what I learned:** GitHub flow fits deploy-on-merge; Git Flow's release branches are for versioned software. Two gotchas: GitHub won't let you approve your own PR, so a solo repo needs 0 required approvals (the PR is a CI gate and a self-review); and after a squash merge `git branch -d` says "not fully merged", because the branch's commits got new IDs on `main`, so delete with `-D` once the PR is merged.
 - **Say it in an interview:** "`main` is protected even from me. Everything lands through a PR, squash-merged as one Conventional Commit, so the history reads like a changelog."
 - **Follow-ups to expect:** Trunk-based development vs GitHub flow? (Trunk-based merges tiny changes into `main` many times a day, often behind feature flags; GitHub flow is the same idea with a PR per change.) How do you ship a hotfix? (Same flow: a `fix/` branch and a fast PR.)
+
+### 2026-10-30 — The monorepo scaffold: one workspace, shared code first `#architecture` `#process`
+- **What happened:** Set up a pnpm workspace (`apps/*`, `packages/*`) with one root config each for TypeScript, ESLint and Prettier, and `pnpm check` to run every check. Created only `packages/shared`. The web app and API folders come in P0.4/P0.5, generated by the Vite and NestJS tools, because empty placeholder apps would have been thrown away. `shared` is used straight from its TypeScript source (no build step); P0.4 checks that NestJS can load it. Tool versions live once in a pnpm *catalog*, so every package uses the same TypeScript and Vitest.
+- **Why / what I learned:** Strict TypeScript flags are cheapest on day one. `noUncheckedIndexedAccess` already mattered in the first function: regex match groups come back as `string | undefined`, so the code must handle the missing case instead of assuming it. `shared` has `"types": []` and no DOM library, so Node-only or browser-only code there fails the type check: it has to run in both.
+- **Say it in an interview:** "I set up the monorepo with one config per tool at the root and strict TypeScript from the first file, and I only created packages when they had real code."
+- **Follow-ups to expect:** Why not Turborepo or Nx? (Plain pnpm is enough until builds get slow; ADR 0002.) What does `noUncheckedIndexedAccess` do? (Array and object lookups may be `undefined`, so you must check.)
+
+### 2026-10-30 — "Latest" TypeScript broke the linter: read the peer warning `#gotcha` `#process`
+- **What happened:** `pnpm add typescript` installed 7.0.2, the new compiler rewritten in Go. pnpm warned about an unmet peer dependency: typescript-eslint 8.72 supports TypeScript `>=4.8.4 <6.1.0`, because type-aware lint rules call the compiler's internal API, which 7.0 changed. Pinned TypeScript to `~6.0.3` in the catalog, with a comment saying why. `pnpm peers check` then reported nothing.
+- **Why / what I learned:** A peer dependency is a package a plugin needs you to install in a version it supports. The warning is easy to scroll past, but here it meant the linter could have broken in confusing ways. `~6.0.3` allows 6.0.x patches only; `^` would have allowed 6.1, outside the supported range.
+- **Say it in an interview:** "I don't install 'latest' blindly. When a peer range said my lint tooling didn't support the new major version, I pinned the newest supported one and left a note to upgrade later."
+- **Follow-ups to expect:** `^` vs `~`? (`^1.2.3` allows any 1.x; `~1.2.3` allows 1.2.x.) Why is TypeScript 7 a big deal? (The Go port type-checks about 10x faster.)
+
+### 2026-10-30 — Supply-chain guards from the first install `#security` `#devops`
+- **What happened:** Set pnpm's `minimumReleaseAge` to 1440 minutes, so it only installs versions that have been public for at least a day. pnpm also blocks dependencies' install scripts unless approved, and none of ours needed one. The committed lockfile records the exact version and checksum of every package.
+- **Why / what I learned:** Attackers who steal a maintainer's npm token publish a poisoned version of a popular package. Such versions are usually spotted and pulled within hours, so a one-day wait avoids most of them. Install scripts are the usual way the poison runs on a developer's machine.
+- **Say it in an interview:** "Dependencies are code I didn't write, so I pin them with a lockfile, block install scripts by default, wait a day before taking new releases, and get Dependabot alerts."
+- **Follow-ups to expect:** What's in a lockfile? (Exact resolved versions plus integrity hashes, so every install is identical.) What if you need a security fix within that day? (Install it explicitly; the wait is a default, not a lock.)
+
+### 2026-10-30 — Proving the checks can fail `#testing` `#process`
+- **What happened:** With the tools set up, every check passed, but a check that has never failed proves nothing. Planted one problem at a time: a type error (TS2322), `Buffer` in shared code (TS2591, because Node types are excluded), an `any` (`no-explicit-any`), an unawaited promise (`no-floating-promises`, which shows type-aware linting is really on), and bad formatting. Each command exited 1. Also found that Vitest 5 exits 1 when there are no test files, so `--passWithNoTests` was used until the first tests landed.
+- **Why / what I learned:** It's the same lesson as the personal-data search that silently matched nothing in session 2. Test the tester: a misconfigured linter that lints zero files also reports "no problems".
+- **Say it in an interview:** "Before trusting my CI checks, I planted a deliberate error for each one and watched it fail."
+- **Follow-ups to expect:** What's type-aware linting? (Rules that use the compiler's type information, e.g. a promise that's never awaited.)
+
+### 2026-10-30 — First money code, test-first, and the `0.29 * 100` trap `#money` `#testing` → ADR 0008
+- **What happened:** Wrote `parseRupees("125.50") → 12550` and `formatPaise(12345678) → "₹1,23,456.78"` with TDD: the tests first, watched all 30 (then 12 more) fail with "is not a function", then the code. 42 tests pass. The tests include the floating-point traps: in JavaScript `0.29 * 100` is `28.999999999999996` and `1.1 * 100` is `110.00000000000001`. So `parseRupees` splits the text at the dot and multiplies only whole numbers. It refuses `1,250`, `₹125`, `12.555`, `-5`, `1e3` and Devanagari digits, returning `null` rather than guessing.
+- **Why / what I learned:** Bad input from a person is expected, so it returns `null` and the screen asks again. A non-integer amount inside the code is a bug, so `formatPaise` throws a `RangeError`. Watching the test fail first proves it tests the thing you think it does.
+- **Say it in an interview:** "Typed amounts never go through floating-point maths: I parse the text into integer paise and refuse anything ambiguous, because a guessed amount could silently save a wrong bill."
+- **Follow-ups to expect:** Why `null` and not an exception? Why refuse commas? (A wrong guess is worse than asking again; Excel import will get its own rules.)
+
+### 2026-10-30 — Lakh/crore grouping with `Intl`, without a float `#money` `#gotcha`
+- **What happened:** `Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' })` gives Indian grouping (`₹98,76,54,321.00`) and `-₹1,250.00` for negatives. Instead of `paise / 100`, `formatPaise` builds the decimal text `"123456.78"` from the digits and passes the string, which `format()` accepts exactly. TypeScript rejected that (TS2769): its types only accept strings it can prove are numbers (`` `${number}` ``), so the built-up string needs an `as` cast, with a comment. `-0` shows as `₹0.00`, not `-₹0.00`.
+- **Why / what I learned:** The built-in `Intl` API knows each locale's rules, so no library is needed. The formatter is created once at module level, because building it on every call is slow.
+- **Say it in an interview:** "Display goes through one helper that uses the en-IN locale for lakh/crore grouping, fed an exact decimal string so even display never touches a float."
+- **Follow-ups to expect:** What about Hindi? (`hi-IN` uses the same Latin digits and grouping by default.)
+
+### 2026-10-30 — Two scanner gotchas: a fake Aadhaar and a mangled path `#security` `#gotcha`
+- **What happened:** The personal-data search flagged a test amount: twelve digits in a row look like an Aadhaar number. I changed the test value instead of learning to ignore the hit, because a false alarm on every commit trains you to skip real ones. Separately, gitleaks run from Git Bash failed with `stat C:/Program Files/Git/repo`: Git Bash rewrites arguments that look like Unix paths (`/repo`) into Windows paths. Running it from PowerShell, as `git-workflow.md` says, works.
+- **Why / what I learned:** Keep alerts trustworthy by fixing false positives at the source. Git Bash (MSYS) path conversion can be turned off with `MSYS_NO_PATHCONV=1`.
+- **Say it in an interview:** "If a check keeps raising false alarms, I fix the cause, because alert fatigue is how real problems get ignored."
+- **Follow-ups to expect:** How would you handle false positives in CI? (A reviewed allowlist entry with a reason, never turning the check off.)

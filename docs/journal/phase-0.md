@@ -7,7 +7,8 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
 - **2026-10-29 (planning chat):** requirements for all modules, with Modules 00 and 01 decided, stored as files in git.
 - **2026-10-29 (kickoff session):** confirmed non-functional requirements with measurable targets (RPO 5 min, RTO 1 hour, bill save < 1 s); answered the six architecture questions; chose the stack (16 ADRs); wrote `docs/architecture.md`; split Phases 0–3 into one-session tasks; started the interview log.
 - **2026-10-30 (P0.1 Git workflow, DevOps stage 1):** scanned all git history for secrets (gitleaks in Docker) and personal data, then made the repo public; protected `main` with a ruleset nobody can bypass; squash merge only; Conventional Commits; PR template; LF line endings via `.gitattributes`; secret scanning, push protection and Dependabot alerts; commits use the GitHub noreply email. Every setting checked through the GitHub API.
-- *Still to do in this phase:* monorepo scaffold, database and Docker Compose, API and web skeletons, CI, design system.
+- **2026-10-30 (P0.2 monorepo scaffold):** pnpm workspace with strict TypeScript, ESLint (type-aware) + Prettier, Vitest; `pnpm check` runs everything. First shared code: `parseRupees` and `formatPaise`, written test-first (45 tests, floating-point traps included). Each check proven to fail on a planted error; a fresh reviewer then tried about 60 hostile inputs and found no wrong amount.
+- *Still to do in this phase:* database and Docker Compose, API and web skeletons, CI, design system.
 
 ## Stack choices vs alternatives
 
@@ -30,6 +31,7 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
 | AI | Claude API through permission-checked tools | Text-to-SQL, reports only | 0015 |
 | Demo data | Deterministic seed through services | SQL inserts, random inserts | 0016 |
 | Git workflow | GitHub flow, squash merge, Conventional Commits, public repo with a ruleset | Git Flow, direct commits to `main`; merge or rebase merges; private repo until the Student Pack | 0017 |
+| Code quality & dependencies | ESLint (type-aware) + Prettier, pnpm catalog, lockfile + blocked install scripts + 1-day release age | Biome, no linter; per-package versions | 0018 |
 
 ## Mistakes and what I learned
 
@@ -39,6 +41,8 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
 - **The repo started inside OneDrive,** which can corrupt `.git`. Moved it out in P0.0.
 - **Assumed settings were done; the API said otherwise.** After the GitHub settings, reading them through the API showed secret scanning was still off. Lesson: verify configuration from the source of truth, not from memory or a screenshot.
 - **A check that never fails proves nothing.** The first personal-data search found nothing because its pattern got mangled on the way to `git grep`; only testing it against a known example exposed that. Lesson: make a check catch something before trusting it.
+- **Installed "latest" TypeScript and broke the linter's peer range.** TypeScript 7 isn't supported by typescript-eslint yet; pinned `~6.0`. Lesson: read peer-dependency warnings.
+- **My plan claimed Node could run `shared` from source. It can't.** The tests passed only because Vite resolves `./money.js` to `money.ts`. A fresh reviewer caught it; P0.4 now plans a compile step. Lesson: "works in the test runner" isn't "works in production".
 - **Waited for a GitHub login code on my phone.** The device-flow code is printed in the terminal. Lesson: read the tool's output before looking elsewhere.
 
 ## Interview questions I can now answer
@@ -55,5 +59,9 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
   A: OIDC gives each GitHub Actions run short-lived credentials, and Systems Manager runs the deploy on the server, so there's no SSH port. (ADR 0012)
 - Q: What's your branching strategy?
   A: GitHub flow: a short-lived branch per task, merged into a protected `main` by pull request, squash-merged as one Conventional Commit. Nobody can push to `main` directly, me included. (ADR 0017)
+- Q: How do you avoid floating-point errors with money input?
+  A: Never multiply the decimal (`0.29 * 100` is `28.999…`): split the text at the dot, do integer maths, and refuse anything ambiguous. (ADR 0008)
+- Q: How do you protect against malicious npm packages?
+  A: A committed lockfile, install scripts blocked by default, a one-day wait on new releases, Dependabot alerts. (ADR 0018)
 - Q: How do you keep secrets and personal data out of a public repo?
   A: `.gitignore` and environment variables; a gitleaks scan plus a personal-data search before each commit; GitHub push protection at push time; gitleaks in CI. I scanned the full history before going public. If a secret leaks, revoke it first. (ADR 0017)

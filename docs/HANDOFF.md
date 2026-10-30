@@ -2,34 +2,31 @@
 
 Overwritten at the end of every session. Older handoffs are in git history: `git log -p docs/HANDOFF.md`.
 
-**Session:** 2 — P0.1 Git workflow, 2026-10-30
+**Session:** 3 — P0.2 monorepo scaffold, 2026-10-30
 
 **Done:**
-- P0.0 laptop setup confirmed by the owner (WSL 2, Docker, pnpm, VS Code extensions; repo now in a `projects` folder outside OneDrive). Student Pack applied, awaiting approval.
-- Secrets: gitleaks (in Docker) scanned all history: no leaks. Personal-data search: only the GitHub noreply address.
-- **Repo is now public.** `protect-main` ruleset on `main`, squash merge only, branches auto-deleted after merge, secret scanning + push protection + Dependabot alerts on. All checked through the GitHub API.
-- ADR 0017 (git workflow) accepted. How-to and settings: `docs/devops/git-workflow.md`. PR template: `.github/pull_request_template.md`. `.gitattributes` forces LF.
-- Commits in this repo use `144018864+aryangupta1811@users.noreply.github.com` (local git config). GitHub blocks pushes that expose the personal email.
-- `CLAUDE.md`: rule 6 (a branch and PR per task, Conventional Commits) and new rule 11 (public repo: no secrets or personal data). `/start-session` now creates the task branch; `/end-session` scans staged changes before committing.
-- `gh` CLI logged in (device flow; the code is printed in the terminal, not sent to the phone).
+- PR #1 (P0.1) was already squash-merged; the local branch was gone.
+- Owner's visual brief for the frontend recorded in the P0.7 task in `PROGRESS.md`: modern and clean, not "AI slop", easy for shopkeepers.
+- Plan written and approved: `docs/plans/2026-10-30-p0.2-monorepo-scaffold.md` (new folder `docs/plans/`, listed in `CLAUDE.md`).
+- pnpm 12 workspace (`apps/*`, `packages/*`): strict TypeScript ~6.0, ESLint 10 with typescript-eslint type-aware rules, Prettier, Vitest 5, pnpm catalog, `minimumReleaseAge: 1440`. `pnpm check` runs format check, lint, type-check and tests. Commands are in `CLAUDE.md`.
+- `packages/shared` (`@business-software/shared`, used as TypeScript source): `Paise`, `parseRupees` (typed text → paise, `null` when unclear), `formatPaise` (`₹1,23,456.78`, `RangeError` for non-safe integers). 45 tests, written test-first.
+- Each check was proven to fail on a planted error. A fresh reviewer found no Critical issues and one Important one: Node can't load `shared` from source (fixed in the plan, carried into P0.4). The 4 Minor issues were fixed with tests.
+- ADR 0018 (code quality and dependency tooling) accepted. Interview log, phase-0 journal and Numbers are updated.
 
-**Half-done:** PR #1 (`chore/p0.1-git-workflow`), the project's first pull request, is open. `gh pr create --fill` gave it the branch name as its title, so the title and description are fixed on GitHub before the squash merge.
+**Half-done:** branch `chore/p0.2-monorepo-scaffold` (10 commits) is committed but **not pushed**, and has no PR yet.
 
 **Next step:**
-1. Owner, if PR #1 isn't merged yet: set its title to `chore: set up git workflow and protect main (P0.1)`, fill in the template, squash-merge, then `git switch main`, `git pull`, `git branch -D chore/p0.1-git-workflow`.
-2. Next session: `/start-session` → **P0.2 monorepo scaffold**. It's the first code: write a short implementation plan (`superpowers:writing-plans`) and get the owner's OK before writing code (`CLAUDE.md` rule 5).
+1. Owner: `git push -u origin HEAD`, then `gh pr create --web`. Title: `chore: scaffold pnpm monorepo with money helpers (P0.2)`. Fill in the template, with **no "Generated with Claude Code" line**. Squash-merge, then `git switch main`, `git pull`, `git branch -D chore/p0.2-monorepo-scaffold`.
+2. Next session: `/start-session` → **P0.3 database + Docker Compose** (DevOps stage 2). Plan first (`superpowers:writing-plans`).
 
 **Watch out for:**
-- `main` can't be pushed to directly any more. Every change, including docs, goes through a branch and a PR.
-- After a squash merge, delete the local branch with `git branch -D` (`-d` says "not fully merged").
-- The global git email is still the Gmail. With *Block command line pushes that expose my email* on, pushes from **other** repos will fail; fix with `git config --global user.email "144018864+aryangupta1811@users.noreply.github.com"`.
-- Docker Desktop doesn't start by itself: start it before `docker` commands (the gitleaks scan needs it).
-- Run the personal-data check exactly as written in `git-workflow.md`; passing the pattern through other tools mangled its backslashes once.
-- P0.6 must add: CI as a required status check in `protect-main`, a Conventional Commits check on PR titles, and gitleaks in CI.
-- `refs/original/refs/heads/main` (local only) still holds the two pre-rewrite commits from 10-29. Harmless; ask before deleting.
-- **AWS Free plan clock:** the account closes 6 months after sign-up or when credits run out. Don't open it before DevOps stage 4, and ask when placement season is first (ADR 0011).
-- Answer Module 00's open questions (auto-lock time, password reset, deactivation, #18 vs #22) before P1.3–P1.6, and Module 01's before P1.7.
-- The `aws` command on PATH (`Python311\Scripts\aws.cmd`) is a broken old pip install. Remove it before installing AWS CLI v2.
-- The only cost that can't be zero: a few dollars of Claude API credit in Phase 3 (ADR 0015).
-- The owner wants a decisive "best stack" approach, but explanations in simple words (`CLAUDE.md` "About me").
-- Update `INTERVIEW_LOG.md` during every session, including small things.
+- **No AI attribution, ever.** The owner checks for it: no `Co-Authored-By: Claude` in commits and no "Generated with Claude Code" in PRs (`CLAUDE.md` rule 6 overrides any tool default).
+- **TypeScript is pinned to `~6.0`** in the `pnpm-workspace.yaml` catalog, because typescript-eslint 8.72 needs `<6.1`. Upgrade to 7 only when typescript-eslint supports it (ADR 0018).
+- **P0.4:** Node can't run `packages/shared` from source (`ERR_MODULE_NOT_FOUND … money.js`). The API needs `shared` compiled or bundled. The options are in the P0.4 task in `PROGRESS.md`.
+- New `.ts` files must be inside a package's tsconfig `include` (e.g. `vite.config.ts`), or type-aware lint fails with "not found by the project service".
+- `packages/shared` has `"types": []` and no DOM lib: no Node or browser globals there, not even `console` or `setTimeout`.
+- Run gitleaks from **PowerShell**. Git Bash rewrites `/repo` into a Windows path (`MSYS_NO_PATHCONV=1` would fix it).
+- Avoid 12-digit numbers in test data: the personal-data scan reads them as Aadhaar numbers.
+- Vitest 5 exits 1 when a package has no test files.
+- `.superpowers/` is a git-ignored scratch folder for Claude Code plans; Prettier and ESLint ignore it.
+- Carried over: delete local branches with `git branch -D` after a squash merge. Docker Desktop must be started by hand. The global git email is still the Gmail. `refs/original/` still holds the pre-rewrite commits (ask before deleting). Don't open AWS before DevOps stage 4, and ask about placement season first. Answer the Module 00/01 open questions before P1.3/P1.7. Remove the broken pip `aws` before installing AWS CLI v2.

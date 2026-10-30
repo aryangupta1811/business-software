@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Shared code runs in the browser and in Node, so neither one's globals are allowed.
+    "types": []
+  },
+  "include": ["src"]
+}

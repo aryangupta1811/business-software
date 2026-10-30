@@ -23,7 +23,5 @@ export async function createApp(config: ApiConfig): Promise<INestApplication> {
   });
   // Caddy sends everything under /api to this service (ADR 0011).
   app.setGlobalPrefix('api');
-  // Closes the database pool when Docker stops the container (SIGTERM).
-  app.enableShutdownHooks();
   return app;
 }

@@ -6,6 +6,7 @@ import {
   type OnApplicationShutdown,
 } from '@nestjs/common';
 import { createDatabase, type Database } from '@business-software/db';
+import { describeError } from './errors.js';
 
 /** Injection token for the app's `Database` (pool + Drizzle), connected as app_runtime. */
 export const DATABASE = 'DATABASE';
@@ -19,10 +20,9 @@ export class DatabaseModule implements OnApplicationShutdown {
       providers: [
         {
           provide: DATABASE,
-          // Only the message: pg's error objects carry the connection password.
           useFactory: () =>
             createDatabase(databaseUrl, (error) => {
-              logger.error(`Idle database connection failed: ${error.message}`);
+              logger.error(`Idle database connection failed: ${describeError(error)}`);
             }),
         },
       ],

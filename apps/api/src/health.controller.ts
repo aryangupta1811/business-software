@@ -1,6 +1,7 @@
 import { Controller, Get, Inject, Logger, ServiceUnavailableException } from '@nestjs/common';
 import type { Database } from '@business-software/db';
 import { DATABASE } from './database.module.js';
+import { describeError } from './errors.js';
 
 /**
  * Liveness (`/health`): the process answers, so there's no reason to restart it.
@@ -22,8 +23,7 @@ export class HealthController {
     try {
       await this.database.pool.query('select 1');
     } catch (error) {
-      // Only the message: pg's error objects carry the connection password.
-      this.logger.warn(`Database unreachable: ${(error as Error).message}`);
+      this.logger.warn(`Database unreachable: ${describeError(error)}`);
       throw new ServiceUnavailableException({ status: 'error', database: 'unreachable' });
     }
     return { status: 'ok', database: 'ok' };

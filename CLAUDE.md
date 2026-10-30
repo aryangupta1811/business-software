@@ -29,6 +29,7 @@ Read files when a task needs them. Don't load everything at once.
 | `docs/devops/DEVOPS_PLAN.md` | DevOps & cloud roadmap | DevOps / infra work |
 | `docs/devops/local-database.md` | Local PostgreSQL: setup, commands, resets, gotchas | Database or Docker Compose work |
 | `docs/devops/git-workflow.md` | Branches, commit messages, PRs, secrets, GitHub settings | Unsure about a branch name, commit message or PR |
+| `docs/devops/secrets.md` | Where secrets live and the five ways they leak (git, images, browser, CI, logs) | Anything touching a password, key or token |
 | `docs/journal/` | Build journal per phase, for interviews | End of each phase |
 | `docs/journal/INTERVIEW_LOG.md` | Running interview-prep record of every decision, concept, bug and gotcha | Add to it during every session |
 
@@ -48,7 +49,7 @@ TypeScript monorepo (pnpm): React + Vite web app, NestJS modular monolith (api +
 8. **Quality bar.** The frontend must look designed, not like a generic template. The backend: no bugs, no unnecessary code, and tests for every business rule (GST math, stock, udhaar balances, salary and advances).
 9. **One task per session.** When the task is done, or `/context` shows the window getting full, run `/end-session`.
 10. **Interview log.** Whenever we make a decision, learn a concept, hit an error, fix a bug or discover a gotcha, however small, add an entry to `docs/journal/INTERVIEW_LOG.md` in the same session, in its format. Update its Pitch and Numbers when the project grows.
-11. **The repo is public.** Never commit secrets, personal data (phone numbers, personal emails, ID numbers, home paths) or real customer data. Real values go in `.env` (git-ignored); personal notes in `CLAUDE.local.md`. Scan staged changes before committing (`docs/devops/git-workflow.md`, Secrets).
+11. **The repo is public.** Never commit secrets, personal data (phone numbers, personal emails, ID numbers, home paths) or real customer data. Real values go in `.env` (git-ignored); personal notes in `CLAUDE.local.md`. Scan staged changes before committing (`docs/devops/git-workflow.md`, Secrets). Secrets never go into images, the browser bundle or logs (`docs/devops/secrets.md`).
 12. Keep this file under 150 lines. Details go in `docs/`.
 
 ## Commands
@@ -56,7 +57,9 @@ TypeScript monorepo (pnpm): React + Vite web app, NestJS modular monolith (api +
 Run from the repo root. Node 24+, pnpm 12.
 
 - Install: `pnpm install`
-- Run: none yet (the API comes in P0.4, the web app in P0.5)
+- Run the API on this computer: `pnpm db:up`, then `pnpm dev` (rebuilds and restarts on save; http://127.0.0.1:3000/api/health)
+- Run everything in containers: `pnpm app:up` (database, migrations, api, worker); stop with `docker compose stop`
+- Build: `pnpm build` (TypeScript project references → `dist/`)
 - Database: `pnpm db:up` (PostgreSQL in Docker Compose), `pnpm db:migrate`, `pnpm db:generate`. First time: copy `.env.example` to `.env` (`docs/devops/local-database.md`)
 - Test: `pnpm test` (Vitest, every package; Docker Desktop must be running for the integration tests)
 - Lint: `pnpm lint` (ESLint with type-aware rules)

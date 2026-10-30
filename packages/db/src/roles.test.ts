@@ -1,23 +1,13 @@
 // Integration test on a throwaway PostgreSQL (ADR 0013): the database itself must
 // stop the app's role from deleting rows or changing the schema (ADRs 0006, 0007).
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { runMigrations } from './migrate.js';
+import { startTestDatabase, type TestDatabase } from './testing.js';
 
 const migrationsFolder = fileURLToPath(new URL('../migrations', import.meta.url));
-const bootstrapFile = fileURLToPath(new URL('../bootstrap/create-roles.sql', import.meta.url));
-
-// The same image as local development: compose.yaml is the one place the version is written.
-function composePostgresImage(): string {
-  const compose = readFileSync(new URL('../../../compose.yaml', import.meta.url), 'utf8');
-  const image = /^\s*image:\s*(postgres:\S+)\s*$/m.exec(compose)?.[1];
-  if (image === undefined) throw new Error('No postgres image found in compose.yaml');
-  return image;
-}
 
 async function countAppliedMigrations(pool: Pool): Promise<number> {
   const result = await pool.query<{ n: number }>(
@@ -27,26 +17,15 @@ async function countAppliedMigrations(pool: Pool): Promise<number> {
 }
 
 describe('app database roles', () => {
-  let container: StartedPostgreSqlContainer;
+  let server: TestDatabase;
   let owner: Pool;
   let runtime: Pool;
 
   beforeAll(async () => {
-    container = await new PostgreSqlContainer(composePostgresImage())
-      .withEnvironment({ APP_OWNER_PASSWORD: 'owner-test', APP_RUNTIME_PASSWORD: 'runtime-test' })
-      .withCopyFilesToContainer([
-        { source: bootstrapFile, target: '/docker-entrypoint-initdb.d/10-create-roles.sql' },
-      ])
-      .start();
-    const server = {
-      host: container.getHost(),
-      port: container.getPort(),
-      database: 'business_software',
-    };
-    owner = new Pool({ ...server, user: 'app_owner', password: 'owner-test' });
-    runtime = new Pool({ ...server, user: 'app_runtime', password: 'runtime-test' });
+    server = await startTestDatabase();
+    owner = new Pool({ connectionString: server.ownerUrl });
+    runtime = new Pool({ connectionString: server.runtimeUrl });
 
-    await migrate(drizzle(owner), { migrationsFolder });
     // Created after the migrations on purpose: grants must cover tables that don't exist yet.
     await owner.query(
       'create table probe (id int generated always as identity primary key, note text)',
@@ -56,7 +35,7 @@ describe('app database roles', () => {
   afterAll(async () => {
     await owner.end();
     await runtime.end();
-    await container.stop();
+    await server.stop();
   });
 
   it('gives neither app role superuser, BYPASSRLS, CREATEROLE or CREATEDB', async () => {
@@ -120,7 +99,7 @@ describe('app database roles', () => {
 
   it('does nothing when migrations run again', async () => {
     const files = readdirSync(migrationsFolder).filter((name) => name.endsWith('.sql'));
-    await migrate(drizzle(owner), { migrationsFolder });
+    await runMigrations(server.ownerUrl);
     expect(await countAppliedMigrations(owner)).toBe(files.length);
   });
 });

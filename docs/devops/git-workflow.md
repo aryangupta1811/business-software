@@ -56,11 +56,17 @@ Examples: `feat(billing): save bill and stock movements in one transaction`, `fi
 
 With squash merges, the **pull request title** becomes the commit on `main`, so it follows this format too. CI checks it from P0.6.
 
+## Pull requests with a migration
+
+Drizzle 0.x silently skips a migration that is older than the newest one already applied (ADR 0021). Before merging a PR that adds a migration, rebase it on `main`. If `main` gained a newer migration meanwhile, delete yours (the `.sql` file and its journal and snapshot entries) and run `pnpm db:generate` again, so yours is the newest.
+
 ## Protected `main`
 
 A repository ruleset on `main`: pull request required, no force pushes, no deletion, linear history, no bypass for anyone. Required approvals are 0 because GitHub doesn't let you approve your own pull request. CI becomes a required status check in P0.6.
 
 ## Secrets
+
+Where secrets live and the rules for images, the browser, CI and logs: `secrets.md`. This section covers git.
 
 - Never commit secrets. `.gitignore` blocks `.env*` (except `.env.example`), `*.pem`, `*.key`, `*.tfvars` and Terraform state. Real values come from environment variables; `.env.example` lists the names with fake values.
 - GitHub secret scanning with push protection rejects a `git push` that contains a known token format (AWS, Anthropic, GitHub…).

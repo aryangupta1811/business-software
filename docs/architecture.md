@@ -53,6 +53,21 @@ Rules:
 - Every write goes through one transaction helper that sets the current business [0006] and writes entry-log rows [0007].
 - The `api` process serves HTTP. The `worker` process runs pg-boss jobs [0010]. Both come from the same image.
 
+## Starting up: one image, three commands
+
+```mermaid
+flowchart LR
+  db[("db<br/>PostgreSQL")] -- "healthy" --> migrate["migrate<br/>node dist/migrate.js<br/>as app_owner, then exits"]
+  migrate -- "exited 0" --> api["api<br/>node dist/main.js<br/>as app_runtime"]
+  migrate -- "exited 0" --> worker["worker<br/>node dist/worker.js<br/>as app_runtime"]
+```
+
+- The schema is upgraded before new code runs, by the only role allowed to change it. If `migrate` fails, `api` and `worker` don't start [0021].
+- `GET /api/health` answers while the process is alive (Docker's healthcheck). `GET /api/health/ready` also checks the database (503 when it can't), for deploys and Caddy later.
+- On `docker stop` (SIGTERM), `api` and `worker` finish their work, close the database pool and exit 0 [0020].
+- pg-boss will run in the `worker` under its own role, `app_queue`, which owns only the `pgboss` schema [0022].
+- Secrets reach containers only as environment variables at start, never inside the image (`docs/devops/secrets.md`).
+
 ## Saving a bill (the most important flow)
 
 ```mermaid
@@ -92,11 +107,11 @@ From ADRs 0007 and 0008: no `DELETE` permission for the app's database user · a
 ```
 apps/
   web/              React + Vite counter app            [0003]
-  api/              NestJS: src/main.ts (api), src/worker.ts (worker)   [0004]
+  api/              NestJS: src/main.ts (api), src/worker.ts (worker), src/migrate.ts; Dockerfile   [0004, 0020, 0021]
 packages/
   shared/           types, Zod schemas, money & GST     [0002, 0008]
   db/               Drizzle schema, migrations, role bootstrap, DB integration tests   [0005, 0019]
-compose.yaml        local services (PostgreSQL)         [0019]
+compose.yaml        local services: db, migrate, api, worker   [0019, 0021]
 infra/
   terraform/        AWS environments                    [0011]
 .github/workflows/  CI/CD                               [0012]

@@ -1,0 +1,32 @@
+{
+  "name": "@business-software/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "start": "node --env-file-if-exists=../../.env dist/main.js",
+    "dev": "tsc -b tsconfig.build.json && pnpm run --parallel \"/^dev:/\"",
+    "dev:build": "tsc -b tsconfig.build.json -w --preserveWatchOutput",
+    "dev:run": "node --watch --env-file-if-exists=../../.env dist/main.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@business-software/db": "workspace:*",
+    "@nestjs/common": "^12.3.2",
+    "@nestjs/core": "^12.3.2",
+    "@nestjs/platform-express": "^12.3.2",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

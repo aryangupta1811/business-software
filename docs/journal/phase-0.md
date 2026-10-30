@@ -9,7 +9,8 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
 - **2026-10-30 (P0.1 Git workflow, DevOps stage 1):** scanned all git history for secrets (gitleaks in Docker) and personal data, then made the repo public; protected `main` with a ruleset nobody can bypass; squash merge only; Conventional Commits; PR template; LF line endings via `.gitattributes`; secret scanning, push protection and Dependabot alerts; commits use the GitHub noreply email. Every setting checked through the GitHub API.
 - **2026-10-30 (P0.2 monorepo scaffold):** pnpm workspace with strict TypeScript, ESLint (type-aware) + Prettier, Vitest; `pnpm check` runs everything. First shared code: `parseRupees` and `formatPaise`, written test-first (45 tests, floating-point traps included). Each check proven to fail on a planted error; a fresh reviewer then tried about 60 hostile inputs and found no wrong amount.
 - **2026-10-30 (P0.3 database + Docker Compose, DevOps stage 2):** PostgreSQL 18 in Docker Compose (localhost-only port, named volume proven to survive `compose down`, required-password guards). Two roles from a bootstrap file: `app_owner` for migrations, `app_runtime` for the app. The first Drizzle migration sets default privileges, so every future table gives the app select/insert/update and never delete. 9 integration tests on a throwaway PostgreSQL (Testcontainers) prove delete, truncate, create, drop and reading migration history are refused, and pin the exact grant set. Planted `DELETE`, `TRIGGER` and missing-sequence grants are each caught. A fresh reviewer verified all five review-focus risks on the live database. It found no bugs, but did find two wrong facts in my notes and a test gap, all fixed.
-- *Still to do in this phase:* API and web skeletons (the rest of stage 2: app containers), CI, design system.
+- **2026-10-30 (P0.4 API skeleton, DevOps stage 2 second half):** NestJS 12 API with liveness (`/api/health`) and readiness (`/api/health/ready`), a worker and a one-shot migrate entry point, all from one non-root `node:24-slim` image. Compose starts db → migrate (as `app_owner`) → api and worker (as `app_runtime`). Packages compile with TypeScript project references, and a `source` export condition lets tests and lint skip the build. Secrets rules for the whole project (`docs/devops/secrets.md`), at the owner's request about the AI key. Docker smoke tests found two real bugs: the worker exited after pg's 10 s idle timeout, and the API exited 143 instead of 0. Both were fixed, but only the worker fix has an automated test: exit codes on SIGTERM can't be tested on Windows, so they're checked by hand until a Linux CI smoke job (P0.6). The final review found the entry points skipped the messages-only logging on a crash, and the worker crash-looped when the database was down at startup; both fixed test-first. Logs now never include error objects or query values. The API listens on `127.0.0.1` unless `HOST` says otherwise. 84 tests. ADRs 0020–0022.
+- *Still to do in this phase:* web skeleton, CI, design system.
 
 ## Stack choices vs alternatives
 
@@ -34,6 +35,9 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
 | Git workflow | GitHub flow, squash merge, Conventional Commits, public repo with a ruleset | Git Flow, direct commits to `main`; merge or rebase merges; private repo until the Student Pack | 0017 |
 | Code quality & dependencies | ESLint (type-aware) + Prettier, pnpm catalog, lockfile + blocked install scripts + 1-day release age | Biome, no linter; per-package versions | 0018 |
 | Database roles & local DB | Bootstrap file + default privileges; `pg`; Drizzle 0.45; Debian `postgres:18` in Compose | Roles in migrations or Terraform; per-table grants; postgres.js; Drizzle 1.0-rc; Alpine | 0019 |
+| API build & runtime | `tsc -b` project references + `source` export condition; Express; Nest JSON logger; multi-stage `node:24-slim` | Bundling, Node type stripping; Fastify; pino; Alpine, distroless | 0020 |
+| Production migrations | One-shot `migrate` container as the owner role, before the app | Migrate at app startup, from CI, by hand | 0021 |
+| Job-queue role | `app_queue` owning only schema `pgboss` | Owner-installed pg-boss + scoped DELETE; CREATE for the runtime role | 0022 |
 
 ## Mistakes and what I learned
 
@@ -46,6 +50,8 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
 - **Installed "latest" TypeScript and broke the linter's peer range.** TypeScript 7 isn't supported by typescript-eslint yet; pinned `~6.0`. Lesson: read peer-dependency warnings.
 - **My plan claimed Node could run `shared` from source. It can't.** The tests passed only because Vite resolves `./money.js` to `money.ts`. A fresh reviewer caught it; P0.4 now plans a compile step. Lesson: "works in the test runner" isn't "works in production".
 - **Tutorial config was stale, and so was my explanation of it.** The Postgres 18 image moved its data folder, so I mounted the new path. I then wrote that the old path would silently lose data. The final review showed the image refuses to start with the old mount instead. Lesson: verify the explanation as well as the config.
+- **Checked the worker for 3 seconds; it died at 10.** Waiting on a signal doesn't keep Node alive, so the worker exited when pg closed its idle connection after 10 s. Only the Docker run (with a restart counter) showed it. Lesson: observe longer than the slowest timer in the system.
+- **Wrote down a security "fact" too broadly.** I saw a password in a test's error report and wrote that pg errors always carry it. pg hides it, and only some serializers print it. The rule (log only messages) was right, the explanation wasn't. Lesson: verify the claim, not just the fix.
 - **Waited for a GitHub login code on my phone.** The device-flow code is printed in the terminal. Lesson: read the tool's output before looking elsewhere.
 
 ## Interview questions I can now answer
@@ -79,3 +85,16 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
   A: Port bound to `127.0.0.1`, passwords only in a git-ignored `.env`, Compose refuses to start without them, and the app's role can't delete or change the schema.
 - Q: How do your tests get a database?
   A: Testcontainers starts a throwaway PostgreSQL with the same image as `compose.yaml` (the test reads it from there), runs the same bootstrap and migrations, then tests real permissions. (ADR 0013)
+
+**DevOps stage 2 (containers), second half:**
+
+- Q: Why is your app image multi-stage?
+  A: The build stage has pnpm and the TypeScript compiler. The final stage copies only the compiled app and its production dependencies, and runs as a non-root user. Smaller, and less to attack. (ADR 0020)
+- Q: How do you run migrations when deploying?
+  A: A one-shot container from the same image, as the schema-owner role. The app containers depend on it completing successfully, so a failed migration stops the rollout. (ADR 0021)
+- Q: Liveness vs readiness?
+  A: Liveness means "restart me if this fails". Readiness means "send me traffic only if this passes". My readiness check includes the database, and my liveness check doesn't, so a database outage doesn't cause restart loops.
+- Q: What happens on `docker stop`?
+  A: SIGTERM, then SIGKILL after 10 s. My processes catch SIGTERM, finish open work, close the database pool and exit 0 in under a second. `init: true` makes sure the signal reaches Node.
+- Q: How do you keep secrets out of images?
+  A: `.dockerignore` excludes `.env*`, no secret in `ARG`/`ENV`, and values arrive at container start. I checked with `docker history` and the image's environment. (`docs/devops/secrets.md`)

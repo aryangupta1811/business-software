@@ -662,3 +662,51 @@ Entry format:
 - **Say it in an interview:** "After bringing the stack up, I check restart counts and exit codes, look inside the image for secrets with `docker history`, and stop the database on purpose to see how the services behave."
 - **Follow-ups to expect:** How would you see why a container keeps restarting? (`docker compose ps -a` for the exit code, `docker logs` for the last lines, `docker inspect` for the restart count and the OOM-killed flag.)
 
+### 2026-10-30 — Hinglish as a third interface language `#product` `#frontend`
+- **What happened:** At the start of P0.5 I added Hinglish (Hindi written in English letters, "Bill banao") next to English and Hindi. Many shopkeepers read Hindi but type and text in Latin letters. Recorded in Module 00 #25 and NFR 7 with change-log lines.
+- **Why / what I learned:** A language is not just a translation, it's also a script. Hinglish gets its own standard tag, `hi-Latn` (BCP 47: language `hi`, script `Latn`), so the browser and screen readers know what they're reading.
+- **Say it in an interview:** "The app runs in English, Hindi and Hinglish. Hinglish is tagged `hi-Latn`, the standard code for Hindi in Latin script, and tests check that the Hindi file is in Devanagari and the Hinglish one never is."
+- **Follow-ups to expect:** Why not just transliterate Hindi automatically? (Hinglish isn't letter-by-letter transliteration: people write "Connected hai", mixing English words in. It has to be written by hand.)
+
+### 2026-10-30 — Web app served by Caddy, same as production `#frontend` `#devops` → ADR 0023
+- **What happened:** The web app is a two-stage Docker image: Node builds the static files, then a small Caddy image serves them and passes `/api/*` to the `api` container. Locally Vite's dev server does the same `/api` proxying.
+- **Why / what I learned:**
+  - Running the real web server locally tests the routing, headers and fallback before the cloud exists.
+  - One origin for page and API means cookies work and there's no CORS. The browser needs no configuration, so there's no `VITE_` variable that could leak a secret.
+  - Caching: Vite puts a content hash in file names, so `/assets/*` can be cached for a year (`immutable`), while `index.html` is `no-cache` so a new deploy shows up on the next load.
+  - The SPA fallback (any unknown path → `index.html`) must not cover `/assets/*`. Otherwise an old tab asking for a deleted chunk gets HTML, cached for a year under a script's name.
+  - A strict Content-Security-Policy (`default-src 'self'`) is free while the app loads only its own files, and blocks injected scripts.
+- **Say it in an interview:** "Caddy serves the built files and reverse-proxies `/api`, so the browser sees one origin. Hashed assets are cached forever, `index.html` never, and missing assets are a real 404 so the SPA fallback can't poison the cache. A strict CSP blocks scripts from anywhere else."
+- **Follow-ups to expect:** What is a reverse proxy? (A server that takes the browser's request and forwards it to another server, here the API, returning its answer as if it were its own.) Why not `vite preview`? (Vite says it's not a production server.)
+
+### 2026-10-30 — PowerShell added a BOM to package.json and broke Vitest `#gotcha` `#tooling`
+- **What happened:** I changed the root `package.json` with PowerShell 5.1's `Set-Content -Encoding utf8`, which writes a byte-order mark (BOM, three invisible bytes) at the start. Vitest then failed with "Unexpected token" while reading the file as JSON, and printed a misleading "Cannot find dependency 'jsdom'". `Add-Content` also gave `.prettierignore` Windows line endings.
+- **Why / what I learned:** The error you see first isn't always the cause: the real error was above it, in Node's JSON parser. In PowerShell 5.1, "utf8" means "UTF-8 with BOM". Edit files with the editor tools, or with .NET's `UTF8Encoding($false)` (no BOM) when a script must write them.
+- **Say it in an interview:** "A test run failed with 'missing dependency', but reading the whole output showed a JSON parse error: a script had written a BOM into package.json. I fixed the file and stopped editing files through PowerShell."
+- **Follow-ups to expect:** What is a BOM? (A marker at the start of a text file saying which Unicode encoding it uses. UTF-8 doesn't need one, and JSON parsers reject it.)
+
+### 2026-10-30 — An i18next default would have shown Hinglish users Devanagari `#frontend` `#gotcha` `#testing`
+- **What happened:** For a language like `hi-Latn`, i18next by default looks for a missing string in `hi-Latn`, then `hi`, then the fallback `en`. So a Hinglish user would have seen Hindi in Devanagari whenever a Hinglish string was missing. `load: 'currentOnly'` skips the `hi` step. I wrote a test that adds a string to English and Hindi only and expects English in Hinglish, then removed the setting to watch the test fail ("expected 'हिन्दी में' to be 'In English'").
+- **Why / what I learned:** Library defaults are designed for regional variants (`en-GB` → `en`), not for a different script. A test should be seen failing before it's trusted.
+- **Say it in an interview:** "I found that i18next's fallback chain would show Hinglish users Devanagari, pinned it with `load: 'currentOnly'`, and proved the test catches it by removing the setting."
+- **Follow-ups to expect:** How do you stop missing translations in the first place? (A test compares every language file's keys with English, and `t()` keys are type-checked against `en.json`.)
+
+### 2026-10-30 — Two lint plugins that didn't fit out of the box `#tooling` `#frontend`
+- **What happened:**
+  - `eslint-plugin-jsx-a11y` (accessibility rules) declares support only up to ESLint 9, and we run 10. I planted a missing `alt` on an `<img>` and a hook inside an `if`; both were caught, so it works despite the warning.
+  - `eslint-plugin-react-refresh` flagged every TanStack route file, because they export a `Route` object and keep their components private. TanStack's plugin moves those components into their own modules, which is where fast refresh happens, so I turned the rule off for `src/routes/` only, with a comment saying why.
+- **Why / what I learned:** A peer-dependency warning means "not promised", not "broken": test it. Turn a rule off as narrowly as possible, and write down the reason.
+- **Say it in an interview:** "When a plugin officially didn't support our ESLint version, I proved it worked by planting errors it had to catch, instead of trusting or ignoring the warning."
+- **Follow-ups to expect:** What is fast refresh? (Vite swaps a changed React component in the running page without a reload, keeping its state. It only works when a file exports nothing but components.)
+
+### 2026-10-30 — A 404 that said "cache me for a year" `#devops` `#gotcha` `#security` → ADR 0023
+- **What happened:** The first `curl -I` check of the Caddy container showed that `/assets/missing.js` answered 404 with `Cache-Control: public, max-age=31536000, immutable`, without the CSP and with `Server: Caddy`. The `header` directives had run before the file server failed, and Caddy's error handling starts a fresh response. Fix: set the long cache only when the file exists (`@exists file`), and answer errors in `handle_errors`, which sets the security headers again plus `Cache-Control: no-store`. A stopped API now gives a clean `502` with the same headers.
+- **Why / what I learned:** Browsers may cache a 404 if the headers allow it. Error responses need their own headers, and the only way to know is to look at the real response, not the config.
+- **Say it in an interview:** "Checking the real headers with curl, I found my 404s carried the one-year immutable cache and lost the security headers, because the web server's error path builds a new response. Errors now get no-store and the same security headers."
+- **Follow-ups to expect:** What does `immutable` add to `max-age`? (It tells the browser not to re-check the file even on reload, which is safe only because the file name changes whenever its content does.)
+
+### 2026-10-30 — Checking the app in a real browser without a browser extension `#testing` `#tooling`
+- **What happened:** The Chrome extension disconnected, so I used Chrome itself in headless mode. `chrome --headless --dump-dom` prints the page after its JavaScript has run. A 60-line Node script drove Chrome over the DevTools protocol (the same protocol Playwright uses), with Node 24's built-in WebSocket. It clicked each language, took screenshots, reloaded to check the choice was kept, and collected console errors and CSP violations: none. With the database stopped the badge said "Server is up, but data can't be loaded", with the API stopped "Can't reach the server", and both went back to "Connected".
+- **Why / what I learned:** Unit tests ran in jsdom, which has no CSP and no real network. Only a real browser proves the strict CSP doesn't break the built app.
+- **Say it in an interview:** "Component tests run in jsdom, but I also loaded the production build in headless Chrome through Caddy, to prove the strict CSP and the `/api` proxy work and the status badge reacts when I stop the database or the API."
+- **Follow-ups to expect:** What is the Chrome DevTools Protocol? (The JSON-over-WebSocket interface Chrome's DevTools use. Puppeteer and Playwright are built on it.)

@@ -1,5 +1,15 @@
-# Local development services. Start with `pnpm db:up`; see docs/devops/local-database.md.
+# Local services. `pnpm db:up` starts only the database (for `pnpm dev`); `pnpm app:up`
+# starts everything. See docs/devops/local-database.md.
 name: business-software
+
+# The api, worker and migrate services run the same image with different commands.
+x-app: &app
+  build:
+    context: .
+    dockerfile: apps/api/Dockerfile
+  image: business-software-app:local
+  # A tiny init process as PID 1 passes Docker's stop signal on to Node.
+  init: true
 
 services:
   db:
@@ -24,6 +34,49 @@ services:
       interval: 2s
       timeout: 5s
       retries: 30
+
+  # One-shot: applies migrations as the owner role, then exits. api and worker wait for it.
+  migrate:
+    <<: *app
+    command: [node, dist/migrate.js]
+    environment:
+      MIGRATION_DATABASE_URL: postgresql://app_owner:${APP_OWNER_PASSWORD}@db:5432/business_software
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *app
+    environment:
+      DATABASE_URL: postgresql://app_runtime:${APP_RUNTIME_PASSWORD}@db:5432/business_software
+    ports:
+      - 127.0.0.1:3000:3000
+    healthcheck:
+      # Liveness only: restarting the api wouldn't fix a database outage. The slim image has
+      # no curl, so Node itself makes the request.
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    <<: *app
+    command: [node, dist/worker.js]
+    environment:
+      DATABASE_URL: postgresql://app_runtime:${APP_RUNTIME_PASSWORD}@db:5432/business_software
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   pgdata:

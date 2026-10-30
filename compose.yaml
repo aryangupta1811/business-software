@@ -80,5 +80,22 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  # Caddy: the web app's files, and /api passed on to the api service.
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    image: business-software-web:local
+    ports:
+      - 127.0.0.1:8080:8080
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:8080/]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    # No depends_on: if the api is down, the page still loads and says it can't reach the
+    # server, which is what the connection badge is for.
+
 volumes:
   pgdata:

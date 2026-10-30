@@ -1,7 +1,7 @@
 # Progress
 
-**Current focus:** Phase 0 — foundations (monorepo scaffold done; database + Docker Compose next)
-**Next step:** Owner pushes and merges the P0.2 pull request; next session: P0.3 database + Docker Compose (plan first)
+**Current focus:** Phase 0 — foundations (database + Docker Compose done; API skeleton next)
+**Next step:** Owner pushes and merges the P0.3 pull request; next session: P0.4 API skeleton (plan first)
 **Last updated:** 2026-10-30
 
 Each task below is sized for **one session**. DevOps stages (from `docs/devops/DEVOPS_PLAN.md`) are woven in where they're first needed. Tasks for DRAFT modules are provisional: re-cut them after `/finalize-module NN`.
@@ -34,8 +34,8 @@ Each task below is sized for **one session**. DevOps stages (from `docs/devops/D
 - [x] **P0.0 Laptop setup** (owner, done 2026-10-30; Student Pack applied, awaiting approval): move the repo out of OneDrive; `wsl --install` in an admin PowerShell, then restart; Docker Desktop (WSL 2 backend), checked with `docker run hello-world`; pnpm (`npm install -g pnpm`); VS Code extensions (ESLint, Prettier, Tailwind CSS IntelliSense, Docker); apply for the GitHub Student Developer Pack. Already installed (checked 2026-10-29): Git 2.56, GitHub CLI 2.103, Node 24.18 (LTS), VS Code; 24 GB RAM, 49 GB free on C:. **Later, at DevOps stage 4:** AWS CLI v2 (the existing `aws` in `Python311\Scripts` is a broken old pip install, so remove it) and Terraform.
 - [x] **P0.1 Git workflow** (DevOps stage 1, done 2026-10-30, ADR 0017): `.gitattributes` forcing LF; PR template; GitHub flow + Conventional Commits in `docs/devops/git-workflow.md`; full-history gitleaks scan (no leaks) and a personal-data check, then the repo was made **public**; `protect-main` ruleset (PR required, squash only, no force-push or deletion, no bypass); secret scanning, push protection and Dependabot alerts on; commits use the GitHub noreply email; `gh` logged in. Verified through the GitHub API.
 - [x] **P0.2 Monorepo scaffold** (done 2026-10-30, ADR 0018, plan `docs/plans/2026-10-30-p0.2-monorepo-scaffold.md`): pnpm 12 workspace (`apps/*`, `packages/*`), strict TypeScript ~6.0 (typescript-eslint doesn't support 7 yet), ESLint with type-aware rules + Prettier, Vitest 5, pnpm catalog, one-day `minimumReleaseAge`; `packages/shared` with `parseRupees` and `formatPaise`, test-first (45 tests); every check proven to fail on a planted error; commands in `CLAUDE.md`. `apps/web` and `apps/api` were deliberately left to P0.5/P0.4, which generate them with Vite and NestJS tools.
-- [ ] **P0.3 Database + Docker Compose** (DevOps stage 2): PostgreSQL in Docker Compose, Drizzle + first migration, migration and runtime database roles, a Testcontainers integration test.
-- [ ] **P0.4 API skeleton:** NestJS app with `/health` and one endpoint that reads from the database; `api` and `worker` entry points; Dockerfile; runs in Compose. **Known from P0.2:** Node can't run `packages/shared` from its TypeScript source (`./money.js` imports point at `.ts` files: `ERR_MODULE_NOT_FOUND`), so the API needs `shared` compiled. Options: a tsc build to `dist` with export conditions, TypeScript project references, bundling the API, or `.ts` import paths with `rewriteRelativeImportExtensions`. Pick one in the P0.4 plan.
+- [x] **P0.3 Database + Docker Compose** (DevOps stage 2, first half; done 2026-10-30, ADR 0019, plan `docs/plans/2026-10-30-p0.3-database-compose.md`): PostgreSQL 18 in Docker Compose (`pnpm db:up`), roles `app_owner`/`app_runtime` from `packages/db/bootstrap/create-roles.sql`, Drizzle 0.45 with migration `0000` (default privileges: select/insert/update, never delete), `pnpm db:migrate`; 9 Testcontainers integration tests; runbook `docs/devops/local-database.md`. A fresh reviewer found no bugs.
+- [ ] **P0.4 API skeleton:** NestJS app with `/health` and one endpoint that reads from the database; `api` and `worker` entry points; Dockerfile; runs in Compose. **Known from P0.2:** Node can't run `packages/shared` from its TypeScript source (`./money.js` imports point at `.ts` files: `ERR_MODULE_NOT_FOUND`), so the API needs `shared` compiled. Options: a tsc build to `dist` with export conditions, TypeScript project references, bundling the API, or `.ts` import paths with `rewriteRelativeImportExtensions`. Pick one in the P0.4 plan. **Known from P0.3 (also decide in the plan):** (a) the API needs a database client in `packages/db` (`pg` Pool + Drizzle) and `DATABASE_URL` for `app_runtime` in `.env.example`; (b) how production runs migrations (now only `drizzle-kit migrate` locally), e.g. a one-shot `migrate` container as `app_owner`; Drizzle 0.x skips out-of-order migrations from merged branches; (c) pg-boss (ADR 0010) creates its own `pgboss` schema and deletes and archives job rows. Who creates that schema (`app_owner` in a migration?), and how does "the runtime role never deletes" (ADR 0007) apply to queue tables (a scoped DELETE on `pgboss.*` only, or a separate role)? Record it in an ADR.
 - [ ] **P0.5 Web skeleton:** React + Vite app shell calling the API; English/Hindi switch with i18next; `docker compose up` starts everything.
 - [ ] **P0.6 CI** (DevOps stage 3): GitHub Actions running lint, type-check, unit and integration tests, and builds on every push/PR; a Conventional Commits check on PR titles; a gitleaks secrets scan; then make CI a required status check in the `protect-main` ruleset (ADR 0017); status badge in a new README.
 - [ ] **P0.7 Design system:** visual direction, colour and type tokens (Latin + Devanagari), spacing, restyled base components, keyboard-shortcut framework. **Owner's brief (2026-10-30):** modern and clean, not "AI slop" (no generic template or AI-generated look), and easy for shopkeepers to use. *At P0.7, ask for the details: colours, apps whose look they like, light/dark.*
@@ -46,7 +46,7 @@ Each task below is sized for **one session**. DevOps stages (from `docs/devops/D
 Foundations under every module:
 
 - [ ] **P1.1 Tenancy & data safety:** businesses and branches tables, `business_id` everywhere, RLS policies, no-`DELETE` grants, cross-business tests [ADRs 0006, 0007]
-- [ ] **P1.2 Entry log recording:** append-only log table and the one write helper every module uses; tests [ADR 0007, Module 06]
+- [ ] **P1.2 Entry log recording:** append-only log table and the one write helper every module uses; tests [ADR 0007, Module 06]. The default privileges from P0.3 give `app_runtime` UPDATE on every table, so this table's migration must `REVOKE UPDATE`, with a `42501` test in the style of `packages/db/src/roles.test.ts`. If RLS helpers or triggers use `SECURITY DEFINER`, also revoke PUBLIC's default EXECUTE on functions.
 - [ ] **DevOps stage 4 — cloud guardrails:** first ask when placement season is (the Free plan's 6-month clock starts at sign-up, so this stage may move later). Then: AWS Free plan account, MFA, no root use, IAM Identity Center, credit-usage budget alert, earn the extra $100 of credits. *Owner does it with Claude's steps.*
 
 Module 00 — answer its open questions first (auto-lock time, password reset, deactivation, counters):
@@ -58,7 +58,7 @@ Module 00 — answer its open questions first (auto-lock time, password reset, d
 
 Module 01 — answer its open questions first (medical costing, built-in units, Excel errors, inter-state transfers):
 
-- [ ] **P1.7 Items:** item fields, units and conversions, prices, GST rate and HSN, MRP rule, Hindi names, search and barcode lookup; archive instead of delete
+- [ ] **P1.7 Items:** item fields, units and conversions, prices, GST rate and HSN, MRP rule, Hindi names, search and barcode lookup; archive instead of delete. Decide an ICU collation for item-name sorting; the Docker image alone doesn't make sorting match RDS (ADR 0019).
 - [ ] **P1.8 Stock ledger:** stock movements, opening stock, adjustments with reason, negative-stock warn/block, two-counter concurrency tests
 - [ ] **P1.9 Excel import** of opening stock
 - [ ] **P1.10 Business-type stock features:** batches and expiry (soonest expiry first), variants, IMEI/serial numbers
@@ -66,7 +66,7 @@ Module 01 — answer its open questions first (medical costing, built-in units, 
 
 DevOps before any real data:
 
-- [ ] **DevOps stage 5 — Terraform:** remote state in S3, network and security groups, the EC2 server with Docker Compose and Caddy, a free domain with HTTPS
+- [ ] **DevOps stage 5 — Terraform:** remote state in S3, network and security groups, the EC2 server with Docker Compose and Caddy, a free domain with HTTPS. Run `packages/db/bootstrap/create-roles.sql` on RDS once by hand; the master user may first need `GRANT app_owner TO <master>` (ADR 0019). Decide whether to `REVOKE CONNECT, TEMP ON DATABASE postgres FROM PUBLIC` (review minor from P0.3).
 - [ ] **DevOps stage 7 — data safety:** RDS with point-in-time restore, nightly `pg_dump` copy to S3, first restore drill, restore runbook, scheduled stop when idle
 - [ ] **DevOps stage 6 — CD:** deploy through Systems Manager on merge with a manual go-ahead, health checks, rollback to the previous image
 

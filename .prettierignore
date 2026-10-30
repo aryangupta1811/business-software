@@ -4,3 +4,5 @@ packages/db/migrations/meta/
 *.md
 # Local scratch space for Claude Code plans (git-ignored)
 .superpowers/
+# Written by TanStack Router's Vite plugin
+apps/web/src/routeTree.gen.ts

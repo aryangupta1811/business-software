@@ -1,1 +1,1 @@
-export type { Paise } from './money.js';
+export { parseRupees, type Paise } from './money.js';

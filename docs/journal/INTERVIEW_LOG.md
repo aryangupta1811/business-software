@@ -441,3 +441,9 @@ Entry format:
 - **Why / what I learned:** Keep alerts trustworthy by fixing false positives at the source. Git Bash (MSYS) path conversion can be turned off with `MSYS_NO_PATHCONV=1`.
 - **Say it in an interview:** "If a check keeps raising false alarms, I fix the cause, because alert fatigue is how real problems get ignored."
 - **Follow-ups to expect:** How would you handle false positives in CI? (A reviewed allowlist entry with a reason, never turning the check off.)
+
+### 2026-10-30 — The final review caught a wrong assumption in my plan `#architecture` `#gotcha` `#process`
+- **What happened:** A fresh reviewer checked the whole P0.2 branch. It tried about 60 hostile inputs on `parseRupees` and found no wrong amount. It did find that my plan claimed `shared`'s source "runs under Node without changes". It doesn't: `node` importing `src/index.ts` fails with `ERR_MODULE_NOT_FOUND … money.js`. Node 24 can strip TypeScript types itself, but it won't map an import of `./money.js` to `money.ts`. Vite and Vitest do that mapping, so the tests passed. I fixed the plan and wrote the finding into the P0.4 task: the API will need `shared` compiled (or bundled).
+- **Why / what I learned:** "It works in the tests" only proves it works in the test runner. An assumption is a claim until something runs it. A reviewer with a fresh context catches what the author's context hides.
+- **Say it in an interview:** "My shared package worked in Vite and Vitest, but a review showed Node can't load it from source, so I planned a compile step for the API before writing it, not after a failed deploy."
+- **Follow-ups to expect:** How do monorepos share TypeScript between a bundled frontend and a Node backend? (Compile the shared package, use project references, or bundle the backend.)

@@ -34,12 +34,15 @@ Update this as the project grows.
 | Largest exact amount in JavaScript | ≈ ₹90 lakh crore in paise (2^53) | ADR 0008 |
 | Business types in v1 | 5 | Module 00 |
 | Modules | 10 (00–09) | `docs/requirements/` |
-| ADRs | 19 (16 at kickoff) | `docs/decisions/` |
+| ADRs | 22 (16 at kickoff) | `docs/decisions/` |
 | Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
-| Automated tests | 54: 45 unit (money helpers, P0.2) + 9 integration on a real PostgreSQL (roles and grants, P0.3) | `pnpm test` |
+| Automated tests | 84: 65 unit (45 money helpers, 20 API config, error, process and shutdown) + 19 integration on a real PostgreSQL (roles and grants, database client, health endpoints, worker startup) | `pnpm test` |
 | PostgreSQL version | 18, everywhere (newest RDS supports) | ADR 0005, `compose.yaml` |
 | Integration test run | ~3 s with the image cached, ~22 s on the first run | P0.3 |
 | How long a new package version waits before we install it | 1 day | `pnpm-workspace.yaml` `minimumReleaseAge` |
+| API Docker image | 375 MB, of which the app is 40 MB (the rest is `node:24-slim`) | P0.4 |
+| First image build on a slow connection | ~12 minutes (later builds reuse the cached install layer) | P0.4 |
+| Clean stop of api and worker | ~0.7 s, exit code 0 | P0.4 |
 
 ---
 
@@ -94,6 +97,13 @@ Short answers; the Log entry has the full story.
 - **Q: How does a command-line tool log in to GitHub without your password?**
   A: The OAuth device flow. The tool gets a short code from GitHub, I approve that code in a browser where I'm already logged in, and the tool receives a token. Only enter codes your own device generated: entering someone else's code logs their device into your account.
 
+- **Q: What's the difference between liveness and readiness?**
+  A: Liveness says the process is alive, so there's no point restarting it. Readiness says it can do its job, here meaning the database answers. My API has `/api/health` (liveness, used by Docker's healthcheck) and `/api/health/ready` (503 when the database is down). Restarting the API wouldn't fix a database outage, so the restart check mustn't depend on the database. → ADR 0020
+- **Q: How do you run database migrations in production?**
+  A: A one-shot container from the same image runs them as the schema-owner role, and the app containers start only after it exits successfully. New code never meets an old schema, and the long-running app can't change the schema. → ADR 0021
+- **Q: How do you stop secrets leaking from a public repo?**
+  A: Five places: git (gitignore, gitleaks, push protection), images (secrets only arrive at container start, checked with `docker history`), the browser bundle (never a `VITE_` secret), CI (no secrets for fork PRs) and logs (messages only, since pg's error objects contain the password). → `docs/devops/secrets.md`
+
 ---
 
 ## Glossary
@@ -111,10 +121,13 @@ Terms I learned on this project, in one line each.
 | Conventional Commits | Commit messages shaped `type(scope): summary`, e.g. `fix(gst): round CGST and SGST separately` |
 | CSRF | A trick where another site makes your browser send a request with your cookies; blocked with SameSite cookies + tokens |
 | Database role | A PostgreSQL login (or group) with its own permissions; here `app_owner` runs migrations, `app_runtime` is the app |
+| Decorator metadata | Type information a compiler attaches to decorated classes; NestJS reads it to know what to inject |
 | Default privileges | PostgreSQL rules that grant permissions on tables automatically when they're created later |
 | Device flow | OAuth login for CLIs and TVs: the device shows a short code, you approve it in a browser where you're logged in |
 | Docker Compose | One YAML file describing several containers, their settings and volumes, started with one command |
 | Docker daemon | The background engine that builds and runs containers; the `docker` command only sends it requests |
+| Exit code 143 | 128 + 15: the process ended because of SIGTERM rather than exiting by itself |
+| Export conditions | Named entry points in a package's `exports` (`source`, `types`, `default`); each tool picks the one it understands |
 | FEFO | First Expiry, First Out: sell the batch that expires soonest |
 | GitHub flow | `main` is always deployable; every change is a short-lived branch merged by pull request |
 | Healthcheck | A command Docker runs repeatedly to decide whether a container is ready, not just started |
@@ -122,18 +135,24 @@ Terms I learned on this project, in one line each.
 | IaC | Infrastructure as Code: cloud resources created from code files (Terraform) instead of clicking in a console |
 | Idempotency key | A unique ID sent with a request so repeating it has the same effect as sending it once |
 | Image (Docker) | A read-only package of a program and everything it needs; containers are started from it |
+| Liveness / readiness | "The process is alive" vs "it can serve requests now" (its dependencies answer) |
 | Migration | A numbered SQL file that changes the database schema, applied once per database and tracked |
 | Modular monolith | One deployable app split internally into modules with clear boundaries |
 | Monorepo | One git repository holding several packages (here: web app, API, shared code) that are developed together |
+| Multi-stage build | A Dockerfile with a build stage (tools, compilers) and a slim final stage that copies only the result |
 | OIDC | OpenID Connect: lets one system prove its identity to another and get short-lived credentials |
+| One-shot container | A container that does one job and exits, like `migrate`; `Exited (0)` means success |
 | ORM | A library that maps database tables to code (Drizzle here) |
 | Outbox pattern | Write "send this message" into the database in the same transaction, send it later from a worker |
 | Peer dependency | A package that a plugin needs but expects you to install, in a version range it supports (typescript-eslint needs TypeScript) |
+| PID 1 / init | The first process in a container; it receives Docker's stop signal. `init: true` adds a tiny init that forwards signals |
 | PITR | Point-in-time restore: rebuild the database as it was at any second in the retention window |
+| Project references | TypeScript's way to build several packages in dependency order, incrementally (`tsc -b`) |
 | Push protection | GitHub rejects a `git push` that contains a known secret format, before it reaches the repo |
 | RLS | Row-Level Security: PostgreSQL policies that decide which rows a query is allowed to see |
 | RPO / RTO | Recovery Point Objective (max data you can lose) / Recovery Time Objective (max time to recover) |
 | Ruleset | GitHub's rules for branches (require a PR, block force-push…), the newer form of branch protection |
+| SIGTERM | The polite "please stop" signal; `docker stop` sends it, then kills the process after 10 s |
 | SPA | Single-page app: the browser loads the app once and then only exchanges data with the server |
 | Squash merge | All of a pull request's commits combined into one commit on `main` |
 | Supply-chain attack | Attacking an app through something it depends on, e.g. publishing a poisoned version of a popular npm package |
@@ -529,3 +548,104 @@ Entry format:
 - **Why / what I learned:** A red test only counts if it's red *for the right reason*. Check the failure message, not just ✗. And behaviour tests can miss configuration that only matters for cases the test doesn't use (identity vs serial), so pin the configuration itself as well.
 - **Say it in an interview:** "A reviewer showed a grant could vanish without any test failing, because identity columns don't check sequence privileges. I added a test that pins the exact grants and confirmed it with planted mutations. The first time, it failed for the wrong reason: a SQL error. I only trust a red test after reading why it's red."
 - **Follow-ups to expect:** Identity vs serial? (Both use a sequence. `serial` is a default calling `nextval`, which checks the caller's sequence rights. Identity is built into the table, so inserting only needs the table's INSERT right.)
+
+### 2026-10-30 — Secrets in a public repo: five leak paths, not one `#security` `#devops`
+- **What happened:** The owner asked that the future Claude API key can never be read by GitHub users. `.gitignore` and gitleaks only cover git. I listed every way a secret leaks from a public project and gave each a rule in `docs/devops/secrets.md`:
+  - git;
+  - Docker image layers (anyone who pulls can run `docker history`);
+  - the browser bundle (Vite inlines `VITE_*` variables);
+  - CI (fork PRs, `pull_request_target`);
+  - logs and error messages.
+
+  In P0.4 I checked the image: no `.env`, and no secret in its environment or history.
+- **Why / what I learned:** "Not in git" isn't "not public". Images, front-end bundles and logs are published too. A paid API key also gets a spend limit, so even a leak has a ceiling.
+- **Say it in an interview:** "Secrets only arrive as environment variables when a container starts: never in an image layer, never in the browser bundle, never in a log line. The Claude key is read only by the API, lives in SSM, and has a spend limit at the provider."
+- **Follow-ups to expect:** A secret got committed, what now? (Revoke it at the provider first; deleting the commit doesn't help because clones and forks keep it.)
+
+### 2026-10-30 — Error objects can leak more than their message `#security` `#gotcha` `#database`
+- **What happened:** A planted-error test printed an unhandled pg error, and Vitest's report showed its `client` field with `password: 'runtime-test'`. My first note said logging any pg error would leak the password. The final review showed that's too broad, and I checked it myself:
+  - pg-pool attaches the client only to idle-connection errors;
+  - pg defines `password` as a hidden (non-enumerable) property, so default `console.log`/`util.inspect` and `JSON.stringify` don't show it;
+  - serializers that read hidden properties do show it: `util.inspect(e, { showHidden: true })`, `%o`, and test-runner or error-reporting tools.
+
+  Two more problems:
+  - Drizzle wraps the real reason in `error.cause`, so logging only `error.message` printed a useless "Failed query: CREATE SCHEMA…".
+  - Drizzle's message ends with `params:` and the query's values, which from P1 will be phone numbers and session tokens.
+
+  Fix: `describeError()` joins the messages along the `cause` chain, cuts each one at `params:`, and shows only the kind of a thrown non-Error. Every entry point goes through `runProcess()`, so even a startup crash is logged that way. All of it is tested.
+- **Why / what I learned:** Libraries attach context to errors for debugging: connections, query values. Whether it's printed depends on the serializer, so log only fields you chose, and follow `cause` to keep the useful reason. Also, verify a security claim before writing it down.
+- **Say it in an interview:** "I log only error messages, never error objects. pg-pool attaches the client to some errors, and its password is hidden but still printed by serializers that read hidden properties. Drizzle's messages also include query values, so I strip those. The log still says 'password authentication failed', just not the password or the customer's data."
+- **Follow-ups to expect:** What is `Error.cause`? (A standard way to wrap a lower-level error inside a higher-level one, so you keep both.)
+
+### 2026-10-30 — An unhandled `error` event crashes Node: the pool needs a handler `#backend` `#database` `#gotcha`
+- **What happened:** When the database restarts, idle pooled connections die, and `pg` emits an `error` event on the pool. An `EventEmitter` with no `error` listener throws, which kills the whole process. A database blip would crash the API. `createDatabase(url, onPoolError)` makes the handler a required argument. A test kills the runtime role's connections with `pg_terminate_backend` and checks that the handler ran and the next query works. Removing the handler made the test fail with exactly that unhandled error.
+- **Why / what I learned:** In Node, the `error` event is special: unhandled means crash. Making the safe thing required in the function signature beats remembering it.
+- **Say it in an interview:** "My pool's error handler is a required parameter, because Node crashes on an unhandled `error` event, and pg raises one whenever the database drops an idle connection. A test kills connections from the server side to prove the API survives."
+- **Follow-ups to expect:** What happens to queries during the outage? (They fail, and `/ready` returns 503. When the database is back, the pool opens new connections. Checked in Docker: no restart needed.)
+
+### 2026-10-30 — Compile once, read source everywhere else: project references + export conditions `#architecture` `#backend` → ADR 0020
+- **What happened:** Node couldn't run our TypeScript packages (known since P0.2), and NestJS needs a compiler anyway for decorator metadata. Each package now builds to `dist/` with `tsc -b` (project references build `shared` → `db` → `api` in order). Packages export a custom `source` condition pointing at `src/*.ts`. TypeScript (`customConditions`), ESLint and Vitest use it, so tests and lint need no build, and Node uses the `default` condition (`dist/*.js`). Checked by deleting every `dist/` and running `pnpm check`. `pnpm dev` runs `tsc -b -w` and `node --watch` together, restarting about 4 s after a save.
+- **Why / what I learned:** Different tools can see different files through one `exports` map. Production should run compiled JavaScript, and fast feedback shouldn't need a build.
+- **Say it in an interview:** "Tests and the editor read my packages' TypeScript through a custom export condition. Node reads compiled output. `tsc -b` builds them in dependency order."
+- **Follow-ups to expect:** Why not bundle? (One more tool, esbuild can't emit decorator metadata, and stack traces point into a bundle.)
+
+### 2026-10-30 — One image, three commands, and migrations first `#devops` `#database` → ADRs 0020, 0021
+- **What happened:** A multi-stage Dockerfile on `node:24-slim`:
+  - pnpm via Corepack;
+  - `pnpm deploy --prod` copies the API with only its production dependencies, workspace packages included;
+  - it runs as the non-root `node` user, with root-owned files.
+
+  It's 375 MB, of which the app is 40 MB. Compose runs it three ways: `migrate` (one-shot, as `app_owner`), then `api` and `worker` (as `app_runtime`), which start only after `migrate` exits 0. With a wrong owner password, `migrate` exited 1 with "password authentication failed", and `api`/`worker` stayed `Created`. The first build took about 12 minutes on a very slow connection; later builds reuse the cached install layer.
+- **Why / what I learned:** The schema must be upgraded before new code runs, by the only role allowed to change it. Manifests are copied before sources so the dependency layer stays cached.
+- **Say it in an interview:** "One image, three commands. A one-shot migrate container upgrades the schema as the owner role, and the app containers depend on it completing successfully, so a failed migration stops the rollout before anything changes."
+- **Follow-ups to expect:** What if the new code isn't compatible with the old schema during a deploy? (Keep migrations backwards-compatible: add first, remove in a later release.)
+
+### 2026-10-30 — Liveness vs readiness `#devops` `#backend`
+- **What happened:** `GET /api/health` returns 200 whenever the process answers. Docker's healthcheck uses it (via `node -e "fetch(...)"`, because the slim image has no curl). `GET /api/health/ready` runs `select 1` as `app_runtime` and returns 503 `{status: "error", database: "unreachable"}` if it fails, without leaking the reason to the caller. Tested with a real database, and with a URL to a closed port. In Docker, stopping the database gave 503 on `/ready` and 200 on `/health`, then 200 again after a restart, with no container restarts.
+- **Why / what I learned:** A restart check that depends on the database would restart a healthy API during a database outage, again and again, fixing nothing.
+- **Say it in an interview:** "Liveness answers 'should Docker restart me?', readiness answers 'should traffic come to me?'. Mixing them causes restart loops during an outage."
+- **Follow-ups to expect:** Where does readiness get used? (By the deploy step and the reverse proxy later, to send traffic only to an instance that can serve it.)
+
+### 2026-10-30 — My worker died after 10 seconds: signal listeners don't keep Node alive `#backend` `#devops` `#mistake` `#gotcha`
+- **What happened:** In the first Docker run, the worker logged "started", then exited with "Warning: Detected unsettled top-level await", and Docker restarted it (restart count 1). It was waiting on `once(process, 'SIGTERM')`. A listener doesn't keep Node's event loop alive. The only thing that did was the pool's idle connection, which pg closes after 10 s, so Node exited (code 13) while still waiting. My host check had only waited 3 s.
+
+  The fix: `waitForShutdown()` holds a long timer until the signal arrives. The test runs it in a child process (Node strips its types) and checks the process is still running a second later. The first red was for the wrong reason: a broken `C:/C:/` path on Windows. After fixing the path, red with exit 13; after the fix, green. 20 s later in Docker: 0 restarts.
+- **Why / what I learned:** Node exits when nothing is pending, regardless of pending promises. Observe longer than the system's slowest timer. Read why a test is red.
+- **Say it in an interview:** "My worker exited after exactly 10 seconds, which matched pg's idle timeout. Waiting for a signal doesn't keep Node's event loop alive, so once the pool's last socket closed, the process ended. I reproduced it in a test, held the process open with a timer until SIGTERM, and verified it in Docker."
+- **Follow-ups to expect:** Exit code 13? (Node's code for a top-level await that never settled.)
+
+### 2026-10-30 — Graceful shutdown: exit 0, not 143 `#devops` `#backend` → ADR 0020
+- **What happened:** `docker compose stop` gave the worker exit 0 but the API 143. NestJS's `enableShutdownHooks()` closes the app and then re-raises SIGTERM, so the process ends "killed by signal" (128 + 15). It was still graceful (0.7 s, not a 10 s kill). I switched the API to the same `waitForShutdown()` + `app.close()` as the worker: both now exit 0 in about 0.7 s. Compose uses `init: true`, so a tiny init process is PID 1 and forwards signals.
+- **Why / what I learned:** `docker stop` sends SIGTERM and kills after 10 s. A process that ignores it loses in-flight work. Exit codes are signals to monitoring, so a clean stop should be 0.
+- **Say it in an interview:** "On SIGTERM my processes stop taking work, finish what's open, close the database pool and exit 0 in under a second. Docker would otherwise SIGKILL them after 10 seconds."
+- **Follow-ups to expect:** Why does PID 1 matter? (The kernel gives PID 1 special signal handling, with no default actions, so a program not written for it may ignore SIGTERM. An init process avoids that.)
+
+### 2026-10-30 — pg-boss needs DDL and DELETE, so it gets its own sandbox role `#database` `#security` → ADR 0022
+- **What happened:** Before deciding how the job queue fits "the app can't delete", I read pg-boss 12.38's SQL. It creates tables while running (per-queue partitions, stats partitions) and deletes finished jobs. None of its functions are `SECURITY DEFINER`, so the caller needs those rights. Decision: a third role, `app_queue`, owns only schema `pgboss`; the business-data role can't touch it, and it can't read business tables. Built in P2.7.
+- **Why / what I learned:** Read what a library actually does to the database before granting it rights. Docs often don't mention run-time DDL.
+- **Say it in an interview:** "My queue library needs to create tables and delete rows by design, so it runs as a separate role sandboxed in its own schema. The 'never delete business data' rule stays true, and the permanent record of each message lives in an outbox table."
+- **Follow-ups to expect:** Why not just grant DELETE on the queue tables to the app role? (pg-boss also creates tables at run time, which that role can't do, and its upgrades would become hand-written migrations.)
+
+### 2026-10-30 — Drizzle 0.x silently skips out-of-order migrations `#database` `#git` `#gotcha` → ADR 0021
+- **What happened:** If two branches each add a migration and the one with the older timestamp merges second, Drizzle 0.x never applies it, without any error. Rule in `git-workflow.md`: rebase a migration PR on `main` before merging, and regenerate it if `main` got a newer one. A CI check is a candidate for P0.6.
+- **Why / what I learned:** Migration tools differ on ordering. Know which one you have before two branches race.
+- **Say it in an interview:** "Drizzle applies migrations by timestamp and skips older ones silently, so my workflow makes a migration PR the newest before it merges."
+- **Follow-ups to expect:** How do other tools handle it? (Some refuse out-of-order migrations with an error, some apply them. Either is safer than silent.)
+
+### 2026-10-30 — The final review: crashes that skipped my own logging rule `#process` `#security` `#devops`
+- **What happened:** A fresh reviewer re-ran all five risks live and found no critical bugs, but three things worth fixing before P1 copies the pattern:
+  1. `main.ts` and `worker.ts` had no top-level `catch`. A startup failure printed a raw stack trace, and with the database down the worker crash-looped under `restart: unless-stopped`.
+  2. `describeError` let Drizzle's `params:` (query values) into logs.
+  3. My notes overstated the pg password fact.
+
+  I also raised one of its minors: `pnpm dev` listened on every interface, so the API was reachable from the shop's Wi-Fi.
+
+  Fixes, each test-first:
+  - `runProcess()` wraps all three entry points (one messages-only line, exit 1);
+  - `createWorker()` logs a warning when the database is unreachable instead of crashing (planted-error check; Docker: db stopped → worker up, 0 restarts);
+  - `params:` is cut off;
+  - a `HOST` setting defaults to `127.0.0.1`, with `0.0.0.0` set only inside the container.
+- **Why / what I learned:** A rule ("log messages only") must cover the paths nobody thinks of, like a crash before the app's logger exists. A dependency outage at boot is normal on a server, so the service should wait, not crash-loop. Re-grade review findings by their effect: "Minor" Wi-Fi exposure broke a rule the project already applies to the database port.
+- **Say it in an interview:** "Every process entry point runs inside one wrapper that turns any crash into a single sanitized log line and exit code 1. The worker tolerates the database being down at boot instead of crash-looping."
+- **Follow-ups to expect:** Crash-and-restart vs wait-and-retry? (Crash-restart is fine for real corruption, but for a dependency that's simply not up yet it floods logs and hides the cause. Waiting with a warning says exactly what's wrong.)
+

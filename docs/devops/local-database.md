@@ -1,12 +1,29 @@
 # Local database runbook
 
-PostgreSQL 18 runs in Docker Compose (`compose.yaml`). Why it's set up this way: ADR 0019. Docker Desktop must be running.
+PostgreSQL 18 runs in Docker Compose (`compose.yaml`), next to the app's own containers. Why it's set up this way: ADRs 0019 (database), 0020 (image), 0021 (migrations). Docker Desktop must be running.
 
 ## First time
 
-1. Copy `.env.example` to `.env` and replace every `change-me` value with a random string of letters and digits. Use the same owner password inside `MIGRATION_DATABASE_URL`.
+1. Copy `.env.example` to `.env` and replace every `change-me` value with a random string of letters and digits. Use the same owner password inside `MIGRATION_DATABASE_URL` and the same runtime password inside `DATABASE_URL`.
 2. `pnpm db:up` creates the volume, runs `packages/db/bootstrap/create-roles.sql` (roles + database) and waits until the database is healthy.
 3. `pnpm db:migrate` applies the migrations as `app_owner`.
+
+## Running the whole app in containers
+
+`pnpm app:up` builds the image (the first build downloads every dependency and can take minutes; later builds reuse the cache) and starts, in order:
+
+1. `db`, until it's healthy;
+2. `migrate`, a one-shot container that applies migrations as `app_owner` and exits (`Exited (0)` is correct);
+3. `api` (http://127.0.0.1:3000/api/health) and `worker`, as `app_runtime`, only if `migrate` succeeded.
+
+| Task | Command |
+| --- | --- |
+| Status | `docker compose ps -a` |
+| Logs (JSON lines) | `docker compose logs api worker migrate` |
+| Is the database reachable? | `curl http://127.0.0.1:3000/api/health/ready` (503 means no) |
+| Stop (data kept) | `docker compose stop` |
+
+For day-to-day coding, run only the database (`pnpm db:up`) and the API on the host with `pnpm dev`, which rebuilds and restarts on every save. Port 3000 can only be used by one of the two at a time.
 
 ## Every day
 

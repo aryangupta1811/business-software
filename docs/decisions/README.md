@@ -25,3 +25,6 @@ Create one with `/record-decision <title>`. Template: `0000-template.md`.
 | [0017](0017-git-workflow.md) | Git workflow: GitHub flow, squash merges, Conventional Commits, public repo | Accepted | 2026-10-30 |
 | [0018](0018-code-quality-and-dependency-tooling.md) | Code quality and dependency tooling: ESLint + Prettier, pnpm catalogs, supply-chain guards | Accepted | 2026-10-30 |
 | [0019](0019-database-roles-and-local-postgres.md) | Database roles and grants: bootstrap file + default privileges; `pg`, Drizzle 0.45, `postgres:18` locally | Accepted | 2026-10-30 |
+| [0020](0020-api-build-and-runtime.md) | API build and runtime: project references + `source` export condition, Express, built-in JSON logs, one slim non-root image with three commands | Accepted | 2026-10-30 |
+| [0021](0021-production-migrations.md) | Production migrations: one-shot `migrate` container as the owner role, before api and worker start | Accepted | 2026-10-30 |
+| [0022](0022-job-queue-database-role.md) | Job-queue database role: pg-boss gets its own role owning only schema `pgboss` | Accepted (built in P2.7) | 2026-10-30 |

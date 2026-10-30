@@ -1,0 +1,13 @@
+packages:
+  - apps/*
+  - packages/*
+
+# One version of each shared tool for the whole repo; packages use "catalog:".
+catalog:
+  # ~6.0: typescript-eslint supports TypeScript below 6.1 (not 7.x yet).
+  typescript: ~6.0.3
+  vitest: ^5.0.5
+
+# Don't install a package version until it has been public for a day (in minutes).
+# Hijacked releases are usually caught and pulled within hours.
+minimumReleaseAge: 1440

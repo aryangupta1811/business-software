@@ -49,6 +49,8 @@ services:
     <<: *app
     environment:
       DATABASE_URL: postgresql://app_runtime:${APP_RUNTIME_PASSWORD}@db:5432/business_software
+      # Every interface inside the container; the port below is published on 127.0.0.1 only.
+      HOST: 0.0.0.0
     ports:
       - 127.0.0.1:3000:3000
     healthcheck:

@@ -1,5 +1,7 @@
 export interface ApiConfig {
   databaseUrl: string;
+  /** Where the API listens: this computer only unless set (containers use 0.0.0.0). */
+  host: string;
   port: number;
   jsonLogs: boolean;
 }
@@ -17,6 +19,12 @@ export function readDatabaseUrl(env: NodeJS.ProcessEnv, name: string): string {
   return value;
 }
 
+function readHost(value: string | undefined): string {
+  if (value === undefined) return '127.0.0.1';
+  if (value.trim() === '') throw new Error('HOST must not be empty');
+  return value;
+}
+
 function readPort(value: string | undefined): number {
   if (value === undefined) return 3000;
   const port = Number(value);
@@ -30,6 +38,7 @@ function readPort(value: string | undefined): number {
 export function loadConfig(env: NodeJS.ProcessEnv): ApiConfig {
   return {
     databaseUrl: readDatabaseUrl(env, 'DATABASE_URL'),
+    host: readHost(env.HOST),
     port: readPort(env.PORT),
     jsonLogs: env.NODE_ENV === 'production',
   };

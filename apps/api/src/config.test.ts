@@ -7,14 +7,19 @@ describe('loadConfig', () => {
   it('reads the database URL and defaults the rest', () => {
     expect(loadConfig({ DATABASE_URL })).toEqual({
       databaseUrl: DATABASE_URL,
+      host: '127.0.0.1',
       port: 3000,
       jsonLogs: false,
     });
   });
 
-  it('reads PORT and logs JSON in production', () => {
-    expect(loadConfig({ DATABASE_URL, PORT: '8080', NODE_ENV: 'production' })).toEqual({
+  // Only this computer by default; containers set HOST=0.0.0.0 (compose.yaml).
+  it('reads HOST and PORT, and logs JSON in production', () => {
+    expect(
+      loadConfig({ DATABASE_URL, HOST: '0.0.0.0', PORT: '8080', NODE_ENV: 'production' }),
+    ).toEqual({
       databaseUrl: DATABASE_URL,
+      host: '0.0.0.0',
       port: 8080,
       jsonLogs: true,
     });
@@ -40,6 +45,10 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ DATABASE_URL: 's3cretpw' })).toThrow(
       /^DATABASE_URL is not a postgresql:\/\/ URL$/,
     );
+  });
+
+  it('refuses an empty HOST', () => {
+    expect(() => loadConfig({ DATABASE_URL, HOST: '' })).toThrow('HOST must not be empty');
   });
 
   it.each(['0', '70000', 'abc', '3000.5', ''])('refuses PORT=%j', (PORT) => {

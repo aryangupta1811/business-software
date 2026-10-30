@@ -12,7 +12,7 @@ import { DATABASE } from './database.module.js';
 const UNREACHABLE_URL = 'postgresql://app_runtime:x@127.0.0.1:1/business_software';
 
 async function startApp(databaseUrl: string): Promise<{ app: INestApplication; baseUrl: string }> {
-  const app = await createApp({ databaseUrl, port: 0, jsonLogs: false });
+  const app = await createApp({ databaseUrl, host: '127.0.0.1', port: 0, jsonLogs: false });
   app.useLogger(false);
   await app.listen(0, '127.0.0.1');
   const { port } = (app.getHttpServer() as Server).address() as AddressInfo;

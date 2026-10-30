@@ -13,6 +13,9 @@
     "verbatimModuleSyntax": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+    // Workspace packages export their TypeScript files under 'source', so type-checks and
+    // lint read them without a build; Node reads the built dist/ files (ADR 0020).
+    "customConditions": ["source"]
   }
 }

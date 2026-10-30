@@ -38,7 +38,7 @@ Each task below is sized for **one session**. DevOps stages (from `docs/devops/D
 - [ ] **P0.4 API skeleton:** NestJS app with `/health` and one endpoint that reads from the database; `api` and `worker` entry points; Dockerfile; runs in Compose.
 - [ ] **P0.5 Web skeleton:** React + Vite app shell calling the API; English/Hindi switch with i18next; `docker compose up` starts everything.
 - [ ] **P0.6 CI** (DevOps stage 3): GitHub Actions running lint, type-check, unit and integration tests, and builds on every push/PR; a Conventional Commits check on PR titles; a gitleaks secrets scan; then make CI a required status check in the `protect-main` ruleset (ADR 0017); status badge in a new README.
-- [ ] **P0.7 Design system:** visual direction, colour and type tokens (Latin + Devanagari), spacing, restyled base components, keyboard-shortcut framework. *Ask the owner for visual preferences.*
+- [ ] **P0.7 Design system:** visual direction, colour and type tokens (Latin + Devanagari), spacing, restyled base components, keyboard-shortcut framework. **Owner's brief (2026-10-30):** modern and clean, not "AI slop" (no generic template or AI-generated look), and easy for shopkeepers to use. *At P0.7, ask for the details: colours, apps whose look they like, light/dark.*
 - [ ] Phase 0 journal (`docs/journal/phase-0.md`)
 
 ## Phase 1 — Core selling

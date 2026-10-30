@@ -89,6 +89,23 @@ describe('app database roles', () => {
     expect(rows).toEqual([{ note: 'b' }]);
   });
 
+  // Pins the whole grant set: an extra privilege (DELETE, TRIGGER…) or a missing sequence
+  // grant (which identity columns never check, but serial columns do) fails here.
+  it('grants future tables and sequences exactly the planned privileges', async () => {
+    const { rows } = await owner.query(
+      `select defaclobjtype::text as kind,
+              string_agg(acl.privilege_type, ',' order by acl.privilege_type) as privileges
+         from pg_default_acl, aclexplode(defaclacl) as acl
+        where acl.grantee = 'app_runtime'::regrole
+        group by defaclobjtype
+        order by defaclobjtype::text collate "C"`,
+    );
+    expect(rows).toEqual([
+      { kind: 'S', privileges: 'SELECT,USAGE' },
+      { kind: 'r', privileges: 'INSERT,SELECT,UPDATE' },
+    ]);
+  });
+
   // 42501 is insufficient_privilege. Checking the code, not the message, means an
   // unrelated error (say a misspelt table, 42P01) can't make these pass.
   it.each([

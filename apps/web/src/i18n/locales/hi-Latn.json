@@ -1,0 +1,18 @@
+{
+  "app": { "name": "Business Software" },
+  "language": { "label": "Bhasha" },
+  "connection": {
+    "checking": "Connection check ho raha hai…",
+    "connected": "Connected hai",
+    "serverDown": "Server se connect nahi ho pa raha",
+    "databaseDown": "Server chalu hai, par data nahi mil raha"
+  },
+  "home": {
+    "title": "Swagat hai",
+    "body": "Billing, stock aur udhaar yahan dikhenge."
+  },
+  "notFound": {
+    "title": "Page nahi mila",
+    "home": "Home par jaayein"
+  }
+}

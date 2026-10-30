@@ -1,5 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+// Starts i18next in the saved language, so the first render is already translated.
+import './i18n';
 import { App } from './app';
 import { createQueryClient } from './query-client';
 import { createAppRouter } from './router';

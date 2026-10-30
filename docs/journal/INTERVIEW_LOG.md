@@ -34,9 +34,9 @@ Update this as the project grows.
 | Largest exact amount in JavaScript | ≈ ₹90 lakh crore in paise (2^53) | ADR 0008 |
 | Business types in v1 | 5 | Module 00 |
 | Modules | 10 (00–09) | `docs/requirements/` |
-| ADRs | 17 (16 at kickoff) | `docs/decisions/` |
+| ADRs | 18 (16 at kickoff) | `docs/decisions/` |
 | Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
-| Automated tests | 42 (money helpers in `packages/shared`, P0.2) | `pnpm test` |
+| Automated tests | 45 (money helpers in `packages/shared`, P0.2) | `pnpm test` |
 | How long a new package version waits before we install it | 1 day | `pnpm-workspace.yaml` `minimumReleaseAge` |
 
 ---
@@ -447,3 +447,15 @@ Entry format:
 - **Why / what I learned:** "It works in the tests" only proves it works in the test runner. An assumption is a claim until something runs it. A reviewer with a fresh context catches what the author's context hides.
 - **Say it in an interview:** "My shared package worked in Vite and Vitest, but a review showed Node can't load it from source, so I planned a compile step for the API before writing it, not after a failed deploy."
 - **Follow-ups to expect:** How do monorepos share TypeScript between a bundled frontend and a Node backend? (Compile the shared package, use project references, or bundle the backend.)
+
+### 2026-10-30 — A test that passes at once must still be shown to fail `#testing`
+- **What happened:** Fixed the review's minor points. Two new tests (`-5` paise → `-₹0.05`, and `"\t125\n"` pasted from a spreadsheet → 12500) passed immediately, because the code already handled them. To prove they guard anything, I broke the code on purpose: dropped `Math.abs` so the minus sign landed inside the zero-padding, and made `trim` strip only spaces. Exactly those two tests failed, and the other 42 didn't notice. Then I restored the code. Also: the error for `2 ** 53` said "not a whole number", but it is whole, just past the safe range, so the message now says "safe whole number" (the test first, red, then the fix). And Prettier and ESLint no longer scan the scratch folder, and type-aware rules no longer trip on `.mjs` config files. Both were shown broken with a probe file first.
+- **Why / what I learned:** This is mutation testing by hand: change the code the way a future bug would and check a test notices. A test that can't fail is decoration.
+- **Say it in an interview:** "When a new test passes straight away, I break the code on purpose to make sure the test would catch that bug."
+- **Follow-ups to expect:** What's mutation testing? (Tools like Stryker make many small code changes automatically and report which ones no test catches.)
+
+### 2026-10-30 — ADR 0018: ESLint + Prettier, pnpm catalogs, supply-chain guards `#process` `#security` → ADR 0018
+- **What happened:** Recorded the tooling chosen in P0.2 as an ADR. ESLint with typescript-eslint's type-aware rules plus Prettier won over Biome (much narrower type-aware checks) and over no linter (the compiler alone misses unawaited promises). A pnpm catalog keeps one version of each tool for every package. The lockfile is committed, install scripts are blocked by default, and new versions wait a day. TypeScript stays on `~6.0` until typescript-eslint supports 7.
+- **Why / what I learned:** Even "just tooling" is a decision with trade-offs (speed vs depth of checks, newest vs supported). Writing it down stops it being re-argued, and records when to revisit it.
+- **Say it in an interview:** "I chose type-aware linting because rules like no-floating-promises catch an unawaited database write, the kind of bug that loses a bill. For the supply chain: a lockfile, blocked install scripts, and a one-day wait on new releases."
+- **Follow-ups to expect:** Why not Biome? When would you switch? (When its type-aware rules cover what we rely on, or lint time becomes a problem.)

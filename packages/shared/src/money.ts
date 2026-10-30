@@ -22,7 +22,7 @@ const RUPEES = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'IN
 /** Shows paise as rupees with Indian digit grouping: 12345678 → "₹1,23,456.78". */
 export function formatPaise(paise: Paise): string {
   if (!Number.isSafeInteger(paise)) {
-    throw new RangeError(`Not a whole number of paise: ${String(paise)}`);
+    throw new RangeError(`Not a safe whole number of paise: ${String(paise)}`);
   }
   const digits = String(Math.abs(paise)).padStart(3, '0');
   const sign = paise < 0 ? '-' : '';

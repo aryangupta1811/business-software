@@ -12,6 +12,7 @@ describe('parseRupees', () => {
     ['.5', 50],
     ['125.', 12500],
     [' 125.50 ', 12550],
+    ['\t125\n', 12500], // pasted from a spreadsheet cell
     // Floating-point traps: 0.29 * 100 = 28.999999999999996 and 1.1 * 100 = 110.00000000000001
     ['0.29', 29],
     ['1.1', 110],
@@ -53,6 +54,7 @@ describe('formatPaise', () => {
     [98765432100, '₹98,76,54,321.00'],
     [Number.MAX_SAFE_INTEGER, '₹9,00,71,99,25,47,409.91'],
     [-125000, '-₹1,250.00'],
+    [-5, '-₹0.05'], // the sign must not end up inside the zero-padding
     [-0, '₹0.00'],
   ])('shows %i paise as %s', (paise, text) => {
     expect(formatPaise(paise)).toBe(text);
@@ -60,5 +62,11 @@ describe('formatPaise', () => {
 
   it.each([12.5, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 53])('throws for %d', (paise) => {
     expect(() => formatPaise(paise)).toThrow(RangeError);
+  });
+
+  it('says why it refuses an amount past the safe range', () => {
+    expect(() => formatPaise(2 ** 53)).toThrow(
+      'Not a safe whole number of paise: 9007199254740992',
+    );
   });
 });

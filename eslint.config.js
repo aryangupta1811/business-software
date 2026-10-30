@@ -35,10 +35,13 @@ export default defineConfig(
       jsxA11y.flatConfigs.recommended,
       reactRefresh.configs.vite,
     ],
-    rules: {
-      // Route files export a `Route` object next to their components.
-      'react-refresh/only-export-components': ['error', { allowExportNames: ['Route'] }],
-    },
+  },
+  {
+    // A route file exports a `Route` object and keeps its components private. TanStack
+    // Router's plugin moves those components into their own modules (autoCodeSplitting),
+    // which is where fast refresh happens, so the rule's warning doesn't apply here.
+    files: ['apps/web/src/routes/**/*.tsx'],
+    rules: { 'react-refresh/only-export-components': 'off' },
   },
   { files: ['**/*.{js,mjs,cjs}'], extends: [tseslint.configs.disableTypeChecked] },
   prettier,

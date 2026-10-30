@@ -1,2 +1,4 @@
 pnpm-lock.yaml
 *.md
+# Local scratch space for Claude Code plans (git-ignored)
+.superpowers/

@@ -9,6 +9,8 @@
   "scripts": {
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
     "db:up": "docker compose up -d --wait --quiet-pull",
+    "db:generate": "pnpm --filter @business-software/db db:generate",
+    "db:migrate": "pnpm --filter @business-software/db db:migrate",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",

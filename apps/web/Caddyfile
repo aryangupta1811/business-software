@@ -1,0 +1,58 @@
+# Serves the web app and passes /api to the api container, so the browser sees one
+# origin: session cookies work and there's no CORS (ADR 0011).
+{
+	# No admin API and no config written to disk: this file is the whole config.
+	admin off
+	persist_config off
+	# Plain HTTP inside Docker. On the server, Caddy gets HTTPS for the real domain (stage 5).
+	auto_https off
+}
+
+(security_headers) {
+	header {
+		# The app loads nothing from other sites, so the browser refuses anything that
+		# isn't ours, including injected scripts.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}
+
+:8080 {
+	encode zstd gzip
+	import security_headers
+
+	# /api itself too, so a call to the bare prefix reaches the API instead of the app's HTML.
+	@api path /api /api/*
+	handle @api {
+		reverse_proxy api:3000
+	}
+
+	# Vite puts a hash of the content in these names, so a changed file gets a new name
+	# and the old one can be cached forever. A missing one is a plain 404, never index.html:
+	# an old tab asking for a deleted file must not cache HTML for a year.
+	handle /assets/* {
+		root * /srv
+		@exists file
+		header @exists Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	# Every other path is a page of the app: send index.html and let the router decide.
+	# no-cache: the browser checks for a new deploy on every load.
+	handle {
+		root * /srv
+		header Cache-Control no-cache
+		try_files {path} /index.html
+		file_server
+	}
+
+	# Errors (a missing asset, the api down) start a fresh response, which drops the
+	# headers set above, so set them again; and never let a browser keep an error.
+	handle_errors {
+		import security_headers
+		header Cache-Control no-store
+		respond "{err.status_code} {err.status_text}"
+	}
+}

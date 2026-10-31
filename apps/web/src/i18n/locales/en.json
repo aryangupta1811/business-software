@@ -1,0 +1,23 @@
+{
+  "app": { "name": "Business Software" },
+  "language": { "label": "Language" },
+  "connection": {
+    "checking": "Checking connection…",
+    "connected": "Connected",
+    "serverDown": "Can't reach the server",
+    "databaseDown": "Server is up, but data can't be loaded"
+  },
+  "home": {
+    "title": "Welcome",
+    "body": "Billing, stock and udhaar will appear here."
+  },
+  "notFound": {
+    "title": "Page not found",
+    "home": "Go to home"
+  },
+  "error": {
+    "title": "Something went wrong",
+    "body": "Check the connection, then reload the page.",
+    "reload": "Reload the page"
+  }
+}

@@ -58,7 +58,7 @@
 
 ## Language & notifications
 
-25. The app runs in **English and Hindi**. Whether bills also print in Hindi is decided in Module 02.
+25. The app runs in **English, Hindi and Hinglish** (Hindi words written in English letters, e.g. "Bill banao"), switchable at any time. Whether bills also print in Hindi is decided in Module 02.
 26. Owner alerts are sent on **WhatsApp**. Details are decided in Module 07.
 
 ## Open questions
@@ -75,3 +75,4 @@ Not decided. Raised by Claude while importing.
 
 - 2026-10-29 — Created from the planning chat on claude.ai.
 - 2026-10-29 — Kickoff session: added the open question on #18 vs #22. No decided point changed.
+- 2026-10-30 — Owner (session 6, P0.5): #25 now includes Hinglish as a third interface language, next to English and Hindi.

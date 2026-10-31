@@ -60,6 +60,7 @@ flowchart LR
   db[("db<br/>PostgreSQL")] -- "healthy" --> migrate["migrate<br/>node dist/migrate.js<br/>as app_owner, then exits"]
   migrate -- "exited 0" --> api["api<br/>node dist/main.js<br/>as app_runtime"]
   migrate -- "exited 0" --> worker["worker<br/>node dist/worker.js<br/>as app_runtime"]
+  web["web<br/>Caddy: app files<br/>+ /api proxy"] -. "/api/*" .-> api
 ```
 
 - The schema is upgraded before new code runs, by the only role allowed to change it. If `migrate` fails, `api` and `worker` don't start [0021].
@@ -67,6 +68,15 @@ flowchart LR
 - On `docker stop` (SIGTERM), `api` and `worker` finish their work, close the database pool and exit 0 [0020].
 - pg-boss will run in the `worker` under its own role, `app_queue`, which owns only the `pgboss` schema [0022].
 - Secrets reach containers only as environment variables at start, never inside the image (`docs/devops/secrets.md`).
+- `web` is its own image (Vite build served by Caddy) and starts without waiting for the API: if the API is down, the page still loads and its connection badge says so [0023].
+
+## The web app
+
+- One origin everywhere: the browser calls relative `/api` URLs. Vite's dev server proxies them in development; Caddy does it in Compose and on the server. So there's no CORS, no browser configuration and no `VITE_` variable [0011, 0023].
+- Caching: hashed `/assets/*` files for a year, `index.html` never, so a deploy shows on the next load. Unknown paths get `index.html` (the router decides); missing assets get a 404.
+- A strict Content-Security-Policy and other security headers on every response, errors included.
+- Languages: English, Hindi and Hinglish (`en`, `hi`, `hi-Latn`), chosen in the header and saved in the browser until logins exist (P1.4) [0023].
+- The header checks `/api/health/ready` every 30 s while the tab is visible, and shows connected, database down or server down [0001]. It waits up to 10 s, longer than the API's own 5 s wait for the database, so a database outage isn't mistaken for the server being down.
 
 ## Saving a bill (the most important flow)
 
@@ -106,12 +116,12 @@ From ADRs 0007 and 0008: no `DELETE` permission for the app's database user · a
 
 ```
 apps/
-  web/              React + Vite counter app            [0003]
+  web/              React + Vite counter app; Dockerfile + Caddyfile   [0003, 0023]
   api/              NestJS: src/main.ts (api), src/worker.ts (worker), src/migrate.ts; Dockerfile   [0004, 0020, 0021]
 packages/
   shared/           types, Zod schemas, money & GST     [0002, 0008]
   db/               Drizzle schema, migrations, role bootstrap, DB integration tests   [0005, 0019]
-compose.yaml        local services: db, migrate, api, worker   [0019, 0021]
+compose.yaml        local services: db, migrate, api, worker, web   [0019, 0021, 0023]
 infra/
   terraform/        AWS environments                    [0011]
 .github/workflows/  CI/CD                               [0012]

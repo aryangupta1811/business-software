@@ -43,7 +43,7 @@ Full detail is in `00-business-setup-users-roles.md`. Summary:
 - **Many businesses can sign up.** Each sees only its own data. One owner can run several branches.
 - **Where it's used:** a counter computer at the shop. **No phone use.**
 - **No super-admin panel** in v1.
-- **Languages:** English and Hindi.
+- **Languages:** English, Hindi and Hinglish (Hindi in English letters).
 - **Owner alerts:** sent on WhatsApp.
 
 ## How it is used at the shop
@@ -75,7 +75,7 @@ Full detail is in `00-business-setup-users-roles.md`. Summary:
 4. **Exact money.** All amounts are exact to the paisa, with GST rounding done the way the rules require.
 5. **Fast billing.** A normal bill should take seconds at the counter.
 6. **Security.** Passwords, owner auto-lock, owner password for permission changes.
-7. **English and Hindi** throughout the app.
+7. **English, Hindi and Hinglish** throughout the app (Hinglish added by the owner on 2026-10-30).
 
 **Measurable targets** (added 2026-10-29):
 
@@ -143,3 +143,4 @@ Full detail is in `00-business-setup-users-roles.md`. Summary:
 - 2026-10-29 — Created from the planning chat on claude.ai.
 - 2026-10-29 — Kickoff session: non-functional requirements confirmed, with measurable targets; the six architecture questions answered (ADRs 0001, 0010, 0011, 0014, 0015, 0016); build phases decided, with demo data starting at the end of Phase 1.
 - 2026-10-29 — Owner: hosting budget is ₹0 (AWS Free plan), not the ₹1,000/month first proposed; v1 runs online. ADR 0011 redesigned before it was committed.
+- 2026-10-30 — Owner (session 6, P0.5): Hinglish added as a third interface language (scope and NFR 7).

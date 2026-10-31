@@ -16,14 +16,17 @@ PostgreSQL 18 runs in Docker Compose (`compose.yaml`), next to the app's own con
 2. `migrate`, a one-shot container that applies migrations as `app_owner` and exits (`Exited (0)` is correct);
 3. `api` (http://127.0.0.1:3000/api/health) and `worker`, as `app_runtime`, only if `migrate` succeeded.
 
+`web` (http://127.0.0.1:8080) starts alongside without waiting: Caddy serves the built app and passes `/api` to `api` (ADR 0023). If the API isn't up, the page loads and its badge says it can't reach the server.
+
 | Task | Command |
 | --- | --- |
 | Status | `docker compose ps -a` |
-| Logs (JSON lines) | `docker compose logs api worker migrate` |
+| Logs (JSON lines) | `docker compose logs api worker migrate` (Caddy: `docker compose logs web`) |
+| Check the web server's headers | `curl -I http://127.0.0.1:8080/` |
 | Is the database reachable? | `curl http://127.0.0.1:3000/api/health/ready` (503 means no) |
 | Stop (data kept) | `docker compose stop` |
 
-For day-to-day coding, run only the database (`pnpm db:up`) and the API on the host with `pnpm dev`, which rebuilds and restarts on every save. Port 3000 can only be used by one of the two at a time.
+For day-to-day coding, run only the database (`pnpm db:up`) and the API and web app on the host with `pnpm dev`, which rebuilds and reloads on every save (open http://127.0.0.1:5173). Port 3000 can only be used by one of the two at a time, so `docker compose stop api` first if the containers are running.
 
 ## Every day
 

@@ -36,7 +36,7 @@ Update this as the project grows.
 | Modules | 10 (00–09) | `docs/requirements/` |
 | ADRs | 26 (16 at kickoff) | `docs/decisions/` |
 | Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
-| Automated tests | 217: 45 shared (money), 21 db, 28 api, 123 web (routing, connection badge, three languages, error screen, 39 contrast checks, components, theme, 23 keyboard-shortcut tests, layout, `/design`) | `pnpm test` |
+| Automated tests | 224: 45 shared (money), 21 db, 28 api, 130 web (routing, connection badge, three languages, error screen, 44 contrast checks, Hindi line height, components, theme, 24 keyboard-shortcut tests, layout, `/design`) | `pnpm test` |
 | Interface languages | 3: English, Hindi, Hinglish (`en`, `hi`, `hi-Latn`) | Module 00 #25, ADR 0023 |
 | Web app download | ~160 KB gzipped JavaScript; fonts 307 KB (woff2, six files, cached for a year); web image 95 MB (Caddy) | P0.7, `vite build` |
 | Readability floor | text ≥ 4.5:1 contrast (main text ≥ 7:1), input edges and focus ring ≥ 3:1, both modes; body text 15 px, nothing under 13 px | ADR 0025 |
@@ -915,3 +915,13 @@ Entry format:
 - **Why / what I learned:** Each cost minutes, not hours, because I read the actual output.
 - **Say it in an interview:** "Small tooling details matter: I read the failing output, not the summary."
 - **Follow-ups to expect:** —
+
+### 2026-10-31 — The final review found three things my tests and my eyes missed `#frontend` `#testing` `#process`
+- **What happened:** A fresh reviewer read the whole P0.7 branch and found:
+  - **Grey on grey:** the unselected language names were `muted` text on the `surface-muted` switcher, 4.15:1. My contrast test only checked the pairs I had thought of. Added the pair, darkened the light grey to `#67676c`.
+  - **Hindi spacing only half applied:** each Tailwind `text-*` class sets its own line height, so Hindi's 1.6 on `<body>` never reached buttons, labels or titles. Hindi now redefines every `--text-*--line-height` variable; checked in the built CSS and in Chrome (13 px → 20.8 px).
+  - **A hidden feature:** `?` was the only way into the shortcut list, so mouse users would never find it, and on the Hindi Inscript layout Shift+/ types "य़", not "?". Added a sidebar button and matched `?` by its physical key too.
+  Each fix started with a test that failed.
+- **Why / what I learned:** A test only guards the cases it lists, and a style rule only works if nothing more specific overrides it. Ten minor findings went into PROGRESS under the tasks where they start to matter (P1.3, P1.13) instead of being fixed now.
+- **Say it in an interview:** "A fresh review found that my readability test had a gap, that a CSS rule was being overridden by utility classes, and that a feature was only reachable by a key some keyboards can't type. I fixed each test-first and scheduled the minor findings against the tasks where they matter."
+- **Follow-ups to expect:** Why not fix the minors too? (They don't affect anyone today; each is written down against the task where it becomes real, so the fix lands with its context and tests.)

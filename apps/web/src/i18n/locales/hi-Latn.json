@@ -20,6 +20,49 @@
     "title": "Swagat hai",
     "body": "Billing, stock aur udhaar yahan dikhenge."
   },
+  "design": {
+    "title": "Design system",
+    "contrastNote": "Har rang ki value, aur card par uska contrast.",
+    "sampleSentence": "Aaj ki bikri kal se zyada rahi.",
+    "sections": {
+      "colours": "Rang",
+      "text": "Akshar",
+      "buttons": "Button",
+      "inputs": "Input",
+      "badges": "Badge",
+      "cards": "Card",
+      "keys": "Keyboard ki keys",
+      "sample": "Namoona"
+    },
+    "buttons": {
+      "save": "Bill save karein",
+      "hold": "Hold karein",
+      "more": "Aur",
+      "cancelBill": "Bill radd karein",
+      "unavailable": "Uplabdh nahi"
+    },
+    "inputs": {
+      "customer": "Grahak ka naam",
+      "phone": "Phone",
+      "phoneError": "10 ank daalein",
+      "invoice": "Invoice number"
+    },
+    "badges": {
+      "cash": "Nakad",
+      "upi": "UPI",
+      "paid": "Payment ho gaya",
+      "udhaar": "Udhaar",
+      "cancelled": "Radd"
+    },
+    "cards": { "title": "Aaj ki bikri", "body": "Kal se 8% zyada" },
+    "sample": {
+      "bill": "Haal ka bill",
+      "item": "Saamaan",
+      "quantity": "Matra",
+      "amount": "Raqam",
+      "total": "Kul"
+    }
+  },
   "notFound": {
     "title": "Page nahi mila",
     "home": "Home par jaayein"

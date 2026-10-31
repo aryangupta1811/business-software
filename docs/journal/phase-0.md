@@ -56,6 +56,7 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
 - **Wrote down a security "fact" too broadly.** I saw a password in a test's error report and wrote that pg errors always carry it. pg hides it, and only some serializers print it. The rule (log only messages) was right, the explanation wasn't. Lesson: verify the claim, not just the fix.
 - **Broke Vitest with an invisible character.** A PowerShell edit wrote a BOM into `package.json`, and Vitest's error blamed a missing `jsdom`. The real error was higher up in the output. Lesson: read the first error, not the last, and edit files with tools that don't add a BOM.
 - **Trusted the config instead of the response.** The Caddyfile looked right, but `curl -I` showed a 404 telling browsers to cache it for a year, without the security headers. Lesson: check the real response, error cases included.
+- **Two 5-second timeouts raced, and my one-off check passed by luck.** The browser and the API's database wait both gave up at 5 s, so "database down" showed as "server down" on about 2 of 5 loads. I had checked it once; the reviewer checked it five times. Lesson: an outer timeout must be clearly longer than the inner one, and anything that can race must be checked more than once.
 - **Waited for a GitHub login code on my phone.** The device-flow code is printed in the terminal. Lesson: read the tool's output before looking elsewhere.
 
 ## Interview questions I can now answer

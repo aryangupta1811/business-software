@@ -14,7 +14,7 @@ The phase journals (`phase-N.md`) are the short story of each phase. This file i
 
 Update this as the project grows.
 
-**30 seconds:** I'm building a multi-tenant web app that runs an Indian retail shop: GST billing, inventory, customer credit (udhaar), staff attendance with salary and advances, an audit log, alerts on WhatsApp, and an AI assistant that answers questions about the shop's own data. The focus is correctness: nothing is ever deleted, a bill and its stock change save together or not at all, and each business's data is kept apart by the database itself. I also used it to learn DevOps: Docker, CI/CD with GitHub Actions, Terraform and AWS.
+**30 seconds:** I'm building a multi-tenant web app, in English, Hindi and Hinglish, that runs an Indian retail shop: GST billing, inventory, customer credit (udhaar), staff attendance with salary and advances, an audit log, alerts on WhatsApp, and an AI assistant that answers questions about the shop's own data. The focus is correctness: nothing is ever deleted, a bill and its stock change save together or not at all, and each business's data is kept apart by the database itself. I also used it to learn DevOps: Docker, CI/CD with GitHub Actions, Terraform and AWS.
 
 **2 minutes:** *(fill in as we build: the problem → what makes it hard → my architecture → one hard bug I solved → how it's deployed → what I'd do differently)*
 
@@ -106,6 +106,16 @@ Short answers; the Log entry has the full story.
   A: A one-shot container from the same image runs them as the schema-owner role, and the app containers start only after it exits successfully. New code never meets an old schema, and the long-running app can't change the schema. → ADR 0021
 - **Q: How do you stop secrets leaking from a public repo?**
   A: Five places: git (gitignore, gitleaks, push protection), images (secrets only arrive at container start, checked with `docker history`), the browser bundle (never a `VITE_` secret), CI (no secrets for fork PRs) and logs (messages only: pg-pool can attach the client, whose hidden password some serializers print, and Drizzle messages carry query values). → `docs/devops/secrets.md`
+- **Q: How does your frontend call the API without CORS?**
+  A: Same origin. Vite's dev server proxies `/api` in development, and Caddy serves the built files and reverse-proxies `/api` in Docker and on the server. The browser only calls relative `/api` URLs, so it needs no configuration and can't leak a secret through a `VITE_` variable. → ADR 0023
+- **Q: How do users get a new deploy straight away while files are still cached?**
+  A: Content-hashed file names. `/assets/*` is cached for a year as `immutable`, because a changed file gets a new name. `index.html` is `no-cache`, so the next load picks up the new names. Missing assets are a real 404 with `no-store`, never `index.html`. → ADR 0023
+- **Q: What is a Content-Security-Policy and what does yours allow?**
+  A: A header telling the browser where scripts, styles and requests may come from. Mine is `default-src 'self'` with no inline scripts, so an injected script can't run or send data elsewhere. I checked the built app in headless Chrome for violations, and error responses carry the header too. → ADR 0023
+- **Q: How do you handle three languages, one of them Hindi in Latin letters?**
+  A: i18next with `en`, `hi` and `hi-Latn` files. Keys are type-checked against English. Tests check that every file has the same keys, Hindi is Devanagari and Hinglish never is. `load: 'currentOnly'` stops Hinglish falling back to Devanagari. → ADR 0023
+- **Q: How do you choose timeouts across layers?**
+  A: Each caller waits longer than what it calls. The API waits 5 s for the database, so the browser waits 10 s. Otherwise a database outage can be reported as "server down", depending on which timer fires first. A test pins the relationship.
 
 ---
 
@@ -727,3 +737,19 @@ Entry format:
 - **Why / what I learned:** When one timeout sits inside another, the outer one must be clearly longer, or the error you report depends on luck. My own check had passed once by chance, and the reviewer repeated it. A check that can race must be run more than once.
 - **Say it in an interview:** "A status badge sometimes showed the wrong outage because the browser's 5-second timeout raced the API's 5-second database timeout. I made the outer timeout twice the inner one and pinned that with a test."
 - **Follow-ups to expect:** How would you set timeouts across layers? (Each layer's timeout is shorter than the one calling it: database < API < browser < load balancer, so the innermost failure is the one reported.)
+
+### 2026-10-30 — The rest of the P0.5 review, and how I checked each fix `#process` `#security` `#devops`
+- **What happened:** Besides the timeout race, the fresh reviewer found:
+  - Express's `X-Powered-By` header reaching the browser. Removed with `app.disable('x-powered-by')`, with a test.
+  - `/api` without a slash getting the app's HTML. Fixed with a named matcher `@api path /api /api/*`. My first try, `handle /api /api/*`, failed the image build, because `caddy validate` runs in the Dockerfile and `handle` takes one matcher only.
+  - TanStack Router's own English error screen replacing the whole app when a page's code can't be downloaded. Replaced with a translated `defaultErrorComponent`.
+
+  Left for later: `/favicon.ico` gets HTML until P0.7 adds an icon, and a redirect on an asset URL carries the long cache header (harmless).
+- **Commands that proved things:**
+  - `curl -s -o NUL -w "%{http_code} %{time_total}s"`: response time, which exposed the 5.00 s race.
+  - `curl -s -D - -o NUL <url>`: only the headers, for GET requests.
+  - `docker compose exec -u root web mv /srv/assets/<chunk> /tmp/`: simulate a missing chunk inside the running container, then move it back.
+  - `chrome --headless=new --dump-dom --virtual-time-budget=15000 <url>`: the page after its JavaScript has run, repeated in a loop to catch flaky results.
+- **Why / what I learned:** Validating config at build time turns a broken web server into a failed build instead of a broken deploy. A fault can be simulated in a running container without changing the image.
+- **Say it in an interview:** "My Dockerfile runs `caddy validate`, so a bad web-server config fails the build, not the deploy. To test the error screen I removed a JavaScript chunk from the running container and loaded the page in headless Chrome."
+- **Follow-ups to expect:** Why hide `X-Powered-By`? (It's not a vulnerability itself, but it tells attackers which framework's known bugs to try. It costs nothing to remove.)

@@ -2,6 +2,13 @@
   "app": { "name": "Business Software" },
   "language": { "label": "Language" },
   "theme": { "toDark": "Switch to dark mode", "toLight": "Switch to light mode" },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "close": "Close",
+    "groups": { "general": "General", "navigation": "Navigation" },
+    "openHelp": "Show keyboard shortcuts",
+    "goHome": "Go to Home"
+  },
   "connection": {
     "checking": "Checking connection…",
     "connected": "Connected",

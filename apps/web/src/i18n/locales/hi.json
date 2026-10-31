@@ -2,6 +2,13 @@
   "app": { "name": "बिज़नेस सॉफ़्टवेयर" },
   "language": { "label": "भाषा" },
   "theme": { "toDark": "डार्क मोड चालू करें", "toLight": "लाइट मोड चालू करें" },
+  "shortcuts": {
+    "title": "कीबोर्ड शॉर्टकट",
+    "close": "बंद करें",
+    "groups": { "general": "सामान्य", "navigation": "नेविगेशन" },
+    "openHelp": "कीबोर्ड शॉर्टकट दिखाएँ",
+    "goHome": "होम पर जाएँ"
+  },
   "connection": {
     "checking": "कनेक्शन जाँचा जा रहा है…",
     "connected": "जुड़ा हुआ है",

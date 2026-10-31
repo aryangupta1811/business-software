@@ -2,6 +2,13 @@
   "app": { "name": "Business Software" },
   "language": { "label": "Bhasha" },
   "theme": { "toDark": "Dark mode chalu karein", "toLight": "Light mode chalu karein" },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "close": "Band karein",
+    "groups": { "general": "Saamanya", "navigation": "Navigation" },
+    "openHelp": "Keyboard shortcuts dikhayein",
+    "goHome": "Home par jaayein"
+  },
   "connection": {
     "checking": "Connection check ho raha hai…",
     "connected": "Connected hai",

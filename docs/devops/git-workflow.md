@@ -31,11 +31,18 @@ GitHub Actions runs five checks on a clean Linux machine (ADR 0024). All five ar
 | --- | --- | --- |
 | `check` | Formatting, lint, a type error, a failing test, a broken build, a workflow mistake | `pnpm check && pnpm build` |
 | `secrets` | gitleaks finds something that looks like a key anywhere in the history | The full-history gitleaks command below |
-| `migrations` | A new migration is older than the newest one on `main` | `node packages/db/scripts/check-migration-order.ts origin/main` |
+| `migrations` | A new migration is older than the newest one on `main`, or the PR removes, re-dates or edits a migration `main` already has | `node packages/db/scripts/check-migration-order.ts origin/main` |
 | `smoke` | The real images don't start, a header is wrong, or a container doesn't stop cleanly | `pnpm app:up`, then `scripts/ci/smoke.sh` in Git Bash |
 | `pr-title` | The title isn't a Conventional Commit (below) | `PR_TITLE='ci: add x' scripts/ci/check-pr-title.sh` |
 
-When a check fails: on the PR, click **Details** next to it, open the red step and read its last lines. The smoke job prints every container's logs on failure. Fix it, commit and push; CI runs again by itself. For a bad title, just rename the PR.
+When a check fails: on the PR, click **Details** next to it, open the red step and read its last lines. The smoke job prints every container's logs on failure or timeout. Fix it, commit and push; CI runs again by itself. For a bad title, just rename the PR. GitHub's *Revert* button makes a title like `Revert "…"`, which fails: rename it (`fix: revert the stock rounding change`). Dependabot's titles may be longer than 72 characters; the check allows that for Dependabot only.
+
+**When `secrets` is red:** it scans the history of every branch, so the finding may come from another branch or an old commit, and it fails every PR until handled.
+1. A real secret: revoke it at the provider first (see Secrets below), then remove it from the code.
+2. A test value or false positive: add the finding's `Fingerprint` line (printed in the job log) to `.gitleaksignore` in a PR, with a comment saying why. It's reviewed like code.
+3. A leftover throwaway branch: delete it on GitHub.
+
+Never rewrite history to hide it without the owner's OK (`CLAUDE.md` rule 6): clones and forks keep copies anyway.
 
 ## Branch names
 

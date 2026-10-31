@@ -36,7 +36,7 @@ Update this as the project grows.
 | Modules | 10 (00–09) | `docs/requirements/` |
 | ADRs | 24 (16 at kickoff) | `docs/decisions/` |
 | Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
-| Automated tests | 127: 71 unit (45 money helpers, 20 API config, error, process and shutdown, 6 migration-order check) + 20 integration on a real PostgreSQL (roles and grants, database client, health endpoints and headers, worker startup) + 36 web (routing, connection badge, the three languages, error screen) | `pnpm test` |
+| Automated tests | 130: 74 unit (45 money helpers, 20 API config, error, process and shutdown, 9 migration check) + 20 integration on a real PostgreSQL (roles and grants, database client, health endpoints and headers, worker startup) + 36 web (routing, connection badge, the three languages, error screen) | `pnpm test` |
 | Interface languages | 3: English, Hindi, Hinglish (`en`, `hi`, `hi-Latn`) | Module 00 #25, ADR 0023 |
 | Web app download | ~122 KB gzipped JavaScript (383 KB raw); web image 93 MB (Caddy) | P0.5, `vite build` |
 | PostgreSQL version | 18, everywhere (newest RDS supports) | ADR 0005, `compose.yaml` |
@@ -46,7 +46,7 @@ Update this as the project grows.
 | First image build on a slow connection | ~12 minutes (later builds reuse the cached install layer) | P0.4 |
 | Clean stop of api and worker | ~0.7 s, exit code 0 | P0.4 |
 | CI checks on every pull request | 5 required: `check`, `secrets`, `migrations`, `smoke`, `pr-title` | ADR 0024 |
-| CI run time | ~3 min in all; `check` (lint, types, 127 tests, build) 47 s; `smoke` 2 min 47 s with an empty cache, 50 s warm | P0.6 |
+| CI run time | ~3 min in all; `check` (lint, types, 130 tests, build) about 50 s; `smoke` 2 min 47 s with an empty cache, 50 s warm | P0.6 |
 | How often the screen checks the server | every 30 s, 10 s timeout (the API waits 5 s for the database) | P0.5, ADR 0001 |
 
 ---
@@ -775,7 +775,7 @@ Entry format:
 - **Follow-ups to expect:** Why not Jenkins? (It needs a server to run, pay for and patch; ADR 0012.) Why Testcontainers instead of a `services:` database? (Same setup as the laptop, including the roles bootstrap script.)
 
 ### 2026-10-31 — Securing the workflows: SHA pins, read-only token, no secrets `#security` `#devops` → ADR 0024
-- **What happened:** Every action is pinned to a 40-character commit SHA with the version in a comment. Dependabot opens one grouped PR a month to update them. The workflow token is `contents: read`, checkout doesn't keep the token (`persist-credentials: false`), and CI uses no secrets at all: the smoke test copies `.env.example`'s fake passwords for a throwaway database.
+- **What happened:** Every action is pinned to a 40-character commit SHA with the version in a comment. Dependabot opens one grouped PR a month to update them. It can't see the Docker images I run inside `run:` steps (gitleaks, actionlint), so those are bumped by hand. The workflow token is `contents: read`, checkout doesn't keep the token (`persist-credentials: false`), and CI uses no secrets at all: the smoke test copies `.env.example`'s fake passwords for a throwaway database.
 - **Why / what I learned:** In March 2025, attackers moved the tags of `tj-actions/changed-files` to code that printed CI secrets into public logs. Anyone using a version tag ran it; anyone pinned to a SHA didn't. A tag is a movable pointer, a SHA isn't.
 - **Say it in an interview:** "I pin actions to commit SHAs because tags can be repointed, as the tj-actions attack showed, and Dependabot keeps the pins fresh. My CI has a read-only token and no secrets, so a hijacked step has nothing to steal."
 - **Follow-ups to expect:** What's `pull_request_target` and why avoid it? (It runs with the base repo's token and secrets; checking out the PR's code there runs a stranger's code with your rights.)
@@ -809,3 +809,15 @@ Entry format:
 - **Why / what I learned:** A written rule nobody checks drifts. Running a new check against past data shows whether the rule is realistic before it starts blocking people.
 - **Say it in an interview:** "I back-tested my PR-title check against the existing history. It caught one of my own titles, one character too long, which showed why the rule needed automating."
 - **Follow-ups to expect:** Why 72 characters? (Git tools and GitHub's UI truncate longer subject lines; 72 leaves room for indentation in `git log`.)
+
+### 2026-10-31 — The P0.6 review: what my own checks let through `#process` `#database` `#devops`
+- **What happened:** A fresh reviewer found nothing critical, but four things worth fixing before merge:
+  - Dependabot titles its grouped PRs `ci: bump <action> from X to Y in the actions group`, up to 76 characters, so my 72-character rule would have turned every monthly update red. Fixed: the length rule is waived for `dependabot[bot]` only (author passed through `env:`, like the title).
+  - The migration check only looked at new migrations. Editing, re-dating or deleting one that `main` already has passed, though databases that ran it would never see the edit, and a later timestamp would make Drizzle run it twice. Now it fails, with 3 new tests, and also catches an edited or deleted `.sql` file (`git diff --diff-filter=DM` against the merge base).
+  - A `catch {}` returned "no migrations" for any error, so a corrupt base journal would have passed. Now only a missing journal means "none"; bad JSON fails the check.
+  - `if: failure()` doesn't fire when a job hits its timeout, because GitHub cancels it instead. The logs step is now `failure() || cancelled()`, and `docker compose up --wait` has `--wait-timeout 180`.
+
+  Two doc claims were also wrong. Dependabot doesn't update Docker images run inside `run:`, and "runs on main always finish" isn't true: a queued run can be replaced.
+- **Why / what I learned:** A check is only as good as the inputs I imagined. The reviewer thought of the bot's titles, edits to old migrations, and a timeout instead of a failure. A catch-all `catch` in a safety check makes it fail open.
+- **Say it in an interview:** "Review found my migration check only looked at new files, so editing an applied migration would have passed and silently drifted production's schema. I extended it to fail on any change to a migration main already has."
+- **Follow-ups to expect:** Why can't you just edit a migration that has run? (Drizzle records it as applied and never runs it again, so existing databases keep the old version while fresh ones get the new one. Fix forward with a new migration.)

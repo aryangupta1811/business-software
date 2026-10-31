@@ -33,7 +33,7 @@ The repo is public, so anyone can open a pull request, and the rules in `docs/de
 - `compose --build`: simpler, but it can't use the GitHub cache, so every run reinstalls every dependency.
 
 ### Pinning actions: full commit SHA (chosen) vs a version tag
-- SHA: the code can't change under us. The tj-actions/changed-files attack in March 2025 moved tags to malicious code that dumped CI secrets. Dependabot (`.github/dependabot.yml`, monthly, actions only) keeps the pins current.
+- SHA: the code can't change under us. The tj-actions/changed-files attack in March 2025 moved tags to malicious code that dumped CI secrets. Dependabot (`.github/dependabot.yml`, monthly, actions only) keeps the action pins current. It doesn't see the gitleaks and actionlint images pinned inside `run:` steps: those are bumped by hand, together with the local gitleaks command in `docs/devops/git-workflow.md`.
 - Tag: readable, but whoever controls the action's repo can repoint it.
 
 ## Decision
@@ -44,9 +44,9 @@ Two workflow files, five jobs, all required in the `protect-main` ruleset. Each 
 | --- | --- | --- |
 | `check` | `ci.yml` | Install with the frozen lockfile, format, lint, type-check, all tests (Testcontainers), build, actionlint on the workflows |
 | `secrets` | `ci.yml` | gitleaks over the whole git history |
-| `migrations` | `ci.yml` (PRs only) | `packages/db/scripts/check-migration-order.ts`: every new migration is newer than every migration on the base branch |
+| `migrations` | `ci.yml` (PRs only) | `packages/db/scripts/check-migration-order.ts`: every new migration is newer than every migration on the base branch, and no migration the base branch has is removed, re-dated or edited (databases that ran it would never see the change) |
 | `smoke` | `ci.yml` | Build both images with the GitHub cache, `docker compose up --wait`, then `scripts/ci/smoke.sh`: readiness direct and through Caddy, Caddy's cache and CSP headers, a 404 for a missing asset, migrate with a wrong password exits 1, api, worker and web exit 0 on `docker compose stop` |
-| `pr-title` | `pr-title.yml` | `scripts/ci/check-pr-title.sh`: Conventional Commit format, lowercase, no full stop, at most 72 characters |
+| `pr-title` | `pr-title.yml` | `scripts/ci/check-pr-title.sh`: Conventional Commit format, lowercase, no full stop, at most 72 characters (waived for Dependabot, whose grouped titles can be longer) |
 
 Rules for every workflow:
 - triggers: `pull_request`, `push` to `main`, `workflow_dispatch`, never `pull_request_target`;
@@ -66,7 +66,9 @@ The pipeline checks what production runs: the real images, started the real way.
 ## Consequences
 
 - A PR can't merge until all five checks pass. A push to `main` runs `check`, `secrets` and `smoke`; `migrations` and `pr-title` only run on PRs.
-- Action updates arrive as one Dependabot PR a month, which must pass CI like any other.
+- Action updates arrive as one Dependabot PR a month, which must pass CI like any other. The tool images (gitleaks, actionlint) are checked for new versions by hand when Dependabot's PR arrives.
+- GitHub's *Revert* button titles a PR `Revert "…"`, which fails `pr-title`: rename it, e.g. `fix: revert the stock rounding change`.
+- `secrets` scans every branch's history, so a leaked key on any branch fails every PR until it's handled (`docs/devops/git-workflow.md`, CI).
 - When `main` moves, an open PR needs *Update branch* and a fresh run before it can merge.
 - Measured on PR #6: `smoke` takes 2 min 47 s with an empty cache and 50 s with a warm one. GitHub scopes the cache by branch: a run reads its own branch's cache and `main`'s. A branch with neither paid 73 s to export the cache, which only saves a 6 s install. Most of the win comes from skipping the TypeScript and Vite builds. The cache holds up to 10 GB per repo and evicts old entries.
 - `ADR 0012`'s CD part (image push, deploy through SSM with OIDC) is still to come in stage 6. It will need a separate workflow with `id-token: write`, never added to `ci.yml`.

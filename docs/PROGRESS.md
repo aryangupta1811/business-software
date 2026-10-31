@@ -1,7 +1,7 @@
 # Progress
 
-**Current focus:** Phase 0 — foundations (CI done; design system next)
-**Next step:** Owner pushes the end-session commit to `ci/p0.6-ci`, waits for green CI, squash-merges PR #6; next session: P0.7 design system (ask the owner for colours, apps they like, light/dark first)
+**Current focus:** Phase 0 — P0.7 design system (brainstorming started on branch `feat/p0.7-design-system`)
+**Next step:** `/start-session`, switch to `feat/p0.7-design-system`, and continue P0.7 brainstorming from the open question in `HANDOFF.md` (which apps' look the owner likes)
 **Last updated:** 2026-10-31
 
 Each task below is sized for **one session**. DevOps stages (from `docs/devops/DEVOPS_PLAN.md`) are woven in where they're first needed. Tasks for DRAFT modules are provisional: re-cut them after `/finalize-module NN`.

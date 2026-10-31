@@ -124,7 +124,8 @@ packages/
 compose.yaml        local services: db, migrate, api, worker, web   [0019, 0021, 0023]
 infra/
   terraform/        AWS environments                    [0011]
-.github/workflows/  CI/CD                               [0012]
+.github/workflows/  CI: ci.yml, pr-title.yml            [0012, 0024]
+scripts/ci/         smoke test, PR-title check          [0024]
 docs/               requirements, decisions, plans, journal
 ```
 
@@ -133,7 +134,7 @@ docs/               requirements, decisions, plans, journal
 | Environment | Where | Database | When it runs |
 | --- | --- | --- | --- |
 | Local | Docker Compose on the laptop | PostgreSQL container | While developing |
-| CI | GitHub Actions | PostgreSQL service container, thrown away | Every push and pull request |
+| CI | GitHub Actions: five required checks (`check`, `secrets`, `migrations`, `smoke`, `pr-title`) [0024] | Testcontainers PostgreSQL for the tests, plus the Compose stack for the smoke test; both thrown away | Every pull request and every push to `main` |
 | Demo (our production) | AWS, from Terraform: one EC2 server + RDS | RDS with point-in-time restore, plus a nightly copy to S3 | During the Free plan's 6 months, timed to placement season; stopped when idle to save credits |
 | Staging | AWS, from the same Terraform code | Small RDS instance | Only to rehearse a risky change; destroyed the same day |
 

@@ -9,7 +9,7 @@ The repo is public, so anything in git, in a published image, in the browser's J
 | This laptop | `.env` in the repo folder (git-ignored). `.env.example` lists the names with fake values. |
 | Docker Compose, locally | `.env`, put into each container's environment by `compose.yaml` when it starts |
 | AWS (stage 5 onwards) | SSM Parameter Store, encrypted (`SecureString`), read on the server at deploy time (ADR 0011) |
-| GitHub Actions | Nothing for AWS: OIDC gives short-lived credentials (ADR 0012). Any other secret goes in GitHub Actions secrets, only if there's no other way. |
+| GitHub Actions | CI uses no secrets at all (ADR 0024): the smoke test copies `.env.example`, whose fake passwords protect a database thrown away after the job. Nothing for AWS either: OIDC gives short-lived credentials (ADR 0012, stage 6). Any other secret goes in GitHub Actions secrets, only if there's no other way. |
 
 Each process gets only what it needs: `migrate` gets `MIGRATION_DATABASE_URL` (owner role), while `api` and `worker` get `DATABASE_URL` (runtime role) (ADR 0021).
 
@@ -18,7 +18,7 @@ Each process gets only what it needs: `migrate` gets `MIGRATION_DATABASE_URL` (o
 1. **Git.**
    - `.gitignore` blocks `.env*`, keys and Terraform state.
    - Before every commit: a gitleaks scan of staged changes and a personal-data search (`git-workflow.md`, Secrets).
-   - GitHub push protection rejects pushes that contain known token formats. From P0.6, gitleaks also runs in CI.
+   - GitHub push protection rejects pushes that contain known token formats. The `secrets` CI job runs gitleaks over the whole history on every PR and push to `main` (ADR 0024).
 2. **Docker images.** Anyone who can pull an image can read every layer, including files deleted in a later layer and every `ENV`/`ARG` value (`docker history`).
    - Secrets are never copied in (`.dockerignore` excludes `.env*`) and never passed as build arguments.
    - They arrive as environment variables when the container starts.

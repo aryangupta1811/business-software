@@ -25,5 +25,7 @@ export default defineConfig({
     // Undo vi.stubGlobal (the tests' fake fetch) and vi.spyOn after each test.
     unstubGlobals: true,
     restoreMocks: true,
+    // Vitest blanks CSS files, even `?raw` imports; the contrast test reads the tokens.
+    css: { include: [/src\/styles\.css/] },
   },
 });

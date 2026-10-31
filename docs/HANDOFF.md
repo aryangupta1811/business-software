@@ -2,100 +2,97 @@
 
 Overwritten at the end of every session. Older handoffs are in git history: `git log -p docs/HANDOFF.md`.
 
-**Session:** 6 — P0.5 web skeleton, 2026-10-30/31
+**Session:** 7 — P0.6 CI, 2026-10-31
 
 **Done:**
-- PR #4 (P0.4) was already squash-merged; no stale remote branches were left.
-- **Owner's requirement change:** Hinglish is a third interface language (Module 00 #25, NFR 7, both change logs).
-- Plan `docs/plans/2026-10-30-p0.5-web-skeleton.md`, approved and run inline, then one fresh review of the whole branch, whose findings were fixed.
-- `apps/web`:
-  - Vite 8, React 19.3, strict TS, written by hand;
-  - TanStack Router: file-based, `autoCodeSplitting`, `routeTree.gen.ts` committed and ignored by ESLint and Prettier;
-  - TanStack Query;
-  - Tailwind 4: only `@import 'tailwindcss'`, no tokens.
-- **Shell:** `routes/__root.tsx` holds the header, the not-found page and `defaultErrorComponent` (`components/route-error.tsx`).
-- `api/health.ts` `fetchReadiness()`:
-  - never rejects; returns `connected` | `database-down` | `server-down`;
-  - `READINESS_TIMEOUT_MS = 10_000`, which must stay above the API's 5 s `connectionTimeoutMillis` (pinned by a test).
-- `components/connection-badge.tsx` polls every 30 s.
-- `i18n/index.ts`:
-  - `LANGUAGES` (`en`, `hi`, `hi-Latn`), `readSavedLanguage`, `changeLanguage` (`localStorage` key `language` + `<html lang>`);
-  - `load: 'currentOnly'`, so Hinglish never falls back to Devanagari;
-  - keys typed from `en.json` (`i18next.d.ts`). `components/language-switcher.tsx`.
-- **Tests:** Vitest + jsdom + Testing Library. `src/test/setup.ts` does cleanup, stubs `scrollTo` and resets to English. `unstubGlobals` and `restoreMocks` are on.
-- **ESLint:**
-  - react-hooks, jsx-a11y and react-refresh for `apps/web`. jsx-a11y's peer range stops at ESLint 9, but it was proven to work on 10.
-  - react-refresh is off in `src/routes/` (TanStack splits route components itself).
-- **Docker:**
-  - `apps/web/Dockerfile`: `node:24-slim` build → `caddy:2.11-alpine` as user `web`, with `caddy validate` at build time.
-  - `apps/web/Caddyfile`:
-    - `@api` (`/api`, `/api/*`) → `api:3000`;
-    - `/assets/*` immutable for a year only if the file exists;
-    - SPA fallback with `no-cache`;
-    - `handle_errors` re-applies the security headers and adds `no-store`;
-    - strict CSP; `admin off`.
-  - `compose.yaml`: `web` on `127.0.0.1:8080`, no `depends_on`. `.dockerignore` now uses `**/.env*`.
-- **API:** `X-Powered-By` disabled (`app.ts`), with a test.
-- **Scripts:** root `pnpm dev` runs the API and web together (web on http://127.0.0.1:5173, proxying `/api`).
-- **Verified:**
-  - curl through Caddy: headers, deep link, missing asset, `/api`, 502 with the API stopped;
-  - headless Chrome over CDP: no CSP violations, all three languages, the choice kept after a reload, the badge correct 6 of 6 times with the db stopped and with the API stopped, the error screen with a page chunk removed;
-  - no secret strings in `/srv`; `web` stops with exit 0.
+- PR #5 (P0.5) was already squash-merged; `main` was clean.
+- Plan `docs/plans/2026-10-31-p0.6-ci.md`. The owner said "find best fit and go":
+  - Claude pushed the branch and opened PR #6;
+  - Claude set the required checks with `gh api`;
+  - the plan was run inline, then one fresh review of the whole branch.
+- **Workflows:**
+  - `.github/workflows/ci.yml` has four jobs:
+    - `check`: format, lint, types, all tests with Testcontainers, build, actionlint;
+    - `secrets`: gitleaks v8.30.1 over the whole history;
+    - `migrations`: PRs only;
+    - `smoke`: builds both images with `docker/build-push-action` and the `gha` cache, runs `docker compose up -d --wait --wait-timeout 180 --no-build`, then `scripts/ci/smoke.sh`; prints container logs on failure or timeout.
+  - `.github/workflows/pr-title.yml` runs `scripts/ci/check-pr-title.sh`, with the title and author passed through `env:`. The 72-character limit is waived for `dependabot[bot]`.
+  - `.github/dependabot.yml`: GitHub Actions only, monthly, grouped, prefix `ci`.
+- **Rules in every workflow:**
+  - actions pinned to SHAs; the gitleaks and actionlint images pinned by digest;
+  - `permissions: contents: read`, `persist-credentials: false`;
+  - no secrets, never `pull_request_target`;
+  - a timeout on every job; `concurrency` cancels a PR's older run.
+- **`packages/db/scripts/check-migration-order.ts`:**
+  - Runs with plain Node (type stripping, no build); `scripts` is in `packages/db/tsconfig.json`, not in the build.
+  - `findOutOfOrderMigrations` and `findChangedMigrations`, with 9 tests.
+  - The CLI also fails on an edited or deleted `.sql` file (diffed against the merge base), and on an unreadable base journal.
+  - Exit codes: 0 OK, 1 problem, 2 unknown ref or no argument.
+- **`scripts/ci/smoke.sh`:** 7 checks:
+  - readiness, direct and through Caddy;
+  - `/` is `no-cache` with the CSP;
+  - a deep link gets 200;
+  - a missing asset is 404 `no-store`;
+  - migrate with a wrong password exits 1;
+  - api, worker and web exit 0 on `docker compose stop`.
+- **`protect-main` ruleset:**
+  - five required checks: `check`, `secrets`, `migrations`, `smoke`, `pr-title`;
+  - each bound to GitHub Actions (app id 15368);
+  - branches must be up to date with `main`.
+  - Verified with `gh api`. The click path is in `git-workflow.md`, step 7.
+- **Proof:**
+  - green on the first run;
+  - each check made to fail once on purpose: `check`, `secrets` and `smoke` on a throwaway branch run with `gh workflow run`, then deleted; `pr-title` by renaming PR #6.
+  - Cache: `smoke` takes 2 min 47 s cold and 50 s warm. A branch with no cache of its own and none on `main` paid 73 s to export it.
+- **Final review:** no critical or important findings. Fixed: Dependabot titles, changed migrations, the fail-open journal read, no logs on a timeout, two false doc claims. Added a "red `secrets`" runbook.
 - **Docs:**
-  - ADR 0023;
-  - `architecture.md` (web section, diagram);
-  - `local-database.md`, `CLAUDE.md` commands, PROGRESS notes for P0.6 and P0.7;
-  - interview log (9 entries, Question bank, Glossary, Numbers, Pitch), phase-0 journal.
-- **Tests:** 121 in all: 45 shared, 12 db, 28 api, 36 web.
+  - ADR 0024 and its line in the ADR index;
+  - `README.md` with the CI badge;
+  - `architecture.md`, `git-workflow.md` (CI section, steps 7 and 8, gitleaks v8.30.1), `secrets.md`, `CLAUDE.md` (CI line), PROGRESS (P0.6 ticked, a P1.3 Playwright note);
+  - the interview log (10 entries, Question bank, Glossary, Numbers) and the phase-0 journal.
+- **Tests:** 130 in all: 45 shared, 21 db, 28 api, 36 web.
 
-**Half-done:** branch `chore/p0.5-web-skeleton` (12 commits plus this end-session commit) is committed but **not pushed**, and has no PR yet. The owner hasn't read the Hindi and Hinglish wording yet (`apps/web/src/i18n/locales/hi.json`, `hi-Latn.json`).
+**Half-done:** PR #6 (`ci/p0.6-ci`) is open, green and mergeable. This end-session commit is local, not pushed.
 
 **Next step:**
-1. Owner: read the Hindi and Hinglish wording, and ask for any changes before merging.
-2. Owner: `git push -u origin HEAD`, then `gh pr create --web`.
-   - Title: `chore: build the react web skeleton with caddy and three languages (P0.5)`.
-   - Fill in the template, with no AI attribution line.
-   - Squash-merge (no CI yet), then `git switch main`, `git pull`, `git branch -D chore/p0.5-web-skeleton`.
-3. Next session: `/start-session` → **P0.6 CI**. Plan first. PROGRESS lists the notes from P0.4 and P0.5:
-   - Linux smoke job: api, worker and web exit codes, plus the Caddy `curl -I` checks;
-   - build both images with a layer cache;
-   - never `pull_request_target` with PR code.
+1. Owner: `git push`. Wait for the five checks, then squash-merge PR #6, keeping the title `ci: add github actions ci with smoke tests and required checks (P0.6)`.
+2. Then `git switch main`, `git pull`, `git branch -D ci/p0.6-ci`. The merge's CI run on `main` fills the cache that new PRs read.
+3. Next session: `/start-session` → **P0.7 design system**. First ask the owner for colours, apps whose look they like, and light or dark (PROGRESS has the P0.5 notes: self-host fonts, Devanagari, shadcn/ui, favicon).
 
 **Watch out for:**
 - **No AI attribution, ever:** no `Co-Authored-By: Claude` and no "Generated with Claude Code" (`CLAUDE.md` rule 6 overrides tool defaults).
-- **Never write repo files with PowerShell `Set-Content`/`Add-Content`/`Out-File`.**
-  - In 5.1 they add a BOM and CRLF. A BOM in `package.json` broke Vitest with a misleading "Cannot find dependency 'jsdom'".
-  - The Write tool keeps a BOM that is already in a file. Strip it with `[IO.File]::WriteAllText(path, text, (New-Object Text.UTF8Encoding $false))`.
-- **The CSP allows only our own origin.** Fonts, icons or scripts from a CDN will be blocked: self-host them (P0.7) or change the CSP on purpose.
-- **Every new string goes in all three locale files.** The tests fail otherwise. Hinglish must not contain Devanagari.
-- **Caddy:**
-  - `handle` takes one matcher, so use a named one (`@x path a b`) for several paths;
-  - error responses drop headers set earlier (hence `handle_errors`);
-  - the Dockerfile's `caddy validate` catches syntax errors at build time.
-- **Timeouts:** any caller must wait longer than the call it makes. The web's 10 s readiness timeout depends on `packages/db` `connectionTimeoutMillis` (5 s).
-- **The Claude in Chrome extension disconnected this session.** Headless Chrome plus a small CDP script did the job. The script isn't in the repo; Playwright arrives in P1.3.
-- **Deferred minors from the final review:**
-  - `/favicon.ico` gets the SPA fallback HTML (add an icon in P0.7);
-  - an asset URL with a trailing slash gives a 308 carrying the immutable header (harmless);
-  - `COPY apps/web` in the Dockerfile means a Caddyfile edit reruns the Vite build (about 0.2 s);
-  - no fake-timer test of a hanging fetch;
-  - React Query pauses polling in a background tab (documented).
-- **Still open from P0.4:**
-  - `describeError` gaps: an empty `AggregateError`, a cyclic `cause`, `cause: null`;
-  - no query timeout on `/ready`;
-  - Node 25+ drops Corepack (note it in ADR 0020 before moving to `node:26-slim`).
-- Carried over:
+- **CI is now the gate.** All five checks are required, and a PR must be up to date with `main`; after another merge, click *Update branch*.
+  - PR titles: lowercase Conventional Commit, at most 72 characters, no full stop.
+  - GitHub's *Revert* button title fails: rename it to e.g. `fix: revert …`.
+  - Editing a PR's description re-runs `pr-title` (5 s).
+- **Migrations:** never edit, re-date or delete one that's on `main`, because CI fails it. Add a new one instead. A new one must be newer than `main`'s (rebase, then regenerate).
+- **A red `secrets` check fails every PR,** because it scans every branch.
+  - Revoke a real key first.
+  - For a false positive, add its fingerprint to `.gitleaksignore` in a PR.
+  - Never commit a fake secret to a real branch; use a throwaway branch and delete it.
+- **Pinned versions:** Dependabot updates only `uses:` actions. The gitleaks image (CI digest plus the local command in `git-workflow.md`) and the actionlint image are bumped by hand. CI and local must use the same gitleaks version.
+- **New workflow rules:**
+  - pin new actions to a SHA with a `# vX.Y.Z` comment;
+  - any `${{ github.event.* }}` value goes through `env:`, never inside `run:`;
+  - run actionlint locally: `docker run --rm -v "${PWD}:/repo:ro" -w /repo rhysd/actionlint:1.7.12` (PowerShell).
+- **Cache:** GitHub scopes it by branch (own branch plus `main`). Don't judge cache speed on a fresh branch.
+- **Never write repo files with PowerShell `Set-Content`/`Add-Content`/`Out-File`** (BOM and CRLF). Strip a BOM with `[IO.File]::WriteAllText(path, text, (New-Object Text.UTF8Encoding $false))`. Inline Python heredocs in Git Bash can mangle quotes and `\n`: write the script to the scratchpad and run it from there.
+- **The CSP allows only our own origin:** self-host fonts and icons in P0.7.
+- **Every new string goes in all three locale files.** Hinglish must not contain Devanagari.
+- **Deferred minors:**
+  - From P0.6:
+    - the "reproduce `check`" row in `git-workflow.md` lacks the actionlint command;
+    - the repo setting *Require actions to be pinned to a full-length commit SHA* is off. The owner decides; it's a settings change.
+  - From P0.5: `/favicon.ico` gets the SPA HTML (P0.7); an asset URL with a trailing slash gets a 308 with the immutable header; a Caddyfile edit reruns the Vite build; no fake-timer test of a hanging fetch; polling pauses in background tabs.
+  - From P0.4: `describeError` gaps (an empty `AggregateError`, a cyclic `cause`, `cause: null`); no query timeout on `/ready`; Node 25+ drops Corepack (note it in ADR 0020 before `node:26-slim`).
+- **Carried over:**
   - Docker Desktop must be running for `pnpm test`, `pnpm check`, `db:up` and `app:up`.
-  - Never `docker compose down -v` without OK.
-  - The bootstrap runs only on an empty volume.
+  - Never `docker compose down -v` without OK. The bootstrap runs only on an empty volume.
   - P1.2's entry-log table must `REVOKE UPDATE`.
-  - pnpm 12 `ERR_PNPM_IGNORED_BUILDS`: decide each package with a reason. pnpm 12 also prints "Agent skills awaiting approval" for TanStack packages; it was left unapproved.
-  - TypeScript stays pinned to `~6.0`.
-  - New `.ts`/`.tsx` files must be in a tsconfig `include`.
+  - pnpm 12 `ERR_PNPM_IGNORED_BUILDS`: decide each package with a reason. pnpm's TanStack "Agent skills awaiting approval" note is expected; it also shows in CI.
+  - TypeScript stays pinned to `~6.0`. New `.ts`/`.tsx` files must be in a tsconfig `include`.
   - `packages/shared` has no Node/DOM globals.
-  - Run gitleaks from PowerShell. The lockfile's only personal-data hit is a public npm author address.
-  - Test data must not look like personal data.
+  - Run gitleaks from PowerShell. Test data must not look like personal data.
   - `refs/original/` still holds the pre-rewrite commits (ask before deleting).
-  - Don't open AWS before stage 4; ask about placement season first.
+  - Don't open AWS before stage 4; ask about placement season first. Remove the broken pip `aws` before installing AWS CLI v2.
   - Answer the Module 00/01 open questions before P1.3/P1.7.
-  - Remove the broken pip `aws` before installing AWS CLI v2.

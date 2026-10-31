@@ -821,3 +821,22 @@ Entry format:
 - **Why / what I learned:** A check is only as good as the inputs I imagined. The reviewer thought of the bot's titles, edits to old migrations, and a timeout instead of a failure. A catch-all `catch` in a safety check makes it fail open.
 - **Say it in an interview:** "Review found my migration check only looked at new files, so editing an applied migration would have passed and silently drifted production's schema. I extended it to fail on any change to a migration main already has."
 - **Follow-ups to expect:** Why can't you just edit a migration that has run? (Drizzle records it as applied and never runs it again, so existing databases keep the old version while fresh ones get the new one. Fix forward with a new migration.)
+
+### 2026-10-31 — `gh` commands for driving CI from the terminal `#devops` `#github` `#tooling`
+- **What happened:** I ran and debugged the whole P0.6 pipeline without opening the browser:
+  - `gh pr checks 6 --watch`: wait for a PR's checks, then print each result.
+  - `gh run view <id> --log-failed`: only the failed steps' logs. A run's logs only become available once the whole run has finished.
+  - `gh api --allow-escape-sequences repos/<owner>/<repo>/actions/jobs/<job>/logs`: one job's full log, including BuildKit's `CACHED` lines.
+  - `gh workflow run ci.yml --ref <branch>`: start a run by hand on any branch (the `workflow_dispatch` trigger).
+  - `gh run rerun <id> --job <job-id>`: re-run one job, e.g. to measure a warm cache.
+  - `gh api --method PUT repos/<owner>/<repo>/rulesets/<id> --input ruleset.json`: replace a ruleset. Send all the existing rules plus the new one, after saving the old JSON.
+  - `gh api repos/<owner>/<repo>/actions/permissions/workflow`: confirm the default token is read-only.
+- **Why / what I learned:** The API shows the real state, so I can check a setting instead of trusting a screenshot. A ruleset `PUT` replaces the whole rule list, so leaving out an existing rule deletes it.
+- **Say it in an interview:** "I drove CI from the GitHub CLI: watched checks, pulled only the failed logs, re-ran single jobs to measure caching, and changed branch rules through the API after backing up the old JSON."
+- **Follow-ups to expect:** PUT vs PATCH? (PUT replaces the whole resource, PATCH changes the fields you send. GitHub's ruleset update is a PUT, so you send everything.)
+
+### 2026-10-31 — `edited` fires on a description edit too `#github` `#gotcha`
+- **What happened:** After I updated PR #6's description, the PR briefly showed "blocked". The `pull_request` `edited` event, which I used so a rename re-runs `pr-title`, also fires when the description or base branch changes. `pr-title` re-ran (5 s), and the required check was pending until it finished.
+- **Why / what I learned:** An event name can cover more than the case you added it for. Here it's harmless, and the reason `pr-title` is its own tiny workflow: a description edit doesn't rebuild everything.
+- **Say it in an interview:** "My PR-title check listens to `edited` so a rename re-runs it. That event also fires on description edits, which is why it's a separate five-second workflow and not part of the main build."
+- **Follow-ups to expect:** How would you run only on title changes? (Compare `github.event.changes.title` in an `if:`, but the check must still report on every new commit, so keep `synchronize`.)

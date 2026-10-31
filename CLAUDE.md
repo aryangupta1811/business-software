@@ -66,3 +66,4 @@ Run from the repo root. Node 24+, pnpm 12.
 - Type-check: `pnpm typecheck`
 - Format: `pnpm format` (Prettier; `pnpm format:check` only reports)
 - Everything, before a commit: `pnpm check`
+- CI: five required checks on every PR (GitHub Actions, ADR 0024); how to read and reproduce a red one: `docs/devops/git-workflow.md`, CI

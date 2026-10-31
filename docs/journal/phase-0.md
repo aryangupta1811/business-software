@@ -12,7 +12,7 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
 - **2026-10-30 (P0.4 API skeleton, DevOps stage 2 second half):** NestJS 12 API with liveness (`/api/health`) and readiness (`/api/health/ready`), a worker and a one-shot migrate entry point, all from one non-root `node:24-slim` image. Compose starts db → migrate (as `app_owner`) → api and worker (as `app_runtime`). Packages compile with TypeScript project references, and a `source` export condition lets tests and lint skip the build. Secrets rules for the whole project (`docs/devops/secrets.md`), at the owner's request about the AI key. Docker smoke tests found two real bugs: the worker exited after pg's 10 s idle timeout, and the API exited 143 instead of 0. Both were fixed, but only the worker fix has an automated test: exit codes on SIGTERM can't be tested on Windows, so they're checked by hand until a Linux CI smoke job (P0.6). The final review found the entry points skipped the messages-only logging on a crash, and the worker crash-looped when the database was down at startup; both fixed test-first. Logs now never include error objects or query values. The API listens on `127.0.0.1` unless `HOST` says otherwise. 84 tests. ADRs 0020–0022.
 - **2026-10-30 (P0.5 web skeleton):** React 19 + Vite 8 app in `apps/web` with TanStack Router (file-based) and Query, Tailwind 4 (setup only), and a header with a server connection badge and an English/Hindi/Hinglish switch. The owner added Hinglish (`hi-Latn`) at the start of the session. Locally Vite proxies `/api`; in Compose a Caddy container (non-root) serves the files and proxies `/api`, as on the server. Hashed assets are cached for a year and `index.html` never, deep links fall back to `index.html`, missing assets are a real 404, and a strict CSP is on every response. No `VITE_` variables. Checked in headless Chrome over the DevTools protocol: no CSP violations, all three languages, and the badge reacts to the database or API being stopped. 36 web tests (121 in all). ADR 0023.
 - **2026-10-31 (P0.6 CI):** GitHub Actions with five required checks on every PR: `check` (format, lint, types, 130 tests including Testcontainers, build, actionlint), `secrets` (gitleaks, whole history), `migrations` (a new migration must be newer than `main`'s, ADR 0021's trap, and `main`'s migrations can't be removed, re-dated or edited), `smoke` (both images built with the GitHub layer cache, started with Compose, then readiness, Caddy headers, a failing migration and clean stops) and `pr-title`. Actions pinned to SHAs and kept fresh by Dependabot (the gitleaks and actionlint images are bumped by hand), read-only token, no secrets. Each check was made to fail once on purpose. All green on the first run; a full run takes about 3 minutes. README with the CI badge. ADR 0024.
-- *Still to do in this phase:* design system.
+- **2026-10-31 (P0.7 design system):** the owner chose the look from browser mockups: Apple-clean (cool white, one blue accent), 8 px corners, IBM Plex Sans with Plex Devanagari, light by default with a sun/moon button. Tokens are CSS variables mapped into Tailwind with the default palette removed, and a WCAG contrast test runs over both modes; it rejected two colours from the approved table. Fonts self-hosted, a tiny external script prevents a dark-mode flash (the CSP blocks inline scripts), base components copied from shadcn/ui, a sidebar and top-bar layout, a keyboard-shortcut registry built for a barcode scanner (`?` help in a native `<dialog>`, `Alt+H` Home), a favicon and a `/design` showcase page. Checked in Chrome through Caddy: no CSP violations, all six mode/language combinations, no overflow at 1024 px. 224 tests (130 web). ADRs 0025–0026.
 
 ## Stack choices vs alternatives
 
@@ -42,6 +42,8 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
 | Job-queue role | `app_queue` owning only schema `pgboss` | Owner-installed pg-boss + scoped DELETE; CREATE for the runtime role | 0022 |
 | CI pipeline | GitHub Actions, Testcontainers in CI, bash PR-title check, gitleaks Docker image, `build-push-action` with the `gha` cache, SHA-pinned actions | `services:` database, marketplace title action, `gitleaks-action`, `compose --build`, version tags | 0024 |
 | Web build & serving | Caddy container serving the build, hashed-file caching, strict CSP, file-based routes, i18next with `en`/`hi`/`hi-Latn` | nginx, `vite preview`; code-based routes; happy-dom | 0023 |
+| Design system | Apple-clean CSS-variable tokens + contrast test, IBM Plex self-hosted, light default, shadcn copied by hand | Warm-paper or slate looks; Inter, Mukta; follow the OS theme; shadcn CLI | 0025 |
+| Shortcuts & modals | Own registry (physical keys, scanner-safe in fields); native `<dialog>` | react-hotkeys-hook, tinykeys; Radix Dialog (+ `'unsafe-inline'` styles) | 0026 |
 
 ## Mistakes and what I learned
 
@@ -61,6 +63,8 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
 - **Two 5-second timeouts raced, and my one-off check passed by luck.** The browser and the API's database wait both gave up at 5 s, so "database down" showed as "server down" on about 2 of 5 loads. I had checked it once; the reviewer checked it five times. Lesson: an outer timeout must be clearly longer than the inner one, and anything that can race must be checked more than once.
 - **My own PR title broke my own rule.** Back-testing the new PR-title check on `main`'s history showed P0.5's title was 73 characters, over the 72 in my git-workflow doc. Lesson: a rule nobody checks drifts; back-test a new check on real data.
 - **Assumed the CI cache would help everywhere.** On a new branch it found nothing (GitHub scopes caches by branch) and exporting it took 73 s to save a 6 s install. A warm re-run took 50 s instead of 2 min 47 s. Lesson: measure an optimisation in the cases that actually happen.
+- **The owner's approved colours failed my own readability rule.** Blue links on the grey page were 4.31:1 and green on its badge 4.48:1 (WCAG AA needs 4.5). Only the automated test caught it; by eye both looked fine. Lesson: turn a goal like "easy to read" into a number a test can check.
+- **The production build changed my data.** The CSS minifier writes `#ffffff` as `#fff`, so `/design` showed NaN for every contrast ratio. Unit tests read the source CSS, so only the real build in a real browser showed it. Lesson: test the artefact you ship, not just the source.
 - **Waited for a GitHub login code on my phone.** The device-flow code is printed in the terminal. Lesson: read the tool's output before looking elsewhere.
 
 ## Interview questions I can now answer
@@ -118,6 +122,17 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
   A: `default-src 'self'` and no inline scripts: the browser refuses any script, style or connection that isn't from our own origin, so an injected script can't run or send data out. I checked in a real browser that the built app causes no violations.
 - Q: How do you support several languages?
   A: i18next with one JSON file per language (`en`, `hi`, `hi-Latn` for Hinglish). Keys are type-checked against English, and tests compare the files' keys and check each one's script. I found that i18next would fall back from Hinglish to Devanagari Hindi and pinned it with `load: 'currentOnly'`.
+
+**Design system (P0.7):**
+
+- Q: How did you make the UI easy to read, and how do you keep it that way?
+  A: Readability was the owner's top priority, so I made it a test: it reads the colour tokens and checks WCAG contrast for every text and edge colour in light and dark. It failed two colours from the approved palette on its first run. (ADR 0025)
+- Q: How do you avoid a white flash for dark-mode users?
+  A: A tiny script in `<head>` reads the saved theme and sets the `dark` class before anything is drawn. It's a separate file, because my CSP blocks inline scripts.
+- Q: How do keyboard shortcuts work with a barcode scanner?
+  A: The scanner types into the focused field, so inside fields only F-keys, Esc and Ctrl/Alt combos fire. Letters match the physical key (`event.code`), so Alt+H still works on a Hindi keyboard layout. Held keys, IME composition and AltGr never trigger anything. (ADR 0026)
+- Q: Why not use the component library's dialog?
+  A: Radix Dialog adds a `<style>` tag at runtime, which my CSP blocks. The browser's `<dialog>` already handles focus, Escape and the backdrop. (ADR 0026)
 
 **CI (P0.6):**
 

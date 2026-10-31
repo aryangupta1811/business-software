@@ -9,7 +9,7 @@ export function LanguageSwitcher() {
     <div
       role="group"
       aria-label={t('language.label')}
-      className="flex rounded-md border border-stone-300 text-sm"
+      className="flex rounded-lg bg-surface-muted p-0.5 text-label"
     >
       {LANGUAGES.map(({ code, name }) => {
         const current = i18n.language === code;
@@ -20,7 +20,7 @@ export function LanguageSwitcher() {
             lang={code}
             aria-pressed={current}
             onClick={() => void changeLanguage(code)}
-            className={`px-3 py-1 ${current ? 'bg-stone-900 text-white' : 'hover:bg-stone-100'}`}
+            className={`rounded-md px-3 py-1 font-medium ${current ? 'bg-surface text-foreground shadow-card' : 'text-muted hover:text-foreground'}`}
           >
             {name}
           </button>

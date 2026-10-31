@@ -1,6 +1,15 @@
 {
   "app": { "name": "Business Software" },
   "language": { "label": "Language" },
+  "nav": { "label": "Main", "home": "Home" },
+  "theme": { "toDark": "Switch to dark mode", "toLight": "Switch to light mode" },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "close": "Close",
+    "groups": { "general": "General", "navigation": "Navigation" },
+    "openHelp": "Show keyboard shortcuts",
+    "goHome": "Go to Home"
+  },
   "connection": {
     "checking": "Checking connection…",
     "connected": "Connected",
@@ -10,6 +19,49 @@
   "home": {
     "title": "Welcome",
     "body": "Billing, stock and udhaar will appear here."
+  },
+  "design": {
+    "title": "Design system",
+    "contrastNote": "Each colour's value, and its contrast against a card.",
+    "sampleSentence": "Today's sales were higher than yesterday's.",
+    "sections": {
+      "colours": "Colours",
+      "text": "Text",
+      "buttons": "Buttons",
+      "inputs": "Inputs",
+      "badges": "Badges",
+      "cards": "Cards",
+      "keys": "Keyboard keys",
+      "sample": "Sample"
+    },
+    "buttons": {
+      "save": "Save bill",
+      "hold": "Hold",
+      "more": "More",
+      "cancelBill": "Cancel bill",
+      "unavailable": "Unavailable"
+    },
+    "inputs": {
+      "customer": "Customer name",
+      "phone": "Phone",
+      "phoneError": "Enter 10 digits",
+      "invoice": "Invoice number"
+    },
+    "badges": {
+      "cash": "Cash",
+      "upi": "UPI",
+      "paid": "Paid",
+      "udhaar": "Udhaar",
+      "cancelled": "Cancelled"
+    },
+    "cards": { "title": "Today's sales", "body": "8% more than yesterday" },
+    "sample": {
+      "bill": "Recent bill",
+      "item": "Item",
+      "quantity": "Quantity",
+      "amount": "Amount",
+      "total": "Total"
+    }
   },
   "notFound": {
     "title": "Page not found",

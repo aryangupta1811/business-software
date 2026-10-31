@@ -1,16 +1,20 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 
 export const Route = createFileRoute('/')({
   component: Home,
+  staticData: { titleKey: 'nav.home' },
 });
 
 function Home() {
   const { t } = useTranslation();
   return (
-    <>
-      <h1 className="text-2xl font-semibold">{t('home.title')}</h1>
-      <p className="mt-2 text-stone-600">{t('home.body')}</p>
-    </>
+    <Card className="max-w-xl">
+      <CardHeader>
+        <CardTitle>{t('home.title')}</CardTitle>
+      </CardHeader>
+      <CardContent className="text-muted">{t('home.body')}</CardContent>
+    </Card>
   );
 }

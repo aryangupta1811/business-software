@@ -57,6 +57,13 @@ expect_status "$headers" "$url" 404
 expect_header "$headers" "$url" 'cache-control: no-store'
 echo "ok: missing asset is 404 no-store"
 
+# 5b. The favicon is a real file, not the app's HTML from the SPA fallback.
+url=http://127.0.0.1:8080/favicon.ico
+headers=$(head_request "$url")
+expect_status "$headers" "$url" 200
+expect_header "$headers" "$url" 'content-type: image/'
+echo "ok: favicon is an image"
+
 # 6. A migration with a wrong password fails (exit 1), so api and worker would never start.
 set +e
 docker compose run --rm --no-deps \

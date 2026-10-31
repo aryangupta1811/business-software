@@ -12,7 +12,8 @@ function renderAt(path: string) {
 
 test('shows the home page at /', async () => {
   renderAt('/');
-  expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Welcome');
+  expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Home');
+  expect(screen.getByRole('heading', { level: 2, name: 'Welcome' })).toBeInTheDocument();
 });
 
 test('shows the not-found page for an unknown path', async () => {

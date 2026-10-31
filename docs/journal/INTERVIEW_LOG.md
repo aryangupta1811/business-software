@@ -34,11 +34,12 @@ Update this as the project grows.
 | Largest exact amount in JavaScript | ≈ ₹90 lakh crore in paise (2^53) | ADR 0008 |
 | Business types in v1 | 5 | Module 00 |
 | Modules | 10 (00–09) | `docs/requirements/` |
-| ADRs | 24 (16 at kickoff) | `docs/decisions/` |
+| ADRs | 26 (16 at kickoff) | `docs/decisions/` |
 | Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
-| Automated tests | 130: 74 unit (45 money helpers, 20 API config, error, process and shutdown, 9 migration check) + 20 integration on a real PostgreSQL (roles and grants, database client, health endpoints and headers, worker startup) + 36 web (routing, connection badge, the three languages, error screen) | `pnpm test` |
+| Automated tests | 224: 45 shared (money), 21 db, 28 api, 130 web (routing, connection badge, three languages, error screen, 44 contrast checks, Hindi line height, components, theme, 24 keyboard-shortcut tests, layout, `/design`) | `pnpm test` |
 | Interface languages | 3: English, Hindi, Hinglish (`en`, `hi`, `hi-Latn`) | Module 00 #25, ADR 0023 |
-| Web app download | ~122 KB gzipped JavaScript (383 KB raw); web image 93 MB (Caddy) | P0.5, `vite build` |
+| Web app download | ~160 KB gzipped JavaScript; fonts 307 KB (woff2, six files, cached for a year); web image 95 MB (Caddy) | P0.7, `vite build` |
+| Readability floor | text ≥ 4.5:1 contrast (main text ≥ 7:1), input edges and focus ring ≥ 3:1, both modes; body text 15 px, nothing under 13 px | ADR 0025 |
 | PostgreSQL version | 18, everywhere (newest RDS supports) | ADR 0005, `compose.yaml` |
 | Integration test run | ~3 s with the image cached, ~22 s on the first run | P0.3 |
 | How long a new package version waits before we install it | 1 day | `pnpm-workspace.yaml` `minimumReleaseAge` |
@@ -125,6 +126,10 @@ Short answers; the Log entry has the full story.
   A: Read-only token permissions, actions pinned to commit SHAs (tags can be moved, as in the tj-actions attack), no `pull_request_target`, no secrets in CI at all, `persist-credentials: false`, and event values like a PR title passed through `env:` rather than `${{ }}` inside a script, which would be script injection. → ADR 0024
 - **Q: How do you know a CI check actually works?**
   A: I made each one fail on purpose: a badly formatted line, a fake API key, a wrong expected header and a bad PR title. I did it on a throwaway branch, because a fake secret committed to the real branch would stay in history and fail every later scan. → P0.6
+- **Q: How did you make "easy to read" testable?**
+  A: Design tokens live in one CSS file, and a test reads them and checks WCAG contrast for every text and edge colour in light and dark mode. On its first run it rejected two colours from the palette the owner had approved. → ADR 0025
+- **Q: How do your keyboard shortcuts coexist with a barcode scanner and a Hindi keyboard?**
+  A: Inside text fields only F-keys, Esc and Ctrl/Alt combos fire, because the scanner types there. Letters match `event.code`, the physical key, so Alt+H works whatever the layout types. Auto-repeat, IME composition and AltGr never fire. → ADR 0026
 
 ---
 
@@ -142,6 +147,7 @@ Terms I learned on this project, in one line each.
 | Cache busting | Putting a hash of a file's content in its name, so a changed file gets a new URL and old copies can be cached forever |
 | Catalog (pnpm) | One list of dependency versions in `pnpm-workspace.yaml` that every package refers to with `"catalog:"` |
 | Branch protection: up to date | A rule that a PR must contain the latest `main` before merging, so its checks ran against what it will actually join |
+| `event.code` vs `event.key` | `code` is the physical key (`KeyH`), `key` is the character it types (`h`, or `ह` on a Hindi layout); shortcuts on letters should use `code` |
 | CI / CD | Continuous Integration (test every change automatically) / Continuous Deployment (ship every green change automatically) |
 | Container | A running, disposable copy of an image, isolated from the rest of the computer |
 | Conventional Commits | Commit messages shaped `type(scope): summary`, e.g. `fix(gst): round CGST and SGST separately` |
@@ -151,6 +157,7 @@ Terms I learned on this project, in one line each.
 | Database role | A PostgreSQL login (or group) with its own permissions; here `app_owner` runs migrations, `app_runtime` is the app |
 | Decorator metadata | Type information a compiler attaches to decorated classes; NestJS reads it to know what to inject |
 | Default privileges | PostgreSQL rules that grant permissions on tables automatically when they're created later |
+| Design token | A named design value (`--surface`, `text-body`) that every screen uses instead of a raw colour or size, so the look changes in one place |
 | Device flow | OAuth login for CLIs and TVs: the device shows a short code, you approve it in a browser where you're logged in |
 | Docker Compose | One YAML file describing several containers, their settings and volumes, started with one command |
 | Docker daemon | The background engine that builds and runs containers; the `docker` command only sends it requests |
@@ -158,10 +165,12 @@ Terms I learned on this project, in one line each.
 | Export conditions | Named entry points in a package's `exports` (`source`, `types`, `default`); each tool picks the one it understands |
 | Fast refresh | Vite swapping a changed React component into the running page without a reload, keeping its state |
 | FEFO | First Expiry, First Out: sell the batch that expires soonest |
+| FOUC | Flash of unstyled (or wrong-theme) content: the page draws once before styles or the saved theme apply |
 | GitHub flow | `main` is always deployable; every change is a short-lived branch merged by pull request |
 | Healthcheck | A command Docker runs repeatedly to decide whether a container is ready, not just started |
 | httpOnly cookie | A cookie JavaScript can't read, so a script injected into the page can't steal the session |
 | IaC | Infrastructure as Code: cloud resources created from code files (Terraform) instead of clicking in a console |
+| IME composition | An input method (e.g. phonetic Hindi) builds a word from several keys; those keydowns have `isComposing` set and aren't commands |
 | Idempotency key | A unique ID sent with a request so repeating it has the same effect as sending it once |
 | Image (Docker) | A read-only package of a program and everything it needs; containers are started from it |
 | Liveness / readiness | "The process is alive" vs "it can serve requests now" (its dependencies answer) |
@@ -197,6 +206,7 @@ Terms I learned on this project, in one line each.
 | Text shaping | Turning letters into correctly joined glyphs; Hindi (Devanagari) needs it for conjuncts like क्ष |
 | Type-aware linting | Lint rules that use the TypeScript compiler's type information, e.g. "this promise is never awaited" |
 | Volume (Docker) | Storage kept outside a container, so data survives when the container is removed |
+| WCAG contrast ratio | How much lighter one colour is than another, from 1:1 to 21:1; AA needs 4.5:1 for normal text and 3:1 for edges and focus rings |
 | Workspace (pnpm) | The set of packages in a monorepo that pnpm installs and links together |
 
 ---
@@ -840,3 +850,78 @@ Entry format:
 - **Why / what I learned:** An event name can cover more than the case you added it for. Here it's harmless, and the reason `pr-title` is its own tiny workflow: a description edit doesn't rebuild everything.
 - **Say it in an interview:** "My PR-title check listens to `edited` so a rename re-runs it. That event also fires on description edits, which is why it's a separate five-second workflow and not part of the main build."
 - **Follow-ups to expect:** How would you run only on title changes? (Compare `github.event.changes.title` in an `if:`, but the check must still report on every new commit, so keep `synchronize`.)
+
+### 2026-10-31 — A design system starts from constraints, not taste `#frontend` `#process`
+- **What happened:** Before picking colours for P0.7, I listed what the product already forces on the design: a counter computer with keyboard and scanner (no phones), screens dense with bills and stock, three languages including Devanagari, and a CSP that allows files only from our own origin.
+- **Why / what I learned:** These rule things out before taste comes in. The CSP means fonts and icons must be bundled with the app, not loaded from Google Fonts. Devanagari has taller letters and marks above and below the line, so line heights and fixed-height boxes must leave room for it. Billing by keyboard means every action needs a shortcut and a visible focus. Treated as a feature, the design work is split into questions, approaches, an approved spec, then a plan.
+- **Say it in an interview:** "I designed the UI from the constraints first: a keyboard-only billing counter, Hindi as well as English, and a strict Content Security Policy. That decided fonts, spacing and focus styles before we argued about colours."
+- **Follow-ups to expect:** Why not load fonts from a CDN? (The CSP's `font-src 'self'` blocks it, and self-hosting avoids a third-party request and works the same on every network.) What changes for Devanagari? (A font with real Devanagari support, larger line height, and no clipped fixed-height boxes; test every screen in all three languages.)
+
+### 2026-10-31 — The owner picked the look from mockups in the browser `#frontend` `#process` → ADR 0025
+- **What happened:** Instead of describing colours in words, I showed three full dashboard mockups (Apple-clean, warm paper, calm slate) in light and dark, then corner radii (10/8/6 px) and three fonts (Inter, IBM Plex, Mukta) with real Hindi, money and look-alike characters. The owner chose Apple-clean, 8 px and IBM Plex in a few minutes.
+- **Why / what I learned:** People choose visuals far better by seeing them than by reading about them. Each screen asked one question, so the answers were clear and became the spec.
+- **Say it in an interview:** "I didn't guess the design: I showed the shop owner mockups side by side, one decision per screen, and wrote their choices into a spec before any code."
+- **Follow-ups to expect:** Why IBM Plex? (One family designed for both Latin and Devanagari, so Hindi matches English, and very clear digits for bills.)
+
+### 2026-10-31 — The contrast test rejected two colours the owner had approved `#frontend` `#testing` → ADR 0025
+- **What happened:** The first run of the readability test failed two colours from the approved table: blue link text on the grey page (4.31:1) and green text on its pale green badge (4.48:1). WCAG AA needs 4.5:1. I switched links to `#0066cc` (apple.com's own link blue) and the green to `#1b7a42`; buttons kept `#0071e3`, which passes with white text.
+- **Why / what I learned:** Both colours looked fine by eye. A goal like "easy to read" only stays true if a test turns it into a number.
+- **Say it in an interview:** "Readability was the top requirement, so I made it a test over the design tokens. It caught two failing colours on day one, before any screen used them."
+- **Follow-ups to expect:** What is a contrast ratio? (Relative luminance of the lighter colour plus 0.05, divided by the darker plus 0.05; 1:1 to 21:1.)
+
+### 2026-10-31 — Vitest blanks CSS files, even `?raw` imports `#testing` `#gotcha`
+- **What happened:** The contrast test imported `styles.css?raw` and got an empty string, so every pair "was missing", and the "light and dark have the same tokens" test passed by comparing two empty lists.
+- **Why / what I learned:** Vitest skips CSS processing by default (`css.include` is empty), raw imports included. I opted `src/styles.css` in, and added a guard test that fails if no tokens are found, so an empty read can never pass silently again.
+- **Say it in an interview:** "A test that compares two empty things passes. I added a guard that the input is really there."
+- **Follow-ups to expect:** Why not read the file with `fs`? (The web app has no Node types, and shouldn't: they'd let browser code use Node APIs by mistake.)
+
+### 2026-10-31 — The production build broke a page the tests passed `#frontend` `#mistake` `#gotcha`
+- **What happened:** On the real build through Caddy, `/design` showed NaN for every contrast ratio. The CSS minifier rewrites `#ffffff` as `#fff` and `#0066cc` as `#06c`, and my contrast function only read six-digit hex. Unit tests read the source CSS, so they never saw it.
+- **Why / what I learned:** Fixed test-first (a short-hex test that failed, then passed). The real-app pass in a browser is not optional; the shipped artefact differs from the source.
+- **Say it in an interview:** "My tests passed, but the minified build rewrote colours to short hex and broke the page. I only found it because I checked the real build in a browser, then added a test for it."
+- **Follow-ups to expect:** What else does a build change? (File names get content hashes, dead code is removed, CSS and JS are minified.)
+
+### 2026-10-31 — Dark mode without a white flash, inside a strict CSP `#frontend` `#security` → ADR 0025
+- **What happened:** If React applied the saved theme, dark-mode users would see a white page for a moment on every load. A tiny script in `<head>` sets the `dark` class before anything is drawn. Inline scripts are blocked by `script-src 'self'`, so it's an external file, `public/theme-init.js`, and a test runs the real file.
+- **Why / what I learned:** Storage can throw (blocked site data), so every read is in `try/catch` and falls back to light.
+- **Say it in an interview:** "I avoided the dark-mode flash with a blocking script in the head, served as a file so my CSP can keep forbidding inline scripts."
+- **Follow-ups to expect:** Why not a CSP hash for an inline script? (Possible, but every edit changes the hash; a file needs no CSP change.)
+
+### 2026-10-31 — Tailwind can't see class names built at runtime `#frontend` `#gotcha`
+- **What happened:** The colour swatches first used `bg-${name}`. Tailwind generates only the classes it finds written out in the source, so those swatches would have had no colour. I switched to a map of full class names (`bg-surface`, …).
+- **Why / what I learned:** Tailwind scans files as text; it never runs the code.
+- **Say it in an interview:** "Tailwind needs complete class names in the source; I keep a lookup table instead of building names with template strings."
+- **Follow-ups to expect:** Another way? (List the classes for Tailwind explicitly, a "safelist".)
+
+### 2026-10-31 — Keyboard shortcuts built for a barcode scanner `#frontend` → ADR 0026
+- **What happened:** I wrote a small shortcut registry instead of using a library. The rules: in text fields only F-keys, Esc and Ctrl/Alt combos fire (the scanner types there); letters match the physical key, so Alt+H works on a Hindi layout where the key types "ह"; modifiers must match exactly, so AltGr (Ctrl+Alt) isn't Alt; held keys (`repeat`) and IME composition never fire; the browser's own keys are refused; a clash throws. `?` lists the active shortcuts.
+- **Why / what I learned:** React StrictMode mounts, unmounts and remounts every component in development, so registering in an effect must clean up exactly, or it reports a false clash; there's a test for it.
+- **Say it in an interview:** "Scanners type like keyboards, so shortcut design is a correctness problem at a billing counter, not just convenience. Every rule has a test."
+- **Follow-ups to expect:** `event.key` vs `event.code`? (`key` is the character typed, `code` the physical key.)
+
+### 2026-10-31 — Native `<dialog>` instead of Radix Dialog, because of the CSP `#frontend` `#security` → ADR 0026
+- **What happened:** Radix Dialog's scroll lock inserts a `<style>` element at runtime, which `style-src 'self'` blocks. The browser's `<dialog>` with `showModal()` handles focus, closes on Escape, makes the page behind inert and styles its backdrop with `::backdrop`, all in plain CSS. jsdom doesn't implement `showModal`, so the test setup polyfills it.
+- **Why / what I learned:** Setting a style from JavaScript (`element.style.x = …`, as Radix Tooltip does) is allowed by the CSP; adding a `<style>` tag or a `style="…"` attribute in HTML isn't. Checked in Chrome: no violations.
+- **Say it in an interview:** "I kept my CSP strict by using the browser's own dialog element, which also gave me accessibility for free."
+- **Follow-ups to expect:** What would `'unsafe-inline'` for styles risk? (Injected CSS can leak data, e.g. through attribute selectors that load background images, and can restyle the page to trick users.)
+
+### 2026-10-31 — Small gotchas in P0.7 `#gotcha`
+- **What happened:**
+  - `:lang(hi)` also matches Hinglish (`hi-Latn`); Hindi's extra line height uses `html[lang='hi']`.
+  - tailwind-merge didn't know our custom text sizes and treated `text-body` and `text-muted` as the same kind, dropping one; `extendTailwindMerge` fixed it.
+  - React's fast-refresh lint rule forbids hooks and components in one file, so the shortcut hooks have their own file.
+  - Resizing the browser window to 1024 px didn't change the page width (Windows display scaling), so I checked overflow by constraining the page width instead.
+  - In Git Bash, a bare `cat > file` before a heredoc waited on input forever, and a long inline Python heredoc broke on its quotes; scripts go in a scratchpad file.
+- **Why / what I learned:** Each cost minutes, not hours, because I read the actual output.
+- **Say it in an interview:** "Small tooling details matter: I read the failing output, not the summary."
+- **Follow-ups to expect:** —
+
+### 2026-10-31 — The final review found three things my tests and my eyes missed `#frontend` `#testing` `#process`
+- **What happened:** A fresh reviewer read the whole P0.7 branch and found:
+  - **Grey on grey:** the unselected language names were `muted` text on the `surface-muted` switcher, 4.15:1. My contrast test only checked the pairs I had thought of. Added the pair, darkened the light grey to `#67676c`.
+  - **Hindi spacing only half applied:** each Tailwind `text-*` class sets its own line height, so Hindi's 1.6 on `<body>` never reached buttons, labels or titles. Hindi now redefines every `--text-*--line-height` variable; checked in the built CSS and in Chrome (13 px → 20.8 px).
+  - **A hidden feature:** `?` was the only way into the shortcut list, so mouse users would never find it, and on the Hindi Inscript layout Shift+/ types "य़", not "?". Added a sidebar button and matched `?` by its physical key too.
+  Each fix started with a test that failed.
+- **Why / what I learned:** A test only guards the cases it lists, and a style rule only works if nothing more specific overrides it. Ten minor findings went into PROGRESS under the tasks where they start to matter (P1.3, P1.13) instead of being fixed now.
+- **Say it in an interview:** "A fresh review found that my readability test had a gap, that a CSS rule was being overridden by utility classes, and that a feature was only reachable by a key some keyboards can't type. I fixed each test-first and scheduled the minor findings against the tasks where they matter."
+- **Follow-ups to expect:** Why not fix the minors too? (They don't affect anyone today; each is written down against the task where it becomes real, so the fix lands with its context and tests.)

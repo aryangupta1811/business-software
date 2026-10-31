@@ -1,5 +1,6 @@
-/** WCAG 2 relative luminance of a `#rrggbb` colour. */
-function luminance(hex: string): number {
+/** WCAG 2 relative luminance of a `#rrggbb` or `#rgb` colour (the minifier writes `#fff`). */
+function luminance(colour: string): number {
+  const hex = colour.length === 4 ? colour.replace(/[0-9a-f]/gi, '$&$&') : colour;
   const [r = 0, g = 0, b = 0] = [1, 3, 5].map((start) => {
     const channel = parseInt(hex.slice(start, start + 2), 16) / 255;
     return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;

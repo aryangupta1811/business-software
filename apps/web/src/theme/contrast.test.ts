@@ -8,6 +8,11 @@ test('black on white is 21:1 and a colour on itself is 1:1', () => {
   expect(contrastRatio('#ffffff', '#ffffff')).toBeCloseTo(1, 2);
 });
 
+test('understands short hex, as the production CSS minifier writes it', () => {
+  expect(contrastRatio('#fff', '#000')).toBeCloseTo(21, 2);
+  expect(contrastRatio('#06c', '#ffffff')).toBeCloseTo(contrastRatio('#0066cc', '#ffffff'), 6);
+});
+
 test('the order of the two colours does not matter', () => {
   expect(contrastRatio('#ffffff', '#0071e3')).toBeCloseTo(contrastRatio('#0071e3', '#ffffff'), 6);
 });

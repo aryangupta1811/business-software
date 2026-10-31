@@ -1,6 +1,7 @@
 {
   "app": { "name": "Business Software" },
   "language": { "label": "Bhasha" },
+  "theme": { "toDark": "Dark mode chalu karein", "toLight": "Light mode chalu karein" },
   "connection": {
     "checking": "Connection check ho raha hai…",
     "connected": "Connected hai",

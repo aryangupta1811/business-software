@@ -11,4 +11,5 @@ afterEach(async () => {
   cleanup();
   await changeLanguage('en');
   localStorage.clear();
+  document.documentElement.classList.remove('dark');
 });

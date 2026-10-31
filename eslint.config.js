@@ -44,5 +44,10 @@ export default defineConfig(
     rules: { 'react-refresh/only-export-components': 'off' },
   },
   { files: ['**/*.{js,mjs,cjs}'], extends: [tseslint.configs.disableTypeChecked] },
+  {
+    // Classic scripts served as they are and run by the browser before the app.
+    files: ['apps/web/public/**/*.js'],
+    languageOptions: { globals: { document: 'readonly', localStorage: 'readonly' } },
+  },
   prettier,
 );

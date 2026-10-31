@@ -1,6 +1,7 @@
 {
   "app": { "name": "Business Software" },
   "language": { "label": "Bhasha" },
+  "nav": { "label": "Mukhya", "home": "Home" },
   "theme": { "toDark": "Dark mode chalu karein", "toLight": "Light mode chalu karein" },
   "shortcuts": {
     "title": "Keyboard shortcuts",

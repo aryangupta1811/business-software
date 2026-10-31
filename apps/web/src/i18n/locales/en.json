@@ -1,6 +1,7 @@
 {
   "app": { "name": "Business Software" },
   "language": { "label": "Language" },
+  "nav": { "label": "Main", "home": "Home" },
   "theme": { "toDark": "Switch to dark mode", "toLight": "Switch to light mode" },
   "shortcuts": {
     "title": "Keyboard shortcuts",

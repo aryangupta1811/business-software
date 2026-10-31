@@ -6,10 +6,10 @@ import { fetchReadiness, type Readiness } from '../api/health';
 const CHECK_EVERY_MS = 30_000;
 
 const STATES = {
-  checking: { text: 'connection.checking', dot: 'bg-stone-400' },
-  connected: { text: 'connection.connected', dot: 'bg-emerald-600' },
-  'database-down': { text: 'connection.databaseDown', dot: 'bg-amber-500' },
-  'server-down': { text: 'connection.serverDown', dot: 'bg-red-600' },
+  checking: { text: 'connection.checking', dot: 'bg-muted' },
+  connected: { text: 'connection.connected', dot: 'bg-success' },
+  'database-down': { text: 'connection.databaseDown', dot: 'bg-warning' },
+  'server-down': { text: 'connection.serverDown', dot: 'bg-danger' },
 } as const satisfies Record<Readiness | 'checking', { text: string; dot: string }>;
 
 export function ConnectionBadge() {
@@ -22,7 +22,7 @@ export function ConnectionBadge() {
   const state = STATES[data ?? 'checking'];
 
   return (
-    <p role="status" className="flex items-center gap-2 text-sm text-stone-700">
+    <p role="status" className="flex items-center gap-2 text-label text-muted">
       <span aria-hidden="true" className={`size-2.5 rounded-full ${state.dot}`} />
       {t(state.text)}
     </p>

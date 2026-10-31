@@ -24,6 +24,12 @@ test('Alt+H goes Home from any page', async () => {
   expect(await screen.findByRole('heading', { level: 1, name: 'Home' })).toBeInTheDocument();
 });
 
+test('a visible button opens the keyboard shortcuts, for mouse users', async () => {
+  renderAt('/');
+  await userEvent.click(await screen.findByRole('button', { name: 'Keyboard shortcuts' }));
+  expect(screen.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeInTheDocument();
+});
+
 test('the top bar has the language switcher and the theme button', async () => {
   renderAt('/');
   expect(await screen.findByRole('group', { name: 'Language' })).toBeInTheDocument();

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ShortcutContext } from './context';
 import { ShortcutRegistry } from './registry';
 import { ShortcutHelp } from './shortcut-help';
@@ -7,6 +7,15 @@ import { ShortcutHelp } from './shortcut-help';
 export function ShortcutProvider({ children }: { children: ReactNode }) {
   const [registry] = useState(() => new ShortcutRegistry());
   const [helpOpen, setHelpOpen] = useState(false);
+  const context = useMemo(
+    () => ({
+      registry,
+      openHelp: () => {
+        setHelpOpen(true);
+      },
+    }),
+    [registry],
+  );
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -24,11 +33,9 @@ export function ShortcutProvider({ children }: { children: ReactNode }) {
         keys: '?',
         description: 'shortcuts.openHelp',
         group: 'general',
-        action: () => {
-          setHelpOpen(true);
-        },
+        action: context.openHelp,
       }),
-    [registry],
+    [registry, context],
   );
 
   useEffect(() => {
@@ -36,7 +43,7 @@ export function ShortcutProvider({ children }: { children: ReactNode }) {
   }, [registry, helpOpen]);
 
   return (
-    <ShortcutContext value={registry}>
+    <ShortcutContext value={context}>
       {children}
       <ShortcutHelp
         open={helpOpen}

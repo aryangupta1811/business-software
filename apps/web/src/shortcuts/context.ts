@@ -1,10 +1,16 @@
 import { createContext, useContext } from 'react';
 import type { ShortcutRegistry } from './registry';
 
-export const ShortcutContext = createContext<ShortcutRegistry | null>(null);
+export interface ShortcutContextValue {
+  registry: ShortcutRegistry;
+  /** Opens the list of shortcuts, for a button as well as the ? key. */
+  openHelp: () => void;
+}
 
-export function useShortcutRegistry(): ShortcutRegistry {
-  const registry = useContext(ShortcutContext);
-  if (!registry) throw new Error('Shortcuts need a <ShortcutProvider> above them');
-  return registry;
+export const ShortcutContext = createContext<ShortcutContextValue | null>(null);
+
+export function useShortcutContext(): ShortcutContextValue {
+  const context = useContext(ShortcutContext);
+  if (!context) throw new Error('Shortcuts need a <ShortcutProvider> above them');
+  return context;
 }

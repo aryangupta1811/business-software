@@ -1,12 +1,13 @@
 import { Link, useMatches, useNavigate } from '@tanstack/react-router';
-import { House } from 'lucide-react';
+import { House, Keyboard } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keyLabels } from '../shortcuts/keys';
-import { useShortcut } from '../shortcuts/use-shortcut';
+import { useOpenShortcutHelp, useShortcut } from '../shortcuts/use-shortcut';
 import { ConnectionBadge } from './connection-badge';
 import { LanguageSwitcher } from './language-switcher';
 import { ThemeToggle } from './theme-toggle';
+import { Button } from './ui/button';
 import { Kbd, KbdGroup } from './ui/kbd';
 
 const HOME_KEYS = 'Alt+H';
@@ -16,6 +17,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const titleKey = useMatches().at(-1)?.staticData.titleKey;
+  const openShortcutHelp = useOpenShortcutHelp();
 
   useShortcut({
     keys: HOME_KEYS,
@@ -47,6 +49,17 @@ export function AppShell({ children }: { children: ReactNode }) {
             </KbdGroup>
           </Link>
         </nav>
+        {/* The ? key alone is invisible to mouse users, so the list has a button too. */}
+        <Button
+          variant="ghost"
+          aria-keyshortcuts="?"
+          onClick={openShortcutHelp}
+          className="mt-auto justify-start gap-2.5 px-2 font-normal text-muted"
+        >
+          <Keyboard aria-hidden="true" />
+          <span className="flex-1 text-left">{t('shortcuts.title')}</span>
+          <Kbd aria-hidden="true">?</Kbd>
+        </Button>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center justify-between gap-6 border-b border-border px-8">

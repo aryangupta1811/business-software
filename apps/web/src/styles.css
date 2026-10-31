@@ -22,7 +22,7 @@
   --surface: #ffffff;
   --surface-muted: #e8e8ed;
   --foreground: #1d1d1f;
-  --muted: #6e6e73;
+  --muted: #67676c;
   --border: #e8e8ed;
   --input-border: #8e8e93;
   --primary: #0071e3;
@@ -101,6 +101,17 @@
   --shadow-card: var(--card-shadow);
 }
 
+/* Devanagari's marks above and below the line need more room. Every text-* class reads
+   its own line-height variable, so Hindi raises them all (src/theme/typography.test.ts).
+   Not :lang(hi), which also matches Hinglish (hi-Latn). */
+html[lang='hi'] {
+  --text-label--line-height: 1.6;
+  --text-body--line-height: 1.6;
+  --text-section--line-height: 1.6;
+  --text-title--line-height: 1.6;
+  --text-figure--line-height: 1.6;
+}
+
 @layer base {
   * {
     border-color: var(--border);
@@ -114,13 +125,7 @@
   body {
     font-family: var(--font-sans);
     font-size: var(--text-body);
-    line-height: 1.5;
-  }
-
-  /* Devanagari's marks above and below the line need more room. Not :lang(hi), which
-     also matches Hinglish (hi-Latn). */
-  html[lang='hi'] body {
-    line-height: 1.6;
+    line-height: var(--text-body--line-height);
   }
 
   /* Billing is keyboard-first: always show where the focus is. */

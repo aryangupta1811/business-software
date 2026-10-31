@@ -59,7 +59,9 @@ export function parseKeys(keys: string): KeyCombo {
  */
 export function matches(combo: KeyCombo, event: KeyboardEvent): boolean {
   const physical = /^(Key|Digit)/.test(combo.key);
-  if ((physical ? event.code : event.key) !== combo.key) return false;
+  // "?" is also Shift+/ by position: on the Hindi Inscript layout that key types "य़".
+  const question = combo.key === '?' && event.code === 'Slash' && event.shiftKey;
+  if (!question && (physical ? event.code : event.key) !== combo.key) return false;
   // "?" needs Shift on most layouts and not on others, so Shift isn't part of it.
   const shiftOk = combo.key === '?' || combo.shift === event.shiftKey;
   return combo.ctrl === event.ctrlKey && combo.alt === event.altKey && shiftOk && !event.metaKey;

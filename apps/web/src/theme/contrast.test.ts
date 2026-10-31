@@ -46,8 +46,9 @@ test('light and dark define the same colour tokens', () => {
 // 7:1 for the main text, 3:1 for input edges and the focus ring.
 const RULES: [foreground: string, backgrounds: string[], minimum: number][] = [
   ['foreground', ['background', 'surface'], 7],
-  ['muted', ['background', 'surface', 'sidebar'], 4.5],
-  ['accent', ['background', 'surface'], 4.5],
+  // surface-muted: the language switcher, hovered nav items and the info badge.
+  ['muted', ['background', 'surface', 'sidebar', 'surface-muted'], 4.5],
+  ['accent', ['background', 'surface', 'surface-muted'], 4.5],
   ['on-primary', ['primary', 'danger-strong'], 4.5],
   ['success', ['surface', 'success-soft'], 4.5],
   ['warning', ['surface', 'warning-soft'], 4.5],

@@ -47,6 +47,14 @@ test('? needs Shift on most layouts, and still matches', () => {
   expect(action).toHaveBeenCalledOnce();
 });
 
+test('? also opens on the Hindi Inscript layout, where Shift+/ types य़', () => {
+  const registry = new ShortcutRegistry();
+  const action = vi.fn();
+  registry.register(shortcut('?', action));
+  expect(press(registry, { key: 'य़', code: 'Slash', shiftKey: true })).toBe(true);
+  expect(action).toHaveBeenCalledOnce();
+});
+
 test('while typing, ? does not fire but F-keys, Escape and Alt+H do', () => {
   const registry = new ShortcutRegistry();
   const actions = { help: vi.fn(), f2: vi.fn(), esc: vi.fn(), home: vi.fn() };

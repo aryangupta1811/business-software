@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findOutOfOrderMigrations } from './check-migration-order.js';
+import { findChangedMigrations, findOutOfOrderMigrations } from './check-migration-order.js';
 
 const first = { tag: '0000_first', when: 1000 };
 const second = { tag: '0001_second', when: 2000 };
@@ -37,5 +37,23 @@ describe('findOutOfOrderMigrations', () => {
     expect(findOutOfOrderMigrations([first, second], [first, second, old, fresh])).toEqual([
       '0002_old',
     ]);
+  });
+});
+
+describe('findChangedMigrations', () => {
+  it('returns nothing when main’s migrations are unchanged', () => {
+    const added = { tag: '0002_new', when: 3000 };
+    expect(findChangedMigrations([first, second], [first, second, added])).toEqual([]);
+  });
+
+  it('reports a migration from main that the PR removes', () => {
+    // Databases that already ran it would keep its changes; fresh ones wouldn't get them.
+    expect(findChangedMigrations([first, second], [first])).toEqual(['0001_second']);
+  });
+
+  it('reports a migration from main whose timestamp the PR changes', () => {
+    // A later timestamp makes Drizzle run an already-applied migration again.
+    const redated = { tag: '0001_second', when: 9000 };
+    expect(findChangedMigrations([first, second], [first, redated])).toEqual(['0001_second']);
   });
 });

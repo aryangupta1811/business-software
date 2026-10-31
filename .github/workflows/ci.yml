@@ -14,7 +14,8 @@ on:
 permissions:
   contents: read
 
-# A new push to a PR cancels its older run; runs on main always finish.
+# A new push to a PR cancels its older run. On main a running build is never cancelled (a
+# queued one can be replaced by a newer push, whose run then covers both commits).
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -117,8 +118,9 @@ jobs:
           load: true
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
-      - run: docker compose up -d --wait --no-build --quiet-pull
+      - run: docker compose up -d --wait --wait-timeout 180 --no-build --quiet-pull
       - run: scripts/ci/smoke.sh
       - name: Container logs
-        if: failure()
+        # Also on a timeout, which cancels the job instead of failing a step.
+        if: failure() || cancelled()
         run: docker compose logs --no-color

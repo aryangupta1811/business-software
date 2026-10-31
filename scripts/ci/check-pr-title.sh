@@ -19,7 +19,9 @@ fi
 if [[ $title == *. ]]; then
   problems+=('it must not end with a full stop')
 fi
-if ((${#title} > 72)); then
+# Dependabot writes its own titles ("ci: bump <action> from X to Y in the actions group"),
+# which can pass 72 characters; only the length rule is waived for it.
+if ((${#title} > 72)) && [[ ${PR_AUTHOR-} != 'dependabot[bot]' ]]; then
   problems+=("it has ${#title} characters; the most is 72")
 fi
 

@@ -76,7 +76,11 @@ flowchart LR
 - Caching: hashed `/assets/*` files for a year, `index.html` never, so a deploy shows on the next load. Unknown paths get `index.html` (the router decides); missing assets get a 404.
 - A strict Content-Security-Policy and other security headers on every response, errors included.
 - Languages: English, Hindi and Hinglish (`en`, `hi`, `hi-Latn`), chosen in the header and saved in the browser until logins exist (P1.4) [0023].
-- The header checks `/api/health/ready` every 30 s while the tab is visible, and shows connected, database down or server down [0001]. It waits up to 10 s, longer than the API's own 5 s wait for the database, so a database outage isn't mistaken for the server being down.
+- The top bar checks `/api/health/ready` every 30 s while the tab is visible, and shows connected, database down or server down [0001]. It waits up to 10 s, longer than the API's own 5 s wait for the database, so a database outage isn't mistaken for the server being down.
+- Look: design tokens are CSS variables in `src/styles.css` (light on `:root`, dark on `.dark`), mapped into Tailwind with `@theme inline`; Tailwind's default colours and text sizes are removed, so screens can only use tokens. A test checks every text and edge colour against WCAG contrast in both modes. IBM Plex (Latin + Devanagari) and Lucide icons are bundled [0025].
+- Layout: a sidebar (pages with their shortcut keys) and a top bar (the page's title from route `staticData`, connection, language, light/dark). Base components are shadcn/ui source in `src/components/ui/`, restyled. `/design` shows all of it, in the live app but not in the sidebar [0025].
+- Light/dark: light by default; `public/theme-init.js` runs before the app and applies a saved dark theme, so there's no white flash (an external file, because the CSP blocks inline scripts) [0025].
+- Shortcuts: components register them while on screen; `?` lists what works now. In text fields only F-keys, `Esc` and `Ctrl`/`Alt` combos fire (the scanner types there); letters match the physical key, so a Hindi layout works. Modals use the native `<dialog>`, because Radix Dialog injects a `<style>` the CSP blocks [0026].
 
 ## Saving a bill (the most important flow)
 

@@ -30,3 +30,5 @@ Create one with `/record-decision <title>`. Template: `0000-template.md`.
 | [0022](0022-job-queue-database-role.md) | Job-queue database role: pg-boss gets its own role owning only schema `pgboss` | Accepted (built in P2.7) | 2026-10-30 |
 | [0023](0023-web-build-serving-and-languages.md) | Web app build, serving and languages: Caddy in Compose, hashed-file caching, strict CSP, file-based routes, English/Hindi/Hinglish | Accepted | 2026-10-30 |
 | [0024](0024-ci-pipeline.md) | CI pipeline: five required checks (check, secrets, migrations, smoke, pr-title), SHA-pinned actions, no secrets | Accepted | 2026-10-31 |
+| [0025](0025-design-system.md) | Design system: Apple-clean tokens with a contrast test, IBM Plex self-hosted, light by default with no-flash dark mode | Accepted | 2026-10-31 |
+| [0026](0026-keyboard-shortcuts-and-native-dialog.md) | Keyboard shortcuts: own small registry (physical keys, scanner-safe in fields); native `<dialog>` for modals | Accepted | 2026-10-31 |

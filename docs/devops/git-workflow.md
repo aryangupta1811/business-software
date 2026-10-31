@@ -73,9 +73,9 @@ Where secrets live and the rules for images, the browser, CI and logs: `secrets.
 - gitleaks, run in Docker so nothing gets installed (PowerShell, from the repo folder, with Docker Desktop running):
   ```powershell
   # Before each commit: only the staged changes
-  docker run --rm -v "${PWD}:/repo:ro" ghcr.io/gitleaks/gitleaks:v8.28.0 git /repo --pre-commit --staged --redact -v
+  docker run --rm -v "${PWD}:/repo:ro" ghcr.io/gitleaks/gitleaks:v8.30.1 git /repo --pre-commit --staged --redact -v
   # Whole history, every branch
-  docker run --rm -v "${PWD}:/repo:ro" ghcr.io/gitleaks/gitleaks:v8.28.0 git /repo --log-opts="--all" --redact -v
+  docker run --rm -v "${PWD}:/repo:ro" ghcr.io/gitleaks/gitleaks:v8.30.1 git /repo --log-opts="--all" --redact -v
   ```
   Last full run on 2026-10-30, before making the repo public: 5 commits, no leaks. From P0.6 it runs in CI.
 - gitleaks looks for secrets, not personal data. Before each commit, also search the staged files for emails, phone numbers, Aadhaar/PAN/GSTIN numbers and home-folder paths (Git Bash):

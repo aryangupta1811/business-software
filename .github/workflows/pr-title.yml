@@ -1,0 +1,28 @@
+# The pull request title becomes the commit on main (squash merge), so it must be a
+# Conventional Commit. Separate from ci.yml so a rename re-runs only this check.
+name: PR title
+
+on:
+  pull_request:
+    # edited: a rename. synchronize: each push, so the latest commit carries this check too.
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-title-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  pr-title:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Through env, never ${{ }} inside run: the title is text anyone can type.
+      - run: scripts/ci/check-pr-title.sh
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}

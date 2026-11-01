@@ -146,6 +146,10 @@ Short answers; the Log entry has the full story.
   A: The setting is transaction-local (`set_config(…, true)`), so it ends with the transaction. But on that connection it then reads back as an empty string, not NULL, and `''::uuid` throws. My policy function turns empty into NULL, so a connection with no business set sees no rows instead of crashing. A test reuses a one-connection pool to prove it. → P1.1
 - **Q: Can Row-Level Security alone stop one tenant's row pointing at another tenant's data?**
   A: No. Foreign-key checks skip RLS, so with a plain `branch_id → branches(id)` key, business B could save a row pointing at A's branch. Every key between tenant tables is composite, `(business_id, branch_id) → branches(business_id, id)`, and a guard test refuses any that isn't. → ADR 0027
+- **Q: How do you make an audit log that nobody can tamper with?**
+  A: The app's database role gets only INSERT and SELECT on it: I `REVOKE UPDATE`, and DELETE and TRUNCATE were never granted. A test proves each fails with `42501`. The write helper takes a transaction, not the database, so a log row always commits or rolls back with the change it describes. → ADR 0028
+- **Q: Why store old and new values as two JSON columns instead of one row per field?**
+  A: One action stays one row (a 20-line bill would otherwise be a pile), and the writer doesn't compute a diff, so a bug can't silently corrupt history. The viewer diffs `before` and `after` when it shows them. → ADR 0028
 
 ---
 
@@ -230,6 +234,8 @@ Terms I learned on this project, in one line each.
 | UUIDv7 | A UUID that starts with a timestamp, so new IDs sort after old ones and inserts append to the index; PostgreSQL 18 has `uuidv7()` built in |
 | FORCE ROW LEVEL SECURITY | Makes RLS apply to the table's owner too; without it, owners silently skip every policy |
 | `set_config(name, value, true)` | Sets a custom setting such as `app.business_id` for the current transaction only; unlike `SET`, it takes query parameters |
+| Append-only table | A table rows can be added to but never changed or removed; here enforced by the database role's grants, not by code |
+| `REVOKE` | SQL that takes a privilege away from a role, e.g. `REVOKE UPDATE ON entry_log FROM app_runtime` |
 
 ---
 
@@ -1009,3 +1015,21 @@ Entry format:
 - **Why / what I learned:** A guard is only as good as the attacks its author imagined, which is exactly why a fresh reviewer is worth it. "Safe by default" settings (`FORCE`) can turn into silent data loss elsewhere (migrations, backups), so every safety feature needs its side effects written down. Eight minor findings went into PROGRESS under the tasks where they matter (P1.2, P1.4, P1.7, stage 7).
 - **Say it in an interview:** "A reviewer found that RLS doesn't cover foreign-key checks or materialized views, and that permissive policies combine with OR. I added a probe for each, watched my guard miss it, then fixed the guard. They also spotted that forcing RLS on the owner makes backups come out empty, so my backup plan uses a role that bypasses RLS and the restore drill checks row counts."
 - **Follow-ups to expect:** Why not just give the owner `BYPASSRLS`? (Then every migration and every mistake as the owner could touch all businesses' rows; a separate backup role with only that power is narrower.)
+
+### 2026-11-01 — Merged P1.1, and two git messages that looked like errors `#git` `#github` `#gotcha`
+- **What happened:** PR #9 passed all five checks and was squash-merged. Re-running the cleanup commands myself gave `branch 'feat/p1.1-tenancy' not found` (it was already deleted) and `a branch named 'feat/p1.2-entry-log' already exists` (it had just been created). Neither was a problem: both said the work was already done.
+- **Why / what I learned:** Read the message before reacting: "not found" on a delete and "already exists" on a create mean the goal is already reached. `git switch -c` only creates a branch; `git switch <name>` moves onto an existing one. After a squash merge, `git branch -d` refuses because git can't see the branch's commits inside `main`'s new single commit, so `-D` is needed.
+- **Say it in an interview:** "With squash merges git doesn't know my branch was merged, because `main` has a new commit, not my commits. So I check that the PR is merged on GitHub, then delete the branch with `-D`."
+- **Follow-ups to expect:** How do you know a squash-merged branch is safe to delete? (The PR shows Merged, and `git diff main <branch>` is empty or only shows later `main` changes.)
+
+### 2026-11-01 — Designing the entry log before any feature needs it `#database` `#architecture` → ADR 0028
+- **What happened:** Started P1.2's design. Module 06 is still DRAFT, but recording must exist from the first feature that changes data, or the early history is missing, so only the recording side is built now. With no users table until P1.4, "who" is a nullable `actor_id` with no foreign key yet (NULL = the system); P1.4 adds the key. Old → new values are two `jsonb` columns, `before` and `after`. `action` is plain text checked by a TypeScript type, not a database enum, so a new action needs no migration. The table defaults `business_id` to the current business, and the runtime role loses UPDATE.
+- **Why / what I learned:** Each choice was made against two rejected options (a minimal users table now; a free-text name; one row per field; a precomputed diff) and written into ADR 0028. Deferring a foreign key is safe only because no real data exists yet; the follow-up is filed under P1.4 so it can't be forgotten.
+- **Say it in an interview:** "The audit log is built before the features that use it, because a log added later can't recover what already happened. The database enforces that it's append-only, and each row commits in the same transaction as its change."
+- **Follow-ups to expect:** Why not a database enum for actions? (Every new action would need a migration, and removing a value from an enum is hard; a TypeScript type catches typos at compile time instead.)
+
+### 2026-11-01 — Design one section at a time, and stop at the end of a session `#process`
+- **What happened:** The P1.2 design is being approved section by section: the table is approved, the write helper was presented, and the guard changes come next. The session ended mid-design, so the half-finished spec was written to a file, marked DRAFT, with what is approved and what is open.
+- **Why / what I learned:** The chat is forgotten between sessions; only files carry a half-done design forward. Marking each section's status stops the next session treating an unanswered section as approved.
+- **Say it in an interview:** —
+- **Follow-ups to expect:** —

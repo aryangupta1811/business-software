@@ -19,4 +19,7 @@ The detailed diary behind the phase stories is `INTERVIEW_LOG.md`: every decisio
 ## Interview questions I can now answer
 - Q:
   A:
+
+## Looking back
+(what worked, what I'd do differently, what carries into the next phase)
 ```

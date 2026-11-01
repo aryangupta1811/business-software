@@ -1,6 +1,8 @@
 # Phase 0 — Foundations
 
-In progress. The detailed diary is `INTERVIEW_LOG.md`.
+Done: 2026-10-29 to 2026-10-31, 9 work sessions, 7 pull requests (P0.1–P0.7). The detailed diary is `INTERVIEW_LOG.md`.
+
+**In one line:** no business feature yet, on purpose. Phase 0 built what is hard to add later: written requirements and 26 decision records, a protected public repo, a monorepo with strict checks, PostgreSQL whose app user can't delete, an API, worker and web app in containers, CI with five required checks, and a tested design system.
 
 ## What we built
 
@@ -142,3 +144,20 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
   A: Actions pinned to commit SHAs, a read-only token, no secrets, no `pull_request_target`, and user-typed values like the PR title passed through `env:` so they can't become shell code.
 - Q: How did you know the checks work?
   A: I made each one fail on purpose (bad formatting, a fake key, a wrong header, a bad title) and watched it go red with a useful message, on a throwaway branch so the fake key never entered the real history.
+
+## Looking back
+
+**What worked:**
+
+- **Decisions written down before code.** Every choice has an ADR with the alternatives I rejected, so "why X and not Y?" has a written answer, and a new session never re-argues an old choice.
+- **Making every check fail once.** Lint, types, the role tests, each CI job and the contrast test were each shown going red on a planted error before I trusted them going green. It caught problems twice: the personal-data search matched nothing because its pattern got mangled, and the worker test's first red was for the wrong reason (a broken Windows path).
+- **A fresh reviewer at the end of each task.** It found something real every time: wrong facts in my notes (P0.3), crash logging and a crash loop (P0.4), the racing timeouts (P0.5), an edited-migration gap (P0.6), and three readability issues (P0.7).
+- **Checking the real thing.** The worst bugs only showed up in Docker, in `curl -I` or in a real browser on the production build, never in unit tests.
+
+**What I'd do differently:**
+
+- **Find the real constraints on day one.** I designed hosting for a budget I didn't have and redesigned it the same day.
+- **Get a Linux CI job running sooner.** Exit codes on SIGTERM couldn't be tested on Windows, so they were checked by hand from P0.4 until P0.6's smoke job.
+- **Write down the cases a test must cover before writing the test.** The contrast test missed grey-on-grey because it only covered the colour pairs I happened to think of.
+
+**Carried into Phase 1:** P1.1 adds the `businesses` table, `business_id` on every row and Row-Level Security, so tenancy is in place before the first business table. Review minors from P0.7 are filed under P1.3 and P1.13 in `PROGRESS.md`.

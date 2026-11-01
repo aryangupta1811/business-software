@@ -16,7 +16,15 @@ Update this as the project grows.
 
 **30 seconds:** I'm building a multi-tenant web app, in English, Hindi and Hinglish, that runs an Indian retail shop: GST billing, inventory, customer credit (udhaar), staff attendance with salary and advances, an audit log, alerts on WhatsApp, and an AI assistant that answers questions about the shop's own data. The focus is correctness: nothing is ever deleted, a bill and its stock change save together or not at all, and each business's data is kept apart by the database itself. I also used it to learn DevOps: Docker, CI/CD with GitHub Actions, Terraform and AWS.
 
-**2 minutes:** *(fill in as we build: the problem → what makes it hard → my architecture → one hard bug I solved → how it's deployed → what I'd do differently)*
+**2 minutes** (written at the end of Phase 0; update "where it stands" and "how it's shipped" as phases finish):
+
+- **The problem:** a small Indian shop runs on a billing app, a paper udhaar register and a staff notebook. I'm building one web app that does all of it, for many shops at once, each seeing only its own data, in English, Hindi and Hinglish.
+- **What makes it hard:** correctness, not the feature list. A bill must save the invoice, the stock change and the udhaar entry together or not at all. Two counters can sell the last unit at the same moment. GST maths must be exact to the paisa. And the owner can't lose a single record.
+- **My architecture:** a TypeScript monorepo with a React single-page app, a NestJS modular monolith (so a bill is one database transaction, not a saga across services) and PostgreSQL. The safety rules live in the database, not only in my code: money is stored as whole paise, the app's database user has no DELETE permission, and Row-Level Security keeps businesses apart. Every choice has a written decision record with the alternatives I rejected; there are 26 so far.
+- **One hard bug:** my background worker kept dying after exactly 10 seconds. That was the database driver's idle timeout. Waiting for the shutdown signal doesn't keep Node's event loop alive, so when the pool's last idle connection closed, the process simply ended. I reproduced it in a test, held the process open until SIGTERM, and confirmed it in Docker with zero restarts.
+- **How it's shipped:** the same Docker Compose stack runs on my laptop and in CI. Every pull request must pass five required checks: lint, types and 224 tests against a real PostgreSQL; a secret scan of the whole history; a migration-order check; the PR title; and a smoke test that starts the real images. Next is Terraform on AWS: one EC2 server plus RDS with point-in-time restore, sized to the Free plan's credits because my budget is ₹0.
+- **Where it stands:** the foundations are done (Phase 0). Phase 1 starts with multi-tenancy and then billing.
+- **What I'd do differently:** pin down the real constraints first. I designed hosting for a budget I didn't have and had to redesign it. And test what you ship: the production CSS minifier broke a page my unit tests said was fine.
 
 ---
 
@@ -47,7 +55,8 @@ Update this as the project grows.
 | First image build on a slow connection | ~12 minutes (later builds reuse the cached install layer) | P0.4 |
 | Clean stop of api and worker | ~0.7 s, exit code 0 | P0.4 |
 | CI checks on every pull request | 5 required: `check`, `secrets`, `migrations`, `smoke`, `pr-title` | ADR 0024 |
-| CI run time | ~3 min in all; `check` (lint, types, 130 tests, build) about 50 s; `smoke` 2 min 47 s with an empty cache, 50 s warm | P0.6 |
+| CI run time | ~3 min in all; `check` (lint, types, tests, build) about 50 s when measured with 130 tests; `smoke` 2 min 47 s with an empty cache, 50 s warm | P0.6 |
+| Phase 0 (foundations) | 3 days (2026-10-29 to 31), 9 work sessions, 7 pull requests, 0 business features on purpose | `phase-0.md` |
 | How often the screen checks the server | every 30 s, 10 s timeout (the API waits 5 s for the database) | P0.5, ADR 0001 |
 
 ---
@@ -130,6 +139,8 @@ Short answers; the Log entry has the full story.
   A: Design tokens live in one CSS file, and a test reads them and checks WCAG contrast for every text and edge colour in light and dark mode. On its first run it rejected two colours from the palette the owner had approved. → ADR 0025
 - **Q: How do your keyboard shortcuts coexist with a barcode scanner and a Hindi keyboard?**
   A: Inside text fields only F-keys, Esc and Ctrl/Alt combos fire, because the scanner types there. Letters match `event.code`, the physical key, so Alt+H works whatever the layout types. Auto-repeat, IME composition and AltGr never fire. → ADR 0026
+- **Q: You spent a whole phase without building a feature. Why?**
+  A: Tenancy, the no-delete permissions, migrations and CI are hard to add once business tables and data exist. Built first, every business table gets `business_id`, Row-Level Security and no DELETE from its first migration, and since P0.6 every change has had to pass the same five checks. → `phase-0.md`
 
 ---
 
@@ -925,3 +936,9 @@ Entry format:
 - **Why / what I learned:** A test only guards the cases it lists, and a style rule only works if nothing more specific overrides it. Ten minor findings went into PROGRESS under the tasks where they start to matter (P1.3, P1.13) instead of being fixed now.
 - **Say it in an interview:** "A fresh review found that my readability test had a gap, that a CSS rule was being overridden by utility classes, and that a feature was only reachable by a key some keyboards can't type. I fixed each test-first and scheduled the minor findings against the tasks where they matter."
 - **Follow-ups to expect:** Why not fix the minors too? (They don't affect anyone today; each is written down against the task where it becomes real, so the fix lands with its context and tests.)
+
+### 2026-11-01 — Closed Phase 0 and wrote the 2-minute pitch `#process`
+- **What happened:** Finished `phase-0.md` (status, a one-line summary, and a new "Looking back" section, now also in the journal template) and filled in the 2-minute pitch: problem → what makes it hard → architecture → one hard bug → how it's shipped → where it stands → what I'd do differently.
+- **Why / what I learned:** A pitch has to say clearly what's built and what's planned, because an interviewer's follow-up will find the difference. So the AWS part is "next", not "deployed", and the pitch says to update those lines as phases finish. For the hard bug I chose the worker that died after 10 s: it has a clear clue (the exact number), a cause that tests Node knowledge (the event loop), and a fix proven by a test.
+- **Say it in an interview:** "Phase 0 has no features on purpose: tenancy, permissions and CI are cheap to build first and expensive to retrofit."
+- **Follow-ups to expect:** What would you cut if you had half the time? (The AI assistant and WhatsApp; billing, stock, udhaar and data safety are the core.)

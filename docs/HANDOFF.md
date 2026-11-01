@@ -2,30 +2,20 @@
 
 Overwritten at the end of every session. Older handoffs are in git history: `git log -p docs/HANDOFF.md`.
 
-**Session:** 9 — P0.7 design system, 2026-10-31 (continued from session 8's brainstorming)
+**Session:** 10 — Phase 0 journal, 2026-11-01
 
 **Done:**
-- **Design chosen by the owner** from browser mockups (superpowers visual companion, files in the git-ignored `.superpowers/brainstorm/`):
-  - Apple-clean (cool white, one blue accent); 8 px corners; IBM Plex Sans + Plex Sans Devanagari; light by default with a sun/moon button; `/design` page in the live app, not in the sidebar.
-  - Spec `docs/plans/2026-10-31-p0.7-design-system-design.md`, plan `docs/plans/2026-10-31-p0.7-design-system.md` (8 tasks, run inline, then one fresh reviewer).
-- **Built** (`apps/web`):
-  - `src/styles.css`: tokens as CSS variables (`:root` light, `.dark`), mapped with `@theme inline`; Tailwind's default colours and text sizes removed (`--color-*: initial`, `--text-*: initial`); Hindi raises every `--text-*--line-height` to 1.6 under `html[lang='hi']`.
-  - `src/theme/contrast.ts` + test (WCAG ratios over both modes, reads `styles.css?raw`; Vitest needed `css.include` for that); `typography.test.ts` (Hindi line heights).
-  - Light/dark: `src/theme/theme.ts`, `public/theme-init.js` (loaded in `<head>`, no dark flash), `components/theme-toggle.tsx`.
-  - `src/components/ui/`: Button, Input, Label, Field, Card, Badge, Kbd, Tooltip (shadcn source copied by hand, no CLI); `src/lib/cn.ts` (tailwind-merge taught our text sizes).
-  - `components/app-shell.tsx`: sidebar (Home with `Alt+H` chip, "Keyboard shortcuts `?`" button) + top bar (title from route `staticData.titleKey`, connection badge, language switcher, theme button). Badge, switcher, home, not-found, error screen restyled.
-  - `src/shortcuts/`: `keys.ts`, `registry.ts`, `context.ts`, `use-shortcut.ts`, `shortcut-provider.tsx`, `shortcut-help.tsx` (native `<dialog>`; jsdom polyfill in `src/test/setup.ts`).
-  - `public/favicon.svg` + `favicon.ico`; `src/routes/design.tsx`; `scripts/ci/smoke.sh` check 5b (favicon is an image).
-- **Checked:** `pnpm check` green (224 tests: 45 shared, 21 db, 28 api, 130 web); smoke test 8/8; Chrome through Caddy: no CSP violations, fonts from our origin, six mode × language combinations, no overflow at 1024 px, Hindi line height 1.6, help button works.
-- **Bugs found and fixed:** contrast test rejected two approved colours (links → `#0066cc`, success → `#1b7a42`); the real build's minifier writes `#fff`, which broke `/design`'s ratios; the final review's three important findings (grey-on-grey switcher → light `--muted` `#67676c`; Hindi spacing overridden by `text-*` classes; no visible way into the shortcut list and `?` untypable on Inscript).
-- **Docs:** ADRs 0025 (design system) and 0026 (shortcuts, native dialog) + index; `architecture.md`; PROGRESS (P0.7 ticked; review minors filed under P1.3 and P1.13); phase-0 journal; interview log (10 entries, 2 questions, 5 glossary terms, numbers).
+- `docs/journal/phase-0.md`: status "Done" (3 days, 9 sessions, 7 PRs), a one-line summary, and a new **Looking back** section (what worked, what I'd do differently, what carries into Phase 1). The section is now in the template in `docs/journal/README.md`, so later phases have it too.
+- `docs/journal/INTERVIEW_LOG.md`: the **2-minute pitch** written (problem → what makes it hard → architecture → hard bug: the worker that died at 10 s → how it's shipped → where it stands → what I'd do differently); Numbers row for Phase 0; stale "130 tests" in the CI-time row clarified; Question bank item "Why a whole phase without features?"; log entry for this session.
+- `docs/PROGRESS.md`: Phase 0 journal ticked; focus moved to Phase 1.
+- Docs only, no code. `pnpm format:check` green.
 
-**Half-done:** the P0.7 pull request (`feat/p0.7-design-system`) is open; it needs green CI and the owner's squash-merge.
+**Half-done:** the PR for `docs/phase-0-journal` (docs only); it needs green CI and the owner's squash-merge.
 
 **Next step:**
-1. Owner: when the five checks are green, review the PR on GitHub and **Squash and merge** (keep the title).
-2. Then `git switch main`, `git pull`, `git branch -D feat/p0.7-design-system`.
-3. Next session: `/start-session` → **P1.1 tenancy & data safety**, or first close Phase 0 by finishing `docs/journal/phase-0.md` (status line still says "In progress"; the 2-minute pitch in the interview log is still empty).
+1. Owner: push, open the PR, squash-merge when the five checks are green; then `git switch main`, `git pull`, `git branch -D docs/phase-0-journal`.
+2. Next session: `/start-session` → **P1.1 tenancy & data safety** (read ADRs 0006 and 0007, `docs/architecture.md`, `docs/devops/local-database.md`, and `packages/db/src/roles.test.ts` for the test style).
+3. Update the pitch's "how it's shipped" and "where it stands" lines whenever a phase finishes.
 
 **Watch out for:**
 - **No AI attribution, ever:** no `Co-Authored-By: Claude` and no "Generated with Claude Code" (`CLAUDE.md` rule 6 overrides tool defaults).

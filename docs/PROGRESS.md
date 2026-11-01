@@ -1,7 +1,7 @@
 # Progress
 
-**Current focus:** P1.1 tenancy & data safety: brainstorming the design (draft spec `docs/plans/2026-11-01-p1.1-tenancy-design.md`)
-**Next step:** Continue P1.1 on branch `feat/p1.1-tenancy`: owner reviews the spec's §3 (database objects), then §4 (`withBusiness`) and §5 (tests) are presented
+**Current focus:** P1.1 done in code (PR on `feat/p1.1-tenancy`); next P1.2 entry log
+**Next step:** Owner pushes `feat/p1.1-tenancy`, opens the PR and squash-merges once CI is green; next session: P1.2 entry log recording
 **Last updated:** 2026-11-01
 
 Each task below is sized for **one session**. DevOps stages (from `docs/devops/DEVOPS_PLAN.md`) are woven in where they're first needed. Tasks for DRAFT modules are provisional: re-cut them after `/finalize-module NN`.
@@ -45,7 +45,7 @@ Each task below is sized for **one session**. DevOps stages (from `docs/devops/D
 
 Foundations under every module:
 
-- [ ] **P1.1 Tenancy & data safety:** businesses and branches tables, `business_id` everywhere, RLS policies, no-`DELETE` grants, cross-business tests [ADRs 0006, 0007]
+- [x] **P1.1 Tenancy & data safety** (done 2026-11-01, ADR 0027, spec `docs/plans/2026-11-01-p1.1-tenancy-design.md`, plan `docs/plans/2026-11-01-p1.1-tenancy.md`): migration `0001` with `businesses` and `branches` (UUIDv7 from `uuidv7()`, `unique (business_id, id)` on branches), a `tenant_isolation` policy on each from `tenantPolicy()` in `packages/db/src/schema.ts`, `ENABLE` + `FORCE` RLS and `app_current_business_id()` (`nullif(…, '')`, not `SECURITY DEFINER`) hand-written into the generated file; `withBusiness`/`withNewBusiness` in `src/tenancy.ts` (`set_config(…, $1::uuid::text, true)`), taking `AppDatabase` (a database with its pool) so a transaction can't be passed in; 15 behaviour tests (cross-business reads and writes, no business set, reused connection, bad IDs, concurrency, FORCE, delete refused) and a catalogue guard (`src/tenancy-guard.test.ts`, 8 rules, 16 probes; a removed `FORCE` line was caught). Owner approved the design section by section. A fresh review showed three leaks past the guard (extra permissive policy, single-column keys between tenant tables, materialized views), all fixed test-first, and the `FORCE` traps for data migrations and `pg_dump` (ADR 0027 Consequences). Review minors filed under P1.2, P1.4, P1.7 and stage 7. 241 tests (38 db). [ADRs 0006, 0007, 0027]
 - [ ] **P1.2 Entry log recording:** append-only log table and the one write helper every module uses; tests [ADR 0007, Module 06]. The default privileges from P0.3 give `app_runtime` UPDATE on every table, so this table's migration must `REVOKE UPDATE`, with a `42501` test in the style of `packages/db/src/roles.test.ts`. If RLS helpers or triggers use `SECURITY DEFINER`, also revoke PUBLIC's default EXECUTE on functions. **From P1.1 (review minors):** the guard's privilege rule checks only direct grants to `app_runtime`/PUBLIC; switch to `has_table_privilege('app_runtime', …)` and assert `app_runtime` is a member of no role; cover every non-system schema (with `drizzle`, later `pgboss`, as listed exceptions); require the `business_id → businesses(id)` key on every tenant table; pin `app_current_business_id()` (body, not `SECURITY DEFINER`, `STABLE`).
 - [ ] **DevOps stage 4 — cloud guardrails:** first ask when placement season is (the Free plan's 6-month clock starts at sign-up, so this stage may move later). Then: AWS Free plan account, MFA, no root use, IAM Identity Center, credit-usage budget alert, earn the extra $100 of credits. *Owner does it with Claude's steps.*
 

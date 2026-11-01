@@ -2,24 +2,26 @@
 
 Overwritten at the end of every session. Older handoffs are in git history: `git log -p docs/HANDOFF.md`.
 
-**Session:** 11 — P1.1 tenancy & data safety (brainstorming, paused), 2026-11-01
+**Session:** 12 — P1.1 tenancy & data safety (design finished, built, reviewed), 2026-11-01
 
 **Done:**
-- Phase 0 journal PR merged as #8 (session 10).
-- Read ADRs 0006, 0007, 0019, `architecture.md` ("Who can see what"), Module 00 (business details, branches), and all of `packages/db` (bootstrap, migration 0000, client, migrate, testing helper, role tests).
-- Brainstorming (superpowers, architectural path). Owner approved: **approach 1** (policies declared in the Drizzle schema through a helper, `FORCE` and the setting function hand-written in the same migration, a guard test over the catalogue); **tenancy-only columns** (signup fields wait for P1.3); the work lives in **`packages/db`** (no API route yet); **UUIDv7** from PostgreSQL 18's `uuidv7()`.
-- Checked in `node_modules`: drizzle-orm 0.45 has `pgPolicy` (`for`, `to`, `using`, `withCheck`) and `enableRLS()`; drizzle-kit 0.31 writes `ENABLE ROW LEVEL SECURITY` but never `FORCE`.
-- Everything so far is in the **draft spec** `docs/plans/2026-11-01-p1.1-tenancy-design.md`.
-- Interview log: 3 entries, 1 question, 3 glossary terms.
+- Committed session 11's docs, then finished the design with the owner section by section: §3 database objects, §4 `withBusiness`, §5 tests. Spec `docs/plans/2026-11-01-p1.1-tenancy-design.md`, **ADR 0027**, plan `docs/plans/2026-11-01-p1.1-tenancy.md`. Owner chose **native** execution (inline, one fresh reviewer at the end).
+- Checked on a throwaway PostgreSQL 18 before planning: an ended transaction-local setting reads back as `''`, `''::uuid` throws, `uuidv7()` gives version 7.
+- **Built** (`packages/db`):
+  - `migrations/0001_tenancy.sql`: `businesses`, `branches` (`unique (business_id, id)`), `tenant_isolation` policies (generated), plus hand-written `app_current_business_id()` and `FORCE ROW LEVEL SECURITY`.
+  - `src/schema.ts`: tables and helpers `id()`, `businessId()`, `createdAt()`, `tenantPolicy()`.
+  - `src/tenancy.ts`: `withBusiness`, `withNewBusiness`, `Transaction`; `src/client.ts`: `AppDatabase` (a type only a pooled database fits, so a transaction can't be passed in).
+  - `src/tenancy.test.ts` (15 tests) and `src/tenancy-guard.test.ts` (8 rules, 16 probes; a removed `FORCE` line was caught).
+- **Fresh review (opus):** 0 critical; all five Review Focus items held live. Three leaks past the guard fixed test-first (extra permissive policy; single-column keys between tenant tables, new `tenant_fk` rule; materialized views, new `kind` rule). `FORCE` traps documented: data migrations as `app_owner` change 0 rows; `pg_dump` as `app_owner` fails or writes empty tables. Eight minors filed in PROGRESS (P1.2, P1.4, P1.7, stage 7).
+- **Checked:** `pnpm check` green, 241 tests (45 shared, 38 db, 28 api, 130 web); `drizzle-kit check` clean; migration applied to the local database.
+- **Docs:** ADR 0027 + index; `architecture.md` (who can see what); `local-database.md` (tenant tables in psql, `FORCE` traps); new `docs/journal/phase-1.md`; interview log (5 entries, 1 question, 3 glossary terms, numbers, pitch).
 
-**Half-done:** brainstorming for P1.1 on branch **`feat/p1.1-tenancy`** (one docs commit, not pushed). No code yet.
+**Half-done:** the P1.1 pull request: branch `feat/p1.1-tenancy` (8 commits including the end-session one), not pushed.
 
 **Next step:**
-1. `/start-session` will report the branch is `feat/p1.1-tenancy`, not `main`: that's expected. Stay on it (`git switch feat/p1.1-tenancy` if needed). Re-invoke `superpowers:brainstorming` and resume, reading only the draft spec.
-2. Ask the owner whether **§3 (database objects)** looks right; it was presented in chat as "Section 1" and not yet answered.
-3. Present §4 (`withBusiness`, schema helper, signup order, the P1.4 login-lookup problem) and §5 (tests), one at a time.
-4. Finish the spec, self-review, owner reviews it, then `superpowers:writing-plans` → `docs/plans/2026-11-01-p1.1-tenancy.md`. Write **ADR 0027** (UUIDv7, policy helper, guard test) with the spec, via `/record-decision`.
-5. No PR until the code is done: one PR for P1.1 holds the spec, plan, ADR and code.
+1. Owner: `git push -u origin HEAD`, `gh pr create --web` with title `feat(db): add tenancy with forced row-level security (P1.1)`, fill in the template, **Squash and merge** when the five checks are green. Then `git switch main`, `git pull`, `git branch -D feat/p1.1-tenancy`.
+2. Watch the `migrations` CI check: `0001` is new, so it must be newer than `main`'s `0000` (it is).
+3. Next session: `/start-session` → **P1.2 entry log recording** (read ADR 0007, Module 06, ADR 0027, `packages/db/src/tenancy*.ts`; the P1.1 review minors filed under P1.2 belong in that task).
 
 **Watch out for:**
 - **No AI attribution, ever:** no `Co-Authored-By: Claude` and no "Generated with Claude Code" (`CLAUDE.md` rule 6 overrides tool defaults).
@@ -45,7 +47,14 @@ Overwritten at the end of every session. Older handoffs are in git history: `git
   - From P0.6: the "reproduce `check`" row in `git-workflow.md` lacks the actionlint command; the repo setting *Require actions to be pinned to a full-length commit SHA* is off (owner decides).
   - From P0.5: an asset URL with a trailing slash gets a 308 with the immutable header; a Caddyfile edit reruns the Vite build; no fake-timer test of a hanging fetch; polling pauses in background tabs.
   - From P0.4: `describeError` gaps (an empty `AggregateError`, a cyclic `cause`, `cause: null`); no query timeout on `/ready`; Node 25+ drops Corepack (note it in ADR 0020 before `node:26-slim`).
-- **P1.1 design gotchas:** a transaction-local setting reads back as `''` (not NULL) after its transaction ends, and `''::uuid` throws, so the function needs `nullif`. Signup must set the new business ID before inserting it. Drizzle can't generate `FORCE`.
+- **Tenancy rules (ADR 0027), enforced by `src/tenancy-guard.test.ts`:**
+  - A new tenant table uses `id()`, `businessId()`, `createdAt()` and `tenantPolicy(t.businessId)`, and its migration adds `ALTER TABLE … FORCE ROW LEVEL SECURITY` by hand (drizzle-kit can't).
+  - Keys into another tenant table are composite: `(business_id, x_id) → x(business_id, id)`, and `x` needs `unique (business_id, id)`.
+  - Only one permissive policy (`tenant_isolation`); no materialized views or foreign tables for tenant data.
+  - Code reaches tenant data only through `withBusiness(db, id, work)` / `withNewBusiness`; never pass a transaction (it won't type-check).
+  - A data migration as `app_owner` changes 0 rows unless it lifts `FORCE` inside its transaction; test the row count.
+  - `pg_dump` as `app_owner` fails; never use `--enable-row-security` (empty tables). Backups need a `BYPASSRLS` role (stage 7).
+  - Drizzle wraps driver errors: the PostgreSQL code is on `error.cause.code`.
 - **Carried over:**
   - Docker Desktop must be running for `pnpm test`, `pnpm check`, `db:up` and `app:up`.
   - Never `docker compose down -v` without OK. The bootstrap runs only on an empty volume.

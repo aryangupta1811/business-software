@@ -23,7 +23,7 @@ Update this as the project grows.
 - **My architecture:** a TypeScript monorepo with a React single-page app, a NestJS modular monolith (so a bill is one database transaction, not a saga across services) and PostgreSQL. The safety rules live in the database, not only in my code: money is stored as whole paise, the app's database user has no DELETE permission, and Row-Level Security keeps businesses apart. Every choice has a written decision record with the alternatives I rejected; there are 26 so far.
 - **One hard bug:** my background worker kept dying after exactly 10 seconds. That was the database driver's idle timeout. Waiting for the shutdown signal doesn't keep Node's event loop alive, so when the pool's last idle connection closed, the process simply ended. I reproduced it in a test, held the process open until SIGTERM, and confirmed it in Docker with zero restarts.
 - **How it's shipped:** the same Docker Compose stack runs on my laptop and in CI. Every pull request must pass five required checks: lint, types and 224 tests against a real PostgreSQL; a secret scan of the whole history; a migration-order check; the PR title; and a smoke test that starts the real images. Next is Terraform on AWS: one EC2 server plus RDS with point-in-time restore, sized to the Free plan's credits because my budget is ₹0.
-- **Where it stands:** the foundations are done (Phase 0). Phase 1 starts with multi-tenancy and then billing.
+- **Where it stands:** the foundations are done (Phase 0). In Phase 1 the database already keeps businesses apart (forced Row-Level Security, with a test that scans every table); billing comes next.
 - **What I'd do differently:** pin down the real constraints first. I designed hosting for a budget I didn't have and had to redesign it. And test what you ship: the production CSS minifier broke a page my unit tests said was fine.
 
 ---
@@ -214,6 +214,9 @@ Terms I learned on this project, in one line each.
 | Supply-chain attack | Attacking an app through something it depends on, e.g. publishing a poisoned version of a popular npm package |
 | TDD | Test-driven development: write a failing test, watch it fail, write the least code that passes, then tidy up |
 | Tenant | One customer business in a multi-tenant system |
+| Permissive vs restrictive policy | Permissive RLS policies are ORed (any one lets a row through); restrictive ones are ANDed on top (each must pass) |
+| Materialized view | A query whose result is stored as a table and refreshed on demand; RLS never applies to it |
+| BYPASSRLS | A role attribute that skips every RLS policy; superusers have it implicitly. Backups need it, the app must never have it |
 | Required status check | A CI job that must pass before GitHub lets a pull request merge; set in the branch ruleset |
 | Script injection (Actions) | Writing `${{ github.event... }}` inside `run:` pastes user-typed text into a shell script, which then runs it; pass it through `env:` instead |
 | SHA pinning | Referring to an action by its full commit hash instead of a tag, so its code can't change without a visible edit |

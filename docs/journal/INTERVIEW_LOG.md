@@ -42,9 +42,9 @@ Update this as the project grows.
 | Largest exact amount in JavaScript | ≈ ₹90 lakh crore in paise (2^53) | ADR 0008 |
 | Business types in v1 | 5 | Module 00 |
 | Modules | 10 (00–09) | `docs/requirements/` |
-| ADRs | 26 (16 at kickoff) | `docs/decisions/` |
+| ADRs | 27 (16 at kickoff) | `docs/decisions/` |
 | Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
-| Automated tests | 224: 45 shared (money), 21 db, 28 api, 130 web (routing, connection badge, three languages, error screen, 44 contrast checks, Hindi line height, components, theme, 24 keyboard-shortcut tests, layout, `/design`) | `pnpm test` |
+| Automated tests | 241: 45 shared (money), 38 db (roles, client, 15 tenancy, 2 guard), 28 api, 130 web (routing, connection badge, three languages, error screen, 44 contrast checks, Hindi line height, components, theme, 24 keyboard-shortcut tests, layout, `/design`) | `pnpm test` |
 | Interface languages | 3: English, Hindi, Hinglish (`en`, `hi`, `hi-Latn`) | Module 00 #25, ADR 0023 |
 | Web app download | ~160 KB gzipped JavaScript; fonts 307 KB (woff2, six files, cached for a year); web image 95 MB (Caddy) | P0.7, `vite build` |
 | Readability floor | text ≥ 4.5:1 contrast (main text ≥ 7:1), input edges and focus ring ≥ 3:1, both modes; body text 15 px, nothing under 13 px | ADR 0025 |
@@ -56,6 +56,7 @@ Update this as the project grows.
 | Clean stop of api and worker | ~0.7 s, exit code 0 | P0.4 |
 | CI checks on every pull request | 5 required: `check`, `secrets`, `migrations`, `smoke`, `pr-title` | ADR 0024 |
 | CI run time | ~3 min in all; `check` (lint, types, tests, build) about 50 s when measured with 130 tests; `smoke` 2 min 47 s with an empty cache, 50 s warm | P0.6 |
+| Tenancy guard | 6 rules checked on every table, proven by 11 probe tables; first tables `businesses`, `branches` | P1.1, ADR 0027 |
 | Phase 0 (foundations) | 3 days (2026-10-29 to 31), 9 work sessions, 7 pull requests, 0 business features on purpose | `phase-0.md` |
 | How often the screen checks the server | every 30 s, 10 s timeout (the API waits 5 s for the database) | P0.5, ADR 0001 |
 
@@ -971,3 +972,25 @@ Entry format:
 - **Why / what I learned:** ADR 0006 said *what* (RLS); this says *how*, and how we keep it true for tables that don't exist yet. A safety rule needs three parts: the mechanism (policies), one way to use it (`withBusiness`), and a check that it's everywhere (the guard test).
 - **Say it in an interview:** "RLS is the guarantee; the guard test guarantees RLS is there. And I made signup go through the same policy by setting the new business's ID before inserting it, so there's no bypass to protect."
 - **Follow-ups to expect:** What's the cost of RLS per query? (One extra comparison per row, against a value computed once per query thanks to the `(select …)` wrapper; with indexes that start with `business_id`, it's negligible.)
+
+### 2026-11-01 — A type test showed a transaction fits where a database is expected `#database` `#testing` `#gotcha` → ADR 0027
+- **What happened:** `withBusiness` must not accept a transaction: calling it inside another transaction would open a savepoint, and the transaction-local business setting would outlive the savepoint, switching the business for the rest of the outer transaction. The plan pinned this with a `// @ts-expect-error` line that passes a transaction. `pnpm typecheck` failed with "Unused '@ts-expect-error' directive": TypeScript accepted the transaction, because Drizzle's transaction type has almost everything the database type has. The fix: `AppDatabase = NodePgDatabase & { $client: Pool }`, the one thing a transaction lacks, and `withBusiness` takes that.
+- **Why / what I learned:** `@ts-expect-error` turns "this must not compile" into a test, and an unused one is a red test. TypeScript compares shapes, not names (structural typing), so two types that look different can still be interchangeable.
+- **Say it in an interview:** "I wanted the compiler to refuse a nested tenant transaction. A type-level test showed it didn't, so I narrowed the parameter to a type only a real connection pool has."
+- **Follow-ups to expect:** Why not check at runtime? (The type check costs nothing at runtime and catches it before the code runs; a runtime check would only fail in the request that does it.)
+
+### 2026-11-01 — Building the tenancy guard, and proving it with a planted fault `#database` `#testing` → ADR 0027
+- **What happened:** The guard is one SQL query over `pg_class`, `pg_policy`, `pg_attribute`, `pg_constraint` and the table ACLs. It compares each policy with what `tenantPolicy()` generates, as PostgreSQL prints it back with `pg_get_expr`: `(business_id = ( SELECT app_current_business_id() AS app_current_business_id))`. Eleven probe tables, each a correct tenant table with one thing broken (no `ENABLE`, no `FORCE`, a `USING (true)` policy, a `FOR SELECT` policy, a nullable `business_id`, `GRANT DELETE … TO PUBLIC`, a `branch_id` with a plain foreign key, and one correct composite key), came back with exactly the expected rules. Then I deleted one `FORCE` line from the migration: the guard reported `businesses` + `force`; I restored it.
+- **Why / what I learned:** Checking the stored policy text is strict: a policy that "looks fine" but compares the wrong column fails. Grants to `PUBLIC` must be checked too, because every role inherits them. A table with no explicit grants has a NULL ACL, so the query uses `acldefault()`.
+- **Say it in an interview:** "My guard test reads PostgreSQL's catalogue, so a new table without RLS, `FORCE`, the right policy or the right grants fails CI. I proved it by breaking each rule on purpose and by deleting a `FORCE` line from the real migration."
+- **Follow-ups to expect:** Why does the superuser still see everything? (Superusers and `BYPASSRLS` roles skip RLS even when it's forced; that's why the app's roles are neither.)
+
+### 2026-11-01 — Small gotchas in P1.1 `#gotcha`
+- **What happened:**
+  - Drizzle 0.45 wraps driver errors, so the PostgreSQL code (`42501`, `22P02`, `23503`) is on `error.cause.code`, not `error.code`.
+  - drizzle-kit wrote `ENABLE ROW LEVEL SECURITY` and the policies, but `FORCE` and the function had to be added to the generated file by hand, with the function first because the policies call it.
+  - Lint forbids `!` (non-null assertions), so "the database returned no row" became an explicit `throw`.
+  - The personal-data search matched a made-up test UUID (`…-8000-000000000000`): twelve zeros look like an Aadhaar number to the pattern. A false positive, but each match gets read, not skipped.
+- **Why / what I learned:** Each was minutes, because the output said exactly what was wrong.
+- **Say it in an interview:** —
+- **Follow-ups to expect:** —

@@ -961,7 +961,13 @@ Entry format:
 - **Follow-ups to expect:** Why not `SET LOCAL`? (`SET` can't take query parameters, so the ID would have to be pasted into the SQL; `set_config` takes it as a parameter.)
 
 ### 2026-11-01 — UUIDv7 for IDs, and a composite key across tenants `#database` `#architecture`
-- **What happened:** Chose UUIDv7 from PostgreSQL 18's built-in `uuidv7()` for every ID (ADR 0001 already said UUIDs; ADR 0027 will record v7). Branches also get `unique (business_id, id)`, so later branch-level tables reference `(business_id, branch_id)`.
+- **What happened:** Chose UUIDv7 from PostgreSQL 18's built-in `uuidv7()` for every ID (ADR 0001 already said UUIDs; ADR 0027 records v7). Branches also get `unique (business_id, id)`, so later branch-level tables reference `(business_id, branch_id)`.
 - **Why / what I learned:** Random UUIDv4s land at random places in the primary-key index, which splits pages and slows inserts; v7 starts with a timestamp, so new rows append at the end. The composite foreign key makes the database refuse a row of business A that points at a branch of business B, a mix-up RLS alone wouldn't catch, because RLS checks each row's own `business_id`, not what it points to.
 - **Say it in an interview:** "IDs are time-ordered UUIDs, so they're safe to create anywhere and still index well, and foreign keys include the business ID so rows can't point across tenants."
 - **Follow-ups to expect:** Doesn't a UUIDv7 leak the creation time? (Yes, to the millisecond. That's fine for bills and items; it would matter for something like a password-reset token, which uses random bytes instead.)
+
+### 2026-11-01 — ADR 0027: how tenancy is built `#database` `#security` → ADR 0027
+- **What happened:** Recorded the P1.1 design: UUIDv7 IDs; each tenant table's RLS policy declared in the Drizzle schema with `tenantPolicy()`, with `FORCE` and `app_current_business_id()` hand-written in the migration; `withBusiness` / `withNewBusiness` as the only way to reach tenant data; a guard test over the catalogue. Rejected: UUIDv4 and serial IDs, hand-written-only policies, an event trigger, `SET LOCAL`, a bypass role for signup, and relying on code review.
+- **Why / what I learned:** ADR 0006 said *what* (RLS); this says *how*, and how we keep it true for tables that don't exist yet. A safety rule needs three parts: the mechanism (policies), one way to use it (`withBusiness`), and a check that it's everywhere (the guard test).
+- **Say it in an interview:** "RLS is the guarantee; the guard test guarantees RLS is there. And I made signup go through the same policy by setting the new business's ID before inserting it, so there's no bypass to protect."
+- **Follow-ups to expect:** What's the cost of RLS per query? (One extra comparison per row, against a value computed once per query thanks to the `(select …)` wrapper; with indexes that start with `business_id`, it's negligible.)

@@ -2,6 +2,8 @@
 // below; src/tenancy-guard.test.ts fails if a table misses one.
 import { sql } from 'drizzle-orm';
 import {
+  foreignKey,
+  jsonb,
   pgPolicy,
   pgTable,
   text,
@@ -60,5 +62,32 @@ export const branches = pgTable(
   (t) => [
     tenantPolicy(t.businessId),
     unique('branches_business_id_id_unique').on(t.businessId, t.id),
+  ],
+);
+
+// Append-only: the migration revokes UPDATE from app_runtime, and DELETE was never granted
+// (ADR 0028). Rows are written only through recordEntry, which never passes business_id.
+export const entryLog = pgTable(
+  'entry_log',
+  {
+    id: id(),
+    businessId: businessId().default(sql`app_current_business_id()`),
+    branchId: uuid('branch_id'),
+    actorId: uuid('actor_id'),
+    action: text('action').notNull(),
+    entityType: text('entity_type').notNull(),
+    entityId: uuid('entity_id').notNull(),
+    reason: text('reason'),
+    before: jsonb('before'),
+    after: jsonb('after'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    tenantPolicy(t.businessId),
+    foreignKey({
+      name: 'entry_log_branch_fk',
+      columns: [t.businessId, t.branchId],
+      foreignColumns: [branches.businessId, branches.id],
+    }),
   ],
 );

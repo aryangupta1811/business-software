@@ -33,3 +33,4 @@ Create one with `/record-decision <title>`. Template: `0000-template.md`.
 | [0025](0025-design-system.md) | Design system: Apple-clean tokens with a contrast test, IBM Plex self-hosted, light by default with no-flash dark mode | Accepted | 2026-10-31 |
 | [0026](0026-keyboard-shortcuts-and-native-dialog.md) | Keyboard shortcuts: own small registry (physical keys, scanner-safe in fields); native `<dialog>` for modals | Accepted | 2026-10-31 |
 | [0027](0027-tenancy-implementation.md) | Tenancy implementation: UUIDv7, RLS policies in the Drizzle schema + hand-written `FORCE`, `withBusiness` as the one way in, a catalogue guard test | Accepted | 2026-11-01 |
+| [0028](0028-entry-log-table.md) | Entry log: one append-only row per action, `before`/`after` JSON, a nullable actor without a key until P1.4 | Accepted | 2026-11-01 |

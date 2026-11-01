@@ -1,7 +1,7 @@
 # 0028 — Entry log: one append-only row per action, `before`/`after` JSON, actor without a key until P1.4
 
 - **Date:** 2026-11-01
-- **Status:** Accepted (table shape); the write helper's details are finished in `docs/plans/2026-11-01-p1.2-entry-log-design.md`
+- **Status:** Accepted. Design: `docs/plans/2026-11-01-p1.2-entry-log-design.md`
 
 ## Context
 
@@ -40,6 +40,8 @@ ADR 0007 says the entry log is append-only and commits with the action it descri
 - It is a normal tenant table (ADR 0027): `tenantPolicy`, `FORCE ROW LEVEL SECURITY`, the guard test.
 - Append-only: the migration runs `REVOKE UPDATE ON entry_log FROM app_runtime`; DELETE and TRUNCATE are already absent from the default privileges (ADR 0019). A test proves `UPDATE`, `DELETE` and `TRUNCATE` fail with `42501`.
 - Rows are kept forever for now (revisit at `/finalize-module 06`).
+- One write helper, `recordEntry(tx, entry)` in `packages/db/src/entry-log.ts`. It takes a transaction, never the database, so a log row can't commit apart from its action. `actorId` is required but may be `null`. The action names live in `ENTRY_ACTIONS` in `packages/db`, with which actions need a reason; a missing or blank required reason throws before the insert.
+- The guard test also enforces append-only: tables on its `appendOnly` list fail if `app_runtime` has UPDATE.
 
 ## Why
 

@@ -8,7 +8,7 @@ import { runMigrations } from './migrate.js';
 const bootstrapFile = fileURLToPath(new URL('../bootstrap/create-roles.sql', import.meta.url));
 
 export interface TestDatabase {
-  /** The container's superuser, for things the app roles may not do. */
+  /** The container's superuser on the app's database, for things the app roles may not do. */
   adminUrl: string;
   ownerUrl: string;
   runtimeUrl: string;
@@ -33,8 +33,11 @@ export async function startTestDatabase(): Promise<TestDatabase> {
   const server = `${container.getHost()}:${String(container.getPort())}/business_software`;
   const ownerUrl = `postgresql://app_owner:owner-test@${server}`;
   await runMigrations(ownerUrl);
+  // getConnectionUri() names the container's default database, not the app's.
+  const adminUrl = new URL(container.getConnectionUri());
+  adminUrl.pathname = '/business_software';
   return {
-    adminUrl: container.getConnectionUri(),
+    adminUrl: adminUrl.toString(),
     ownerUrl,
     runtimeUrl: `postgresql://app_runtime:runtime-test@${server}`,
     stop: async () => {

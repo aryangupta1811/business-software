@@ -1,27 +1,51 @@
-// Guard test on a throwaway PostgreSQL (ADR 0027): reads the catalogue and fails if any table
-// in `public` breaks a tenancy rule, so a table added months from now can't forget RLS.
+// Guard test on a throwaway PostgreSQL (ADRs 0027, 0028): reads the catalogue and fails if any
+// table or function the app can reach breaks a tenancy rule, so a table added months from now
+// can't forget RLS.
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startTestDatabase, type TestDatabase } from './testing.js';
 
 type Rule =
-  'rls' | 'force' | 'policy' | 'business_id' | 'privileges' | 'branch_fk' | 'tenant_fk' | 'kind';
+  | 'rls'
+  | 'force'
+  | 'policy'
+  | 'business_id'
+  | 'business_fk'
+  | 'privileges'
+  | 'append_only'
+  | 'branch_fk'
+  | 'tenant_fk'
+  | 'kind';
 interface Violation {
   table: string;
   rule: Rule;
 }
 
-// One row per broken rule. The policy must be the only permissive one (permissive policies are
-// ORed together) and match what tenantPolicy() generates, as PostgreSQL
-// prints it back; the tenant column is `id` on businesses and business_id everywhere else.
-// Grants to PUBLIC count too: app_runtime gets everything PUBLIC has.
+/** Tables the app may only insert into and read (ADRs 0007, 0028). */
+const APPEND_ONLY = ['entry_log'];
+
+/** Schemas that hold no tenant data. `pgboss` joins in P2.7 (ADR 0022). */
+const NOT_TENANT_SCHEMAS = [
+  'drizzle', // drizzle-kit's migration history; app_runtime can't read it
+];
+
+// Every schema except PostgreSQL's own and NOT_TENANT_SCHEMAS (always query parameter $1).
+const appSchema = (n: string) =>
+  `${n}.nspname <> 'information_schema' and ${n}.nspname not like 'pg\\_%'
+   and ${n}.nspname <> all($1::name[])`;
+
+// One row per broken rule. Tables outside public are named with their schema. The policy must
+// be the only permissive one (permissive policies are ORed together) and match what
+// tenantPolicy() generates, as PostgreSQL prints it back; the tenant column is `id` on
+// businesses and business_id everywhere else. has_table_privilege counts grants to PUBLIC and
+// to any role app_runtime belongs to. $2 is the append-only list.
 const violationsQuery = `
   with tables as (
-    select c.oid, c.relname, c.relrowsecurity, c.relforcerowsecurity,
-           coalesce(c.relacl, acldefault('r', c.relowner)) as acl,
-           case when c.relname = 'businesses' then 'id' else 'business_id' end as tenant_column
+    select c.oid, c.oid::regclass::text as relname, c.relrowsecurity, c.relforcerowsecurity,
+           case when c.oid = 'businesses'::regclass then 'id' else 'business_id' end
+             as tenant_column
       from pg_class c join pg_namespace n on n.oid = c.relnamespace
-     where n.nspname = 'public' and c.relkind in ('r', 'p')
+     where ${appSchema('n')} and c.relkind in ('r', 'p')
   ),
   fk_columns as (
     select c.conrelid, c.confrelid,
@@ -51,14 +75,27 @@ const violationsQuery = `
                t.tenant_column))
     union all
     select t.relname, 'business_id' from tables t
-     where t.relname <> 'businesses' and not exists (
+     where t.oid <> 'businesses'::regclass and not exists (
        select 1 from pg_attribute a
         where a.attrelid = t.oid and a.attname = 'business_id' and not a.attisdropped
           and a.atttypid = 'uuid'::regtype and a.attnotnull)
     union all
-    select distinct t.relname, 'privileges' from tables t, aclexplode(t.acl) as acl
-     where acl.grantee in ('app_runtime'::regrole::oid, 0)
-       and acl.privilege_type not in ('SELECT', 'INSERT', 'UPDATE')
+    select t.relname, 'business_fk' from tables t
+     where t.oid <> 'businesses'::regclass
+       and exists (select 1 from pg_attribute a
+                    where a.attrelid = t.oid and a.attname = 'business_id' and not a.attisdropped)
+       and not exists (select 1 from fk_columns f
+                        where f.conrelid = t.oid and f.confrelid = 'businesses'::regclass
+                          and f.columns = array['business_id']::name[]
+                          and f.referenced = array['id']::name[])
+    union all
+    select t.relname, 'privileges' from tables t
+     where exists (select 1 from unnest(array['DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER',
+                                              'MAINTAIN']) as p
+                    where has_table_privilege('app_runtime', t.oid, p))
+    union all
+    select t.relname, 'append_only' from tables t
+     where t.relname = any($2::text[]) and has_table_privilege('app_runtime', t.oid, 'UPDATE')
     union all
     select t.relname, 'branch_fk' from tables t
      where exists (select 1 from pg_attribute a
@@ -78,14 +115,64 @@ const violationsQuery = `
                     = array_position(f.referenced, 'business_id'::name), false) = false
     union all
     -- RLS never applies to these, so they can't hold tenant data.
-    select c.relname, 'kind' from pg_class c join pg_namespace n on n.oid = c.relnamespace
-     where n.nspname = 'public' and c.relkind in ('m', 'f')
+    select c.oid::regclass::text, 'kind' from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace
+     where ${appSchema('n')} and c.relkind in ('m', 'f')
   ) as violations
   order by relname collate "C", rule collate "C"`;
 
-async function findTenancyViolations(pool: Pool): Promise<Violation[]> {
-  const { rows } = await pool.query<Violation>(violationsQuery);
+async function findTenancyViolations(pool: Pool, appendOnly = APPEND_ONLY): Promise<Violation[]> {
+  const { rows } = await pool.query<Violation>(violationsQuery, [NOT_TENANT_SCHEMAS, appendOnly]);
   return rows;
+}
+
+interface FunctionViolation {
+  name: string;
+  rule: 'definer_public' | 'function_pin';
+}
+
+// The policy function's body exactly as migration 0001 writes it (ADR 0027).
+const businessIdFunctionBody =
+  " select nullif(current_setting('app.business_id', true), '')::uuid ";
+
+// definer_public: a SECURITY DEFINER function runs with its owner's rights, so one that PUBLIC
+// may execute is a way around RLS. function_pin: app_current_business_id() is missing or no
+// longer a plain STABLE SQL function with its exact body. $2 is that body.
+const functionViolationsQuery = `
+  with functions as (
+    select p.oid::regproc::text as name, p.proname, p.prosecdef, p.provolatile, p.prosrc,
+           l.lanname, coalesce(p.proacl, acldefault('f', p.proowner)) as acl
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+      join pg_language l on l.oid = p.prolang
+     where ${appSchema('n')}
+  )
+  select name, rule from (
+    select distinct f.name, 'definer_public' as rule from functions f, aclexplode(f.acl) as acl
+     where f.prosecdef and acl.grantee = 0 and acl.privilege_type = 'EXECUTE'
+    union all
+    select 'app_current_business_id', 'function_pin'
+     where not exists (select 1 from functions f
+                        where f.proname = 'app_current_business_id' and not f.prosecdef
+                          and f.provolatile = 's' and f.lanname = 'sql' and f.prosrc = $2)
+  ) as violations
+  order by name collate "C", rule collate "C"`;
+
+async function findFunctionViolations(pool: Pool): Promise<FunctionViolation[]> {
+  const { rows } = await pool.query<FunctionViolation>(functionViolationsQuery, [
+    NOT_TENANT_SCHEMAS,
+    businessIdFunctionBody,
+  ]);
+  return rows;
+}
+
+// Membership is how privileges are inherited, so app_runtime belongs to no role.
+async function findRoleMemberships(pool: Pool): Promise<string[]> {
+  const { rows } = await pool.query<{ rolname: string }>(
+    `select r.rolname from pg_auth_members m join pg_roles r on r.oid = m.roleid
+      where m.member = 'app_runtime'::regrole order by r.rolname collate "C"`,
+  );
+  return rows.map((row) => row.rolname);
 }
 
 const tenantColumn = 'business_id uuid not null references businesses(id)';
@@ -141,6 +228,17 @@ const probes: Probe[] = [
     columns: `${tenantColumn}, branch_id uuid,
       foreign key (business_id, branch_id) references branches(business_id, id)`,
   },
+  // Without the key, business_id could name a business that doesn't exist.
+  { name: 'probe_no_business_fk', columns: 'business_id uuid not null' },
+  // Checked with this probe added to the append-only list.
+  { name: 'probe_append_only' },
+  // app_runtime gets what probe_role has: an inherited DELETE is still a DELETE.
+  {
+    name: 'probe_inherited_delete',
+    after: 'grant delete on probe_inherited_delete to probe_role',
+  },
+  // Tenant tables outside public are checked too.
+  { name: 'probe_schema.probe_other', enable: false },
 ];
 
 async function createProbe(owner: Pool, probe: Probe): Promise<void> {
@@ -161,14 +259,18 @@ async function createProbe(owner: Pool, probe: Probe): Promise<void> {
 describe('tenancy guard', () => {
   let server: TestDatabase;
   let owner: Pool;
+  // The container's superuser: app_owner can't create roles or schemas.
+  let admin: Pool;
 
   beforeAll(async () => {
     server = await startTestDatabase();
     owner = new Pool({ connectionString: server.ownerUrl });
+    admin = new Pool({ connectionString: server.adminUrl });
   });
 
   afterAll(async () => {
     await owner.end();
+    await admin.end();
     await server.stop();
   });
 
@@ -176,18 +278,32 @@ describe('tenancy guard', () => {
     expect(await findTenancyViolations(owner)).toEqual([]);
   });
 
+  it('finds no unsafe or changed functions in the real schema', async () => {
+    expect(await findFunctionViolations(owner)).toEqual([]);
+  });
+
+  it('keeps app_runtime out of every other role', async () => {
+    expect(await findRoleMemberships(owner)).toEqual([]);
+  });
+
   it('reports each broken probe table under the right rule', async () => {
     try {
+      await admin.query('create role probe_role');
+      await admin.query('grant probe_role to app_runtime');
+      await admin.query('create schema probe_schema authorization app_owner');
       for (const probe of probes) await createProbe(owner, probe);
       // RLS never applies to a materialized view: it holds whatever its refresh could see.
       await owner.query('create materialized view probe_matview as select id from branches');
-      expect(await findTenancyViolations(owner)).toEqual([
+      expect(await findTenancyViolations(owner, [...APPEND_ONLY, 'probe_append_only'])).toEqual([
+        { table: 'probe_append_only', rule: 'append_only' },
         { table: 'probe_branch_fk', rule: 'branch_fk' },
         { table: 'probe_branch_fk', rule: 'tenant_fk' },
         { table: 'probe_delete_grant', rule: 'privileges' },
         { table: 'probe_extra_permissive', rule: 'policy' },
         { table: 'probe_from_branch_fk', rule: 'tenant_fk' },
+        { table: 'probe_inherited_delete', rule: 'privileges' },
         { table: 'probe_matview', rule: 'kind' },
+        { table: 'probe_no_business_fk', rule: 'business_fk' },
         { table: 'probe_no_business_id', rule: 'business_id' },
         { table: 'probe_no_business_id', rule: 'policy' },
         { table: 'probe_no_force', rule: 'force' },
@@ -195,13 +311,39 @@ describe('tenancy guard', () => {
         { table: 'probe_no_rls', rule: 'rls' },
         { table: 'probe_nullable_business_id', rule: 'business_id' },
         { table: 'probe_public_delete', rule: 'privileges' },
+        { table: 'probe_schema.probe_other', rule: 'rls' },
         { table: 'probe_select_policy', rule: 'policy' },
         { table: 'probe_wrong_policy', rule: 'policy' },
       ]);
+      expect(await findRoleMemberships(owner)).toEqual(['probe_role']);
     } finally {
       await owner.query('drop materialized view if exists probe_matview');
       await owner.query(`drop table if exists ${probes.map((p) => p.name).join(', ')}`);
+      await admin.query('drop schema if exists probe_schema cascade');
+      await admin.query('revoke probe_role from app_runtime');
+      await admin.query('drop role if exists probe_role');
     }
     expect(await findTenancyViolations(owner)).toEqual([]);
+    expect(await findRoleMemberships(owner)).toEqual([]);
+  });
+
+  // A SECURITY DEFINER function runs with its owner's rights, so one anyone can call is a way
+  // around RLS. Making the real policy function one must trip both rules.
+  it('reports unsafe and changed functions', async () => {
+    try {
+      await owner.query(
+        "create function probe_definer() returns int language sql security definer as 'select 1'",
+      );
+      await owner.query('alter function app_current_business_id() security definer');
+      expect(await findFunctionViolations(owner)).toEqual([
+        { name: 'app_current_business_id', rule: 'definer_public' },
+        { name: 'app_current_business_id', rule: 'function_pin' },
+        { name: 'probe_definer', rule: 'definer_public' },
+      ]);
+    } finally {
+      await owner.query('alter function app_current_business_id() security invoker');
+      await owner.query('drop function if exists probe_definer()');
+    }
+    expect(await findFunctionViolations(owner)).toEqual([]);
   });
 });

@@ -1,7 +1,7 @@
 # Progress
 
-**Current focus:** Phase 0 closed (journal and pitch done); Phase 1 next
-**Next step:** Owner squash-merges the Phase 0 journal PR; next session: P1.1 tenancy & data safety
+**Current focus:** P1.1 tenancy & data safety: brainstorming the design (draft spec `docs/plans/2026-11-01-p1.1-tenancy-design.md`)
+**Next step:** Continue P1.1 on branch `feat/p1.1-tenancy`: owner reviews the spec's §3 (database objects), then §4 (`withBusiness`) and §5 (tests) are presented
 **Last updated:** 2026-11-01
 
 Each task below is sized for **one session**. DevOps stages (from `docs/devops/DEVOPS_PLAN.md`) are woven in where they're first needed. Tasks for DRAFT modules are provisional: re-cut them after `/finalize-module NN`.

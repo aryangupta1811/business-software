@@ -2,20 +2,24 @@
 
 Overwritten at the end of every session. Older handoffs are in git history: `git log -p docs/HANDOFF.md`.
 
-**Session:** 10 — Phase 0 journal, 2026-11-01
+**Session:** 11 — P1.1 tenancy & data safety (brainstorming, paused), 2026-11-01
 
 **Done:**
-- `docs/journal/phase-0.md`: status "Done" (3 days, 9 sessions, 7 PRs), a one-line summary, and a new **Looking back** section (what worked, what I'd do differently, what carries into Phase 1). The section is now in the template in `docs/journal/README.md`, so later phases have it too.
-- `docs/journal/INTERVIEW_LOG.md`: the **2-minute pitch** written (problem → what makes it hard → architecture → hard bug: the worker that died at 10 s → how it's shipped → where it stands → what I'd do differently); Numbers row for Phase 0; stale "130 tests" in the CI-time row clarified; Question bank item "Why a whole phase without features?"; log entry for this session.
-- `docs/PROGRESS.md`: Phase 0 journal ticked; focus moved to Phase 1.
-- Docs only, no code. `pnpm format:check` green.
+- Phase 0 journal PR merged as #8 (session 10).
+- Read ADRs 0006, 0007, 0019, `architecture.md` ("Who can see what"), Module 00 (business details, branches), and all of `packages/db` (bootstrap, migration 0000, client, migrate, testing helper, role tests).
+- Brainstorming (superpowers, architectural path). Owner approved: **approach 1** (policies declared in the Drizzle schema through a helper, `FORCE` and the setting function hand-written in the same migration, a guard test over the catalogue); **tenancy-only columns** (signup fields wait for P1.3); the work lives in **`packages/db`** (no API route yet); **UUIDv7** from PostgreSQL 18's `uuidv7()`.
+- Checked in `node_modules`: drizzle-orm 0.45 has `pgPolicy` (`for`, `to`, `using`, `withCheck`) and `enableRLS()`; drizzle-kit 0.31 writes `ENABLE ROW LEVEL SECURITY` but never `FORCE`.
+- Everything so far is in the **draft spec** `docs/plans/2026-11-01-p1.1-tenancy-design.md`.
+- Interview log: 3 entries, 1 question, 3 glossary terms.
 
-**Half-done:** the PR for `docs/phase-0-journal` (docs only); it needs green CI and the owner's squash-merge.
+**Half-done:** brainstorming for P1.1 on branch **`feat/p1.1-tenancy`** (one docs commit, not pushed). No code yet.
 
 **Next step:**
-1. Owner: push, open the PR, squash-merge when the five checks are green; then `git switch main`, `git pull`, `git branch -D docs/phase-0-journal`.
-2. Next session: `/start-session` → **P1.1 tenancy & data safety** (read ADRs 0006 and 0007, `docs/architecture.md`, `docs/devops/local-database.md`, and `packages/db/src/roles.test.ts` for the test style).
-3. Update the pitch's "how it's shipped" and "where it stands" lines whenever a phase finishes.
+1. `/start-session` will report the branch is `feat/p1.1-tenancy`, not `main`: that's expected. Stay on it (`git switch feat/p1.1-tenancy` if needed). Re-invoke `superpowers:brainstorming` and resume, reading only the draft spec.
+2. Ask the owner whether **§3 (database objects)** looks right; it was presented in chat as "Section 1" and not yet answered.
+3. Present §4 (`withBusiness`, schema helper, signup order, the P1.4 login-lookup problem) and §5 (tests), one at a time.
+4. Finish the spec, self-review, owner reviews it, then `superpowers:writing-plans` → `docs/plans/2026-11-01-p1.1-tenancy.md`. Write **ADR 0027** (UUIDv7, policy helper, guard test) with the spec, via `/record-decision`.
+5. No PR until the code is done: one PR for P1.1 holds the spec, plan, ADR and code.
 
 **Watch out for:**
 - **No AI attribution, ever:** no `Co-Authored-By: Claude` and no "Generated with Claude Code" (`CLAUDE.md` rule 6 overrides tool defaults).
@@ -41,6 +45,7 @@ Overwritten at the end of every session. Older handoffs are in git history: `git
   - From P0.6: the "reproduce `check`" row in `git-workflow.md` lacks the actionlint command; the repo setting *Require actions to be pinned to a full-length commit SHA* is off (owner decides).
   - From P0.5: an asset URL with a trailing slash gets a 308 with the immutable header; a Caddyfile edit reruns the Vite build; no fake-timer test of a hanging fetch; polling pauses in background tabs.
   - From P0.4: `describeError` gaps (an empty `AggregateError`, a cyclic `cause`, `cause: null`); no query timeout on `/ready`; Node 25+ drops Corepack (note it in ADR 0020 before `node:26-slim`).
+- **P1.1 design gotchas:** a transaction-local setting reads back as `''` (not NULL) after its transaction ends, and `''::uuid` throws, so the function needs `nullif`. Signup must set the new business ID before inserting it. Drizzle can't generate `FORCE`.
 - **Carried over:**
   - Docker Desktop must be running for `pnpm test`, `pnpm check`, `db:up` and `app:up`.
   - Never `docker compose down -v` without OK. The bootstrap runs only on an empty volume.

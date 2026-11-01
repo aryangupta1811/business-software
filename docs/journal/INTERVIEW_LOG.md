@@ -141,6 +141,8 @@ Short answers; the Log entry has the full story.
   A: Inside text fields only F-keys, Esc and Ctrl/Alt combos fire, because the scanner types there. Letters match `event.code`, the physical key, so Alt+H works whatever the layout types. Auto-repeat, IME composition and AltGr never fire. → ADR 0026
 - **Q: You spent a whole phase without building a feature. Why?**
   A: Tenancy, the no-delete permissions, migrations and CI are hard to add once business tables and data exist. Built first, every business table gets `business_id`, Row-Level Security and no DELETE from its first migration, and since P0.6 every change has had to pass the same five checks. → `phase-0.md`
+- **Q: Your app sets the tenant per transaction. What happens to a pooled connection afterwards?**
+  A: The setting is transaction-local (`set_config(…, true)`), so it ends with the transaction. But on that connection it then reads back as an empty string, not NULL, and `''::uuid` throws. My policy function turns empty into NULL, so a connection with no business set sees no rows instead of crashing. A test reuses a one-connection pool to prove it. → P1.1
 
 ---
 
@@ -219,6 +221,9 @@ Terms I learned on this project, in one line each.
 | Volume (Docker) | Storage kept outside a container, so data survives when the container is removed |
 | WCAG contrast ratio | How much lighter one colour is than another, from 1:1 to 21:1; AA needs 4.5:1 for normal text and 3:1 for edges and focus rings |
 | Workspace (pnpm) | The set of packages in a monorepo that pnpm installs and links together |
+| UUIDv7 | A UUID that starts with a timestamp, so new IDs sort after old ones and inserts append to the index; PostgreSQL 18 has `uuidv7()` built in |
+| FORCE ROW LEVEL SECURITY | Makes RLS apply to the table's owner too; without it, owners silently skip every policy |
+| `set_config(name, value, true)` | Sets a custom setting such as `app.business_id` for the current transaction only; unlike `SET`, it takes query parameters |
 
 ---
 
@@ -942,3 +947,21 @@ Entry format:
 - **Why / what I learned:** A pitch has to say clearly what's built and what's planned, because an interviewer's follow-up will find the difference. So the AWS part is "next", not "deployed", and the pitch says to update those lines as phases finish. For the hard bug I chose the worker that died after 10 s: it has a clear clue (the exact number), a cause that tests Node knowledge (the event loop), and a fix proven by a test.
 - **Say it in an interview:** "Phase 0 has no features on purpose: tenancy, permissions and CI are cheap to build first and expensive to retrofit."
 - **Follow-ups to expect:** What would you cut if you had half the time? (The AI assistant and WhatsApp; billing, stock, udhaar and data safety are the core.)
+
+### 2026-11-01 — P1.1 design: policies in the Drizzle schema, plus a guard test `#database` `#security` `#process`
+- **What happened:** Brainstormed P1.1 (tenancy) and chose to declare each table's RLS policy next to the table in the Drizzle schema, through a helper, instead of hand-writing every policy in SQL. Checked the library before designing: drizzle-orm 0.45 has `pgPolicy` and drizzle-kit 0.31 writes `ENABLE ROW LEVEL SECURITY`, but nothing generates `FORCE ROW LEVEL SECURITY`, so that line and the setting function are hand-written in the same migration. The real safety net is a **guard test** that reads PostgreSQL's catalogue and fails if any table lacks `business_id`, RLS, `FORCE` or a policy, or is granted DELETE.
+- **Why / what I learned:** A rule that depends on remembering it per table will be forgotten once; a test over the whole catalogue catches the forgotten table in CI. Without `FORCE`, the table owner (my migration role) skips RLS silently. Columns stay tenancy-only (`id`, `name`, `created_at`); signup fields wait for P1.3, so I don't guess Module 00's open questions.
+- **Say it in an interview:** "Every tenant table gets its policy from one helper, and a test scans the database catalogue so a new table without RLS fails CI. The policy is the guarantee; the test guarantees the policy exists."
+- **Follow-ups to expect:** Why not an event trigger that enables RLS on every new table? (Event triggers need superuser-level rights, which my app roles deliberately don't have, and they'd behave differently on RDS. The guard test works the same everywhere, and it also checks the policy and grants, not just that RLS is on.)
+
+### 2026-11-01 — Two tenancy gotchas: the empty-string setting and signup's chicken-and-egg `#database` `#gotcha`
+- **What happened:** While designing, two traps came up. (1) After a transaction-local `set_config('app.business_id', …, true)` ends, the setting doesn't disappear on that connection: it reads back as `''`, and casting `''` to `uuid` throws an error. So the policy function uses `nullif(current_setting('app.business_id', true), '')::uuid`: no business set means NULL, which matches no rows. (2) The `businesses` table's own policy only allows the current business's row, so signup can't insert a business before one is set. The fix is to generate the new ID first, set it as the current business, then insert. The policy check passes and no bypass role is needed.
+- **Why / what I learned:** Fail-safe defaults matter: "nothing set" must mean "see nothing", never "error" or "see everything". Both behaviours get integration tests in P1.1 (the first with a one-connection pool, so the same connection is reused).
+- **Say it in an interview:** "A pooled connection that served business A must show nothing to the next request until it sets its own business. I proved that with a test that reuses the same connection."
+- **Follow-ups to expect:** Why not `SET LOCAL`? (`SET` can't take query parameters, so the ID would have to be pasted into the SQL; `set_config` takes it as a parameter.)
+
+### 2026-11-01 — UUIDv7 for IDs, and a composite key across tenants `#database` `#architecture`
+- **What happened:** Chose UUIDv7 from PostgreSQL 18's built-in `uuidv7()` for every ID (ADR 0001 already said UUIDs; ADR 0027 will record v7). Branches also get `unique (business_id, id)`, so later branch-level tables reference `(business_id, branch_id)`.
+- **Why / what I learned:** Random UUIDv4s land at random places in the primary-key index, which splits pages and slows inserts; v7 starts with a timestamp, so new rows append at the end. The composite foreign key makes the database refuse a row of business A that points at a branch of business B, a mix-up RLS alone wouldn't catch, because RLS checks each row's own `business_id`, not what it points to.
+- **Say it in an interview:** "IDs are time-ordered UUIDs, so they're safe to create anywhere and still index well, and foreign keys include the business ID so rows can't point across tenants."
+- **Follow-ups to expect:** Doesn't a UUIDv7 leak the creation time? (Yes, to the millisecond. That's fine for bills and items; it would matter for something like a password-reset token, which uses random bytes instead.)

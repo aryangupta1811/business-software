@@ -66,6 +66,17 @@ The app always uses `true` (one transaction only), through `withBusiness`. The `
 - **A data migration as `app_owner` changes 0 rows, with no error.** Wrap the statement in `ALTER TABLE … NO FORCE ROW LEVEL SECURITY` / `FORCE ROW LEVEL SECURITY` inside the migration, and test the row count.
 - **`pg_dump -U app_owner` fails** on tenant tables, and `--enable-row-security` makes it succeed with **empty** tables. Dump as `postgres` locally (and a `BYPASSRLS` role on RDS); never use `--enable-row-security`.
 
+### The entry log
+
+`entry_log` is a tenant table like the others, and it is **append-only** (ADR 0028): `app_runtime` may only insert and read. With a business set:
+
+```sql
+select created_at, actor_id, action, entity_type, reason, before, after
+  from entry_log order by id desc limit 20;  -- newest first; order by id, not created_at
+```
+
+Order by `id`: entries written in one transaction share `created_at` (it's the transaction's start time), but their UUIDv7 IDs keep the order. `UPDATE`, `DELETE` and `TRUNCATE` fail with `permission denied` as `app_runtime`, even for debugging. That's the point: fix a wrong entry by recording a correcting one, never by editing.
+
 ## Things to know
 
 - **The bootstrap runs only on an empty volume.** Changing a password in `.env` later does nothing by itself. Change it in the database too: `ALTER ROLE app_runtime PASSWORD '...'` as `postgres`.

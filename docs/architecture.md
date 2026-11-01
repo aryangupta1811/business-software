@@ -107,7 +107,7 @@ Why each step exists: ADR 0007 (transaction, ledger, locked counter, lock order,
 
 ## Who can see what: four layers
 
-1. **Business:** PostgreSQL Row-Level Security filters every query by the current business [0006].
+1. **Business:** PostgreSQL Row-Level Security filters every query by the current business [0006, 0027]. Code reaches business data only through `withBusiness(db, businessId, work)` (or `withNewBusiness` at signup) in `packages/db`, which sets `app.business_id` for that one transaction. Every tenant table has a `tenant_isolation` policy and `FORCE ROW LEVEL SECURITY`, so even the owner role is filtered; with no business set, a table shows no rows. A guard test reads the catalogue of schema `public` and fails CI if a table misses RLS, `FORCE`, the policy or `business_id`, has an extra permissive policy, grants the app (or PUBLIC) more than SELECT/INSERT/UPDATE, or has a foreign key into another tenant table that doesn't include `business_id`; it also refuses materialized views. Tables so far: `businesses` and `branches` (IDs are UUIDv7). Foreign keys between tenant tables are composite, e.g. `(business_id, branch_id) → branches(business_id, id)`, because foreign-key checks skip RLS: without it a row could point at another business's branch.
 2. **Branch:** branch-level data is filtered by the branches the user may use.
 3. **Permissions:** a guard on each API route checks the per-staff feature switches (Module 00 #17). The AI assistant uses the same checks [0015].
 4. **Screen:** the UI hides what a user can't use. This is convenience only. The API is the real check.

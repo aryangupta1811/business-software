@@ -2,20 +2,26 @@
 
 Overwritten at the end of every session. Older handoffs are in git history: `git log -p docs/HANDOFF.md`.
 
-**Session:** 10 — Phase 0 journal, 2026-11-01
+**Session:** 12 — P1.1 tenancy & data safety (design finished, built, reviewed), 2026-11-01
 
 **Done:**
-- `docs/journal/phase-0.md`: status "Done" (3 days, 9 sessions, 7 PRs), a one-line summary, and a new **Looking back** section (what worked, what I'd do differently, what carries into Phase 1). The section is now in the template in `docs/journal/README.md`, so later phases have it too.
-- `docs/journal/INTERVIEW_LOG.md`: the **2-minute pitch** written (problem → what makes it hard → architecture → hard bug: the worker that died at 10 s → how it's shipped → where it stands → what I'd do differently); Numbers row for Phase 0; stale "130 tests" in the CI-time row clarified; Question bank item "Why a whole phase without features?"; log entry for this session.
-- `docs/PROGRESS.md`: Phase 0 journal ticked; focus moved to Phase 1.
-- Docs only, no code. `pnpm format:check` green.
+- Committed session 11's docs, then finished the design with the owner section by section: §3 database objects, §4 `withBusiness`, §5 tests. Spec `docs/plans/2026-11-01-p1.1-tenancy-design.md`, **ADR 0027**, plan `docs/plans/2026-11-01-p1.1-tenancy.md`. Owner chose **native** execution (inline, one fresh reviewer at the end).
+- Checked on a throwaway PostgreSQL 18 before planning: an ended transaction-local setting reads back as `''`, `''::uuid` throws, `uuidv7()` gives version 7.
+- **Built** (`packages/db`):
+  - `migrations/0001_tenancy.sql`: `businesses`, `branches` (`unique (business_id, id)`), `tenant_isolation` policies (generated), plus hand-written `app_current_business_id()` and `FORCE ROW LEVEL SECURITY`.
+  - `src/schema.ts`: tables and helpers `id()`, `businessId()`, `createdAt()`, `tenantPolicy()`.
+  - `src/tenancy.ts`: `withBusiness`, `withNewBusiness`, `Transaction`; `src/client.ts`: `AppDatabase` (a type only a pooled database fits, so a transaction can't be passed in).
+  - `src/tenancy.test.ts` (15 tests) and `src/tenancy-guard.test.ts` (8 rules, 16 probes; a removed `FORCE` line was caught).
+- **Fresh review (opus):** 0 critical; all five Review Focus items held live. Three leaks past the guard fixed test-first (extra permissive policy; single-column keys between tenant tables, new `tenant_fk` rule; materialized views, new `kind` rule). `FORCE` traps documented: data migrations as `app_owner` change 0 rows; `pg_dump` as `app_owner` fails or writes empty tables. Eight minors filed in PROGRESS (P1.2, P1.4, P1.7, stage 7).
+- **Checked:** `pnpm check` green, 241 tests (45 shared, 38 db, 28 api, 130 web); `drizzle-kit check` clean; migration applied to the local database.
+- **Docs:** ADR 0027 + index; `architecture.md` (who can see what); `local-database.md` (tenant tables in psql, `FORCE` traps); new `docs/journal/phase-1.md`; interview log (5 entries, 1 question, 3 glossary terms, numbers, pitch).
 
-**Half-done:** the PR for `docs/phase-0-journal` (docs only); it needs green CI and the owner's squash-merge.
+**Half-done:** the P1.1 pull request: branch `feat/p1.1-tenancy` (8 commits including the end-session one), not pushed.
 
 **Next step:**
-1. Owner: push, open the PR, squash-merge when the five checks are green; then `git switch main`, `git pull`, `git branch -D docs/phase-0-journal`.
-2. Next session: `/start-session` → **P1.1 tenancy & data safety** (read ADRs 0006 and 0007, `docs/architecture.md`, `docs/devops/local-database.md`, and `packages/db/src/roles.test.ts` for the test style).
-3. Update the pitch's "how it's shipped" and "where it stands" lines whenever a phase finishes.
+1. Owner: `git push -u origin HEAD`, `gh pr create --web` with title `feat(db): add tenancy with forced row-level security (P1.1)`, fill in the template, **Squash and merge** when the five checks are green. Then `git switch main`, `git pull`, `git branch -D feat/p1.1-tenancy`.
+2. Watch the `migrations` CI check: `0001` is new, so it must be newer than `main`'s `0000` (it is).
+3. Next session: `/start-session` → **P1.2 entry log recording** (read ADR 0007, Module 06, ADR 0027, `packages/db/src/tenancy*.ts`; the P1.1 review minors filed under P1.2 belong in that task).
 
 **Watch out for:**
 - **No AI attribution, ever:** no `Co-Authored-By: Claude` and no "Generated with Claude Code" (`CLAUDE.md` rule 6 overrides tool defaults).
@@ -41,6 +47,14 @@ Overwritten at the end of every session. Older handoffs are in git history: `git
   - From P0.6: the "reproduce `check`" row in `git-workflow.md` lacks the actionlint command; the repo setting *Require actions to be pinned to a full-length commit SHA* is off (owner decides).
   - From P0.5: an asset URL with a trailing slash gets a 308 with the immutable header; a Caddyfile edit reruns the Vite build; no fake-timer test of a hanging fetch; polling pauses in background tabs.
   - From P0.4: `describeError` gaps (an empty `AggregateError`, a cyclic `cause`, `cause: null`); no query timeout on `/ready`; Node 25+ drops Corepack (note it in ADR 0020 before `node:26-slim`).
+- **Tenancy rules (ADR 0027), enforced by `src/tenancy-guard.test.ts`:**
+  - A new tenant table uses `id()`, `businessId()`, `createdAt()` and `tenantPolicy(t.businessId)`, and its migration adds `ALTER TABLE … FORCE ROW LEVEL SECURITY` by hand (drizzle-kit can't).
+  - Keys into another tenant table are composite: `(business_id, x_id) → x(business_id, id)`, and `x` needs `unique (business_id, id)`.
+  - Only one permissive policy (`tenant_isolation`); no materialized views or foreign tables for tenant data.
+  - Code reaches tenant data only through `withBusiness(db, id, work)` / `withNewBusiness`; never pass a transaction (it won't type-check).
+  - A data migration as `app_owner` changes 0 rows unless it lifts `FORCE` inside its transaction; test the row count.
+  - `pg_dump` as `app_owner` fails; never use `--enable-row-security` (empty tables). Backups need a `BYPASSRLS` role (stage 7).
+  - Drizzle wraps driver errors: the PostgreSQL code is on `error.cause.code`.
 - **Carried over:**
   - Docker Desktop must be running for `pnpm test`, `pnpm check`, `db:up` and `app:up`.
   - Never `docker compose down -v` without OK. The bootstrap runs only on an empty volume.

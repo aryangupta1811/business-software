@@ -23,7 +23,7 @@ Update this as the project grows.
 - **My architecture:** a TypeScript monorepo with a React single-page app, a NestJS modular monolith (so a bill is one database transaction, not a saga across services) and PostgreSQL. The safety rules live in the database, not only in my code: money is stored as whole paise, the app's database user has no DELETE permission, and Row-Level Security keeps businesses apart. Every choice has a written decision record with the alternatives I rejected; there are 26 so far.
 - **One hard bug:** my background worker kept dying after exactly 10 seconds. That was the database driver's idle timeout. Waiting for the shutdown signal doesn't keep Node's event loop alive, so when the pool's last idle connection closed, the process simply ended. I reproduced it in a test, held the process open until SIGTERM, and confirmed it in Docker with zero restarts.
 - **How it's shipped:** the same Docker Compose stack runs on my laptop and in CI. Every pull request must pass five required checks: lint, types and 224 tests against a real PostgreSQL; a secret scan of the whole history; a migration-order check; the PR title; and a smoke test that starts the real images. Next is Terraform on AWS: one EC2 server plus RDS with point-in-time restore, sized to the Free plan's credits because my budget is ₹0.
-- **Where it stands:** the foundations are done (Phase 0). Phase 1 starts with multi-tenancy and then billing.
+- **Where it stands:** the foundations are done (Phase 0). In Phase 1 the database already keeps businesses apart (forced Row-Level Security, with a test that scans every table); billing comes next.
 - **What I'd do differently:** pin down the real constraints first. I designed hosting for a budget I didn't have and had to redesign it. And test what you ship: the production CSS minifier broke a page my unit tests said was fine.
 
 ---
@@ -42,9 +42,9 @@ Update this as the project grows.
 | Largest exact amount in JavaScript | ≈ ₹90 lakh crore in paise (2^53) | ADR 0008 |
 | Business types in v1 | 5 | Module 00 |
 | Modules | 10 (00–09) | `docs/requirements/` |
-| ADRs | 26 (16 at kickoff) | `docs/decisions/` |
+| ADRs | 27 (16 at kickoff) | `docs/decisions/` |
 | Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
-| Automated tests | 224: 45 shared (money), 21 db, 28 api, 130 web (routing, connection badge, three languages, error screen, 44 contrast checks, Hindi line height, components, theme, 24 keyboard-shortcut tests, layout, `/design`) | `pnpm test` |
+| Automated tests | 241: 45 shared (money), 38 db (roles, client, 15 tenancy, 2 guard), 28 api, 130 web (routing, connection badge, three languages, error screen, 44 contrast checks, Hindi line height, components, theme, 24 keyboard-shortcut tests, layout, `/design`) | `pnpm test` |
 | Interface languages | 3: English, Hindi, Hinglish (`en`, `hi`, `hi-Latn`) | Module 00 #25, ADR 0023 |
 | Web app download | ~160 KB gzipped JavaScript; fonts 307 KB (woff2, six files, cached for a year); web image 95 MB (Caddy) | P0.7, `vite build` |
 | Readability floor | text ≥ 4.5:1 contrast (main text ≥ 7:1), input edges and focus ring ≥ 3:1, both modes; body text 15 px, nothing under 13 px | ADR 0025 |
@@ -56,6 +56,7 @@ Update this as the project grows.
 | Clean stop of api and worker | ~0.7 s, exit code 0 | P0.4 |
 | CI checks on every pull request | 5 required: `check`, `secrets`, `migrations`, `smoke`, `pr-title` | ADR 0024 |
 | CI run time | ~3 min in all; `check` (lint, types, tests, build) about 50 s when measured with 130 tests; `smoke` 2 min 47 s with an empty cache, 50 s warm | P0.6 |
+| Tenancy guard | 8 rules checked on every table, proven by 16 probes (each breaks one rule, three are correct and must pass); first tables `businesses`, `branches` | P1.1, ADR 0027 |
 | Phase 0 (foundations) | 3 days (2026-10-29 to 31), 9 work sessions, 7 pull requests, 0 business features on purpose | `phase-0.md` |
 | How often the screen checks the server | every 30 s, 10 s timeout (the API waits 5 s for the database) | P0.5, ADR 0001 |
 
@@ -141,6 +142,10 @@ Short answers; the Log entry has the full story.
   A: Inside text fields only F-keys, Esc and Ctrl/Alt combos fire, because the scanner types there. Letters match `event.code`, the physical key, so Alt+H works whatever the layout types. Auto-repeat, IME composition and AltGr never fire. → ADR 0026
 - **Q: You spent a whole phase without building a feature. Why?**
   A: Tenancy, the no-delete permissions, migrations and CI are hard to add once business tables and data exist. Built first, every business table gets `business_id`, Row-Level Security and no DELETE from its first migration, and since P0.6 every change has had to pass the same five checks. → `phase-0.md`
+- **Q: Your app sets the tenant per transaction. What happens to a pooled connection afterwards?**
+  A: The setting is transaction-local (`set_config(…, true)`), so it ends with the transaction. But on that connection it then reads back as an empty string, not NULL, and `''::uuid` throws. My policy function turns empty into NULL, so a connection with no business set sees no rows instead of crashing. A test reuses a one-connection pool to prove it. → P1.1
+- **Q: Can Row-Level Security alone stop one tenant's row pointing at another tenant's data?**
+  A: No. Foreign-key checks skip RLS, so with a plain `branch_id → branches(id)` key, business B could save a row pointing at A's branch. Every key between tenant tables is composite, `(business_id, branch_id) → branches(business_id, id)`, and a guard test refuses any that isn't. → ADR 0027
 
 ---
 
@@ -209,6 +214,9 @@ Terms I learned on this project, in one line each.
 | Supply-chain attack | Attacking an app through something it depends on, e.g. publishing a poisoned version of a popular npm package |
 | TDD | Test-driven development: write a failing test, watch it fail, write the least code that passes, then tidy up |
 | Tenant | One customer business in a multi-tenant system |
+| Permissive vs restrictive policy | Permissive RLS policies are ORed (any one lets a row through); restrictive ones are ANDed on top (each must pass) |
+| Materialized view | A query whose result is stored as a table and refreshed on demand; RLS never applies to it |
+| BYPASSRLS | A role attribute that skips every RLS policy; superusers have it implicitly. Backups need it, the app must never have it |
 | Required status check | A CI job that must pass before GitHub lets a pull request merge; set in the branch ruleset |
 | Script injection (Actions) | Writing `${{ github.event... }}` inside `run:` pastes user-typed text into a shell script, which then runs it; pass it through `env:` instead |
 | SHA pinning | Referring to an action by its full commit hash instead of a tag, so its code can't change without a visible edit |
@@ -219,6 +227,9 @@ Terms I learned on this project, in one line each.
 | Volume (Docker) | Storage kept outside a container, so data survives when the container is removed |
 | WCAG contrast ratio | How much lighter one colour is than another, from 1:1 to 21:1; AA needs 4.5:1 for normal text and 3:1 for edges and focus rings |
 | Workspace (pnpm) | The set of packages in a monorepo that pnpm installs and links together |
+| UUIDv7 | A UUID that starts with a timestamp, so new IDs sort after old ones and inserts append to the index; PostgreSQL 18 has `uuidv7()` built in |
+| FORCE ROW LEVEL SECURITY | Makes RLS apply to the table's owner too; without it, owners silently skip every policy |
+| `set_config(name, value, true)` | Sets a custom setting such as `app.business_id` for the current transaction only; unlike `SET`, it takes query parameters |
 
 ---
 
@@ -942,3 +953,59 @@ Entry format:
 - **Why / what I learned:** A pitch has to say clearly what's built and what's planned, because an interviewer's follow-up will find the difference. So the AWS part is "next", not "deployed", and the pitch says to update those lines as phases finish. For the hard bug I chose the worker that died after 10 s: it has a clear clue (the exact number), a cause that tests Node knowledge (the event loop), and a fix proven by a test.
 - **Say it in an interview:** "Phase 0 has no features on purpose: tenancy, permissions and CI are cheap to build first and expensive to retrofit."
 - **Follow-ups to expect:** What would you cut if you had half the time? (The AI assistant and WhatsApp; billing, stock, udhaar and data safety are the core.)
+
+### 2026-11-01 — P1.1 design: policies in the Drizzle schema, plus a guard test `#database` `#security` `#process`
+- **What happened:** Brainstormed P1.1 (tenancy) and chose to declare each table's RLS policy next to the table in the Drizzle schema, through a helper, instead of hand-writing every policy in SQL. Checked the library before designing: drizzle-orm 0.45 has `pgPolicy` and drizzle-kit 0.31 writes `ENABLE ROW LEVEL SECURITY`, but nothing generates `FORCE ROW LEVEL SECURITY`, so that line and the setting function are hand-written in the same migration. The real safety net is a **guard test** that reads PostgreSQL's catalogue and fails if any table lacks `business_id`, RLS, `FORCE` or a policy, or is granted DELETE.
+- **Why / what I learned:** A rule that depends on remembering it per table will be forgotten once; a test over the whole catalogue catches the forgotten table in CI. Without `FORCE`, the table owner (my migration role) skips RLS silently. Columns stay tenancy-only (`id`, `name`, `created_at`); signup fields wait for P1.3, so I don't guess Module 00's open questions.
+- **Say it in an interview:** "Every tenant table gets its policy from one helper, and a test scans the database catalogue so a new table without RLS fails CI. The policy is the guarantee; the test guarantees the policy exists."
+- **Follow-ups to expect:** Why not an event trigger that enables RLS on every new table? (Event triggers need superuser-level rights, which my app roles deliberately don't have, and they'd behave differently on RDS. The guard test works the same everywhere, and it also checks the policy and grants, not just that RLS is on.)
+
+### 2026-11-01 — Two tenancy gotchas: the empty-string setting and signup's chicken-and-egg `#database` `#gotcha`
+- **What happened:** While designing, two traps came up. (1) After a transaction-local `set_config('app.business_id', …, true)` ends, the setting doesn't disappear on that connection: it reads back as `''`, and casting `''` to `uuid` throws an error. So the policy function uses `nullif(current_setting('app.business_id', true), '')::uuid`: no business set means NULL, which matches no rows. (2) The `businesses` table's own policy only allows the current business's row, so signup can't insert a business before one is set. The fix is to generate the new ID first, set it as the current business, then insert. The policy check passes and no bypass role is needed.
+- **Why / what I learned:** Fail-safe defaults matter: "nothing set" must mean "see nothing", never "error" or "see everything". Both behaviours get integration tests in P1.1 (the first with a one-connection pool, so the same connection is reused).
+- **Say it in an interview:** "A pooled connection that served business A must show nothing to the next request until it sets its own business. I proved that with a test that reuses the same connection."
+- **Follow-ups to expect:** Why not `SET LOCAL`? (`SET` can't take query parameters, so the ID would have to be pasted into the SQL; `set_config` takes it as a parameter.)
+
+### 2026-11-01 — UUIDv7 for IDs, and a composite key across tenants `#database` `#architecture`
+- **What happened:** Chose UUIDv7 from PostgreSQL 18's built-in `uuidv7()` for every ID (ADR 0001 already said UUIDs; ADR 0027 records v7). Branches also get `unique (business_id, id)`, so later branch-level tables reference `(business_id, branch_id)`.
+- **Why / what I learned:** Random UUIDv4s land at random places in the primary-key index, which splits pages and slows inserts; v7 starts with a timestamp, so new rows append at the end. The composite foreign key makes the database refuse a row of business A that points at a branch of business B, a mix-up RLS alone wouldn't catch, because RLS checks each row's own `business_id`, not what it points to.
+- **Say it in an interview:** "IDs are time-ordered UUIDs, so they're safe to create anywhere and still index well, and foreign keys include the business ID so rows can't point across tenants."
+- **Follow-ups to expect:** Doesn't a UUIDv7 leak the creation time? (Yes, to the millisecond. That's fine for bills and items; it would matter for something like a password-reset token, which uses random bytes instead.)
+
+### 2026-11-01 — ADR 0027: how tenancy is built `#database` `#security` → ADR 0027
+- **What happened:** Recorded the P1.1 design: UUIDv7 IDs; each tenant table's RLS policy declared in the Drizzle schema with `tenantPolicy()`, with `FORCE` and `app_current_business_id()` hand-written in the migration; `withBusiness` / `withNewBusiness` as the only way to reach tenant data; a guard test over the catalogue. Rejected: UUIDv4 and serial IDs, hand-written-only policies, an event trigger, `SET LOCAL`, a bypass role for signup, and relying on code review.
+- **Why / what I learned:** ADR 0006 said *what* (RLS); this says *how*, and how we keep it true for tables that don't exist yet. A safety rule needs three parts: the mechanism (policies), one way to use it (`withBusiness`), and a check that it's everywhere (the guard test).
+- **Say it in an interview:** "RLS is the guarantee; the guard test guarantees RLS is there. And I made signup go through the same policy by setting the new business's ID before inserting it, so there's no bypass to protect."
+- **Follow-ups to expect:** What's the cost of RLS per query? (One extra comparison per row, against a value computed once per query thanks to the `(select …)` wrapper; with indexes that start with `business_id`, it's negligible.)
+
+### 2026-11-01 — A type test showed a transaction fits where a database is expected `#database` `#testing` `#gotcha` → ADR 0027
+- **What happened:** `withBusiness` must not accept a transaction: calling it inside another transaction would open a savepoint, and the transaction-local business setting would outlive the savepoint, switching the business for the rest of the outer transaction. The plan pinned this with a `// @ts-expect-error` line that passes a transaction. `pnpm typecheck` failed with "Unused '@ts-expect-error' directive": TypeScript accepted the transaction, because Drizzle's transaction type has almost everything the database type has. The fix: `AppDatabase = NodePgDatabase & { $client: Pool }`, the one thing a transaction lacks, and `withBusiness` takes that.
+- **Why / what I learned:** `@ts-expect-error` turns "this must not compile" into a test, and an unused one is a red test. TypeScript compares shapes, not names (structural typing), so two types that look different can still be interchangeable.
+- **Say it in an interview:** "I wanted the compiler to refuse a nested tenant transaction. A type-level test showed it didn't, so I narrowed the parameter to a type only a real connection pool has."
+- **Follow-ups to expect:** Why not check at runtime? (The type check costs nothing at runtime and catches it before the code runs; a runtime check would only fail in the request that does it.)
+
+### 2026-11-01 — Building the tenancy guard, and proving it with a planted fault `#database` `#testing` → ADR 0027
+- **What happened:** The guard is one SQL query over `pg_class`, `pg_policy`, `pg_attribute`, `pg_constraint` and the table ACLs. It compares each policy with what `tenantPolicy()` generates, as PostgreSQL prints it back with `pg_get_expr`: `(business_id = ( SELECT app_current_business_id() AS app_current_business_id))`. Eleven probe tables, each a correct tenant table with one thing broken (no `ENABLE`, no `FORCE`, a `USING (true)` policy, a `FOR SELECT` policy, a nullable `business_id`, `GRANT DELETE … TO PUBLIC`, a `branch_id` with a plain foreign key, and one correct composite key), came back with exactly the expected rules. Then I deleted one `FORCE` line from the migration: the guard reported `businesses` + `force`; I restored it.
+- **Why / what I learned:** Checking the stored policy text is strict: a policy that "looks fine" but compares the wrong column fails. Grants to `PUBLIC` must be checked too, because every role inherits them. A table with no explicit grants has a NULL ACL, so the query uses `acldefault()`.
+- **Say it in an interview:** "My guard test reads PostgreSQL's catalogue, so a new table without RLS, `FORCE`, the right policy or the right grants fails CI. I proved it by breaking each rule on purpose and by deleting a `FORCE` line from the real migration."
+- **Follow-ups to expect:** Why does the superuser still see everything? (Superusers and `BYPASSRLS` roles skip RLS even when it's forced; that's why the app's roles are neither.)
+
+### 2026-11-01 — Small gotchas in P1.1 `#gotcha`
+- **What happened:**
+  - Drizzle 0.45 wraps driver errors, so the PostgreSQL code (`42501`, `22P02`, `23503`) is on `error.cause.code`, not `error.code`.
+  - drizzle-kit wrote `ENABLE ROW LEVEL SECURITY` and the policies, but `FORCE` and the function had to be added to the generated file by hand, with the function first because the policies call it.
+  - Lint forbids `!` (non-null assertions), so "the database returned no row" became an explicit `throw`.
+  - The personal-data search matched a made-up test UUID (`…-8000-000000000000`): twelve zeros look like an Aadhaar number to the pattern. A false positive, but each match gets read, not skipped.
+- **Why / what I learned:** Each was minutes, because the output said exactly what was wrong.
+- **Say it in an interview:** —
+- **Follow-ups to expect:** —
+
+### 2026-11-01 — The final review found three ways past my guard, and a backup trap `#database` `#security` `#testing` → ADR 0027
+- **What happened:** A fresh reviewer attacked the branch on a live PostgreSQL 18. My two tables were correct, but the guard (whose job is future tables) missed three leaks, each shown leaking business A's rows to business B:
+  - **An extra permissive policy:** PostgreSQL ORs permissive policies, so a correct `tenant_isolation` plus a `reporting … using (true)` shows everything. The guard now refuses any permissive policy except `tenant_isolation` (restrictive ones only narrow, so they're allowed).
+  - **Single-column foreign keys:** foreign-key checks skip RLS, so `from_branch_id → branches(id)` let B save a row pointing at A's branch. My rule only looked at columns named exactly `branch_id`. New `tenant_fk` rule: every key into another tenant table must pair `business_id` with `business_id`.
+  - **Materialized views:** RLS never applies to them; one refreshed by the owner kept A's rows and showed them to anyone. New `kind` rule refuses them (and foreign tables) in `public`.
+  It also found that `FORCE`, which filters the owner role, makes a data migration as `app_owner` change 0 rows silently, and makes `pg_dump` as `app_owner` fail, or write empty tables with `--enable-row-security`. Both are now in ADR 0027, the database runbook and PROGRESS (stage 7: backups need a `BYPASSRLS` role). Each guard fix started with a probe table that the old guard missed (red), then the query change (green).
+- **Why / what I learned:** A guard is only as good as the attacks its author imagined, which is exactly why a fresh reviewer is worth it. "Safe by default" settings (`FORCE`) can turn into silent data loss elsewhere (migrations, backups), so every safety feature needs its side effects written down. Eight minor findings went into PROGRESS under the tasks where they matter (P1.2, P1.4, P1.7, stage 7).
+- **Say it in an interview:** "A reviewer found that RLS doesn't cover foreign-key checks or materialized views, and that permissive policies combine with OR. I added a probe for each, watched my guard miss it, then fixed the guard. They also spotted that forcing RLS on the owner makes backups come out empty, so my backup plan uses a role that bypasses RLS and the restore drill checks row counts."
+- **Follow-ups to expect:** Why not just give the owner `BYPASSRLS`? (Then every migration and every mistake as the owner could touch all businesses' rows; a separate backup role with only that power is narrower.)

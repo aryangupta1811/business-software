@@ -49,6 +49,23 @@ docker compose exec db psql -U app_runtime -d business_software
 
 The image trusts every connection made from inside the container, even over `127.0.0.1`. Passwords are only checked for connections from outside it, such as the app, `pnpm db:migrate`, or a GUI client on `127.0.0.1:5432`. A wrong password there gets `password authentication failed` (`28P01`).
 
+## Tenant tables in psql
+
+Every business table has Row-Level Security (ADRs 0006, 0027). As `app_runtime` or `app_owner` it looks empty, and inserts are refused, until you pick a business for the session:
+
+```sql
+select id, name from businesses;  -- 0 rows: no business set
+select set_config('app.business_id', '<business id>', false);  -- false: for the whole psql session
+select id, name from branches;    -- that business's rows only
+```
+
+The app always uses `true` (one transaction only), through `withBusiness`. The `postgres` superuser skips RLS entirely, even `FORCE`d, so it sees every business: use it only for looking, never for app work.
+
+`FORCE` filters `app_owner` too, which has two traps (ADR 0027):
+
+- **A data migration as `app_owner` changes 0 rows, with no error.** Wrap the statement in `ALTER TABLE … NO FORCE ROW LEVEL SECURITY` / `FORCE ROW LEVEL SECURITY` inside the migration, and test the row count.
+- **`pg_dump -U app_owner` fails** on tenant tables, and `--enable-row-security` makes it succeed with **empty** tables. Dump as `postgres` locally (and a `BYPASSRLS` role on RDS); never use `--enable-row-security`.
+
 ## Things to know
 
 - **The bootstrap runs only on an empty volume.** Changing a password in `.env` later does nothing by itself. Change it in the database too: `ALTER ROLE app_runtime PASSWORD '...'` as `postgres`.

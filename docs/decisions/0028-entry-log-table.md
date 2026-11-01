@@ -41,7 +41,8 @@ ADR 0007 says the entry log is append-only and commits with the action it descri
 - Append-only: the migration runs `REVOKE UPDATE ON entry_log FROM app_runtime`; DELETE and TRUNCATE are already absent from the default privileges (ADR 0019). A test proves `UPDATE`, `DELETE` and `TRUNCATE` fail with `42501`.
 - Rows are kept forever for now (revisit at `/finalize-module 06`).
 - One write helper, `recordEntry(tx, entry)` in `packages/db/src/entry-log.ts`. It takes a transaction, never the database, so a log row can't commit apart from its action. `actorId` is required but may be `null`. The action names live in `ENTRY_ACTIONS` in `packages/db`, with which actions need a reason; a missing or blank required reason throws before the insert.
-- The guard test also enforces append-only: tables on its `appendOnly` list fail if `app_runtime` has UPDATE.
+- `recordEntry` also throws on an `actorId` of `undefined` from untyped code (Drizzle would store NULL, "the system"). A non-blank reason is stored trimmed.
+- The guard test also enforces append-only: tables on its `APPEND_ONLY` list fail if `app_runtime` has UPDATE on the table or any column. Because a plain view checks its base tables' rights as the view's owner (`app_owner`), writing through a view would skip the missing UPDATE and DELETE, so every view must be `security_invoker`. Any `SECURITY DEFINER` function the app can execute (through PUBLIC, a direct grant or a role) fails unless it is on `DEFINER_ALLOWED` (empty until P1.4), and there must be exactly one `app_current_business_id`.
 
 ## Why
 

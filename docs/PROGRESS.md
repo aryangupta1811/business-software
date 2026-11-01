@@ -46,19 +46,19 @@ Each task below is sized for **one session**. DevOps stages (from `docs/devops/D
 Foundations under every module:
 
 - [ ] **P1.1 Tenancy & data safety:** businesses and branches tables, `business_id` everywhere, RLS policies, no-`DELETE` grants, cross-business tests [ADRs 0006, 0007]
-- [ ] **P1.2 Entry log recording:** append-only log table and the one write helper every module uses; tests [ADR 0007, Module 06]. The default privileges from P0.3 give `app_runtime` UPDATE on every table, so this table's migration must `REVOKE UPDATE`, with a `42501` test in the style of `packages/db/src/roles.test.ts`. If RLS helpers or triggers use `SECURITY DEFINER`, also revoke PUBLIC's default EXECUTE on functions.
+- [ ] **P1.2 Entry log recording:** append-only log table and the one write helper every module uses; tests [ADR 0007, Module 06]. The default privileges from P0.3 give `app_runtime` UPDATE on every table, so this table's migration must `REVOKE UPDATE`, with a `42501` test in the style of `packages/db/src/roles.test.ts`. If RLS helpers or triggers use `SECURITY DEFINER`, also revoke PUBLIC's default EXECUTE on functions. **From P1.1 (review minors):** the guard's privilege rule checks only direct grants to `app_runtime`/PUBLIC; switch to `has_table_privilege('app_runtime', …)` and assert `app_runtime` is a member of no role; cover every non-system schema (with `drizzle`, later `pgboss`, as listed exceptions); require the `business_id → businesses(id)` key on every tenant table; pin `app_current_business_id()` (body, not `SECURITY DEFINER`, `STABLE`).
 - [ ] **DevOps stage 4 — cloud guardrails:** first ask when placement season is (the Free plan's 6-month clock starts at sign-up, so this stage may move later). Then: AWS Free plan account, MFA, no root use, IAM Identity Center, credit-usage budget alert, earn the extra $100 of credits. *Owner does it with Claude's steps.*
 
 Module 00 — answer its open questions first (auto-lock time, password reset, deactivation, counters):
 
 - [ ] **P1.3 Signup & business setup:** signup (5 fields), business-type presets, GST status, settings page. **From P0.6:** when Playwright arrives, add a CI job (or a step in `smoke`) that loads the built app through Caddy and fails on any CSP violation; add it to the required checks. **From P0.7 (review minors):** use `min-h-*`, not `h-14`/`h-10`, for the top bar and nav items so long Hindi can't overflow; make the sidebar and top bar sticky for long pages; `readTokens` should fail on a token that isn't 6-digit hex; `/design` card titles are `h2` inside `h2` sections and it lacks an icon button and a tooltip example; the Home link could carry `aria-keyshortcuts`, and the theme button's tooltip repeats its label for screen readers; `readSavedTheme` is used only by tests (use it or remove it).
-- [ ] **P1.4 Login & sessions:** owner and staff login, Argon2id, sessions, rate limiting, auto-lock, re-authentication [ADR 0009]
+- [ ] **P1.4 Login & sessions:** owner and staff login, Argon2id, sessions, rate limiting, auto-lock, re-authentication [ADR 0009] **From P1.1:** at login the business isn't known yet, so the user lookup needs a narrow cross-business path (ADR 0027); `withBusiness` should also refuse a null/undefined ID from untyped code (today it fails safe with no rows).
 - [ ] **P1.5 Staff logins & permissions:** owner creates staff logins, per-person feature switches behind the owner's password, API permission guard, UI hiding
 - [ ] **P1.6 Branches:** add branches, branch switcher, branch-scoped data
 
 Module 01 — answer its open questions first (medical costing, built-in units, Excel errors, inter-state transfers):
 
-- [ ] **P1.7 Items:** item fields, units and conversions, prices, GST rate and HSN, MRP rule, Hindi names, search and barcode lookup; archive instead of delete. Decide an ICU collation for item-name sorting; the Docker image alone doesn't make sorting match RDS (ADR 0019).
+- [ ] **P1.7 Items:** item fields, units and conversions, prices, GST rate and HSN, MRP rule, Hindi names, search and barcode lookup; archive instead of delete. Decide an ICU collation for item-name sorting; the Docker image alone doesn't make sorting match RDS (ADR 0019). **From P1.1 (review minor):** every unique constraint on a tenant table must include `business_id` (e.g. `unique (business_id, item_code)`), or one business's codes collide with and reveal another's; add a guard rule. Referenced tables need `unique (business_id, id)` (ADR 0027).
 - [ ] **P1.8 Stock ledger:** stock movements, opening stock, adjustments with reason, negative-stock warn/block, two-counter concurrency tests
 - [ ] **P1.9 Excel import** of opening stock
 - [ ] **P1.10 Business-type stock features:** batches and expiry (soonest expiry first), variants, IMEI/serial numbers
@@ -67,7 +67,7 @@ Module 01 — answer its open questions first (medical costing, built-in units, 
 DevOps before any real data:
 
 - [ ] **DevOps stage 5 — Terraform:** remote state in S3, network and security groups, the EC2 server with Docker Compose and Caddy, a free domain with HTTPS. Run `packages/db/bootstrap/create-roles.sql` on RDS once by hand; the master user may first need `GRANT app_owner TO <master>` (ADR 0019). Decide whether to `REVOKE CONNECT, TEMP ON DATABASE postgres FROM PUBLIC` (review minor from P0.3). The queue role `app_queue` (ADR 0022) is added to the bootstrap in P2.7; if RDS is bootstrapped before that, P2.7 adds it to RDS with a one-time script run by hand. Secrets go in SSM as `SecureString`s; `migrate` gets only `MIGRATION_DATABASE_URL`, and `api`/`worker` get only `DATABASE_URL` (ADR 0021).
-- [ ] **DevOps stage 7 — data safety:** RDS with point-in-time restore, nightly `pg_dump` copy to S3, first restore drill, restore runbook, scheduled stop when idle
+- [ ] **DevOps stage 7 — data safety:** RDS with point-in-time restore, nightly `pg_dump` copy to S3, first restore drill, restore runbook, scheduled stop when idle **From P1.1 (ADR 0027):** `pg_dump` must run as a `BYPASSRLS` role (or the RDS master), never with `--enable-row-security`, which writes empty tables; the restore drill checks row counts.
 - [ ] **DevOps stage 6 — CD:** deploy through Systems Manager on merge with a manual go-ahead, health checks, rollback to the previous image
 
 Modules 02 and 03:

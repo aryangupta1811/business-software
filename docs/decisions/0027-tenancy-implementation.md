@@ -56,7 +56,7 @@ Design: `docs/plans/2026-11-01-p1.1-tenancy-design.md`.
 ### Making sure every table follows the rules
 
 #### Option A — A guard test over PostgreSQL's catalogue (chosen)
-- Pros: one test reads `pg_class`, `pg_policy`, the column list, the grants and the foreign keys, and lists every table in `public` with RLS off or not forced, no correct `tenant_isolation` policy, no `business_id`, more than SELECT/INSERT/UPDATE for `app_runtime`, or a `branch_id` without the composite foreign key `(business_id, branch_id) → branches(business_id, id)`. A forgotten table fails CI. The test proves itself with one deliberately broken probe table per rule.
+- Pros: one test reads `pg_class`, `pg_policy`, the column list, the grants and the foreign keys, and lists every table in `public` with RLS off or not forced, no correct `tenant_isolation` policy or an extra permissive one, no `business_id`, more than SELECT/INSERT/UPDATE for `app_runtime` or PUBLIC, a `branch_id` without the composite foreign key `(business_id, branch_id) → branches(business_id, id)`, or any foreign key into another tenant table that doesn't pair `business_id` with `business_id`. It also refuses materialized views and foreign tables in `public`, which RLS never applies to. A forgotten table fails CI. The test proves itself with one deliberately broken probe table per rule.
 - Cons: an honest non-tenant table will need an entry in an exceptions list, with its reason.
 
 #### Option B — Code review and a checklist
@@ -68,7 +68,7 @@ Design: `docs/plans/2026-11-01-p1.1-tenancy-design.md`.
 - Tenant tables declare `tenantPolicy(column)` in `packages/db/src/schema.ts`: one permissive policy for all commands, to PUBLIC, with `column = (select app_current_business_id())` in both `USING` and `WITH CHECK`. Migrations add `FORCE ROW LEVEL SECURITY` and the function by hand.
 - `app_current_business_id()` is a plain `STABLE` SQL function (not `SECURITY DEFINER`) returning `nullif(current_setting('app.business_id', true), '')::uuid`.
 - Tenant data is reached only through `withBusiness` and `withNewBusiness` (`packages/db/src/tenancy.ts`).
-- Branch-level tables reference `(business_id, branch_id)`; `branches` has `unique (business_id, id)` for it.
+- Every foreign key into another tenant table (other than `businesses`) is composite and pairs `business_id` with `business_id`, e.g. `(business_id, branch_id) → branches(business_id, id)`, because foreign-key checks skip RLS. So every table that is referenced has `unique (business_id, id)`, like `branches`.
 - `src/tenancy-guard.test.ts` enforces all of this on every test run.
 
 ## Why
@@ -78,6 +78,9 @@ The database is the guarantee (ADR 0006), and the guard test guarantees that the
 ## Consequences
 
 - Every new tenant table: `businessId()`, `tenantPolicy(…)`, and `FORCE` added in its migration. The guard test fails until all three are there.
+- **`FORCE` filters the migration role too.** A data migration (an `UPDATE` or backfill) run as `app_owner` with no business set changes **0 rows, with no error**: a later "copy the column, then drop the old one" migration would lose data. A data migration must, inside its own transaction, `ALTER TABLE … NO FORCE ROW LEVEL SECURITY`, run the statement, then `FORCE` again (DDL is transactional), or run per business with `set_config`, and its test must check the row count.
+- **`pg_dump` as `app_owner` fails** ("query would be affected by row-level security policy"), and with `--enable-row-security` it exits 0 and writes **empty** tables. Backups (ADR 0011, DevOps stage 7) must run as a role with `BYPASSRLS` (or the RDS master user), never with `--enable-row-security`, and the restore drill must check row counts.
+- No materialized views or foreign tables for tenant data: RLS never applies to them (the guard refuses them).
 - After a transaction-local setting ends, PostgreSQL reads it back as `''` on that connection; the function's `nullif` handles it, and a test reuses one pooled connection to prove it.
 - Querying tenant tables by hand (psql) shows nothing until `select set_config('app.business_id', '<id>', false)` is run (`docs/devops/local-database.md`).
 - P1.4 must look up a user's business at login, before any business is set: probably a narrow `SECURITY DEFINER` function with PUBLIC's EXECUTE revoked. Decided there.
@@ -85,4 +88,4 @@ The database is the guarantee (ADR 0006), and the guard test guarantees that the
 
 ## Interview note
 
-Every tenant table gets its RLS policy from one helper in the schema, and a test scans PostgreSQL's catalogue so a table without RLS, `FORCE`, a correct policy or the right grants fails CI. Code sets the business with a transaction-local `set_config`, and a missing or reset setting means no rows, so a pooled connection can't leak one shop's data into the next request. Signup sets the new business's ID before inserting it, so even creating a business goes through the same policy with no bypass.
+Every tenant table gets its RLS policy from one helper in the schema, and a test scans PostgreSQL's catalogue so a table without RLS, `FORCE`, a correct policy, the right grants or business-scoped foreign keys fails CI. Code sets the business with a transaction-local `set_config`, and a missing or reset setting means no rows, so a pooled connection can't leak one shop's data into the next request. Signup sets the new business's ID before inserting it, so even creating a business goes through the same policy with no bypass.

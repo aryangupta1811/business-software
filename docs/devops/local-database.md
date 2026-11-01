@@ -61,6 +61,11 @@ select id, name from branches;    -- that business's rows only
 
 The app always uses `true` (one transaction only), through `withBusiness`. The `postgres` superuser skips RLS entirely, even `FORCE`d, so it sees every business: use it only for looking, never for app work.
 
+`FORCE` filters `app_owner` too, which has two traps (ADR 0027):
+
+- **A data migration as `app_owner` changes 0 rows, with no error.** Wrap the statement in `ALTER TABLE … NO FORCE ROW LEVEL SECURITY` / `FORCE ROW LEVEL SECURITY` inside the migration, and test the row count.
+- **`pg_dump -U app_owner` fails** on tenant tables, and `--enable-row-security` makes it succeed with **empty** tables. Dump as `postgres` locally (and a `BYPASSRLS` role on RDS); never use `--enable-row-security`.
+
 ## Things to know
 
 - **The bootstrap runs only on an empty volume.** Changing a password in `.env` later does nothing by itself. Change it in the database too: `ALTER ROLE app_runtime PASSWORD '...'` as `postgres`.

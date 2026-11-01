@@ -56,7 +56,7 @@ Update this as the project grows.
 | Clean stop of api and worker | ~0.7 s, exit code 0 | P0.4 |
 | CI checks on every pull request | 5 required: `check`, `secrets`, `migrations`, `smoke`, `pr-title` | ADR 0024 |
 | CI run time | ~3 min in all; `check` (lint, types, tests, build) about 50 s when measured with 130 tests; `smoke` 2 min 47 s with an empty cache, 50 s warm | P0.6 |
-| Tenancy guard | 6 rules checked on every table, proven by 11 probe tables; first tables `businesses`, `branches` | P1.1, ADR 0027 |
+| Tenancy guard | 8 rules checked on every table, proven by 16 probes (each breaks one rule, three are correct and must pass); first tables `businesses`, `branches` | P1.1, ADR 0027 |
 | Phase 0 (foundations) | 3 days (2026-10-29 to 31), 9 work sessions, 7 pull requests, 0 business features on purpose | `phase-0.md` |
 | How often the screen checks the server | every 30 s, 10 s timeout (the API waits 5 s for the database) | P0.5, ADR 0001 |
 
@@ -144,6 +144,8 @@ Short answers; the Log entry has the full story.
   A: Tenancy, the no-delete permissions, migrations and CI are hard to add once business tables and data exist. Built first, every business table gets `business_id`, Row-Level Security and no DELETE from its first migration, and since P0.6 every change has had to pass the same five checks. → `phase-0.md`
 - **Q: Your app sets the tenant per transaction. What happens to a pooled connection afterwards?**
   A: The setting is transaction-local (`set_config(…, true)`), so it ends with the transaction. But on that connection it then reads back as an empty string, not NULL, and `''::uuid` throws. My policy function turns empty into NULL, so a connection with no business set sees no rows instead of crashing. A test reuses a one-connection pool to prove it. → P1.1
+- **Q: Can Row-Level Security alone stop one tenant's row pointing at another tenant's data?**
+  A: No. Foreign-key checks skip RLS, so with a plain `branch_id → branches(id)` key, business B could save a row pointing at A's branch. Every key between tenant tables is composite, `(business_id, branch_id) → branches(business_id, id)`, and a guard test refuses any that isn't. → ADR 0027
 
 ---
 
@@ -994,3 +996,13 @@ Entry format:
 - **Why / what I learned:** Each was minutes, because the output said exactly what was wrong.
 - **Say it in an interview:** —
 - **Follow-ups to expect:** —
+
+### 2026-11-01 — The final review found three ways past my guard, and a backup trap `#database` `#security` `#testing` → ADR 0027
+- **What happened:** A fresh reviewer attacked the branch on a live PostgreSQL 18. My two tables were correct, but the guard (whose job is future tables) missed three leaks, each shown leaking business A's rows to business B:
+  - **An extra permissive policy:** PostgreSQL ORs permissive policies, so a correct `tenant_isolation` plus a `reporting … using (true)` shows everything. The guard now refuses any permissive policy except `tenant_isolation` (restrictive ones only narrow, so they're allowed).
+  - **Single-column foreign keys:** foreign-key checks skip RLS, so `from_branch_id → branches(id)` let B save a row pointing at A's branch. My rule only looked at columns named exactly `branch_id`. New `tenant_fk` rule: every key into another tenant table must pair `business_id` with `business_id`.
+  - **Materialized views:** RLS never applies to them; one refreshed by the owner kept A's rows and showed them to anyone. New `kind` rule refuses them (and foreign tables) in `public`.
+  It also found that `FORCE`, which filters the owner role, makes a data migration as `app_owner` change 0 rows silently, and makes `pg_dump` as `app_owner` fail, or write empty tables with `--enable-row-security`. Both are now in ADR 0027, the database runbook and PROGRESS (stage 7: backups need a `BYPASSRLS` role). Each guard fix started with a probe table that the old guard missed (red), then the query change (green).
+- **Why / what I learned:** A guard is only as good as the attacks its author imagined, which is exactly why a fresh reviewer is worth it. "Safe by default" settings (`FORCE`) can turn into silent data loss elsewhere (migrations, backups), so every safety feature needs its side effects written down. Eight minor findings went into PROGRESS under the tasks where they matter (P1.2, P1.4, P1.7, stage 7).
+- **Say it in an interview:** "A reviewer found that RLS doesn't cover foreign-key checks or materialized views, and that permissive policies combine with OR. I added a probe for each, watched my guard miss it, then fixed the guard. They also spotted that forcing RLS on the owner makes backups come out empty, so my backup plan uses a role that bypasses RLS and the restore drill checks row counts."
+- **Follow-ups to expect:** Why not just give the owner `BYPASSRLS`? (Then every migration and every mistake as the owner could touch all businesses' rows; a separate backup role with only that power is narrower.)

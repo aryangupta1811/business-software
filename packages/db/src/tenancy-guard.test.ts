@@ -4,13 +4,15 @@ import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startTestDatabase, type TestDatabase } from './testing.js';
 
-type Rule = 'rls' | 'force' | 'policy' | 'business_id' | 'privileges' | 'branch_fk';
+type Rule =
+  'rls' | 'force' | 'policy' | 'business_id' | 'privileges' | 'branch_fk' | 'tenant_fk' | 'kind';
 interface Violation {
   table: string;
   rule: Rule;
 }
 
-// One row per broken rule. The policy must match what tenantPolicy() generates, as PostgreSQL
+// One row per broken rule. The policy must be the only permissive one (permissive policies are
+// ORed together) and match what tenantPolicy() generates, as PostgreSQL
 // prints it back; the tenant column is `id` on businesses and business_id everywhere else.
 // Grants to PUBLIC count too: app_runtime gets everything PUBLIC has.
 const violationsQuery = `
@@ -36,7 +38,10 @@ const violationsQuery = `
     union all
     select relname, 'force' from tables where not relforcerowsecurity
     union all
-    select t.relname, 'policy' from tables t where not exists (
+    select t.relname, 'policy' from tables t
+     where exists (select 1 from pg_policy p
+                    where p.polrelid = t.oid and p.polpermissive and p.polname <> 'tenant_isolation')
+        or not exists (
       select 1 from pg_policy p
        where p.polrelid = t.oid and p.polname = 'tenant_isolation'
          and p.polcmd = '*' and p.polpermissive and p.polroles = '{0}'::oid[]
@@ -62,6 +67,19 @@ const violationsQuery = `
                         where f.conrelid = t.oid and f.confrelid = 'branches'::regclass
                           and f.columns = array['business_id', 'branch_id']::name[]
                           and f.referenced = array['business_id', 'id']::name[])
+    union all
+    -- Every key into another tenant table must pair business_id with business_id.
+    select distinct t.relname, 'tenant_fk' from tables t
+      join fk_columns f on f.conrelid = t.oid
+     where f.confrelid <> 'businesses'::regclass
+       and exists (select 1 from pg_attribute a
+                    where a.attrelid = f.confrelid and a.attname = 'business_id' and not a.attisdropped)
+       and coalesce(array_position(f.columns, 'business_id'::name)
+                    = array_position(f.referenced, 'business_id'::name), false) = false
+    union all
+    -- RLS never applies to these, so they can't hold tenant data.
+    select c.relname, 'kind' from pg_class c join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'public' and c.relkind in ('m', 'f')
   ) as violations
   order by relname collate "C", rule collate "C"`;
 
@@ -97,6 +115,27 @@ const probes: Probe[] = [
   { name: 'probe_delete_grant', after: 'grant delete on probe_delete_grant to app_runtime' },
   { name: 'probe_public_delete', after: 'grant delete on probe_public_delete to public' },
   { name: 'probe_branch_fk', columns: `${tenantColumn}, branch_id uuid references branches(id)` },
+  // Permissive policies are ORed together: one more `using (true)` would show every business.
+  {
+    name: 'probe_extra_permissive',
+    after:
+      'create policy reporting on probe_extra_permissive as permissive for select using (true)',
+  },
+  // Restrictive policies only narrow what tenant_isolation allows.
+  {
+    name: 'probe_extra_restrictive',
+    after: 'create policy narrow on probe_extra_restrictive as restrictive for all using (true)',
+  },
+  // Foreign-key checks skip RLS, so a single-column key could point at another business's row.
+  {
+    name: 'probe_from_branch_fk',
+    columns: `${tenantColumn}, from_branch_id uuid references branches(id)`,
+  },
+  {
+    name: 'probe_good_from_branch_fk',
+    columns: `${tenantColumn}, from_branch_id uuid,
+      foreign key (business_id, from_branch_id) references branches(business_id, id)`,
+  },
   {
     name: 'probe_good_branch_fk',
     columns: `${tenantColumn}, branch_id uuid,
@@ -140,9 +179,15 @@ describe('tenancy guard', () => {
   it('reports each broken probe table under the right rule', async () => {
     try {
       for (const probe of probes) await createProbe(owner, probe);
+      // RLS never applies to a materialized view: it holds whatever its refresh could see.
+      await owner.query('create materialized view probe_matview as select id from branches');
       expect(await findTenancyViolations(owner)).toEqual([
         { table: 'probe_branch_fk', rule: 'branch_fk' },
+        { table: 'probe_branch_fk', rule: 'tenant_fk' },
         { table: 'probe_delete_grant', rule: 'privileges' },
+        { table: 'probe_extra_permissive', rule: 'policy' },
+        { table: 'probe_from_branch_fk', rule: 'tenant_fk' },
+        { table: 'probe_matview', rule: 'kind' },
         { table: 'probe_no_business_id', rule: 'business_id' },
         { table: 'probe_no_business_id', rule: 'policy' },
         { table: 'probe_no_force', rule: 'force' },
@@ -154,6 +199,7 @@ describe('tenancy guard', () => {
         { table: 'probe_wrong_policy', rule: 'policy' },
       ]);
     } finally {
+      await owner.query('drop materialized view if exists probe_matview');
       await owner.query(`drop table if exists ${probes.map((p) => p.name).join(', ')}`);
     }
     expect(await findTenancyViolations(owner)).toEqual([]);

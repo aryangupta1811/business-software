@@ -1,8 +1,14 @@
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 
+/**
+ * Drizzle over a pool. The `$client` part is what a transaction lacks, so `withBusiness` can't be
+ * handed a transaction by mistake (ADR 0027).
+ */
+export type AppDatabase = NodePgDatabase & { $client: Pool };
+
 export interface Database {
-  db: NodePgDatabase;
+  db: AppDatabase;
   pool: Pool;
   close(): Promise<void>;
 }

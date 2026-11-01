@@ -24,6 +24,10 @@ export interface EntryInput {
 }
 
 export async function recordEntry(tx: Transaction, entry: EntryInput): Promise<void> {
+  // Untyped code could pass undefined, which Drizzle would store as NULL: "the system".
+  if ((entry.actorId as string | null | undefined) === undefined) {
+    throw new Error('recordEntry needs actorId (null for the system)');
+  }
   // Untyped callers can pass a name the list doesn't have; it then needs no reason.
   const rules: Partial<Record<string, { reasonRequired: boolean }>> = ENTRY_ACTIONS;
   const trimmed = entry.reason?.trim();

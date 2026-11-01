@@ -15,7 +15,8 @@ type Rule =
   | 'append_only'
   | 'branch_fk'
   | 'tenant_fk'
-  | 'kind';
+  | 'kind'
+  | 'view';
 interface Violation {
   table: string;
   rule: Rule;
@@ -90,12 +91,14 @@ const violationsQuery = `
                           and f.referenced = array['id']::name[])
     union all
     select t.relname, 'privileges' from tables t
-     where exists (select 1 from unnest(array['DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER',
-                                              'MAINTAIN']) as p
+     where exists (select 1 from unnest(array['DELETE', 'TRUNCATE', 'TRIGGER', 'MAINTAIN']) as p
                     where has_table_privilege('app_runtime', t.oid, p))
+        -- REFERENCES and UPDATE can also be granted per column.
+        or has_any_column_privilege('app_runtime', t.oid, 'REFERENCES')
     union all
     select t.relname, 'append_only' from tables t
-     where t.relname = any($2::text[]) and has_table_privilege('app_runtime', t.oid, 'UPDATE')
+     where t.relname = any($2::text[])
+       and has_any_column_privilege('app_runtime', t.oid, 'UPDATE')
     union all
     select t.relname, 'branch_fk' from tables t
      where exists (select 1 from pg_attribute a
@@ -118,6 +121,14 @@ const violationsQuery = `
     select c.oid::regclass::text, 'kind' from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
      where ${appSchema('n')} and c.relkind in ('m', 'f')
+    union all
+    -- A plain view checks its base tables' rights as the view's owner, app_owner, so writing
+    -- through it would skip app_runtime's missing UPDATE and DELETE. security_invoker checks
+    -- the caller instead.
+    select c.oid::regclass::text, 'view' from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace
+     where ${appSchema('n')} and c.relkind = 'v'
+       and not coalesce('security_invoker=true' = any(c.reloptions), false)
   ) as violations
   order by relname collate "C", rule collate "C"`;
 
@@ -128,33 +139,42 @@ async function findTenancyViolations(pool: Pool, appendOnly = APPEND_ONLY): Prom
 
 interface FunctionViolation {
   name: string;
-  rule: 'definer_public' | 'function_pin';
+  rule: 'definer' | 'function_pin';
 }
+
+/** SECURITY DEFINER functions the app may call, each with its reason. None yet (P1.4). */
+const DEFINER_ALLOWED: string[] = [];
 
 // The policy function's body exactly as migration 0001 writes it (ADR 0027).
 const businessIdFunctionBody =
   " select nullif(current_setting('app.business_id', true), '')::uuid ";
 
-// definer_public: a SECURITY DEFINER function runs with its owner's rights, so one that PUBLIC
-// may execute is a way around RLS. function_pin: app_current_business_id() is missing or no
-// longer a plain STABLE SQL function with its exact body. $2 is that body.
+// definer: a SECURITY DEFINER function runs with its owner's rights, so one app_runtime may
+// execute (through PUBLIC, a direct grant or a role) is a way around RLS unless it's on
+// DEFINER_ALLOWED. function_pin: there must be exactly one app_current_business_id, the
+// zero-argument one in public, still a plain STABLE SQL function with its exact body; an
+// overload with the right body would otherwise hide a changed original. $2 is that body,
+// $3 is DEFINER_ALLOWED.
 const functionViolationsQuery = `
   with functions as (
-    select p.oid::regproc::text as name, p.proname, p.prosecdef, p.provolatile, p.prosrc,
-           l.lanname, coalesce(p.proacl, acldefault('f', p.proowner)) as acl
+    select p.oid, p.oid::regproc::text as name, p.proname, p.prosecdef, p.provolatile,
+           p.prosrc, l.lanname
       from pg_proc p
       join pg_namespace n on n.oid = p.pronamespace
       join pg_language l on l.oid = p.prolang
      where ${appSchema('n')}
   )
   select name, rule from (
-    select distinct f.name, 'definer_public' as rule from functions f, aclexplode(f.acl) as acl
-     where f.prosecdef and acl.grantee = 0 and acl.privilege_type = 'EXECUTE'
+    select f.name, 'definer' as rule from functions f
+     where f.prosecdef and has_function_privilege('app_runtime', f.oid, 'EXECUTE')
+       and f.name <> all($3::text[])
     union all
     select 'app_current_business_id', 'function_pin'
-     where not exists (select 1 from functions f
-                        where f.proname = 'app_current_business_id' and not f.prosecdef
-                          and f.provolatile = 's' and f.lanname = 'sql' and f.prosrc = $2)
+     where (select count(*) from functions f where f.proname = 'app_current_business_id') <> 1
+        or not exists (select 1 from functions f
+                        where f.oid = to_regprocedure('public.app_current_business_id()')
+                          and not f.prosecdef and f.provolatile = 's' and f.lanname = 'sql'
+                          and f.prosrc = $2)
   ) as violations
   order by name collate "C", rule collate "C"`;
 
@@ -162,6 +182,7 @@ async function findFunctionViolations(pool: Pool): Promise<FunctionViolation[]> 
   const { rows } = await pool.query<FunctionViolation>(functionViolationsQuery, [
     NOT_TENANT_SCHEMAS,
     businessIdFunctionBody,
+    DEFINER_ALLOWED,
   ]);
   return rows;
 }
@@ -237,6 +258,16 @@ const probes: Probe[] = [
     name: 'probe_inherited_delete',
     after: 'grant delete on probe_inherited_delete to probe_role',
   },
+  // A column-level grant is still UPDATE. Checked with this probe on the append-only list.
+  {
+    name: 'probe_column_update',
+    after: `revoke update on probe_column_update from app_runtime;
+            grant update (id) on probe_column_update to app_runtime`,
+  },
+  {
+    name: 'probe_column_references',
+    after: 'grant references (id) on probe_column_references to app_runtime',
+  },
   // Tenant tables outside public are checked too.
   { name: 'probe_schema.probe_other', enable: false },
 ];
@@ -294,10 +325,19 @@ describe('tenancy guard', () => {
       for (const probe of probes) await createProbe(owner, probe);
       // RLS never applies to a materialized view: it holds whatever its refresh could see.
       await owner.query('create materialized view probe_matview as select id from branches');
-      expect(await findTenancyViolations(owner, [...APPEND_ONLY, 'probe_append_only'])).toEqual([
+      // A plain view checks the base table's rights as its owner (app_owner), so app_runtime's
+      // default UPDATE on the view would update entry_log. security_invoker checks app_runtime.
+      await owner.query('create view probe_view as select * from entry_log');
+      await owner.query(
+        'create view probe_invoker_view with (security_invoker = true) as select * from entry_log',
+      );
+      const appendOnly = [...APPEND_ONLY, 'probe_append_only', 'probe_column_update'];
+      expect(await findTenancyViolations(owner, appendOnly)).toEqual([
         { table: 'probe_append_only', rule: 'append_only' },
         { table: 'probe_branch_fk', rule: 'branch_fk' },
         { table: 'probe_branch_fk', rule: 'tenant_fk' },
+        { table: 'probe_column_references', rule: 'privileges' },
+        { table: 'probe_column_update', rule: 'append_only' },
         { table: 'probe_delete_grant', rule: 'privileges' },
         { table: 'probe_extra_permissive', rule: 'policy' },
         { table: 'probe_from_branch_fk', rule: 'tenant_fk' },
@@ -313,10 +353,12 @@ describe('tenancy guard', () => {
         { table: 'probe_public_delete', rule: 'privileges' },
         { table: 'probe_schema.probe_other', rule: 'rls' },
         { table: 'probe_select_policy', rule: 'policy' },
+        { table: 'probe_view', rule: 'view' },
         { table: 'probe_wrong_policy', rule: 'policy' },
       ]);
       expect(await findRoleMemberships(owner)).toEqual(['probe_role']);
     } finally {
+      await owner.query('drop view if exists probe_view, probe_invoker_view');
       await owner.query('drop materialized view if exists probe_matview');
       await owner.query(`drop table if exists ${probes.map((p) => p.name).join(', ')}`);
       await admin.query('drop schema if exists probe_schema cascade');
@@ -327,22 +369,45 @@ describe('tenancy guard', () => {
     expect(await findRoleMemberships(owner)).toEqual([]);
   });
 
-  // A SECURITY DEFINER function runs with its owner's rights, so one anyone can call is a way
-  // around RLS. Making the real policy function one must trip both rules.
+  // A SECURITY DEFINER function runs with its owner's rights, so one the app can call is a way
+  // around RLS, whether it reaches app_runtime through PUBLIC or a direct grant. Making the real
+  // policy function one must trip both rules.
   it('reports unsafe and changed functions', async () => {
     try {
       await owner.query(
         "create function probe_definer() returns int language sql security definer as 'select 1'",
       );
+      await owner.query(`
+        create function probe_definer_granted() returns int language sql security definer
+          as 'select 1';
+        revoke execute on function probe_definer_granted() from public;
+        grant execute on function probe_definer_granted() to app_runtime`);
       await owner.query('alter function app_current_business_id() security definer');
       expect(await findFunctionViolations(owner)).toEqual([
-        { name: 'app_current_business_id', rule: 'definer_public' },
+        { name: 'app_current_business_id', rule: 'definer' },
         { name: 'app_current_business_id', rule: 'function_pin' },
-        { name: 'probe_definer', rule: 'definer_public' },
+        { name: 'probe_definer', rule: 'definer' },
+        { name: 'probe_definer_granted', rule: 'definer' },
       ]);
     } finally {
       await owner.query('alter function app_current_business_id() security invoker');
-      await owner.query('drop function if exists probe_definer()');
+      await owner.query('drop function if exists probe_definer(), probe_definer_granted()');
+    }
+    expect(await findFunctionViolations(owner)).toEqual([]);
+  });
+
+  // With a correct overload present, a check by name alone passes while the real one is changed.
+  it('pins the one app_current_business_id(), not any function of that name', async () => {
+    try {
+      await owner.query(
+        `create function app_current_business_id(x int) returns uuid language sql stable
+           as $$${businessIdFunctionBody}$$`,
+      );
+      expect(await findFunctionViolations(owner)).toEqual([
+        { name: 'app_current_business_id', rule: 'function_pin' },
+      ]);
+    } finally {
+      await owner.query('drop function if exists app_current_business_id(int)');
     }
     expect(await findFunctionViolations(owner)).toEqual([]);
   });

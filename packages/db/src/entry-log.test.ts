@@ -157,6 +157,15 @@ describe('entry log', () => {
     expect(await entriesOf(a.businessId)).toHaveLength(count);
   });
 
+  // Untyped code (say `req.user?.id`) could pass undefined; Drizzle would then store NULL,
+  // which means "the system", and misattribute the action.
+  it('refuses a missing actor ID from untyped code', async () => {
+    const entry = { ...adjust(), actorId: undefined } as unknown as EntryInput;
+    await expect(
+      withBusiness(runtime.db, a.businessId, (tx) => recordEntry(tx, entry)),
+    ).rejects.toThrow('recordEntry needs actorId (null for the system)');
+  });
+
   it('refuses a malformed actor ID', async () => {
     await expect(
       withBusiness(runtime.db, a.businessId, (tx) =>

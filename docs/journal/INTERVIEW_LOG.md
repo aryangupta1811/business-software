@@ -20,10 +20,10 @@ Update this as the project grows.
 
 - **The problem:** a small Indian shop runs on a billing app, a paper udhaar register and a staff notebook. I'm building one web app that does all of it, for many shops at once, each seeing only its own data, in English, Hindi and Hinglish.
 - **What makes it hard:** correctness, not the feature list. A bill must save the invoice, the stock change and the udhaar entry together or not at all. Two counters can sell the last unit at the same moment. GST maths must be exact to the paisa. And the owner can't lose a single record.
-- **My architecture:** a TypeScript monorepo with a React single-page app, a NestJS modular monolith (so a bill is one database transaction, not a saga across services) and PostgreSQL. The safety rules live in the database, not only in my code: money is stored as whole paise, the app's database user has no DELETE permission, and Row-Level Security keeps businesses apart. Every choice has a written decision record with the alternatives I rejected; there are 26 so far.
+- **My architecture:** a TypeScript monorepo with a React single-page app, a NestJS modular monolith (so a bill is one database transaction, not a saga across services) and PostgreSQL. The safety rules live in the database, not only in my code: money is stored as whole paise, the app's database user has no DELETE permission, and Row-Level Security keeps businesses apart. Every choice has a written decision record with the alternatives I rejected; there are 28 so far.
 - **One hard bug:** my background worker kept dying after exactly 10 seconds. That was the database driver's idle timeout. Waiting for the shutdown signal doesn't keep Node's event loop alive, so when the pool's last idle connection closed, the process simply ended. I reproduced it in a test, held the process open until SIGTERM, and confirmed it in Docker with zero restarts.
-- **How it's shipped:** the same Docker Compose stack runs on my laptop and in CI. Every pull request must pass five required checks: lint, types and 224 tests against a real PostgreSQL; a secret scan of the whole history; a migration-order check; the PR title; and a smoke test that starts the real images. Next is Terraform on AWS: one EC2 server plus RDS with point-in-time restore, sized to the Free plan's credits because my budget is ₹0.
-- **Where it stands:** the foundations are done (Phase 0). In Phase 1 the database already keeps businesses apart (forced Row-Level Security, with a test that scans every table); billing comes next.
+- **How it's shipped:** the same Docker Compose stack runs on my laptop and in CI. Every pull request must pass five required checks: lint, types and 262 tests against a real PostgreSQL; a secret scan of the whole history; a migration-order check; the PR title; and a smoke test that starts the real images. Next is Terraform on AWS: one EC2 server plus RDS with point-in-time restore, sized to the Free plan's credits because my budget is ₹0.
+- **Where it stands:** the foundations are done (Phase 0). In Phase 1 the database already keeps businesses apart (forced Row-Level Security, with a test that scans every table), and an append-only audit log records every change in the same transaction; logins and billing come next.
 - **What I'd do differently:** pin down the real constraints first. I designed hosting for a budget I didn't have and had to redesign it. And test what you ship: the production CSS minifier broke a page my unit tests said was fine.
 
 ---
@@ -42,9 +42,9 @@ Update this as the project grows.
 | Largest exact amount in JavaScript | ≈ ₹90 lakh crore in paise (2^53) | ADR 0008 |
 | Business types in v1 | 5 | Module 00 |
 | Modules | 10 (00–09) | `docs/requirements/` |
-| ADRs | 27 (16 at kickoff) | `docs/decisions/` |
+| ADRs | 28 (16 at kickoff) | `docs/decisions/` |
 | Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
-| Automated tests | 241: 45 shared (money), 38 db (roles, client, 15 tenancy, 2 guard), 28 api, 130 web (routing, connection badge, three languages, error screen, 44 contrast checks, Hindi line height, components, theme, 24 keyboard-shortcut tests, layout, `/design`) | `pnpm test` |
+| Automated tests | 262: 45 shared (money), 59 db (roles, client, 15 tenancy, 17 entry log, 6 guard), 28 api, 130 web (routing, connection badge, three languages, error screen, 44 contrast checks, Hindi line height, components, theme, 24 keyboard-shortcut tests, layout, `/design`) | `pnpm test` |
 | Interface languages | 3: English, Hindi, Hinglish (`en`, `hi`, `hi-Latn`) | Module 00 #25, ADR 0023 |
 | Web app download | ~160 KB gzipped JavaScript; fonts 307 KB (woff2, six files, cached for a year); web image 95 MB (Caddy) | P0.7, `vite build` |
 | Readability floor | text ≥ 4.5:1 contrast (main text ≥ 7:1), input edges and focus ring ≥ 3:1, both modes; body text 15 px, nothing under 13 px | ADR 0025 |
@@ -56,7 +56,8 @@ Update this as the project grows.
 | Clean stop of api and worker | ~0.7 s, exit code 0 | P0.4 |
 | CI checks on every pull request | 5 required: `check`, `secrets`, `migrations`, `smoke`, `pr-title` | ADR 0024 |
 | CI run time | ~3 min in all; `check` (lint, types, tests, build) about 50 s when measured with 130 tests; `smoke` 2 min 47 s with an empty cache, 50 s warm | P0.6 |
-| Tenancy guard | 8 rules checked on every table, proven by 16 probes (each breaks one rule, three are correct and must pass); first tables `businesses`, `branches` | P1.1, ADR 0027 |
+| Tenancy guard | 11 rules on every table and view in every app schema, plus 2 function rules and a role-membership check, proven by 28 probes (each breaks one rule; a few are correct and must pass); tables `businesses`, `branches`, `entry_log` | P1.1–P1.2, ADRs 0027, 0028 |
+| Entry log | append-only: `app_runtime` may only INSERT and SELECT; one write helper, `recordEntry(tx, …)` | P1.2, ADR 0028 |
 | Phase 0 (foundations) | 3 days (2026-10-29 to 31), 9 work sessions, 7 pull requests, 0 business features on purpose | `phase-0.md` |
 | How often the screen checks the server | every 30 s, 10 s timeout (the API waits 5 s for the database) | P0.5, ADR 0001 |
 
@@ -150,6 +151,10 @@ Short answers; the Log entry has the full story.
   A: The app's database role gets only INSERT and SELECT on it: I `REVOKE UPDATE`, and DELETE and TRUNCATE were never granted. A test proves each fails with `42501`. The write helper takes a transaction, not the database, so a log row always commits or rolls back with the change it describes. → ADR 0028
 - **Q: Why store old and new values as two JSON columns instead of one row per field?**
   A: One action stays one row (a 20-line bill would otherwise be a pile), and the writer doesn't compute a diff, so a bug can't silently corrupt history. The viewer diffs `before` and `after` when it shows them. → ADR 0028
+- **Q: Your app's role has no UPDATE on the log. Is that enough?**
+  A: No. Three other routes reopen it: a column-level UPDATE grant (`has_table_privilege` says no, `has_any_column_privilege` says yes), a plain view (it checks the base table's rights as the view's owner, who owns the log), and a `SECURITY DEFINER` function the app may call. My guard checks all three: column privileges, `security_invoker` on every view, and an allowed list for definer functions. → ADR 0028
+- **Q: What's the difference between a type check and a runtime check, in your log helper?**
+  A: `actorId: string | null` makes leaving out "who" a compile error for typed code. Untyped code (a request object typed `any`) could still pass `undefined`, which the ORM stores as NULL, meaning "the system", so the helper also throws at runtime. → ADR 0028
 
 ---
 
@@ -236,6 +241,10 @@ Terms I learned on this project, in one line each.
 | `set_config(name, value, true)` | Sets a custom setting such as `app.business_id` for the current transaction only; unlike `SET`, it takes query parameters |
 | Append-only table | A table rows can be added to but never changed or removed; here enforced by the database role's grants, not by code |
 | `REVOKE` | SQL that takes a privilege away from a role, e.g. `REVOKE UPDATE ON entry_log FROM app_runtime` |
+| `SECURITY DEFINER` | A function that runs with its owner's rights instead of the caller's; a way around RLS and grants if the wrong role can call it |
+| `security_invoker` (views) | Makes a view check its base tables' rights and RLS as the person querying, not as the view's owner (PostgreSQL 15+) |
+| `has_any_column_privilege` | True if a role has a privilege on the whole table or on any one column; `has_table_privilege` misses column-level grants |
+| Effective privileges | What a role can really do: its own grants, plus PUBLIC's, plus those of every role it belongs to |
 
 ---
 
@@ -1033,3 +1042,31 @@ Entry format:
 - **Why / what I learned:** The chat is forgotten between sessions; only files carry a half-done design forward. Marking each section's status stops the next session treating an unanswered section as approved.
 - **Say it in an interview:** —
 - **Follow-ups to expect:** —
+
+### 2026-11-02 — Built the entry log and its one write helper `#database` `#testing` → ADR 0028
+- **What happened:** Migration `0002` adds `entry_log` as a normal tenant table (policy, `FORCE`, composite branch key) with `business_id` defaulting to `app_current_business_id()`, and a hand-written `REVOKE UPDATE … FROM app_runtime`. `recordEntry(tx, entry)` checks the reason, serialises `before`/`after` once to fail early on a `BigInt`, and inserts without passing `business_id`. 17 tests, written first and watched failing: fields, rollback, two businesses, no business, reasons, `42501` on UPDATE/DELETE/TRUNCATE, a branch from another business, bad JSON, a malformed actor, logging at signup, ordering.
+- **Why / what I learned:** Letting the database fill in `business_id` means the helper can't name the wrong business at all. Taking a transaction (not the database) makes "log and action commit together" a compile-time fact.
+- **Say it in an interview:** "Every module writes its audit row through one helper that only accepts the action's own transaction, so the log row and the change commit or roll back together, and the database refuses any edit to the log."
+- **Follow-ups to expect:** What if logging fails? (The whole action fails and rolls back: a change without its log row is worse than a retry.)
+
+### 2026-11-02 — Small gotchas while building P1.2 `#gotcha` `#database`
+- **What happened:**
+  - With no business set, the insert failed with `42501`, not the `23502` (NOT NULL) I'd planned: PostgreSQL runs the RLS `WITH CHECK` (`NULL = NULL` isn't true) before NOT NULL.
+  - `now()` is the transaction's start time, so two entries in one transaction share `created_at`; the UUIDv7 `id` keeps their order (monotonic within one connection in PostgreSQL 18).
+  - The test superuser URL from Testcontainers named the container's default database, not `business_software`, so my probe schema "didn't exist". `testing.ts` now points `adminUrl` at the app database.
+  - Strict TypeScript (`exactOptionalPropertyTypes`) refused `{ reason: undefined }`: an optional property must be left out, not set to `undefined`. Lint refused `||` for "blank → null" (prefer `??`), which would have been wrong for `''`; an explicit check is clearer anyway.
+- **Why / what I learned:** Read the actual error code before "fixing" the test; the database's order of checks is part of its behaviour.
+- **Say it in an interview:** —
+- **Follow-ups to expect:** —
+
+### 2026-11-02 — The review found four more ways to edit an "append-only" table `#security` `#database` `#testing` → ADR 0028
+- **What happened:** A fresh reviewer attacked the branch on a live PostgreSQL 18 and found the guard missed:
+  - **A plain view:** `create view x as select * from entry_log` gets UPDATE for the app from the default privileges, and a simple view checks the base table's rights as its *owner* (`app_owner`, who owns the log), so `update x …` changed a log row. Fix: every view must be `security_invoker`.
+  - **A column-level grant:** `grant update (reason) on entry_log to app_runtime` leaves `has_table_privilege(…, 'UPDATE')` false. Fix: `has_any_column_privilege`.
+  - **A definer function granted straight to the app:** my rule only looked at PUBLIC; the best-practice "revoke from PUBLIC, grant to app_runtime" slipped through. Fix: any `SECURITY DEFINER` function the app can run fails unless it's on `DEFINER_ALLOWED` (empty until P1.4).
+  - **An overloaded policy function:** a correct `app_current_business_id(int)` made the pin pass while the real one was changed to return another business's ID, leaking its rows. Fix: pin the exact zero-argument function and require it to be the only one.
+  - Also a code gap: untyped code passing `actorId: undefined` was stored as NULL, "the system". Fix: a runtime check.
+  Each fix started with a probe or test that failed. Seven minor findings went to PROGRESS.
+- **Why / what I learned:** "Has UPDATE on the table" is one route; the question that matters is "can this role change a row by any route?". Views and definer functions run with someone else's rights, which is exactly how permissions get bypassed.
+- **Say it in an interview:** "My audit log is insert-only for the app, and a reviewer showed me four ways a future migration could quietly undo that: a view, a column grant, a definer function and an overloaded function. I reproduced each as a failing probe, then made the guard check what the role can actually do."
+- **Follow-ups to expect:** Why not just ban views? (Reporting views are useful; `security_invoker` keeps them while making them obey the caller's rights and RLS.)

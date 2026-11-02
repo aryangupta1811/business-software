@@ -155,6 +155,8 @@ Short answers; the Log entry has the full story.
   A: No. Three other routes reopen it: a column-level UPDATE grant (`has_table_privilege` says no, `has_any_column_privilege` says yes), a plain view (it checks the base table's rights as the view's owner, who owns the log), and a `SECURITY DEFINER` function the app may call. My guard checks all three: column privileges, `security_invoker` on every view, and an allowed list for definer functions. → ADR 0028
 - **Q: What's the difference between a type check and a runtime check, in your log helper?**
   A: `actorId: string | null` makes leaving out "who" a compile error for typed code. Untyped code (a request object typed `any`) could still pass `undefined`, which the ORM stores as NULL, meaning "the system", so the helper also throws at runtime. → ADR 0028
+- **Q: How does a shop owner recover a forgotten password with no phone app?**
+  A: An emailed reset link, once the email is confirmed, plus a recovery key printed at signup, for when the email account itself is lost. I rejected SMS OTP: every message costs money, and in India the sender must first register on the DLT system. Staff passwords are simpler, because the owner resets them. → Module 00 #30–#33
 
 ---
 
@@ -245,6 +247,8 @@ Terms I learned on this project, in one line each.
 | `security_invoker` (views) | Makes a view check its base tables' rights and RLS as the person querying, not as the view's owner (PostgreSQL 15+) |
 | `has_any_column_privilege` | True if a role has a privilege on the whole table or on any one column; `has_table_privilege` misses column-level grants |
 | Effective privileges | What a role can really do: its own grants, plus PUBLIC's, plus those of every role it belongs to |
+| Recovery key | A one-time secret shown at signup and kept on paper, which can reset the password when every other way in is lost |
+| DLT (India) | TRAI's Distributed Ledger Technology registry: businesses must register sender IDs and message templates before sending commercial SMS, OTPs included |
 
 ---
 
@@ -1070,3 +1074,9 @@ Entry format:
 - **Why / what I learned:** "Has UPDATE on the table" is one route; the question that matters is "can this role change a row by any route?". Views and definer functions run with someone else's rights, which is exactly how permissions get bypassed.
 - **Say it in an interview:** "My audit log is insert-only for the app, and a reviewer showed me four ways a future migration could quietly undo that: a view, a column grant, a definer function and an overloaded function. I reproduced each as a failing probe, then made the guard check what the role can actually do."
 - **Follow-ups to expect:** Why not just ban views? (Reporting views are useful; `security_invoker` keeps them while making them obey the caller's rights and RLS.)
+
+### 2026-11-02 — Answered Module 00's open questions before building signup `#requirements` `#security` `#product`
+- **What happened:** Before P1.3, I answered the five questions left open in Module 00, and two that came up while answering them. Owner auto-lock: 5 minutes, settable from 1 to 30. A staff session ends after 30 idle minutes. Forgotten owner password: an email link, plus a printed recovery key. Staff passwords: the owner resets them. Staff who leave are deactivated, never deleted. Each staff member has one home branch, and a login can be allowed into others. Owners log in by email. Staff log in with a username that only has to be unique within the shop, because the counter computer remembers which shop it belongs to. Adding email to signup changed a DECIDED point (#7: 6 fields, not 5), so it went into the Change log.
+- **Why / what I learned:** The open questions decide the shape of the users and sessions tables. Guessing would have meant a migration later on real data. One answer led to the next: email reset meant email at signup, which meant checking the address, which raised the question of what people log in with. That last one wasn't on the list at all.
+- **Say it in an interview:** "Before writing the login code, I settled the product rules it depends on. SMS OTP was out because of cost and India's DLT registration, so owners recover by email or a printed recovery key. Staff usernames are scoped to the shop, because the counter computer knows which shop it belongs to."
+- **Follow-ups to expect:** Why does staff get a 30-minute logout but the owner a 5-minute lock? (The owner's screen shows salaries and profit, so it locks fast and keeps the session for a quick unlock. Staff screens show less, but a login left open overnight would put another person's name on the entry log.)

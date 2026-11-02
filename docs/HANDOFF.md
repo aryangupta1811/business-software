@@ -2,27 +2,33 @@
 
 Overwritten at the end of every session. Older handoffs are in git history: `git log -p docs/HANDOFF.md`.
 
-**Session:** 15 — Module 00's open questions answered, 2026-11-02
+**Session:** 16 — DevOps stage 4 steps written, 2026-11-02
 
 **Done:**
-- P1.2 was already merged as **PR #10** before this session; its branches are gone.
-- **Module 00 open questions answered by the owner** (`docs/requirements/00-business-setup-users-roles.md`, Change log 2026-11-02):
-  - #21: owner auto-lock 5 min by default, settable 1–30 in settings.
-  - #18 reworded: each counter computer is shared; a shop can have several (#22).
-  - **#7 changed:** signup now has **6 fields** (owner's email added; it left #8's settings list).
-  - New #27–#35: owner logs in by email (unique across the app); staff by username unique within the business, and the counter computer remembers its business after the owner's first login; staff session ends after 30 idle min (owner can change); owner reset by email link (only once the email is confirmed) or a printed recovery key (*proposed by Claude:* single use, then a new key); email confirmed after signup via a banner; owner resets staff passwords; staff deactivated, never deleted, reactivation allowed; one home branch per staff member, plus extra branches for a login.
-  - SMS OTP rejected: per-message cost and India's DLT registration.
-- **ADR 0009:** three "still open" lines now point to the answers (decision unchanged).
-- **PROGRESS:** task ticked; P1.3, P1.4, P1.6 carry the new points; P1.4 must record an ADR for the email service.
-- **Journal:** `phase-1.md` (what was built, two product-rule rows, one lesson, one question); interview log (2 entries, 1 question, 2 glossary terms).
+- Module 00's PR was already merged as **#11**; its branch is gone.
+- Owner: placement season is close, so **DevOps stage 4** comes before P1.3 (the owner wrote "closed"; read as "close" and not corrected — confirm at the next session).
+- Read AWS's *Choosing a plan* page and the Free Tier FAQ (2026-11-02): **joining AWS Organizations upgrades a Free plan account to Paid** (irreversible), and the Free plan and credits are **only for new AWS customers**. The owner floated a second account in a family member's name; Claude advised against it (that rule; the account and bill would legally be hers). A family member's card as the payment method on the owner's own account is fine.
+- **ADR 0029** (new): root locked away with MFA; daily work as an IAM user with MFA in group `admins` (`AdministratorAccess`, narrowed at stage 10); **no Identity Center / Organizations / Control Tower** on the Free plan; CLI credentials for stage 5 still to decide (short-lived).
+- **Runbook** `docs/devops/aws-account.md`: steps A–F, the irreversible rules, what not to do yet. Row added to `CLAUDE.md`'s file table.
+- PROGRESS stage 4 line rewritten; interview log (1 entry, 2 questions, 5 glossary terms, ADR count 29).
 
-**Half-done:** the PR for branch `docs/module-00-open-questions` (2 commits, not pushed, not merged).
+**Half-done:**
+- The PR for branch `docs/devops-stage-4` (1 commit, not pushed, not merged).
+- **Stage 4 itself:** the owner does the runbook's steps A–E on their own, later. Nothing has been created in AWS yet.
 
 **Next step:**
-1. Owner: `git push -u origin HEAD`, `gh pr create --web` with title `docs: answer module 00's open questions`, fill in the template, **Squash and merge** when the five checks are green. Then `git switch main`, `git pull`, `git branch -D docs/module-00-open-questions`.
-2. Next session: `/start-session`, then **P1.3 Signup & business setup**. Design first (brainstorm → spec → plan, owner approves section by section): the `businesses` columns for the 6 signup fields, the first `users` table (owner) or what waits for P1.4, business-type presets as data, GST status, the settings page. If placement season is close, DevOps stage 4 may come first (ask).
+1. Owner: `git push -u origin HEAD`, `gh pr create --web` with title `docs: add aws account runbook and adr 0029`, fill in the template, **Squash and merge** when the five checks are green. Then `git switch main`, `git pull`, `git branch -D docs/devops-stage-4`.
+2. Owner: open the AWS account with `docs/devops/aws-account.md`, steps A–E.
+3. Next session: `/start-session`, then check stage 4 together (step F: plan shown is Free, credit balance, days left, the Explore AWS activity list), plan the credit activities that launch a server or database so nothing is left running, and tick stage 4. Then **P1.3 Signup & business setup**, design first (brainstorm → spec → plan, owner approves section by section).
 
 **Watch out for:**
+- **AWS (ADR 0029, runbook):**
+  - Never join or create an AWS Organization, set up Control Tower, or turn on Identity Center's organization instance while on the Free plan: it upgrades to Paid, irreversibly.
+  - One account only, in the owner's own name.
+  - The 6-month clock started at sign-up (date it in PROGRESS once the owner reports it). Credit activities must be done within 6 months; earned credits expire 12 months after sign-up.
+  - Before creating anything, state its expected cost against the remaining credits (ADR 0011). RDS restarts itself after 7 days stopped.
+  - Never commit the account ID, sign-in alias or link, root email or passwords.
+  - The 2026-10-29 interview log entry (`aws sso login`) describes the old plan; stage 5 decides the laptop's short-lived CLI credentials (check what the installed AWS CLI v2 offers; no long-lived access keys if avoidable).
 - **No AI attribution, ever:** no `Co-Authored-By: Claude` and no "Generated with Claude Code" (`CLAUDE.md` rule 6 overrides tool defaults).
 - **Module 00 rules that shape P1.3/P1.4:**
   - Owner email is unique **across all businesses** (#27): a global unique index, outside RLS's per-business view. The login lookup is the narrow cross-business path (ADR 0027), a `SECURITY DEFINER` function on `DEFINER_ALLOWED`.
@@ -78,5 +84,4 @@ Overwritten at the end of every session. Older handoffs are in git history: `git
   - `packages/shared` has no Node/DOM globals; `apps/web` has no Node types (tests read files with Vite `?raw`).
   - Test data must not look like personal data.
   - `refs/original/` still holds the pre-rewrite commits (ask before deleting).
-  - Don't open AWS before stage 4; ask about placement season first.
   - Answer the Module 01 open questions before P1.7.

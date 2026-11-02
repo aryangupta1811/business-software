@@ -29,6 +29,7 @@ Read files when a task needs them. Don't load everything at once.
 | `docs/devops/DEVOPS_PLAN.md` | DevOps & cloud roadmap | DevOps / infra work |
 | `docs/devops/local-database.md` | Local PostgreSQL: setup, commands, resets, gotchas | Database or Docker Compose work |
 | `docs/devops/git-workflow.md` | Branches, commit messages, PRs, secrets, GitHub settings | Unsure about a branch name, commit message or PR |
+| `docs/devops/aws-account.md` | AWS account setup, sign-in and Free plan rules | AWS console or cloud work |
 | `docs/devops/secrets.md` | Where secrets live and the five ways they leak (git, images, browser, CI, logs) | Anything touching a password, key or token |
 | `docs/journal/` | Build journal per phase, for interviews | End of each phase |
 | `docs/journal/INTERVIEW_LOG.md` | Running interview-prep record of every decision, concept, bug and gotcha | Add to it during every session |

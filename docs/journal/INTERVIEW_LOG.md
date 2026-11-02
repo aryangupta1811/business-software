@@ -20,7 +20,7 @@ Update this as the project grows.
 
 - **The problem:** a small Indian shop runs on a billing app, a paper udhaar register and a staff notebook. I'm building one web app that does all of it, for many shops at once, each seeing only its own data, in English, Hindi and Hinglish.
 - **What makes it hard:** correctness, not the feature list. A bill must save the invoice, the stock change and the udhaar entry together or not at all. Two counters can sell the last unit at the same moment. GST maths must be exact to the paisa. And the owner can't lose a single record.
-- **My architecture:** a TypeScript monorepo with a React single-page app, a NestJS modular monolith (so a bill is one database transaction, not a saga across services) and PostgreSQL. The safety rules live in the database, not only in my code: money is stored as whole paise, the app's database user has no DELETE permission, and Row-Level Security keeps businesses apart. Every choice has a written decision record with the alternatives I rejected; there are 28 so far.
+- **My architecture:** a TypeScript monorepo with a React single-page app, a NestJS modular monolith (so a bill is one database transaction, not a saga across services) and PostgreSQL. The safety rules live in the database, not only in my code: money is stored as whole paise, the app's database user has no DELETE permission, and Row-Level Security keeps businesses apart. Every choice has a written decision record with the alternatives I rejected; there are 29 so far.
 - **One hard bug:** my background worker kept dying after exactly 10 seconds. That was the database driver's idle timeout. Waiting for the shutdown signal doesn't keep Node's event loop alive, so when the pool's last idle connection closed, the process simply ended. I reproduced it in a test, held the process open until SIGTERM, and confirmed it in Docker with zero restarts.
 - **How it's shipped:** the same Docker Compose stack runs on my laptop and in CI. Every pull request must pass five required checks: lint, types and 262 tests against a real PostgreSQL; a secret scan of the whole history; a migration-order check; the PR title; and a smoke test that starts the real images. Next is Terraform on AWS: one EC2 server plus RDS with point-in-time restore, sized to the Free plan's credits because my budget is ₹0.
 - **Where it stands:** the foundations are done (Phase 0). In Phase 1 the database already keeps businesses apart (forced Row-Level Security, with a test that scans every table), and an append-only audit log records every change in the same transaction; logins and billing come next.
@@ -42,7 +42,7 @@ Update this as the project grows.
 | Largest exact amount in JavaScript | ≈ ₹90 lakh crore in paise (2^53) | ADR 0008 |
 | Business types in v1 | 5 | Module 00 |
 | Modules | 10 (00–09) | `docs/requirements/` |
-| ADRs | 28 (16 at kickoff) | `docs/decisions/` |
+| ADRs | 29 (16 at kickoff) | `docs/decisions/` |
 | Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
 | Automated tests | 262: 45 shared (money), 59 db (roles, client, 15 tenancy, 17 entry log, 6 guard), 28 api, 130 web (routing, connection badge, three languages, error screen, 44 contrast checks, Hindi line height, components, theme, 24 keyboard-shortcut tests, layout, `/design`) | `pnpm test` |
 | Interface languages | 3: English, Hindi, Hinglish (`en`, `hi`, `hi-Latn`) | Module 00 #25, ADR 0023 |
@@ -87,6 +87,10 @@ Short answers; the Log entry has the full story.
   A: OIDC. GitHub proves its identity to AWS for each run and gets short-lived credentials for one IAM role, so there's no long-lived secret to leak. → ADR 0012
 - **Q: How did you host it with no budget?**
   A: AWS Free plan credits, and a design sized to them: one EC2 server running the same Docker Compose stack as my laptop, plus RDS for managed backups. I skipped the load balancer, NAT gateway and ECS, which would have used the credits in about 4 months. Everything is Terraform, so moving to ECS later is an infrastructure change only. → ADR 0011
+- **Q: Why not just use the AWS root user?**
+  A: Root can do anything, including closing the account, and no policy can limit it, so a leaked root password is the worst possible leak. I put MFA on it, created no access keys, and use it only for account-level tasks. Daily work is an IAM user with MFA. → ADR 0029
+- **Q: Why an IAM user and not IAM Identity Center?**
+  A: Identity Center's account access needs AWS Organizations, and AWS's Free plan page says joining Organizations upgrades the account to Paid, which can't be undone. My budget is zero, so I chose an IAM user with MFA in an admin group for now. With many accounts or a team, Identity Center is the right tool. → ADR 0029
 - **Q: What's RPO and RTO for your app?**
   A: RPO is how much data you can lose (5 minutes, thanks to point-in-time restore). RTO is how long recovery takes (1 hour, checked by a monthly restore drill). → `product-overview.md` NFR 1
 - **Q: Why did you test against a real database instead of mocks?**
@@ -249,6 +253,11 @@ Terms I learned on this project, in one line each.
 | Effective privileges | What a role can really do: its own grants, plus PUBLIC's, plus those of every role it belongs to |
 | Recovery key | A one-time secret shown at signup and kept on paper, which can reset the password when every other way in is lost |
 | DLT (India) | TRAI's Distributed Ledger Technology registry: businesses must register sender IDs and message templates before sending commercial SMS, OTPs included |
+| Root user (AWS) | The account's email login: it can do anything, including closing the account, and no policy can limit it; MFA on, no access keys, used only for account-level tasks |
+| IAM user / group / role | A user is a long-lived identity (a person or program) in one account; a group gives several users the same policies; a role has no password and is *assumed* for short-lived credentials |
+| MFA | Multi-factor authentication: a second proof (authenticator code or passkey) on top of the password |
+| AWS Organizations | Groups several AWS accounts under one management account; joining one upgrades a Free plan account to Paid |
+| IAM Identity Center | AWS's single sign-on: one login for many accounts, giving short-lived credentials (`aws sso login`); its account-access setup needs Organizations |
 
 ---
 
@@ -1086,3 +1095,9 @@ Entry format:
 - **Why / what I learned:** Running a tool from a pinned image means nothing to install or keep updated, and my laptop runs the same version as CI. Check the runbook before reaching for a command from memory.
 - **Say it in an interview:** "My secret scanner runs from a pinned Docker image, both on my laptop and in CI, so a local scan and the CI check can't disagree because of version drift."
 - **Follow-ups to expect:** —
+
+### 2026-11-02 — Read the Free plan's rules before following my own AWS plan `#cloud` `#security` `#cost` `#gotcha` → ADR 0029
+- **What happened:** Placement season is close, so DevOps stage 4 (opening the AWS account) came before P1.3. My plan said "IAM Identity Center" for sign-in. Before writing the steps, Claude read AWS's *Choosing a plan* page: "Free account plans will automatically upgrade to paid plan if you join AWS Organizations." Identity Center's usual setup turns Organizations on. So the plan changed to a root user locked away with MFA and an IAM user with MFA for daily work. The steps are in `docs/devops/aws-account.md`. The Free Tier FAQ also says the Free plan and credits are only for new AWS customers, so there's one account, in my own name. A family member's card as the payment method is fine; a second account isn't.
+- **Why / what I learned:** A plan written before reading the provider's current rules can contain a trap. This one would have upgraded the account to Paid without asking, and that can't be undone. A one-way door is worth ten minutes of reading first. The earlier plan for the laptop's CLI (`aws sso login`, 2026-10-29 entry) depended on Identity Center, so how the CLI gets short-lived credentials moves to stage 5.
+- **Say it in an interview:** "Before opening the account, I checked the Free plan's rules and found that joining AWS Organizations upgrades it to Paid. So instead of Identity Center I locked the root user away with MFA and work as an IAM user with MFA, and I'll narrow its admin rights in the security review."
+- **Follow-ups to expect:** What's the difference between an IAM user, a group and a role? How will Terraform get credentials without long-lived access keys? (Stage 5 decides: short-lived credentials, e.g. the CLI's console sign-in or a role assumed with MFA; CI already uses OIDC.)

@@ -5,7 +5,7 @@
 
 ## Context
 
-Owner and staff share one counter computer, and each staff member with access logs in with their own ID (Module 00 #18). The owner's session locks itself after inactivity (#21). Changing permissions needs the owner's password (#17). A staff member who leaves is deactivated, never deleted (open question in Module 00). Security NFR 6: passwords, auto-lock, owner password for permission changes.
+Owner and staff share one counter computer, and each staff member with access logs in with their own ID (Module 00 #18). The owner's session locks itself after inactivity (#21). Changing permissions needs the owner's password (#17). A staff member who leaves is deactivated, never deleted (Module 00 #34). Security NFR 6: passwords, auto-lock, owner password for permission changes.
 
 ## Options considered
 
@@ -29,7 +29,7 @@ Option B.
 - The browser gets a random session token in a cookie set `httpOnly`, `Secure`, `SameSite=Lax`. Unsafe requests also carry a CSRF token.
 - Passwords are hashed with **Argon2id**.
 - Login attempts are rate-limited per username and per IP address.
-- **Auto-lock:** after the idle time, the session is marked locked, and the next request needs the password again. The exact time is still an open question in Module 00.
+- **Auto-lock:** after the idle time, the session is marked locked, and the next request needs the password again. The owner's session locks after 5 minutes by default, settable from 1 to 30 (Module 00 #21). A staff session ends after 30 idle minutes by default (#29). Both were answered 2026-11-02.
 - **Re-authentication:** sensitive actions (permission changes) ask for the owner's password again, even inside an unlocked session.
 - Library vs a thin layer of our own on vetted primitives: decided in the first auth task.
 
@@ -40,7 +40,7 @@ Instant revocation is a hard requirement on a shared computer, and server sessio
 ## Consequences
 
 - Deactivating a user deletes nothing: their sessions are revoked and their login is disabled (ADR 0007).
-- How the owner resets a forgotten password (email OTP or SMS OTP) is still open in Module 00 and must be answered before the auth task.
+- Answered 2026-11-02 (Module 00 #30–#33): the owner resets a forgotten password by an emailed link (once the email is confirmed) or a printed recovery key; the owner resets staff passwords. Sending email is a new dependency, so P1.4 records an ADR for the email service.
 - Session rows are business data for the entry log ("who was logged in") and are kept, not deleted.
 
 ## Interview note

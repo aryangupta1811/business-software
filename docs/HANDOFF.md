@@ -2,36 +2,41 @@
 
 Overwritten at the end of every session. Older handoffs are in git history: `git log -p docs/HANDOFF.md`.
 
-**Session:** 13–14 — P1.1 merged; P1.2 entry log designed, built and reviewed, 2026-11-01 to 2026-11-02
+**Session:** 15 — Module 00's open questions answered, 2026-11-02
 
 **Done:**
-- P1.1 merged as **PR #9** (all five checks green). Its local and remote branches are gone.
-- **P1.2 design** with the owner, section by section: actor option A (nullable `actor_id`, no key until P1.4), `before`/`after` jsonb, the `recordEntry` helper, the guard changes. Spec `docs/plans/2026-11-01-p1.2-entry-log-design.md`, **ADR 0028**, plan `docs/plans/2026-11-02-p1.2-entry-log.md`. Owner chose **native** execution.
-- **Built** (`packages/db`):
-  - `migrations/0002_entry_log.sql`: `entry_log` (generated) plus hand-written `FORCE ROW LEVEL SECURITY` and `REVOKE UPDATE … FROM app_runtime`.
-  - `src/schema.ts`: `entryLog` (`business_id` defaults to `app_current_business_id()`, composite `entry_log_branch_fk`).
-  - `src/entry-log.ts`: `ENTRY_ACTIONS` (`stock.adjusted` needs a reason), `EntryAction`, `EntryInput`, `recordEntry(tx, entry)`; runtime refusal of `actorId: undefined`.
-  - `src/entry-log.test.ts` (17 tests); `src/tenancy-guard.test.ts` widened (effective and column privileges, every non-system schema with `drizzle` exempt, `business_fk`, `append_only`, `view`, `definer` with `DEFINER_ALLOWED`, exact `function_pin`, role membership; 28 probes); `src/testing.ts` `adminUrl` now on the app database.
-- **Fresh review (opus):** 0 critical; Review Focus all held live; 4 important + 1 minor re-graded important, all fixed test-first (views, column grants, definer granted to the app, overloaded pin function, `actorId` undefined). 7 minors filed in PROGRESS (P1.4, P1.7, P2.6).
-- **Checked:** `pnpm check` green, 262 tests (45 shared, 59 db, 28 api, 130 web); `drizzle-kit check` clean; migration order OK; migration applied to the local database; guard proven on the real migration (removing `REVOKE UPDATE` fails it with `entry_log: append_only`).
-- **Docs:** ADR 0028 + index; `architecture.md`; `local-database.md` ("The entry log"); `phase-1.md`; interview log (5 entries, 4 questions, 6 glossary terms, numbers, pitch).
+- P1.2 was already merged as **PR #10** before this session; its branches are gone.
+- **Module 00 open questions answered by the owner** (`docs/requirements/00-business-setup-users-roles.md`, Change log 2026-11-02):
+  - #21: owner auto-lock 5 min by default, settable 1–30 in settings.
+  - #18 reworded: each counter computer is shared; a shop can have several (#22).
+  - **#7 changed:** signup now has **6 fields** (owner's email added; it left #8's settings list).
+  - New #27–#35: owner logs in by email (unique across the app); staff by username unique within the business, and the counter computer remembers its business after the owner's first login; staff session ends after 30 idle min (owner can change); owner reset by email link (only once the email is confirmed) or a printed recovery key (*proposed by Claude:* single use, then a new key); email confirmed after signup via a banner; owner resets staff passwords; staff deactivated, never deleted, reactivation allowed; one home branch per staff member, plus extra branches for a login.
+  - SMS OTP rejected: per-message cost and India's DLT registration.
+- **ADR 0009:** three "still open" lines now point to the answers (decision unchanged).
+- **PROGRESS:** task ticked; P1.3, P1.4, P1.6 carry the new points; P1.4 must record an ADR for the email service.
+- **Journal:** `phase-1.md` (what was built, two product-rule rows, one lesson, one question); interview log (2 entries, 1 question, 2 glossary terms).
 
-**Half-done:** the P1.2 pull request: branch `feat/p1.2-entry-log` (9 commits including the end-session one; only the first is pushed), not merged.
+**Half-done:** the PR for branch `docs/module-00-open-questions` (2 commits, not pushed, not merged).
 
 **Next step:**
-1. Owner: `git push -u origin HEAD`, `gh pr create --web` with title `feat(db): add the append-only entry log (P1.2)`, fill in the template, **Squash and merge** when the five checks are green. Then `git switch main`, `git pull`, `git branch -D feat/p1.2-entry-log`.
-2. Watch the `migrations` check: `0002` is new and must be newer than `main`'s `0001` (it is; checked locally).
-3. Next session: `/start-session`, then choose: **DevOps stage 4** (first ask when placement season is) or answering **Module 00's open questions** (auto-lock time, password reset, deactivation, counters) before P1.3.
+1. Owner: `git push -u origin HEAD`, `gh pr create --web` with title `docs: answer module 00's open questions`, fill in the template, **Squash and merge** when the five checks are green. Then `git switch main`, `git pull`, `git branch -D docs/module-00-open-questions`.
+2. Next session: `/start-session`, then **P1.3 Signup & business setup**. Design first (brainstorm → spec → plan, owner approves section by section): the `businesses` columns for the 6 signup fields, the first `users` table (owner) or what waits for P1.4, business-type presets as data, GST status, the settings page. If placement season is close, DevOps stage 4 may come first (ask).
 
 **Watch out for:**
 - **No AI attribution, ever:** no `Co-Authored-By: Claude` and no "Generated with Claude Code" (`CLAUDE.md` rule 6 overrides tool defaults).
+- **Module 00 rules that shape P1.3/P1.4:**
+  - Owner email is unique **across all businesses** (#27): a global unique index, outside RLS's per-business view. The login lookup is the narrow cross-business path (ADR 0027), a `SECURITY DEFINER` function on `DEFINER_ALLOWED`.
+  - Staff usernames are unique **within a business**: `unique (business_id, username)` (also the P1.7 rule that every tenant unique key includes `business_id`).
+  - The recovery key and reset tokens are random bytes stored only as hashes; never UUIDv7 (ADR 0027).
+  - Sending email is new infrastructure: P1.4 needs an ADR (e.g. SES in the cloud, Mailpit locally). SES needs a verified domain (stage 5) and leaving its sandbox. The secret rules in `docs/devops/secrets.md` apply.
+  - Auto-lock (owner, 5 min) and staff idle logout (30 min) are per-business settings.
 - **Entry log rules (ADR 0028):**
   - Write only through `recordEntry(tx, …)` inside the action's own `withBusiness` transaction; never `tx.insert(entryLog)` (the table is still exported; P2.6 should stop that).
   - A new action goes into `ENTRY_ACTIONS` with `reasonRequired`.
   - `actorId` is the logged-in person, or `null` only for the system.
   - Order entries by `id`, not `created_at` (entries in one transaction share `now()`).
   - Fix a wrong entry by recording a correcting one; `app_runtime` can't UPDATE or DELETE it.
-- **Guard rules now enforced (`src/tenancy-guard.test.ts`):** every view needs `with (security_invoker = true)`; no column-level UPDATE on an `APPEND_ONLY` table; a `SECURITY DEFINER` function the app can run must be on `DEFINER_ALLOWED` with its reason (P1.4's login lookup: also revoke PUBLIC and pin `search_path`); exactly one `app_current_business_id()`; `app_runtime` belongs to no role; a new non-tenant schema goes on `NOT_TENANT_SCHEMAS` with its reason.
+- **Guard rules (`src/tenancy-guard.test.ts`):** every view needs `with (security_invoker = true)`; no column-level UPDATE on an `APPEND_ONLY` table; a `SECURITY DEFINER` function the app can run must be on `DEFINER_ALLOWED` with its reason (P1.4's login lookup: also revoke PUBLIC and pin `search_path`); exactly one `app_current_business_id()`; `app_runtime` belongs to no role; a new non-tenant schema goes on `NOT_TENANT_SCHEMAS` with its reason.
 - **Test helper:** `startTestDatabase().adminUrl` is the superuser on the app database (`business_software`); use it for roles and schemas, which `app_owner` can't create.
 - **Tenancy rules (ADR 0027):**
   - A new tenant table uses `id()`, `businessId()`, `createdAt()` and `tenantPolicy(t.businessId)`, and its migration adds `ALTER TABLE … FORCE ROW LEVEL SECURITY` by hand.
@@ -56,6 +61,7 @@ Overwritten at the end of every session. Older handoffs are in git history: `git
   - GitHub's *Revert* button title fails: rename it to e.g. `fix: revert …`.
 - **Migrations:** never edit, re-date or delete one that's on `main`. Add a new one instead.
 - **A red `secrets` check fails every PR.** Revoke a real key first; for a false positive, add its fingerprint to `.gitleaksignore` in a PR; never commit a fake secret to a real branch.
+- **gitleaks isn't installed locally:** run it with the Docker command in `docs/devops/git-workflow.md` (PowerShell, Docker Desktop running).
 - **Pinned versions:** Dependabot updates only `uses:` actions; the gitleaks and actionlint images are bumped by hand. New actions are pinned to a SHA with a `# vX.Y.Z` comment; `${{ github.event.* }}` values go through `env:`.
 - **Shell gotchas:** never write repo files with PowerShell `Set-Content`/`Add-Content`/`Out-File` (BOM and CRLF). In Git Bash, no bare `cat > file` before a heredoc, and long Python with quotes goes in a scratchpad script file.
 - **Git:** after a squash merge, `git branch -d` refuses (git can't see the commits in `main`); use `-D`. `git switch -c` only creates; to move onto an existing branch use `git switch <name>`.
@@ -70,7 +76,7 @@ Overwritten at the end of every session. Older handoffs are in git history: `git
   - pnpm 12 `ERR_PNPM_IGNORED_BUILDS`: decide each package with a reason. A pre-existing peer warning (`eslint-plugin-jsx-a11y` wants ESLint ≤ 9) is known.
   - TypeScript stays pinned to `~6.0`. New `.ts`/`.tsx` files must be in a tsconfig `include`. `exactOptionalPropertyTypes` is on: leave an optional property out instead of setting it to `undefined`.
   - `packages/shared` has no Node/DOM globals; `apps/web` has no Node types (tests read files with Vite `?raw`).
-  - Run gitleaks from PowerShell. Test data must not look like personal data.
+  - Test data must not look like personal data.
   - `refs/original/` still holds the pre-rewrite commits (ask before deleting).
   - Don't open AWS before stage 4; ask about placement season first.
-  - Answer the Module 00/01 open questions before P1.3/P1.7.
+  - Answer the Module 01 open questions before P1.7.

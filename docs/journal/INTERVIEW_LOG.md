@@ -1080,3 +1080,9 @@ Entry format:
 - **Why / what I learned:** The open questions decide the shape of the users and sessions tables. Guessing would have meant a migration later on real data. One answer led to the next: email reset meant email at signup, which meant checking the address, which raised the question of what people log in with. That last one wasn't on the list at all.
 - **Say it in an interview:** "Before writing the login code, I settled the product rules it depends on. SMS OTP was out because of cost and India's DLT registration, so owners recover by email or a printed recovery key. Staff usernames are scoped to the shop, because the counter computer knows which shop it belongs to."
 - **Follow-ups to expect:** Why does staff get a 30-minute logout but the owner a 5-minute lock? (The owner's screen shows salaries and profit, so it locks fast and keeps the session for a quick unlock. Staff screens show less, but a login left open overnight would put another person's name on the entry log.)
+
+### 2026-11-02 — gitleaks isn't installed; it runs in Docker `#devops` `#gotcha`
+- **What happened:** Before committing, `gitleaks git --staged` failed in PowerShell with "not recognized". gitleaks isn't installed on this laptop. `docs/devops/git-workflow.md` runs it as a pinned Docker image (`ghcr.io/gitleaks/gitleaks:v8.30.1`), with the repo mounted read-only. That command found no leaks.
+- **Why / what I learned:** Running a tool from a pinned image means nothing to install or keep updated, and my laptop runs the same version as CI. Check the runbook before reaching for a command from memory.
+- **Say it in an interview:** "My secret scanner runs from a pinned Docker image, both on my laptop and in CI, so a local scan and the CI check can't disagree because of version drift."
+- **Follow-ups to expect:** —

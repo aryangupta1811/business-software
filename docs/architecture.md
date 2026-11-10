@@ -65,6 +65,7 @@ flowchart LR
 
 - The schema is upgraded before new code runs, by the only role allowed to change it. If `migrate` fails, `api` and `worker` don't start [0021].
 - `GET /api/health` answers while the process is alive (Docker's healthcheck). `GET /api/health/ready` also checks the database (503 when it can't), for deploys and Caddy later.
+- When something fails: a request that throws unexpectedly gets a plain 500 and leaves one messages-only log line (`UnhandledErrorFilter`). A database connection lost in the middle of a transaction fails that request, not the process. An error nothing caught is logged the same way and the process exits 1, so Docker restarts it (`docs/devops/secrets.md`, rule 5).
 - On `docker stop` (SIGTERM), `api` and `worker` finish their work, close the database pool and exit 0 [0020].
 - pg-boss will run in the `worker` under its own role, `app_queue`, which owns only the `pgboss` schema [0022].
 - Secrets reach containers only as environment variables at start, never inside the image (`docs/devops/secrets.md`).

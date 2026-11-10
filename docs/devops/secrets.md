@@ -33,7 +33,9 @@ Each process gets only what it needs: `migrate` gets `MIGRATION_DATABASE_URL` (o
    - Config errors name the variable, never its value (`DATABASE_URL is not set`).
    - Log errors with `describeError(error)` (messages only), never the error object. pg-pool attaches the client to idle-connection errors. Its password is a hidden property, so default printing doesn't show it, but serializers that read hidden properties do (`%o`, `showHidden`, test-runner serializers, some error reporters).
    - Drizzle's failed-query messages end with the query's values (`params: …`), which will be customers' data. `describeError` cuts them off.
-   - Every entry point runs inside `runProcess()`, so even a crash at startup is logged this way.
+   - Every entry point runs inside `runProcess()`, so even a crash at startup is logged this way. So is an error nothing caught later (an `error` event with no listener, a promise nobody awaited): Node's own crash report would print the whole error object.
+   - A request that fails unexpectedly goes through `UnhandledErrorFilter` (`apps/api/src/error-filter.ts`): one `describeError` line in the log, a plain 500 to the browser. Nest's default filter logs the error object, which for a failed query includes its values and PostgreSQL's `detail` line (`Key (email)=(…) already exists.`).
+   - A message can still carry a value: PostgreSQL quotes a malformed input in some messages (`invalid input syntax for type uuid: "…"`). Validate input before it reaches a query (P1.3).
 
 ## The Claude API key (Phase 3)
 

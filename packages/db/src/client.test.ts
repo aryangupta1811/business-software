@@ -1,5 +1,5 @@
 // Integration test on a throwaway PostgreSQL (ADR 0013): the client the api and worker use.
-import { Pool } from 'pg';
+import { Pool, type PoolClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createDatabase, type Database } from './client.js';
 import { startTestDatabase, type TestDatabase } from './testing.js';
@@ -52,6 +52,32 @@ describe('createDatabase', () => {
       const { rows } = await pool.query<{ ok: number }>('select 1 as ok');
       expect(rows).toEqual([{ ok: 1 }]);
     }, onPoolError);
+  });
+
+  // Every transaction (so every withBusiness call) checks a connection out of the pool, and
+  // pg-pool handles 'error' events only on idle ones. A connection lost while checked out
+  // (a database restart or failover) would be an unhandled 'error' event: a crashed process.
+  it('survives the database dropping a connection in the middle of a transaction', async () => {
+    await withDatabase(async ({ db, pool }) => {
+      let client: PoolClient | undefined;
+      pool.once('acquire', (acquired: PoolClient) => {
+        client = acquired;
+      });
+      await expect(
+        db.transaction(async (tx) => {
+          await tx.execute('select 1');
+          const closed = new Promise((resolve) => client?.once('end', resolve));
+          await admin.query(
+            "select pg_terminate_backend(pid) from pg_stat_activity where usename = 'app_runtime'",
+          );
+          await closed;
+          await tx.execute('select 1');
+        }),
+      ).rejects.toThrow();
+
+      const { rows } = await pool.query<{ ok: number }>('select 1 as ok');
+      expect(rows).toEqual([{ ok: 1 }]);
+    });
   });
 
   it('closes its pool', async () => {

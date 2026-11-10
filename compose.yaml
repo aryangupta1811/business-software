@@ -13,7 +13,7 @@ x-app: &app
 
 services:
   db:
-    # Same major version as RDS (ADR 0005). packages/db/src/roles.test.ts reads this line.
+    # Same major version as RDS (ADR 0005). packages/db/src/testing.ts reads this line.
     image: postgres:18
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}

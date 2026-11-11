@@ -57,6 +57,7 @@ It fits inside the free credits while keeping the one thing that matters most: m
 
 ## Consequences
 
+- **Checked 2026-11-10** (`docs/plans/2026-11-10-plan-review.md`): a Graviton server is **ARM64**, and CI builds x86 images, which don't run on it. Both images build for `linux/arm64` unchanged and were run on it (API health, Caddy's headers). The deploy stage (6) must build, smoke-test and push on GitHub's ARM64 runner (`ubuntu-24.04-arm`, free for public repos). AWS's EC2 guide lists the instance types a Free plan account may launch: `t3.micro`, `t3.small`, `t4g.micro`, `t4g.small`, `c7i-flex.large`, `m7i-flex.large`; so `t4g.small` is allowed. RDS offers PostgreSQL 18 (18.4).
 - **Estimated cost** (confirm with the AWS Pricing Calculator at stage 4): EC2 `t4g.small` ~$12, 20 GB disk ~$2, public IPv4 address ~$4, RDS `db.t4g.micro` + 20 GB ~$15, S3 and data transfer under $1. That's about $30–35/month, or about $25 with `t4g.micro`. With only the first $100 of credits, that's roughly 3 months, so earn the extra $100 and **stop EC2 and RDS when idle** until placement season. RDS restarts itself after 7 days stopped, so a scheduled stop job is needed.
 - **The account closes after 6 months.** Infrastructure is Terraform (rebuildable) and the demo data is a deterministic seed (ADR 0016), so nothing important is lost. Before it closes: export the database, and record a demo video and screenshots for the portfolio.
 - **After closing,** the live demo needs a new home (a Paid plan, or a free host). Decide then.

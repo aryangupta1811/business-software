@@ -6,7 +6,7 @@ This folder is the project's memory. Everything decided in the planning chat on 
 
 - **Decisions live in files, not chats.** A chat can end, get compacted or be cleared. Files stay.
 - **The files live in git.** Every change is a saved version you can go back to.
-- **The repo is pushed to a private GitHub repo.** If your laptop dies, nothing is lost.
+- **The repo is pushed to GitHub.** If your laptop dies, nothing is lost. It started private and has been **public** since 2026-10-30, so no secret or personal data ever goes into it (`CLAUDE.md` rule 11).
 - **Claude Code reads `CLAUDE.md` automatically every session**, and again after the conversation is compacted. `CLAUDE.md` tells it where everything else is.
 - **Every session ends with `/end-session`**, which writes what happened into `docs/PROGRESS.md` and `docs/HANDOFF.md` and commits. The next session starts from those files.
 

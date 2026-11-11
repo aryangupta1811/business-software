@@ -19,6 +19,7 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
   - The log gave no reason at all when `localhost` refused the connection.
 
   The plan had gaps too, now filed under their tasks in `PROGRESS.md`: the worker can't see any business's rows without a cross-business read; the public demo login and its "reset" clash with the no-delete rule; login isn't the only lookup that happens before a business is known. 272 tests.
+- **2026-11-10 (plan and technology review, no feature code):** every technology checked with evidence (`docs/plans/2026-11-10-plan-review.md`). The stack stays. Experiments corrected four assumptions: pg-boss needs `createSchema: false` to run as its restricted role; the Graviton server is ARM64 while CI builds x86 images (both images were built and run on ARM64); tests don't need the SWC plugin; Argon2id is built into Node 24. The order of work changed to **demo-first**: cloud stages 5, 6 and 7 before any feature, then the shortest path to a printed bill, then demo data, then the rest.
 
 ## Stack choices vs alternatives
 

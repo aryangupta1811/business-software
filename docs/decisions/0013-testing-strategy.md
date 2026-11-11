@@ -40,6 +40,7 @@ The bugs that would break "zero data loss" and "data separation" only exist in a
 - Docker Desktop is needed on the Windows machine for integration tests (also needed for Docker Compose).
 - Keep the pyramid: many fast unit tests, fewer integration tests, a handful of end-to-end tests.
 - Demo data (ADR 0016) also serves as a large realistic fixture.
+- **Checked 2026-11-10:** the SWC plugin named in the decision isn't needed. With Vitest 5 as installed, a NestJS service injected by its constructor type (no `@Inject()` token) resolves in a test: the decorator metadata is kept (`docs/plans/2026-11-10-plan-review.md`). Don't add the plugin unless that stops being true.
 
 ## Interview note
 

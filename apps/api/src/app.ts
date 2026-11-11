@@ -4,6 +4,7 @@ import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { ApiConfig } from './config.js';
 import { DatabaseModule } from './database.module.js';
+import { UnhandledErrorFilter } from './error-filter.js';
 import { HealthController } from './health.controller.js';
 
 @Module({})
@@ -26,5 +27,6 @@ export async function createApp(config: ApiConfig): Promise<INestApplication> {
   app.disable('x-powered-by');
   // Caddy sends everything under /api to this service (ADR 0011).
   app.setGlobalPrefix('api');
+  app.useGlobalFilters(new UnhandledErrorFilter(app.getHttpAdapter()));
   return app;
 }

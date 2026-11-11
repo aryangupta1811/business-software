@@ -12,6 +12,14 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
   - A forgotten owner password is reset by an email link or a printed recovery key. The owner resets staff passwords.
   - Staff who leave are deactivated, never deleted. Each staff member has one home branch.
   - Signup gained the owner's email (6 fields).
+- **2026-11-10 (deep scan, before opening the AWS account):** a full read of the code, the migrations, the pipeline and the plan, plus 18 attacks on a live database as the app's own role. Tenant isolation and the no-delete rules held. Four bugs were in how the API fails, not in what it does, and each got a failing test first:
+  - A database connection lost in the middle of a transaction crashed the whole API process.
+  - Any request failing on a query would have logged the query's values (customers' data), because Nest's default error handler logs the error object.
+  - An error nothing caught was printed by Node as a whole object, skipping the messages-only rule.
+  - The log gave no reason at all when `localhost` refused the connection.
+
+  The plan had gaps too, now filed under their tasks in `PROGRESS.md`: the worker can't see any business's rows without a cross-business read; the public demo login and its "reset" clash with the no-delete rule; login isn't the only lookup that happens before a business is known. 272 tests.
+- **2026-11-10 (plan and technology review, no feature code):** every technology checked with evidence (`docs/plans/2026-11-10-plan-review.md`). The stack stays. Experiments corrected four assumptions: pg-boss needs `createSchema: false` to run as its restricted role; the Graviton server is ARM64 while CI builds x86 images (both images were built and run on ARM64); tests don't need the SWC plugin; Argon2id is built into Node 24. The order of work changed to **demo-first**: cloud stages 5, 6 and 7 before any feature, then the shortest path to a printed bill, then demo data, then the rest.
 
 ## Stack choices vs alternatives
 
@@ -37,9 +45,15 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
 - **A type isn't a runtime check.** `actorId: string | null` makes forgetting "who" a compile error, but untyped code can still pass `undefined`, which became NULL, meaning "the system". One line at runtime closes it.
 - **A test helper pointed at the wrong database.** The superuser URL named the container's default database, so a schema probe "didn't exist". Lesson: when a setup step fails, check where it ran before changing the test.
 - **The list of open questions wasn't complete.** Answering "how to reset a password" (by email) made email a login detail, and that exposed a question nobody had listed: what owners and staff type to log in. Lesson: after answering each question, ask what it changes downstream.
+- **I had tested the idle half of a failure and assumed the other half.** A test killed the database's *idle* connections and the API survived, so I believed a database restart was covered. pg-pool removes its `error` listener from a connection the moment it's checked out, and every transaction checks one out. Lesson: for each failure, ask what state the system is in when it happens, and test the busy state too.
+- **A rule I wrote down wasn't the framework's default.** "Never log the error object" was in `secrets.md` and in my own code, but the first unexpected error in a request would have gone through Nest's handler, which logs exactly that. Lesson: a rule about logging has to be enforced at every exit: my code, the framework's handler and the runtime's crash report.
 
 ## Interview questions I can now answer
 
+- Q: What happens to your API when the database restarts in the middle of a request?
+  A: That request fails with a 500 and the process keeps running. It used to crash: pg-pool listens for `error` only on idle connections, and Node kills a process on an `error` event with no listener. I listen on every connection the pool opens, and a test terminates the backend mid-transaction to prove it. (`packages/db/src/client.ts`)
+- Q: How do you keep customer data out of your logs?
+  A: Only messages are logged, never error objects. A failed query's error carries its values and PostgreSQL's `detail` line, and Nest's default handler logs the whole object, so I replaced it with a filter that logs one line and answers a plain 500. The same rule covers startup failures and uncaught errors. (`docs/devops/secrets.md`)
 - Q: How do you make an audit log tamper-proof for the app?
   A: The app's role has only INSERT and SELECT, a test proves UPDATE, DELETE and TRUNCATE fail with `42501`, and a guard fails CI if any route back opens up: column grants, views without `security_invoker`, or definer functions the app can call. (ADR 0028)
 - Q: Why does the log helper take a transaction instead of the database?

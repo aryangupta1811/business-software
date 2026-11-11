@@ -36,6 +36,37 @@ describe('describeError', () => {
     expect(describeError(error)).toBe('connection lost');
   });
 
+  // What Node throws when every address of a host refuses (`localhost` is ::1 and 127.0.0.1):
+  // an AggregateError whose own message is empty.
+  it('describes an error with no message by the errors inside it', () => {
+    const error = new AggregateError(
+      [
+        new Error('connect ECONNREFUSED ::1:5432'),
+        new Error('connect ECONNREFUSED 127.0.0.1:5432'),
+      ],
+      '',
+    );
+    expect(describeError(error)).toBe(
+      'connect ECONNREFUSED ::1:5432; connect ECONNREFUSED 127.0.0.1:5432',
+    );
+  });
+
+  it('falls back to the kind of error when there is no message anywhere', () => {
+    expect(describeError(new RangeError(''))).toBe('RangeError');
+    expect(describeError(new AggregateError([], ''))).toBe('AggregateError');
+  });
+
+  it('stops when the causes loop back', () => {
+    const first = new Error('first');
+    const second = new Error('second', { cause: first });
+    first.cause = second;
+    expect(describeError(first)).toBe('first → second');
+  });
+
+  it('treats a null cause as no cause', () => {
+    expect(describeError(new Error('boom', { cause: null }))).toBe('boom');
+  });
+
   it('describes a thrown string', () => {
     expect(describeError('plain text')).toBe('plain text');
   });

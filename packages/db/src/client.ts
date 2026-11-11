@@ -22,5 +22,11 @@ export interface Database {
 export function createDatabase(url: string, onPoolError: (error: Error) => void): Database {
   const pool = new Pool({ connectionString: url, max: 10, connectionTimeoutMillis: 5_000 });
   pool.on('error', onPoolError);
+  // pg-pool listens for 'error' on a connection only while it sits idle. One that is lost
+  // while checked out (every transaction checks one out) would emit an unhandled 'error' too.
+  // This listener hides nothing: the transaction's next query rejects with the reason.
+  pool.on('connect', (client) => {
+    client.on('error', () => undefined);
+  });
   return { db: drizzle(pool), pool, close: () => pool.end() };
 }

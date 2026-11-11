@@ -2,26 +2,54 @@
 
 Overwritten at the end of every session. Older handoffs are in git history: `git log -p docs/HANDOFF.md`.
 
-**Session:** 16 — DevOps stage 4 steps written, 2026-11-02
+**Session:** 17 — Deep scan, then a plan and technology review, 2026-11-10
 
 **Done:**
-- Module 00's PR was already merged as **#11**; its branch is gone.
-- Owner: placement season is close, so **DevOps stage 4** comes before P1.3 (the owner wrote "closed"; read as "close" and not corrected — confirm at the next session).
-- Read AWS's *Choosing a plan* page and the Free Tier FAQ (2026-11-02): **joining AWS Organizations upgrades a Free plan account to Paid** (irreversible), and the Free plan and credits are **only for new AWS customers**. The owner floated a second account in a family member's name; Claude advised against it (that rule; the account and bill would legally be hers). A family member's card as the payment method on the owner's own account is fine.
-- **ADR 0029** (new): root locked away with MFA; daily work as an IAM user with MFA in group `admins` (`AdministratorAccess`, narrowed at stage 10); **no Identity Center / Organizations / Control Tower** on the Free plan; CLI credentials for stage 5 still to decide (short-lived).
-- **Runbook** `docs/devops/aws-account.md`: steps A–F, the irreversible rules, what not to do yet. Row added to `CLAUDE.md`'s file table.
-- PROGRESS stage 4 line rewritten; interview log (1 entry, 2 questions, 5 glossary terms, ADR count 29).
+- The stage 4 docs PR was already merged as **#12**. `main` is synced.
+- **Deep scan** (owner's request, before opening the AWS account), on branch `fix/deep-scan-findings`. Every source file, migration, workflow, Dockerfile and the plan were read; a live test database was attacked 18 ways as `app_runtime`. Tenant isolation and the no-delete rules held.
+- **Four bugs fixed, each with a test that failed first:**
+  1. `packages/db/src/client.ts`: a connection lost in the middle of a transaction crashed the whole process (pg-pool listens for `error` only on idle connections). Every connection now has a listener.
+  2. `apps/api/src/error-filter.ts` (new, installed in `app.ts`): Nest's default handler logs the error object, so a request failing on a query would have logged its values and PostgreSQL's `detail` line. `UnhandledErrorFilter` logs one `describeError` line and answers a plain 500.
+  3. `apps/api/src/run.ts`: `runProcess` now also handles `uncaughtException` and `unhandledRejection` (one safe line, exit 1).
+  4. `apps/api/src/errors.ts`: `describeError` gave an empty reason for a refused connection to `localhost` (`AggregateError`), spun for ever on a looping `cause` chain, and misreported `cause: null`.
+- Small fixes: the file name in `compose.yaml`'s comment, the README's status line.
+- **Plan gaps** written into `PROGRESS.md` under P1.3, P1.4, P1.8, P1.20, P2.7 and stage 5 (each marked "From the 2026-11-10 scan").
+- Docs: `secrets.md` rule 5, `architecture.md` (what happens when something fails), `phase-1.md`, interview log (6 entries, 4 questions, 4 glossary terms, 272 tests).
+- **Plan and technology review** (owner's second request; `docs/plans/2026-11-10-plan-review.md`). Every technology was checked against what is installed, the npm registry, official pages and experiments. Verdict: keep the stack. What the experiments corrected:
+  - **pg-boss** can't start as ADR 0022 describes: it needs `createSchema: false` (dated note in ADR 0022; under P2.7).
+  - **The server is ARM64, CI builds x86.** Both images were built and run for `linux/arm64` on the laptop; the deploy stage must build on GitHub's ARM64 runner (dated note in ADR 0011; under stages 5 and 6).
+  - **No SWC plugin needed:** Vitest 5 keeps decorator metadata (dated note in ADR 0013; under P1.3).
+  - **Argon2id is built into Node 24** (`crypto.argon2`), also in the ARM64 image (under P1.4).
+  - ICU collations (`hi-x-icu`) are in the `postgres:18` image (under P1.7). `pnpm audit --prod` is clean; 3 moderate advisories in development tools only.
+- **New rule (owner, 2026-11-11): Claude pushes and opens pull requests itself**, after listing what is about to be uploaded; it doesn't wait for an answer, and it doesn't merge. Written into the end-session skill (step 9) and `git-workflow.md`.
+- **Owner's answers (2026-11-10):** placement interviews are **1 to 3 months away** (so "close", not "closed"). The order of work is now **demo-first**: PROGRESS's Phase 1 was re-ordered (same tasks and numbers): cloud stages 5, 6, 7 first, then signup, login, items, stock, billing, printing, then udhaar and demo data, then the deferred tasks (P1.5, P1.6, P1.9–P1.11, P1.16, P1.17, P1.19).
+- `pnpm check` and `pnpm build` are green: **272 tests** (45 shared, 60 db, 37 api, 130 web). The compiled API was started by hand and answered 200, 503, 404 and 400 correctly.
 
 **Half-done:**
-- The PR for branch `docs/devops-stage-4` (1 commit, not pushed, not merged).
-- **Stage 4 itself:** the owner does the runbook's steps A–E on their own, later. Nothing has been created in AWS yet.
+- The PR for branch `fix/deep-scan-findings`: pushed and opened by Claude on 2026-11-11, not merged. Check its five CI results; `smoke` is the one check that couldn't run on Windows beforehand.
+- The local branch `docs/devops-stage-4` still exists (merged as #12). Claude's delete was blocked by the permission mode: `git branch -D docs/devops-stage-4`.
+- **Stage 4 itself:** the owner does the AWS runbook's steps A–E. Nothing has been created in AWS yet.
 
 **Next step:**
-1. Owner: `git push -u origin HEAD`, `gh pr create --web` with title `docs: add aws account runbook and adr 0029`, fill in the template, **Squash and merge** when the five checks are green. Then `git switch main`, `git pull`, `git branch -D docs/devops-stage-4`.
+1. Owner: the branch `fix/deep-scan-findings` was pushed and its pull request opened by Claude on 2026-11-11 (title `fix(api): survive a lost connection and keep query values out of logs`). **Squash and merge** it when the five checks are green. Then `git switch main`, `git pull`, `git branch -D fix/deep-scan-findings`.
 2. Owner: open the AWS account with `docs/devops/aws-account.md`, steps A–E.
-3. Next session: `/start-session`, then check stage 4 together (step F: plan shown is Free, credit balance, days left, the Explore AWS activity list), plan the credit activities that launch a server or database so nothing is left running, and tick stage 4. Then **P1.3 Signup & business setup**, design first (brainstorm → spec → plan, owner approves section by section).
+3. Next session: `/start-session`, then check stage 4 together (step F), plan the credit activities that launch a server or database so nothing is left running, and tick stage 4. Then **DevOps stage 5 (Terraform)**, which now comes before P1.3: first decide how the laptop's CLI gets short-lived credentials (ADR 0029), and state the expected cost before creating anything. Its PROGRESS line carries the notes from both reviews (ARM64, swap, the real host name in `DATABASE_URL`).
+4. A small PR any time: the **dependency refresh** task in PROGRESS.
+5. **Owner decisions waiting** (in PROGRESS): whether `entry_log`'s `id` and `created_at` become database-only (P1.4 e); what a visitor may do in the public demo and how it resets (P1.20); whether a thin AI slice comes right after demo data v1 (end of step 3).
 
 **Watch out for:**
+- **Demo-first order (2026-11-10):** work PROGRESS's Phase 1 from top to bottom. These make the deferrals safe and affordable, so keep them:
+  - P1.3's signup creates the business's first branch.
+  - From P1.4 on, every route names the permission it needs (the owner has them all), so P1.5 only adds staff logins and switches.
+  - P1.8's stock ledger leaves room for a batch and a serial number, so P1.10 isn't a rewrite.
+  - Stage 7 (backups, restore drill) must be done before P1.3 stores the first real data.
+  - The server and database cost credits from stage 5 on: stop them by hand after each session until stage 7's schedule exists.
+- **Checked facts not to rediscover:** pg-boss needs `createSchema: false`; images must be built for `linux/arm64`; no SWC plugin; `crypto.argon2` exists; TypeScript stays `~6.0` and Drizzle stays 0.45 (1.0 is still a release candidate).
+- **Failure paths (2026-11-10 scan):**
+  - For an answer the client should see, throw one of Nest's `HttpException`s. Anything else that escapes a request becomes a 500 and one log line through `UnhandledErrorFilter`. Never `logger.error(error)` with an object: `describeError(error)` only.
+  - `createDatabase` keeps an `error` listener on every connection. Any other `new Pool` (like the one in `runMigrations`) has none: a dropped connection there ends the process through `runProcess`'s crash handler, which is right for `migrate`.
+  - `runProcess` owns `uncaughtException` and `unhandledRejection`. Don't add other listeners for them.
+  - A test for "the database goes away" must cover a connection that is in use, not only an idle one.
 - **AWS (ADR 0029, runbook):**
   - Never join or create an AWS Organization, set up Control Tower, or turn on Identity Center's organization instance while on the Free plan: it upgrades to Paid, irreversibly.
   - One account only, in the owner's own name.
@@ -75,7 +103,7 @@ Overwritten at the end of every session. Older handoffs are in git history: `git
 - **Deferred minors (older):**
   - From P0.6: the "reproduce `check`" row in `git-workflow.md` lacks the actionlint command; the repo setting *Require actions to be pinned to a full-length commit SHA* is off (owner decides).
   - From P0.5: an asset URL with a trailing slash gets a 308 with the immutable header; a Caddyfile edit reruns the Vite build; no fake-timer test of a hanging fetch; polling pauses in background tabs.
-  - From P0.4: `describeError` gaps (an empty `AggregateError`, a cyclic `cause`, `cause: null`); no query timeout on `/ready`; Node 25+ drops Corepack (note it in ADR 0020 before `node:26-slim`).
+  - From P0.4: no query timeout on `/ready` (P1.8 sets timeouts); Node 25+ drops Corepack (note it in ADR 0020 before `node:26-slim`).
 - **Carried over:**
   - Docker Desktop must be running for `pnpm test`, `pnpm check`, `db:up` and `app:up`.
   - Never `docker compose down -v` without OK. The bootstrap runs only on an empty volume.

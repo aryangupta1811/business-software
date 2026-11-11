@@ -56,6 +56,7 @@ pg-boss needs table-creation and delete rights by design. Giving those rights to
 - RDS bootstrap (stage 5, before P2.7): if P2.7 hasn't happened yet, `app_queue` is added later with a small one-time script, run by hand as on day one. Note in `PROGRESS.md`.
 - Moving an outbox row to a job and marking it sent isn't one transaction across the two roles. Delivery is at least once, as ADR 0010 already accepts, and sending is idempotent by notification ID.
 - A pg-boss upgrade migrates its own schema when the worker starts. Read the release notes before upgrading.
+- **Checked 2026-11-10** (pg-boss 12.38.1 on PostgreSQL 18.6, set up as in decision 1; `docs/plans/2026-11-10-plan-review.md`): pg-boss must be started with **`createSchema: false`**. By default it runs `CREATE SCHEMA IF NOT EXISTS pgboss`, and PostgreSQL checks the right to create schemas before it checks whether the schema exists, so `start()` fails with `permission denied for database`. The fix is the option, never a `CREATE` grant on the database. With it, start, plain and partitioned queues, send, work, schedule and stop all worked as `app_queue`; `app_queue` couldn't read or create a table in `public`, and `app_runtime` couldn't read `pgboss`. pg-boss needed no extension.
 
 ## Interview note
 

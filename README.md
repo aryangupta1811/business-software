@@ -4,7 +4,7 @@
 
 One web app to run an Indian shop end to end: GST billing, inventory, udhaar (customer credit), suppliers, staff attendance and salary, an audit log, alerts, a dashboard and an AI assistant, in English, Hindi and Hinglish. Many businesses can sign up, and the database itself keeps each one's data apart. Nothing is ever hard-deleted.
 
-**Status:** Phase 0 (foundations). The plan and progress are in [`docs/PROGRESS.md`](docs/PROGRESS.md).
+**Status:** Phase 1 (core selling). The foundations, tenant isolation and the audit log are built; signup, logins and billing come next. The plan and progress are in [`docs/PROGRESS.md`](docs/PROGRESS.md).
 
 **Stack:** TypeScript monorepo (pnpm). React + Vite web app, NestJS API and worker, PostgreSQL + Drizzle with Row-Level Security. Docker Compose locally, GitHub Actions CI, AWS (EC2 + RDS) through Terraform. The reasons for each choice are in [`docs/decisions/`](docs/decisions/).
 

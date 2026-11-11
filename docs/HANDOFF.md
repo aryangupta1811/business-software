@@ -21,16 +21,17 @@ Overwritten at the end of every session. Older handoffs are in git history: `git
   - **No SWC plugin needed:** Vitest 5 keeps decorator metadata (dated note in ADR 0013; under P1.3).
   - **Argon2id is built into Node 24** (`crypto.argon2`), also in the ARM64 image (under P1.4).
   - ICU collations (`hi-x-icu`) are in the `postgres:18` image (under P1.7). `pnpm audit --prod` is clean; 3 moderate advisories in development tools only.
+- **New rule (owner, 2026-11-11): Claude pushes and opens pull requests itself**, after listing what is about to be uploaded; it doesn't wait for an answer, and it doesn't merge. Written into the end-session skill (step 9) and `git-workflow.md`.
 - **Owner's answers (2026-11-10):** placement interviews are **1 to 3 months away** (so "close", not "closed"). The order of work is now **demo-first**: PROGRESS's Phase 1 was re-ordered (same tasks and numbers): cloud stages 5, 6, 7 first, then signup, login, items, stock, billing, printing, then udhaar and demo data, then the deferred tasks (P1.5, P1.6, P1.9–P1.11, P1.16, P1.17, P1.19).
 - `pnpm check` and `pnpm build` are green: **272 tests** (45 shared, 60 db, 37 api, 130 web). The compiled API was started by hand and answered 200, 503, 404 and 400 correctly.
 
 **Half-done:**
-- The PR for branch `fix/deep-scan-findings` (committed, not pushed, not merged). CI's `smoke` job hasn't run on it yet: it's the only check that can't run on Windows.
+- The PR for branch `fix/deep-scan-findings`: pushed and opened by Claude on 2026-11-11, not merged. Check its five CI results; `smoke` is the one check that couldn't run on Windows beforehand.
 - The local branch `docs/devops-stage-4` still exists (merged as #12). Claude's delete was blocked by the permission mode: `git branch -D docs/devops-stage-4`.
 - **Stage 4 itself:** the owner does the AWS runbook's steps A–E. Nothing has been created in AWS yet.
 
 **Next step:**
-1. Owner: `git push -u origin HEAD`, `gh pr create --web` with title `fix(api): survive a lost connection and keep query values out of logs`, fill in the template, **Squash and merge** when the five checks are green. Then `git switch main`, `git pull`, `git branch -D fix/deep-scan-findings`.
+1. Owner: the branch `fix/deep-scan-findings` was pushed and its pull request opened by Claude on 2026-11-11 (title `fix(api): survive a lost connection and keep query values out of logs`). **Squash and merge** it when the five checks are green. Then `git switch main`, `git pull`, `git branch -D fix/deep-scan-findings`.
 2. Owner: open the AWS account with `docs/devops/aws-account.md`, steps A–E.
 3. Next session: `/start-session`, then check stage 4 together (step F), plan the credit activities that launch a server or database so nothing is left running, and tick stage 4. Then **DevOps stage 5 (Terraform)**, which now comes before P1.3: first decide how the laptop's CLI gets short-lived credentials (ADR 0029), and state the expected cost before creating anything. Its PROGRESS line carries the notes from both reviews (ARM64, swap, the real host name in `DATABASE_URL`).
 4. A small PR any time: the **dependency refresh** task in PROGRESS.

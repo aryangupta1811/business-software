@@ -22,7 +22,7 @@ Update this as the project grows.
 - **What makes it hard:** correctness, not the feature list. A bill must save the invoice, the stock change and the udhaar entry together or not at all. Two counters can sell the last unit at the same moment. GST maths must be exact to the paisa. And the owner can't lose a single record.
 - **My architecture:** a TypeScript monorepo with a React single-page app, a NestJS modular monolith (so a bill is one database transaction, not a saga across services) and PostgreSQL. The safety rules live in the database, not only in my code: money is stored as whole paise, the app's database user has no DELETE permission, and Row-Level Security keeps businesses apart. Every choice has a written decision record with the alternatives I rejected; there are 32 so far.
 - **One hard bug:** my background worker kept dying after exactly 10 seconds. That was the database driver's idle timeout. Waiting for the shutdown signal doesn't keep Node's event loop alive, so when the pool's last idle connection closed, the process simply ended. I reproduced it in a test, held the process open until SIGTERM, and confirmed it in Docker with zero restarts.
-- **How it's shipped:** the same Docker Compose stack runs on my laptop and in CI. Every pull request must pass five required checks: lint, types and 272 tests against a real PostgreSQL; a secret scan of the whole history; a migration-order check; the PR title; and a smoke test that starts the real images. Next is Terraform on AWS: one EC2 server plus RDS with point-in-time restore, sized to the Free plan's credits because my budget is ₹0.
+- **How it's shipped:** the same Docker Compose stack runs on my laptop and in CI. Every pull request must pass five required checks: lint, types and 272 tests against a real PostgreSQL; a secret scan of the whole history; a migration-order check; the PR title; and a smoke test that starts the real images. Next is Terraform on AWS in Sydney: one EC2 server plus RDS with point-in-time restore, priced at about 5 cents per running hour and run only for sessions and demos, because my budget is ₹0.
 - **Where it stands:** the foundations are done (Phase 0). In Phase 1 the database already keeps businesses apart (forced Row-Level Security, with a test that scans every table), and an append-only audit log records every change in the same transaction; logins and billing come next.
 - **What I'd do differently:** pin down the real constraints first. I designed hosting for a budget I didn't have and had to redesign it. And test what you ship: the production CSS minifier broke a page my unit tests said was fine.
 
@@ -93,9 +93,13 @@ Short answers; the Log entry has the full story.
 - **Q: Why an IAM user and not IAM Identity Center?**
   A: Identity Center's account access needs AWS Organizations, and joining Organizations upgrades a Free plan account to Paid, which can't be undone. That's why I first planned an IAM user with MFA (ADR 0029). AWS's new sign-up flow then made it moot: people sign in through the project's Team page, and AWS manages the structure behind it. → ADR 0030
 - **Q: Why is your server in Sydney and not Mumbai?**
-  A: My Free plan project is locked to the Region AWS assigned, Sydney. Mumbai needs the Paid plan plus "advanced features", which can't be undone and can charge my card. My budget is zero, so I accepted about 0.1 s more per request for a demo, and wrote down that real shop data would need the Region question reopened. → ADR 0030
+  A: My Free plan project is locked to the Region AWS assigned, Sydney. Mumbai needs the Paid plan plus "advanced features", which can't be undone and can charge my card. My budget is zero, so I accepted about 0.2 s more per round trip (measured) for a demo, and wrote down that real shop data would need the Region question reopened. → ADR 0030
 - **Q: How do you make sure the cloud doesn't cost you money?**
   A: On the Free plan AWS can't charge the card; it closes the account when credits run out. So the risk is burning credits early. I have a monthly budget that excludes credits (by default AWS subtracts them, so a normal budget shows $0 while credits drain), alerting at $5, $10, $15 and on forecast. I also stop the server and database when idle and state each resource's cost before Terraform creates it. → ADR 0030
+- **Q: How do you and your AI assistant get into AWS without access keys?**
+  A: `aws login` gives my laptop 12-hour credentials from my console sign-in (MFA on my identity), renewed for up to 90 days, and Terraform's provider reads them natively. Every command names the profile and the provider pins the allowed account ID, because my laptop once had a live key for another project as its default. CI will use OIDC with its own narrow role. → ADR 0031
+- **Q: Why no Elastic IP on your server?**
+  A: An Elastic IP bills every hour, even while the server is stopped, and mine is stopped most of the time. The auto-assigned address is released on stop and costs nothing then; the server updates a free DuckDNS name at boot, so the address can change. → ADR 0032
 - **Q: What's RPO and RTO for your app?**
   A: RPO is how much data you can lose (5 minutes, thanks to point-in-time restore). RTO is how long recovery takes (1 hour, checked by a monthly restore drill). → `product-overview.md` NFR 1
 - **Q: Why did you test against a real database instead of mocks?**
@@ -279,6 +283,13 @@ Terms I learned on this project, in one line each.
 | `uncaughtException` / `unhandledRejection` | Node's process-level events for an error nothing caught: a throw (or an `error` event with no listener), and a rejected promise nobody awaited |
 | `AggregateError` | One error that wraps several, in `.errors`; Node throws it when every address of a host refuses the connection, with an empty message of its own |
 | Checked-out connection | A pool connection handed to code for a while (a whole transaction), as opposed to an idle one waiting in the pool |
+| `aws login` | AWS CLI command (v2.32+) that turns a console sign-in into temporary credentials for a named profile: 12 hours, renewed for up to 90 days |
+| `allowed_account_ids` | Terraform AWS provider setting: refuse to run unless the credentials belong to one of these accounts |
+| AWS Pricing API | `aws pricing get-products`: AWS's price list as data, filtered by service, Region and attributes; the same numbers as the Pricing Calculator |
+| Elastic IP | A fixed public IPv4 address you keep; billed every hour, even while the server is stopped |
+| EventBridge Scheduler | AWS's cron service: calls an AWS API on a schedule (ours stops EC2 and RDS nightly) through a role |
+| DuckDNS | A free dynamic-DNS service: a subdomain whose IP the server updates through a URL with a token |
+| Write-only argument (Terraform) | An argument such as `password_wo` that Terraform sends to the provider but never stores in state or plan files |
 
 ---
 

@@ -20,9 +20,9 @@ Update this as the project grows.
 
 - **The problem:** a small Indian shop runs on a billing app, a paper udhaar register and a staff notebook. I'm building one web app that does all of it, for many shops at once, each seeing only its own data, in English, Hindi and Hinglish.
 - **What makes it hard:** correctness, not the feature list. A bill must save the invoice, the stock change and the udhaar entry together or not at all. Two counters can sell the last unit at the same moment. GST maths must be exact to the paisa. And the owner can't lose a single record.
-- **My architecture:** a TypeScript monorepo with a React single-page app, a NestJS modular monolith (so a bill is one database transaction, not a saga across services) and PostgreSQL. The safety rules live in the database, not only in my code: money is stored as whole paise, the app's database user has no DELETE permission, and Row-Level Security keeps businesses apart. Every choice has a written decision record with the alternatives I rejected; there are 30 so far.
+- **My architecture:** a TypeScript monorepo with a React single-page app, a NestJS modular monolith (so a bill is one database transaction, not a saga across services) and PostgreSQL. The safety rules live in the database, not only in my code: money is stored as whole paise, the app's database user has no DELETE permission, and Row-Level Security keeps businesses apart. Every choice has a written decision record with the alternatives I rejected; there are 32 so far.
 - **One hard bug:** my background worker kept dying after exactly 10 seconds. That was the database driver's idle timeout. Waiting for the shutdown signal doesn't keep Node's event loop alive, so when the pool's last idle connection closed, the process simply ended. I reproduced it in a test, held the process open until SIGTERM, and confirmed it in Docker with zero restarts.
-- **How it's shipped:** the same Docker Compose stack runs on my laptop and in CI. Every pull request must pass five required checks: lint, types and 272 tests against a real PostgreSQL; a secret scan of the whole history; a migration-order check; the PR title; and a smoke test that starts the real images. Next is Terraform on AWS: one EC2 server plus RDS with point-in-time restore, sized to the Free plan's credits because my budget is ₹0.
+- **How it's shipped:** the same Docker Compose stack runs on my laptop and in CI. Every pull request must pass five required checks: lint, types and 272 tests against a real PostgreSQL; a secret scan of the whole history; a migration-order check; the PR title; and a smoke test that starts the real images. Next is Terraform on AWS in Sydney: one EC2 server plus RDS with point-in-time restore, priced at about 5 cents per running hour and run only for sessions and demos, because my budget is ₹0.
 - **Where it stands:** the foundations are done (Phase 0). In Phase 1 the database already keeps businesses apart (forced Row-Level Security, with a test that scans every table), and an append-only audit log records every change in the same transaction; logins and billing come next.
 - **What I'd do differently:** pin down the real constraints first. I designed hosting for a budget I didn't have and had to redesign it. And test what you ship: the production CSS minifier broke a page my unit tests said was fine.
 
@@ -37,12 +37,13 @@ Update this as the project grows.
 | Scanned item appears on screen | < 200 ms | NFR 5 |
 | Bill save | < 1 second | NFR 5 |
 | Cloud budget | ₹0: AWS Free plan, $100 credits now + up to $100 from 5 activities, until 2027-05-12; Region Sydney `ap-southeast-2` | ADRs 0011, 0030 |
-| Hosting cost target | ~$25–35 / month of credits | ADR 0011 |
+| Hosting cost (Sydney) | $0.0512 per running hour + $4.73 a month for disks: ≈ $7.80 a month at ~60 h, ≈ $42 at 24/7 | ADRs 0011, 0032 |
+| Extra latency, India → Sydney | ~0.2 s per round trip (Mumbai ~55–80 ms, Sydney ~270–300 ms) | ADR 0032 |
 | Money stored as | whole paise (₹12.50 = 1250) | ADR 0008 |
 | Largest exact amount in JavaScript | ≈ ₹90 lakh crore in paise (2^53) | ADR 0008 |
 | Business types in v1 | 5 | Module 00 |
 | Modules | 10 (00–09) | `docs/requirements/` |
-| ADRs | 30 (16 at kickoff) | `docs/decisions/` |
+| ADRs | 32 (16 at kickoff) | `docs/decisions/` |
 | Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
 | Automated tests | 272: 45 shared (money), 60 db (roles, client, 15 tenancy, 17 entry log, 6 guard), 37 api (health, config, shutdown, worker, error logging), 130 web (routing, connection badge, three languages, error screen, 44 contrast checks, Hindi line height, components, theme, 24 keyboard-shortcut tests, layout, `/design`) | `pnpm test` |
 | Interface languages | 3: English, Hindi, Hinglish (`en`, `hi`, `hi-Latn`) | Module 00 #25, ADR 0023 |
@@ -92,9 +93,13 @@ Short answers; the Log entry has the full story.
 - **Q: Why an IAM user and not IAM Identity Center?**
   A: Identity Center's account access needs AWS Organizations, and joining Organizations upgrades a Free plan account to Paid, which can't be undone. That's why I first planned an IAM user with MFA (ADR 0029). AWS's new sign-up flow then made it moot: people sign in through the project's Team page, and AWS manages the structure behind it. → ADR 0030
 - **Q: Why is your server in Sydney and not Mumbai?**
-  A: My Free plan project is locked to the Region AWS assigned, Sydney. Mumbai needs the Paid plan plus "advanced features", which can't be undone and can charge my card. My budget is zero, so I accepted about 0.1 s more per request for a demo, and wrote down that real shop data would need the Region question reopened. → ADR 0030
+  A: My Free plan project is locked to the Region AWS assigned, Sydney. Mumbai needs the Paid plan plus "advanced features", which can't be undone and can charge my card. My budget is zero, so I accepted about 0.2 s more per round trip (measured) for a demo, and wrote down that real shop data would need the Region question reopened. → ADR 0030
 - **Q: How do you make sure the cloud doesn't cost you money?**
   A: On the Free plan AWS can't charge the card; it closes the account when credits run out. So the risk is burning credits early. I have a monthly budget that excludes credits (by default AWS subtracts them, so a normal budget shows $0 while credits drain), alerting at $5, $10, $15 and on forecast. I also stop the server and database when idle and state each resource's cost before Terraform creates it. → ADR 0030
+- **Q: How do you and your AI assistant get into AWS without access keys?**
+  A: `aws login` gives my laptop 12-hour credentials from my console sign-in (MFA on my identity), renewed for up to 90 days, and Terraform's provider reads them natively. Every command names the profile and the provider pins the allowed account ID, because my laptop once had a live key for another project as its default. CI will use OIDC with its own narrow role. → ADR 0031
+- **Q: Why no Elastic IP on your server?**
+  A: An Elastic IP bills every hour, even while the server is stopped, and mine is stopped most of the time. The auto-assigned address is released on stop and costs nothing then; the server updates a free DuckDNS name at boot, so the address can change. → ADR 0032
 - **Q: What's RPO and RTO for your app?**
   A: RPO is how much data you can lose (5 minutes, thanks to point-in-time restore). RTO is how long recovery takes (1 hour, checked by a monthly restore drill). → `product-overview.md` NFR 1
 - **Q: Why did you test against a real database instead of mocks?**
@@ -278,6 +283,13 @@ Terms I learned on this project, in one line each.
 | `uncaughtException` / `unhandledRejection` | Node's process-level events for an error nothing caught: a throw (or an `error` event with no listener), and a rejected promise nobody awaited |
 | `AggregateError` | One error that wraps several, in `.errors`; Node throws it when every address of a host refuses the connection, with an empty message of its own |
 | Checked-out connection | A pool connection handed to code for a while (a whole transaction), as opposed to an idle one waiting in the pool |
+| `aws login` | AWS CLI command (v2.32+) that turns a console sign-in into temporary credentials for a named profile: 12 hours, renewed for up to 90 days |
+| `allowed_account_ids` | Terraform AWS provider setting: refuse to run unless the credentials belong to one of these accounts |
+| AWS Pricing API | `aws pricing get-products`: AWS's price list as data, filtered by service, Region and attributes; the same numbers as the Pricing Calculator |
+| Elastic IP | A fixed public IPv4 address you keep; billed every hour, even while the server is stopped |
+| EventBridge Scheduler | AWS's cron service: calls an AWS API on a schedule (ours stops EC2 and RDS nightly) through a role |
+| DuckDNS | A free dynamic-DNS service: a subdomain whose IP the server updates through a URL with a token |
+| Write-only argument (Terraform) | An argument such as `password_wo` that Terraform sends to the provider but never stores in state or plan files |
 
 ---
 
@@ -1215,3 +1227,37 @@ Entry format:
 - **Why / what I learned:** consoles move things around. Read what's on the screen instead of following remembered clicks, and keep identifiers out of everything public.
 - **Say it in an interview:** "AWS console URLs include the account ID, so screenshots and notes for a public repo need it removed."
 - **Follow-ups to expect:** Is an account ID a secret? (Not on its own: AWS says it's an identifier, not a credential. Still, keeping it out of a public repo means less to target.)
+
+### 2026-11-12 — Signing Terraform in without access keys: `aws login` `#cloud` `#security` `#devops` → ADR 0031
+- **What happened:** The 2026-10-29 plan was `aws sso login` through IAM Identity Center, but my account's new projects-based experience has no Identity Center and no IAM users for people. AWS's own page for this experience documents `aws login --profile <name>`: it opens the browser, I pick my project and session, and the CLI gets credentials for an assumed role (`AccountFullAccessRole`), valid 12 hours and renewed for up to 90 days. Terraform's AWS provider reads that profile natively (provider ≥ 6.23, and the S3 backend from Terraform 1.15). I left out AWS's "Agent Toolkit" setup: it would also install an MCP server, skills and a second rule file next to `CLAUDE.md`, none of which Terraform needs.
+- **Why / what I learned:** The goal stays the same whatever the sign-in flow is called: temporary credentials, nothing long-lived on disk, MFA on the identity. Read the provider's support for a new credential type before choosing it; older tools needed a `credential_process` wrapper.
+- **Say it in an interview:** "There are no AWS access keys in my project. The CLI and Terraform use 12-hour credentials from my console sign-in, and CI will use OIDC with its own narrow role."
+- **Follow-ups to expect:** What's the risk with your laptop session? (It's full access. Fine for one owner's laptop, never for CI. CI gets least privilege through OIDC.) What happens after 12 hours? (Commands fail with expired credentials; `aws login` again.)
+
+### 2026-11-12 — A live key for another account was my laptop's default `#cloud` `#security` `#gotcha` → ADR 0031
+- **What happened:** Before using Terraform, Claude looked at `~/.aws/`. A `credentials` file from April 2026 (written by the AWS Toolkit for VS Code) had two profiles with long-lived access keys, and `[default]` still worked: it was an IAM user from a different project, in another account, defaulting to `us-east-1`. Any `aws` command or Terraform run without a profile would have acted on that account, which isn't on a Free plan. Fix: every command names `--profile business-software`, and the Terraform provider gets `allowed_account_ids` (the ID in a git-ignored file), so it refuses any other account even with the wrong credentials. The OCR project is finished, so `[default]` was renamed to a named profile (now a command without a profile fails with `NoCredentials`). Deactivating the key from the laptop failed: the key's own user may not call `iam:UpdateAccessKey` (good least privilege), and the second profile's key was already invalid. So it gets deactivated in that account's console.
+- **Why / what I learned:** Credentials outlive the projects they were made for. Tools silently fall back to `[default]`. A guard that checks *which account* you're in is cheap and catches the worst mistake in cloud work.
+- **Say it in an interview:** "My Terraform provider pins the allowed account ID, so a wrong default profile makes it fail instead of building in the wrong account."
+- **Follow-ups to expect:** What else could you do? (Delete or rotate unused keys; remove `[default]` so nothing works without a profile; `aws configure list` shows which credentials win and why.)
+
+### 2026-11-12 — Priced it with the Pricing API before creating anything `#cloud` `#cost` → ADR 0032
+- **What happened:** ADR 0011's estimate was Mumbai's. Claude queried the AWS Pricing API (`aws pricing get-products`, endpoint in `us-east-1`; it worked even though my project is locked to Sydney) for each line item. Sydney: EC2 `t4g.small` $0.0212/h, public IPv4 $0.005/h, RDS `db.t4g.micro` $0.025/h, EBS gp3 $0.096/GB-month, RDS gp3 $0.138/GB-month. That's **$0.0512 per running hour plus $4.73 a month** for disks: ≈ $42 a month at 24/7, ≈ $7.80 at 60 hours a month. I chose an auto-assigned IP (released while stopped) over an Elastic IP (billed even while stopped), a DuckDNS name the server updates at boot, Ubuntu 26.04 ARM64 (automatic security updates by default), and a nightly EventBridge Scheduler stop at 23:30 IST.
+- **Why / what I learned:** Split cloud cost into "per running hour" and "per month regardless": stopping only removes the first part. An Elastic IP is a fixed-cost trap on a server that's mostly off.
+- **Say it in an interview:** "I priced every resource with the Pricing API first. Running only for sessions and demos keeps the whole stack under $8 a month, and a nightly schedule stops it in case I forget."
+- **Follow-ups to expect:** Why not `t4g.micro`? (Half the price, but 1 GB is tight for api + worker + Chromium; measure first.) What still costs while stopped? (Both disks: $4.73 a month.)
+
+### 2026-11-12 — Measured: Sydney adds 0.2 s per round trip from India `#cloud` `#architecture` `#frontend` → ADR 0032
+- **What happened:** ADR 0030 guessed 0.1–0.15 s. Claude timed TCP connections from my laptop to AWS's public endpoints, without DNS time: Mumbai ~55–80 ms, Sydney ~270–300 ms. That's about 0.2 s extra per round trip.
+- **Why / what I learned:** Measure instead of guessing. NFR 5 wants a scanned item on screen in under 200 ms, which one Sydney round trip already uses up. So the billing screen (P1.13) must find items in a copy kept in the browser, not ask the server per scan.
+- **Say it in an interview:** "Measuring latency to my Region showed one round trip already exceeded my 200 ms scan target, so the billing screen looks items up locally and only saving a bill goes to the server."
+- **Follow-ups to expect:** How do you keep the browser's copy fresh? (Load the catalogue at start, refresh in the background, and let the server re-check prices and stock when the bill is saved.) Why does HTTPS make it worse? (A new connection needs TCP plus TLS handshakes first; keep-alive and HTTP/2 reuse one connection.)
+
+### 2026-11-12 — Small gotchas installing the cloud tools `#devops` `#gotcha`
+- **What happened:**
+  - `winget install` changes PATH, but the open terminal keeps the old one: reload it or open a new terminal.
+  - The old AWS CLI v1 had left launcher scripts in `Python311\Scripts` with no package behind them. CLI v2 lands earlier on PATH, so it wins (`Get-Command aws -All` shows the order).
+  - Git Bash rewrites arguments that start with `/` into Windows paths, which mangled the SSM parameter name `/aws/service/...`. `MSYS_NO_PATHCONV=1` before the command stops it.
+  - `winget` installed Terraform 1.17.1 while 1.17.2 was already out; Terraform itself says so on `terraform version`.
+- **Why / what I learned:** on Windows, check *which* binary runs and what the shell did to your arguments before debugging the tool.
+- **Say it in an interview:** "When a command behaves strangely on Windows, I check `Get-Command -All` for the binary and whether Git Bash rewrote a path argument."
+- **Follow-ups to expect:** Why not install the CLI with pip? (v2 isn't on PyPI; v1 is old and needs a Python environment.)

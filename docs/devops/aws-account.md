@@ -27,7 +27,7 @@ Why each choice: ADR 0011 (Free plan, one server + RDS) and **ADR 0030** (new pr
 
 - Through the identity you signed up with (Google, GitHub, Apple or Amazon), then the project. **MFA lives on that identity:** turn on 2-step verification there (for Google: myaccount.google.com → Security). That protects the AWS project too.
 - Bookmark the console after signing in. Don't commit the URL; it contains the account ID.
-- The laptop's AWS CLI and Terraform sign-in is decided in stage 5 (short-lived credentials, no access keys on disk if avoidable).
+- **Laptop (CLI and Terraform), ADR 0031:** `aws login --profile business-software` opens the browser; pick the project and session. Credentials last 12 hours and renew for 90 days. Always name the profile: the laptop has no `[default]` credentials on purpose, so a command without `--profile` fails instead of reaching another account.
 
 ## Keeping it free: the money guardrails
 
@@ -54,7 +54,8 @@ Console Home → Explore AWS widget → filter *Earn AWS credits*. Credits earne
 | Create a web app using AWS Lambda | Not started | Later: a tiny function, deleted afterwards. Check its price first; it should cost cents at most. |
 | Use a foundation model in the Amazon Bedrock playground | Not started | Later: one short prompt. Check the model's price per token first; it should cost under a cent. |
 
-## Not yet
+## Tools on the laptop
 
-- No AWS CLI or Terraform until stage 5. The old broken `aws` in `Python311\Scripts` gets removed then.
-- No resources apart from the budget.
+- AWS CLI v2 (2.40.0) and Terraform (1.17.1), installed 2026-11-12 with `winget install --id Amazon.AWSCLI` / `Hashicorp.Terraform`. Open a new terminal after installing so PATH is fresh.
+- The old AWS CLI v1 launchers in Python's `Scripts` folder were deleted the same day.
+- Prices and the server shape: ADR 0032. Terraform's plan: `docs/plans/2026-11-12-stage-5-terraform.md`.

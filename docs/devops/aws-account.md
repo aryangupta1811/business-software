@@ -1,58 +1,60 @@
-# AWS account: setup and sign-in (DevOps stage 4)
+# AWS account: what we have and how to keep it free (DevOps stage 4)
 
-The owner does these steps in the browser, once. Why each choice: ADR 0011 (Free plan, Mumbai) and ADR 0029 (root locked away, IAM user with MFA, no Organizations).
+Why each choice: ADR 0011 (Free plan, one server + RDS) and **ADR 0030** (new projects-based experience, Region Sydney, budget without credits). ADR 0029's IAM-user plan is replaced: the account we got has no place for it.
 
-**The repo is public.** The account ID, the sign-in alias or link, the root email and every password stay out of it. Keep them in a password manager.
+**The repo is public.** The account ID, the sign-in URL, the owner's email and every password stay out of it. Keep them in a password manager.
+
+## The account (checked in the console, 2026-11-12)
+
+| What | Value |
+| --- | --- |
+| Plan | **Free** ("Upgrade plan" button shown, not clicked) |
+| Credits | $100, plus up to $100 from 5 activities (below) |
+| Days | 182 left on 2026-11-12; AWS shows the end date **2027-05-12** |
+| Sign-up experience | AWS's new projects-based one (2026-09): sign in with an identity provider into a project; settings at `settings.aws.com` (Projects, Team, Billing, Profile) |
+| Region | **Asia Pacific (Sydney) `ap-southeast-2`**, assigned to the project. Other Regions need Paid + advanced features. |
+| IAM users | none (IAM says people get access through the Team page; IAM users are for programs only) |
+| Resources | none: 0 S3 buckets in any Region, $0 spent |
+| Budget | `monthly-credit-burn`, created 2026-11-12 (below) |
 
 ## Rules that can't be undone
 
-- **One account, in your own name.** The Free plan and its credits are only for new AWS customers. Anyone who has (or had) an account is ineligible (Free Tier FAQ). Using a family member's card as the *payment method* is fine. A second account is not.
-- **Don't join or create an AWS Organization**, set up Control Tower, or turn on IAM Identity Center's organization instance. Joining Organizations upgrades a Free plan account to Paid, and an upgrade can't be reversed.
-- **The 6-month clock starts at sign-up.** The account closes after 6 months or when the credits run out, whichever comes first (ADR 0011).
+- **Never click "Upgrade plan" or "Activate advanced features".** Advanced features need the Paid plan and can't be turned off. On the Paid plan AWS can charge your card. On the Free plan it can't: it closes the account when the credits or the 6 months run out.
+- **Don't create or join an AWS Organization**, or set up Control Tower.
+- **One account, in your own name.** The Free plan and its credits are only for new AWS customers.
 
-## A. Get ready (10 minutes)
+## How you sign in
 
-1. An email you'll keep for years. A Gmail alias works: `yourname+aws@gmail.com` arrives in your normal inbox.
-2. A password manager (Bitwarden is free) for the root password and MFA recovery codes.
-3. An authenticator app on your phone, or a passkey.
-4. A debit or credit card with online and international payments turned on. AWS charges about ₹2 to check the card and refunds it.
+- Through the identity you signed up with (Google, GitHub, Apple or Amazon), then the project. **MFA lives on that identity:** turn on 2-step verification there (for Google: myaccount.google.com → Security). That protects the AWS project too.
+- Bookmark the console after signing in. Don't commit the URL; it contains the account ID.
+- The laptop's AWS CLI and Terraform sign-in is decided in stage 5 (short-lived credentials, no access keys on disk if avoidable).
 
-## B. Create the account
+## Keeping it free: the money guardrails
 
-5. aws.amazon.com → **Create account**.
-6. Choose the **Free plan**, account type **Personal**, support plan **Basic**. Fill in your own details.
+1. **The budget** (Billing and Cost Management → Budgets → `monthly-credit-burn`):
+   - Monthly cost budget, **$15**, unblended cost.
+   - Scope: *Filter specific AWS cost dimensions* → **Charge type → Excludes → Credit, Refund**. By default AWS counts credits as negative cost, so without this filter the budget would show $0 while the credits drain.
+   - Email alerts at **33% (~$5), 66% (~$10), 100% actual**, and **100% forecasted**.
+   - No actions. An alert-only budget is free. On the Free plan a budget can only warn; it can't stop anything.
+   - **Owner:** AWS emails each new recipient a confirmation link. Click it, or no alert arrives.
+2. **Stop the server and the database after every session** until stage 7's automatic schedule exists. A stopped server pays only for its disk; RDS restarts itself after 7 days stopped.
+3. **Before Terraform creates anything**, Claude states its cost per hour and per month against the remaining credits.
+4. Nothing that bills by the hour while idle: no NAT gateway, no load balancer, no extra Elastic IPs.
+5. Target: about **$10 a month** (running only for sessions and demos), about $60 over the 6 months.
 
-## C. Lock the root user
+## Credit activities ($20 each, within the 6 months)
 
-The root user is the email login. It can do anything, including closing the account, and no policy can limit it.
+Console Home → Explore AWS widget → filter *Earn AWS credits*. Credits earned expire 12 months after sign-up.
 
-7. Top-right menu → **Security credentials** → assign MFA (passkey or authenticator app).
-8. Never create access keys for root. Save its password in the password manager.
-
-## D. Create the everyday admin login
-
-9. Top-right menu → **Account** → *IAM user and role access to Billing information* → **Activate**. Without this, an IAM user can't see the credit balance.
-10. **IAM** → **User groups** → create `admins` with the policy `AdministratorAccess`.
-11. **IAM** → **Users** → create a user for yourself. Turn on console access with a custom password, and add the user to `admins`.
-12. **IAM** → **Dashboard** → create an **account alias**. This gives a short sign-in link; bookmark it.
-13. Sign out. Sign in through that link as the new user, then add MFA to this user too (**Security credentials**).
-14. From now on, use only this login. Root is only for account-level tasks (closing the account, changing the root email, a few billing settings).
-
-## E. Region and money
-
-15. Console **Settings** → default Region **Asia Pacific (Mumbai) `ap-south-1`**.
-16. Console Home:
-    - **Cost and Usage widget:** credit balance and days left. AWS also emails as the credits and the 6 months run low.
-    - **Explore AWS widget**, filtered to *Earn AWS credits*: the activities that earn up to $100 more. Complete them within 6 months of opening the account. Earned credits expire 12 months after sign-up.
-17. Do any activity that only sets something up (for example, a budget or alert) now. **Don't start an activity that launches a server or database yet.** Running ones use credits. Bring the list to the next session, so each one is done at the smallest size and removed straight after.
-
-## F. Report back (next session)
-
-- The plan shown (should be **Free**).
-- The credit balance and days left.
-- The list of credit-earning activities and which ones are done.
+| Activity | Status (2026-11-12) | Plan |
+| --- | --- | --- |
+| Set up a cost budget using AWS Budgets | Budget created; widget still "Not started" right after | Check next session. If it stays "Not started", open the activity from the widget and follow its own steps. |
+| Launch an instance using EC2 | Not started | Stage 5: launch the real `t4g.small` (or the smallest allowed type) through Terraform. If the activity needs its own launch, use the smallest type and terminate it within the hour (a few cents). |
+| Create an Aurora or RDS database | Not started | Stage 5: the real RDS instance (`db.t4g.micro`), stopped after the session. Never Aurora (costs more). |
+| Create a web app using AWS Lambda | Not started | Later: a tiny function, deleted afterwards. Check its price first; it should cost cents at most. |
+| Use a foundation model in the Amazon Bedrock playground | Not started | Later: one short prompt. Check the model's price per token first; it should cost under a cent. |
 
 ## Not yet
 
-- **No AWS CLI or Terraform** until stage 5. The old broken `aws` in `Python311\Scripts` gets removed then, and how the laptop gets short-lived credentials is decided then (ADR 0029).
-- No resources: nothing is created in the account in stage 4 apart from the IAM group, the user and any credit activity that costs nothing.
+- No AWS CLI or Terraform until stage 5. The old broken `aws` in `Python311\Scripts` gets removed then.
+- No resources apart from the budget.

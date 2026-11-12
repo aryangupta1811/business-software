@@ -1204,3 +1204,14 @@ Entry format:
 - **Why / what I learned:** An alert you never receive feels exactly like an alert you don't need. Test what a monitor measures, not only that it exists. On the Free plan budgets only warn: they can't stop a server (budget actions can, and the first two are free).
 - **Say it in an interview:** "My cost alarm initially would have measured net cost, which is zero while credits pay, so it could never fire. I filtered out credits so it measures what the resources really cost."
 - **Follow-ups to expect:** Actual vs forecasted alert? (Actual fires when spend crosses the line. Forecast fires early, when the month's projection will cross it.) Why $15? (About 1.5× the planned ~$10 a month, so it means "something is left running".)
+
+### 2026-11-12 — Small gotchas in stage 4 `#cloud` `#gotcha` `#devops`
+- **What happened:**
+  - The console's web addresses carry the account ID (`<account-id>-<suffix>.<region>.console.aws.amazon.com`). Never paste one into a doc, an issue or a commit.
+  - In the new experience the Region selector is gone. The only clue was a link pointing at `ap-southeast-2`, and opening a service in another Region showed the lock.
+  - The "Earn AWS credits" list sits in a small inner scroll box on Console Home. It looks like 2 activities until you scroll inside it. There are 5.
+  - The budget form's credit switch moved from *Advanced options* to *Scope → Filter specific AWS cost dimensions → Charge type*. The old place now only shows a note pointing to the new one.
+  - The local gitleaks scan needs Docker Desktop running. With it off, the scan can't run, and the PR's `secrets` check is the safety net.
+- **Why / what I learned:** consoles move things around. Read what's on the screen instead of following remembered clicks, and keep identifiers out of everything public.
+- **Say it in an interview:** "AWS console URLs include the account ID, so screenshots and notes for a public repo need it removed."
+- **Follow-ups to expect:** Is an account ID a secret? (Not on its own: AWS says it's an identifier, not a credential. Still, keeping it out of a public repo means less to target.)

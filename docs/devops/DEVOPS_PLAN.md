@@ -4,7 +4,7 @@
 
 Tools below are **candidates**. The real choice for each stage is made with me and recorded as an ADR.
 
-**Chosen in the kickoff session (2026-10-29):** Docker + Docker Compose for local development (`docs/architecture.md`); GitHub Actions for CI/CD, logging in to AWS with OIDC (ADR 0012); AWS `ap-south-1` on the **Free plan**, with one EC2 server running Docker Compose, RDS PostgreSQL and S3, built with Terraform (ADR 0011). Tools for stages 9–11 are still candidates.
+**Chosen in the kickoff session (2026-10-29):** Docker + Docker Compose for local development (`docs/architecture.md`); GitHub Actions for CI/CD, logging in to AWS with OIDC (ADR 0012); AWS on the **Free plan** (Region Sydney `ap-southeast-2` since 2026-11-12, ADR 0030; first planned as `ap-south-1`), with one EC2 server running Docker Compose, RDS PostgreSQL and S3, built with Terraform (ADR 0011). Tools for stages 9–11 are still candidates.
 
 ## How to teach me
 
@@ -33,7 +33,7 @@ Each stage is woven into a project phase (see `docs/PROGRESS.md`).
 | 1 | Git workflow | Branches, pull requests, protected `main`, commit conventions, no secrets in git | Git, GitHub | Phase 0 |
 | 2 | Containers | A container per service; app + database start with one command locally | Docker, Docker Compose | Phase 0 (walking skeleton) |
 | 3 | Continuous integration | Every push/PR runs lint, tests and a build; `main` stays green | GitHub Actions or Jenkins | Phase 0 |
-| 4 | Cloud basics & guardrails | Secure account (MFA, no root use), IAM users/roles, budget alarm, region choice | AWS (Mumbai `ap-south-1` suggested: close to Indian users) | Start of Phase 1 |
+| 4 | Cloud basics & guardrails | Secure account (MFA, no root use), IAM users/roles, budget alarm, region choice | AWS (Mumbai was suggested; the Free plan project is locked to Sydney `ap-southeast-2`, ADR 0030) | Start of Phase 1 |
 | 5 | Infrastructure as code | Every cloud resource created from code; a staging environment created on demand | Terraform | Phase 1 |
 | 6 | Continuous deployment | Deploy on merge with a manual go-ahead; one-step rollback; health checks | GitHub Actions + AWS Systems Manager | Phase 1 |
 | 7 | Data safety | Managed database with automated backups and point-in-time restore; backups copied to separate storage; a restore drill run monthly; a written restore runbook | AWS managed database + object storage | Phase 1, before any real data |

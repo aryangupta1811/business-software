@@ -20,6 +20,7 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
 
   The plan had gaps too, now filed under their tasks in `PROGRESS.md`: the worker can't see any business's rows without a cross-business read; the public demo login and its "reset" clash with the no-delete rule; login isn't the only lookup that happens before a business is known. 272 tests.
 - **2026-11-10 (plan and technology review, no feature code):** every technology checked with evidence (`docs/plans/2026-11-10-plan-review.md`). The stack stays. Experiments corrected four assumptions: pg-boss needs `createSchema: false` to run as its restricted role; the Graviton server is ARM64 while CI builds x86 images (both images were built and run on ARM64); tests don't need the SWC plugin; Argon2id is built into Node 24. The order of work changed to **demo-first**: cloud stages 5, 6 and 7 before any feature, then the shortest path to a printed bill, then demo data, then the rest.
+- **2026-11-12 (DevOps stage 4, cloud guardrails, no code):** the owner opened the AWS account and Claude checked it in the console (read-only, except one budget). Free plan, $100 of credits until 2027-05-12, nothing running. The account came from AWS's new projects-based sign-up experience. It has no IAM users for people, and the Free plan project is locked to **Sydney**, so the runbook written for the old experience no longer fitted. To keep the project fully free, the owner chose Sydney over an irreversible upgrade. A $15 monthly budget alerts on real spend, with credits filtered out. ADR 0030 replaces ADR 0029, and the runbook was rewritten.
 
 ## Stack choices vs alternatives
 
@@ -34,6 +35,9 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
 | Action names | Text column + a TypeScript list | A database enum (a migration per new action) | 0028 |
 | Owner password reset (product rule) | Email link + printed recovery key | SMS OTP (per-message cost, DLT registration); recovery key only | Module 00 #30–#33 |
 | Staff login (product rule) | Username unique within the shop; the counter computer remembers the shop | A shop code typed at every login; usernames unique across the app | Module 00 #28 |
+| AWS Region | Sydney `ap-southeast-2`, the Free plan project's assigned Region | Mumbai via the Paid plan + advanced features (irreversible, card chargeable); a second project in Mumbai (unknown if allowed) | 0030 |
+| Cost alarm | AWS Budget on gross cost (Credit and Refund excluded), $15 a month, actual and forecast alerts | Default budget (credits hide spend); a Paid plan spend limit | 0030 |
+| When to start the cloud | Now, running only for sessions and demos (~$10 a month) | AWS at the end (the 6-month clock runs anyway; no live demo for placements) | 0011, 0030 |
 
 ## Mistakes and what I learned
 
@@ -47,8 +51,15 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
 - **The list of open questions wasn't complete.** Answering "how to reset a password" (by email) made email a login detail, and that exposed a question nobody had listed: what owners and staff type to log in. Lesson: after answering each question, ask what it changes downstream.
 - **I had tested the idle half of a failure and assumed the other half.** A test killed the database's *idle* connections and the API survived, so I believed a database restart was covered. pg-pool removes its `error` listener from a connection the moment it's checked out, and every transaction checks one out. Lesson: for each failure, ask what state the system is in when it happens, and test the busy state too.
 - **A rule I wrote down wasn't the framework's default.** "Never log the error object" was in `secrets.md` and in my own code, but the first unexpected error in a request would have gone through Nest's handler, which logs exactly that. Lesson: a rule about logging has to be enforced at every exit: my code, the framework's handler and the runtime's crash report.
+- **My runbook described an AWS that had changed.** It was written in early November for IAM users and a Mumbai default. The account I opened came from the new experience (September 2026): no IAM users for people, and a Region lock. Lesson: before following cloud steps, look at the real account; providers change their onboarding faster than notes age.
+- **A cost alarm can be blind.** AWS Budgets subtracts credits by default, so an alert at $5 would never fire on a credit-funded account. Lesson: check what a monitor measures, not only that it exists.
 
 ## Interview questions I can now answer
+
+- Q: Why is your server in Sydney when your users are in India?
+  A: My AWS Free plan project is locked to Sydney. Mumbai needs a paid plan and an irreversible "advanced features" switch, and my budget is zero. A demo can live with about 0.1 s more per request; real shop data would need the Region reopened. (ADR 0030)
+- Q: How do you stop the cloud costing you money?
+  A: The Free plan can't charge my card; the risk is burning credits early. A budget that excludes credits alerts at $5, $10 and $15 a month and on forecast, the server and database run only during sessions and demos, and every resource's cost is stated before Terraform creates it. (ADR 0030)
 
 - Q: What happens to your API when the database restarts in the middle of a request?
   A: That request fails with a 500 and the process keeps running. It used to crash: pg-pool listens for `error` only on idle connections, and Node kills a process on an `error` event with no listener. I listen on every connection the pool opens, and a test terminates the backend mid-transaction to prove it. (`packages/db/src/client.ts`)

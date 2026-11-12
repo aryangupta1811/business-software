@@ -4,7 +4,7 @@
 
 ## In one paragraph
 
-A web app opened in Chrome on the shop's counter computer. It talks over HTTPS to one backend, a modular monolith [0004], running in containers on a single server on AWS Mumbai (Free plan, ₹0 budget) [0011] and storing everything in one PostgreSQL database [0005]. A worker process (same code, different entry point) runs background jobs: WhatsApp messages, alerts, PDFs [0010]. All businesses share the same tables, and the database itself keeps each business's rows apart [0006]. v1 needs internet; a dropped connection never loses or duplicates a bill [0001].
+A web app opened in Chrome on the shop's counter computer. It talks over HTTPS to one backend, a modular monolith [0004], running in containers on a single server on AWS Sydney (Free plan, ₹0 budget) [0011, 0030] and storing everything in one PostgreSQL database [0005]. A worker process (same code, different entry point) runs background jobs: WhatsApp messages, alerts, PDFs [0010]. All businesses share the same tables, and the database itself keeps each business's rows apart [0006]. v1 needs internet; a dropped connection never loses or duplicates a bill [0001].
 
 ## The big picture (production)
 
@@ -15,7 +15,7 @@ flowchart LR
     chrome --> printer["Receipt / A4 printer"]
   end
 
-  subgraph aws["AWS Mumbai (ap-south-1), Free plan"]
+  subgraph aws["AWS Sydney (ap-southeast-2), Free plan"]
     subgraph ec2["EC2 server running Docker Compose"]
       caddy["Caddy<br/>HTTPS + web app files"]
       api["api<br/>NestJS"]

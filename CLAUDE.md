@@ -36,7 +36,7 @@ Read files when a task needs them. Don't load everything at once.
 
 ## Stack
 
-TypeScript monorepo (pnpm): React + Vite web app, NestJS modular monolith (api + worker), PostgreSQL + Drizzle with Row-Level Security, Docker Compose locally, GitHub Actions CI/CD, AWS Mumbai Free plan (one EC2 server + RDS, ₹0 budget) via Terraform. Reasons: `docs/architecture.md` and ADRs 0001–0018.
+TypeScript monorepo (pnpm): React + Vite web app, NestJS modular monolith (api + worker), PostgreSQL + Drizzle with Row-Level Security, Docker Compose locally, GitHub Actions CI/CD, AWS Sydney Free plan (one EC2 server + RDS, ₹0 budget; never upgrade the plan, ADR 0030) via Terraform. Reasons: `docs/architecture.md` and ADRs 0001–0018.
 
 ## Rules
 

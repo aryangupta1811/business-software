@@ -20,7 +20,7 @@ Update this as the project grows.
 
 - **The problem:** a small Indian shop runs on a billing app, a paper udhaar register and a staff notebook. I'm building one web app that does all of it, for many shops at once, each seeing only its own data, in English, Hindi and Hinglish.
 - **What makes it hard:** correctness, not the feature list. A bill must save the invoice, the stock change and the udhaar entry together or not at all. Two counters can sell the last unit at the same moment. GST maths must be exact to the paisa. And the owner can't lose a single record.
-- **My architecture:** a TypeScript monorepo with a React single-page app, a NestJS modular monolith (so a bill is one database transaction, not a saga across services) and PostgreSQL. The safety rules live in the database, not only in my code: money is stored as whole paise, the app's database user has no DELETE permission, and Row-Level Security keeps businesses apart. Every choice has a written decision record with the alternatives I rejected; there are 29 so far.
+- **My architecture:** a TypeScript monorepo with a React single-page app, a NestJS modular monolith (so a bill is one database transaction, not a saga across services) and PostgreSQL. The safety rules live in the database, not only in my code: money is stored as whole paise, the app's database user has no DELETE permission, and Row-Level Security keeps businesses apart. Every choice has a written decision record with the alternatives I rejected; there are 30 so far.
 - **One hard bug:** my background worker kept dying after exactly 10 seconds. That was the database driver's idle timeout. Waiting for the shutdown signal doesn't keep Node's event loop alive, so when the pool's last idle connection closed, the process simply ended. I reproduced it in a test, held the process open until SIGTERM, and confirmed it in Docker with zero restarts.
 - **How it's shipped:** the same Docker Compose stack runs on my laptop and in CI. Every pull request must pass five required checks: lint, types and 272 tests against a real PostgreSQL; a secret scan of the whole history; a migration-order check; the PR title; and a smoke test that starts the real images. Next is Terraform on AWS: one EC2 server plus RDS with point-in-time restore, sized to the Free plan's credits because my budget is ₹0.
 - **Where it stands:** the foundations are done (Phase 0). In Phase 1 the database already keeps businesses apart (forced Row-Level Security, with a test that scans every table), and an append-only audit log records every change in the same transaction; logins and billing come next.
@@ -36,13 +36,13 @@ Update this as the project grows.
 | Max time to recover (RTO) | 1 hour | Restore runbook + monthly drill |
 | Scanned item appears on screen | < 200 ms | NFR 5 |
 | Bill save | < 1 second | NFR 5 |
-| Cloud budget | ₹0: AWS Free plan, up to $200 credits over 6 months | ADR 0011 |
+| Cloud budget | ₹0: AWS Free plan, $100 credits now + up to $100 from 5 activities, until 2027-05-12; Region Sydney `ap-southeast-2` | ADRs 0011, 0030 |
 | Hosting cost target | ~$25–35 / month of credits | ADR 0011 |
 | Money stored as | whole paise (₹12.50 = 1250) | ADR 0008 |
 | Largest exact amount in JavaScript | ≈ ₹90 lakh crore in paise (2^53) | ADR 0008 |
 | Business types in v1 | 5 | Module 00 |
 | Modules | 10 (00–09) | `docs/requirements/` |
-| ADRs | 29 (16 at kickoff) | `docs/decisions/` |
+| ADRs | 30 (16 at kickoff) | `docs/decisions/` |
 | Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
 | Automated tests | 272: 45 shared (money), 60 db (roles, client, 15 tenancy, 17 entry log, 6 guard), 37 api (health, config, shutdown, worker, error logging), 130 web (routing, connection badge, three languages, error screen, 44 contrast checks, Hindi line height, components, theme, 24 keyboard-shortcut tests, layout, `/design`) | `pnpm test` |
 | Interface languages | 3: English, Hindi, Hinglish (`en`, `hi`, `hi-Latn`) | Module 00 #25, ADR 0023 |
@@ -88,9 +88,13 @@ Short answers; the Log entry has the full story.
 - **Q: How did you host it with no budget?**
   A: AWS Free plan credits, and a design sized to them: one EC2 server running the same Docker Compose stack as my laptop, plus RDS for managed backups. I skipped the load balancer, NAT gateway and ECS, which would have used the credits in about 4 months. Everything is Terraform, so moving to ECS later is an infrastructure change only. → ADR 0011
 - **Q: Why not just use the AWS root user?**
-  A: Root can do anything, including closing the account, and no policy can limit it, so a leaked root password is the worst possible leak. I put MFA on it, created no access keys, and use it only for account-level tasks. Daily work is an IAM user with MFA. → ADR 0029
+  A: Root can do anything, including closing the account, and no policy can limit it, so a leaked root password is the worst possible leak. My plan was MFA on root and daily work as an IAM user (ADR 0029). The account I actually got came from AWS's new sign-up flow: I sign in through my identity provider into a project, MFA lives on that identity, and IAM users are only for programs. → ADR 0030
 - **Q: Why an IAM user and not IAM Identity Center?**
-  A: Identity Center's account access needs AWS Organizations, and AWS's Free plan page says joining Organizations upgrades the account to Paid, which can't be undone. My budget is zero, so I chose an IAM user with MFA in an admin group for now. With many accounts or a team, Identity Center is the right tool. → ADR 0029
+  A: Identity Center's account access needs AWS Organizations, and joining Organizations upgrades a Free plan account to Paid, which can't be undone. That's why I first planned an IAM user with MFA (ADR 0029). AWS's new sign-up flow then made it moot: people sign in through the project's Team page, and AWS manages the structure behind it. → ADR 0030
+- **Q: Why is your server in Sydney and not Mumbai?**
+  A: My Free plan project is locked to the Region AWS assigned, Sydney. Mumbai needs the Paid plan plus "advanced features", which can't be undone and can charge my card. My budget is zero, so I accepted about 0.1 s more per request for a demo, and wrote down that real shop data would need the Region question reopened. → ADR 0030
+- **Q: How do you make sure the cloud doesn't cost you money?**
+  A: On the Free plan AWS can't charge the card; it closes the account when credits run out. So the risk is burning credits early. I have a monthly budget that excludes credits (by default AWS subtracts them, so a normal budget shows $0 while credits drain), alerting at $5, $10, $15 and on forecast. I also stop the server and database when idle and state each resource's cost before Terraform creates it. → ADR 0030
 - **Q: What's RPO and RTO for your app?**
   A: RPO is how much data you can lose (5 minutes, thanks to point-in-time restore). RTO is how long recovery takes (1 hour, checked by a monthly restore drill). → `product-overview.md` NFR 1
 - **Q: Why did you test against a real database instead of mocks?**
@@ -266,6 +270,10 @@ Terms I learned on this project, in one line each.
 | MFA | Multi-factor authentication: a second proof (authenticator code or passkey) on top of the password |
 | AWS Organizations | Groups several AWS accounts under one management account; joining one upgrades a Free plan account to Paid |
 | IAM Identity Center | AWS's single sign-on: one login for many accounts, giving short-lived credentials (`aws sso login`); its account-access setup needs Organizations |
+| AWS project (new experience) | Since 2026-09, new AWS customers sign in with Google/GitHub/Apple/Amazon into a "project": an AWS account AWS sets up for you, with a team page instead of IAM users and one assigned Region on the Free plan |
+| Advanced features (AWS) | The switch that turns a new-experience project into a full AWS Organization with every Region; needs the Paid plan and can't be undone |
+| AWS Budgets | Free alerts when cost (or forecast cost) passes a threshold; on the Free plan they only warn, they can't stop anything. Credits count as negative cost unless you filter them out |
+| Region | A geographic group of AWS data centres (`ap-south-1` Mumbai, `ap-southeast-2` Sydney); most resources live in one Region, and distance adds latency |
 | Exception filter (NestJS) | The last stop for an error thrown while handling a request: it decides the HTTP answer and what gets logged. Ours is `UnhandledErrorFilter` |
 | `uncaughtException` / `unhandledRejection` | Node's process-level events for an error nothing caught: a throw (or an `error` event with no listener), and a rejected promise nobody awaited |
 | `AggregateError` | One error that wraps several, in `.errors`; Node throws it when every address of a host refuses the connection, with an empty message of its own |
@@ -1178,3 +1186,32 @@ Entry format:
 - **Why / what I learned:** A plan can be right task by task and still be in the wrong order. Deploying a skeleton first means the pipeline is exercised by every feature instead of once at the end. Ordering by "shortest path to the core flow" protects against running out of time with the most important screen unbuilt.
 - **Say it in an interview:** "I deployed a walking skeleton before building features, so every merge went through the real pipeline to a real server. Then I built the thinnest path to the product's core, a saved and printed GST bill, before anything optional."
 - **Follow-ups to expect:** What did deferring permissions risk? (Retrofitting checks onto existing routes. So the guard and permission names exist from the first route; only staff logins come later.) What does it cost? (About $30 of credits a month from day one, so the server and database are stopped when idle.)
+
+### 2026-11-12 — "Put AWS at the end to save money?" No: the clock is already running `#cloud` `#cost` `#process`
+- **What happened:** After opening the AWS account I asked whether to move all the AWS work to the end of the project, to spend less. We worked it through. The Free plan closes the account 6 months after sign-up whether I use it or not. Credits only drop while a resource exists. So "AWS at the end" saves nothing that "AWS now, switched off when idle" doesn't, and it would waste the clock and leave no live link during placements. Rough numbers (ADR 0011, Mumbai prices): running 24/7 ≈ $30–35 a month (≈ $190 over 6 months, too close to the limit); running only for sessions and demos (~100 hours a month) ≈ $10 a month (≈ $60 over 6 months).
+- **Why / what I learned:** A stopped server still pays for its disk, but not its hours. A cost question about cloud is usually a question about *hours running*, not *when you start*.
+- **Say it in an interview:** "My cloud budget was zero, so I measured cost in running hours. I built the infrastructure early with Terraform, kept the server and database stopped except for work sessions and demos, and stayed around $10 a month of credits instead of $35."
+- **Follow-ups to expect:** What still costs money when an EC2 instance is stopped? (Its EBS disk, and an Elastic IP if one is allocated. An auto-assigned public IP is released on stop.) What happens to RDS when stopped? (Storage is still charged, and AWS restarts it after 7 days, so a scheduled stop is needed.)
+
+### 2026-11-12 — My AWS account wasn't the one my runbook described `#cloud` `#security` `#gotcha` → ADR 0030
+- **What happened:** Checking stage 4 in the console, Claude found that the account came from AWS's new sign-up experience (announced 2026-09-16). I sign in with an identity provider into a "project". IAM has no users and says people get access through the Team page. There's no account-alias or user-group page. And the project is locked to **Sydney**: opening EC2 in Mumbai said "Your project is assigned to Asia Pacific (Sydney) … upgrade your plan first, and then activate advanced features." The runbook's steps C and D (root MFA, an IAM user in group `admins`, an alias) had nowhere to go. I chose Sydney and stayed on the Free plan. ADR 0030 replaces ADR 0029, and the runbook was rewritten.
+- **Why / what I learned:** Cloud providers change their sign-up flow, and a runbook is only as current as the console it was written against. Check the real account before following the steps. The dangerous buttons were in plain sight ("Upgrade plan", "Activate advanced features"), and both are one-way doors.
+- **Say it in an interview:** "When I opened the account, AWS's new onboarding locked my free project to Sydney. Getting Mumbai meant an irreversible upgrade to a paid plan. I kept the free plan, took the latency hit for a demo, and recorded the trade-off and when to reopen it."
+- **Follow-ups to expect:** What latency does Sydney add from India? (Roughly 0.1–0.15 s per round trip, to measure in stage 5.) What about data residency? (Demo data only. Real shop data would need a Region decision first.)
+
+### 2026-11-12 — A budget that stays at $0 while the credits drain `#cloud` `#cost` `#gotcha` → ADR 0030
+- **What happened:** AWS Budgets counts credits as negative cost by default, so a normal "alert me at $5" budget never fires while the free credits pay for everything. In the console the switch has moved: it's no longer under Advanced options but under **Scope → Filter specific AWS cost dimensions → Charge type → Excludes → Credit, Refund**. Budget `monthly-credit-burn`: $15 a month, alerts at 33%, 66%, 100% actual and 100% forecast, by email. It's also one of the five $20 credit activities. The widget still said "Not started" right after creating it, so check again next session.
+- **Why / what I learned:** An alert you never receive feels exactly like an alert you don't need. Test what a monitor measures, not only that it exists. On the Free plan budgets only warn: they can't stop a server (budget actions can, and the first two are free).
+- **Say it in an interview:** "My cost alarm initially would have measured net cost, which is zero while credits pay, so it could never fire. I filtered out credits so it measures what the resources really cost."
+- **Follow-ups to expect:** Actual vs forecasted alert? (Actual fires when spend crosses the line. Forecast fires early, when the month's projection will cross it.) Why $15? (About 1.5× the planned ~$10 a month, so it means "something is left running".)
+
+### 2026-11-12 — Small gotchas in stage 4 `#cloud` `#gotcha` `#devops`
+- **What happened:**
+  - The console's web addresses carry the account ID (`<account-id>-<suffix>.<region>.console.aws.amazon.com`). Never paste one into a doc, an issue or a commit.
+  - In the new experience the Region selector is gone. The only clue was a link pointing at `ap-southeast-2`, and opening a service in another Region showed the lock.
+  - The "Earn AWS credits" list sits in a small inner scroll box on Console Home. It looks like 2 activities until you scroll inside it. There are 5.
+  - The budget form's credit switch moved from *Advanced options* to *Scope → Filter specific AWS cost dimensions → Charge type*. The old place now only shows a note pointing to the new one.
+  - The local gitleaks scan needs Docker Desktop running. With it off, the scan can't run, and the PR's `secrets` check is the safety net.
+- **Why / what I learned:** consoles move things around. Read what's on the screen instead of following remembered clicks, and keep identifiers out of everything public.
+- **Say it in an interview:** "AWS console URLs include the account ID, so screenshots and notes for a public repo need it removed."
+- **Follow-ups to expect:** Is an account ID a secret? (Not on its own: AWS says it's an identifier, not a credential. Still, keeping it out of a public repo means less to target.)

@@ -1,7 +1,7 @@
 # 0029 — AWS account access: root locked away, an IAM user with MFA, no AWS Organizations on the Free plan
 
 - **Date:** 2026-11-02
-- **Status:** Accepted
+- **Status:** Replaced by 0030 (2026-11-12: the account came from AWS's new projects-based experience, which has no IAM users for people, no account alias and a Region lock; the "never join Organizations" rule survives in 0030 as "never upgrade, never activate advanced features")
 
 ## Context
 

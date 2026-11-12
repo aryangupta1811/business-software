@@ -36,3 +36,5 @@ Create one with `/record-decision <title>`. Template: `0000-template.md`.
 | [0028](0028-entry-log-table.md) | Entry log: one append-only row per action, `before`/`after` JSON, a nullable actor without a key until P1.4 | Accepted | 2026-11-01 |
 | [0029](0029-aws-account-access.md) | AWS account access: root locked away, an IAM user with MFA, no AWS Organizations on the Free plan | Replaced by 0030 | 2026-11-02 |
 | [0030](0030-aws-new-experience-sydney.md) | AWS account: new projects-based Free plan, Region Sydney (`ap-southeast-2`), a budget that leaves out credits; never upgrade or activate advanced features | Accepted | 2026-11-12 |
+| [0031](0031-laptop-aws-sign-in.md) | Laptop sign-in for the AWS CLI and Terraform: `aws login` with a named profile, `allowed_account_ids` guard, no access keys | Accepted | 2026-11-12 |
+| [0032](0032-stage-5-server-shape-and-cost.md) | Stage 5 server shape: Ubuntu 26.04 ARM64, auto-assigned IP + DuckDNS, nightly stop; Sydney cost ≈ $0.05 per running hour + $4.73 a month | Accepted | 2026-11-12 |

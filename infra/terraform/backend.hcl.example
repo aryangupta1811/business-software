@@ -1,0 +1,3 @@
+# Copy to backend.hcl (git-ignored: the bucket name contains the account ID).
+# Used by every root: terraform init -backend-config=../backend.hcl
+bucket = "business-software-tfstate-123456789012"

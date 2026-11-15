@@ -21,6 +21,7 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
   The plan had gaps too, now filed under their tasks in `PROGRESS.md`: the worker can't see any business's rows without a cross-business read; the public demo login and its "reset" clash with the no-delete rule; login isn't the only lookup that happens before a business is known. 272 tests.
 - **2026-11-10 (plan and technology review, no feature code):** every technology checked with evidence (`docs/plans/2026-11-10-plan-review.md`). The stack stays. Experiments corrected four assumptions: pg-boss needs `createSchema: false` to run as its restricted role; the Graviton server is ARM64 while CI builds x86 images (both images were built and run on ARM64); tests don't need the SWC plugin; Argon2id is built into Node 24. The order of work changed to **demo-first**: cloud stages 5, 6 and 7 before any feature, then the shortest path to a printed bill, then demo data, then the rest.
 - **2026-11-12 (DevOps stage 4, cloud guardrails, no code):** the owner opened the AWS account and Claude checked it in the console (read-only, except one budget). Free plan, $100 of credits until 2027-05-12, nothing running. The account came from AWS's new projects-based sign-up experience. It has no IAM users for people, and the Free plan project is locked to **Sydney**, so the runbook written for the old experience no longer fitted. To keep the project fully free, the owner chose Sydney over an irreversible upgrade. A $15 monthly budget alerts on real spend, with credits filtered out. ADR 0030 replaces ADR 0029, and the runbook was rewritten.
+- **2026-11-12 (DevOps stage 5 part 1, prep, no resources created):** AWS CLI v2 and Terraform installed. The laptop signs in with `aws login` (temporary credentials from the console session, no access keys; ADR 0031). Checked in Sydney that the server type, PostgreSQL 18.6 and Ubuntu 26.04 ARM64 are available; priced every resource with the Pricing API ($0.0512 per running hour + $4.73 a month); measured 0.2 s extra latency from India. The owner chose an auto-assigned IP with DuckDNS, Ubuntu, and a nightly stop (ADR 0032). The Terraform plan for parts 2 and 3 waits for the owner's OK.
 
 ## Stack choices vs alternatives
 
@@ -38,6 +39,10 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
 | AWS Region | Sydney `ap-southeast-2`, the Free plan project's assigned Region | Mumbai via the Paid plan + advanced features (irreversible, card chargeable); a second project in Mumbai (unknown if allowed) | 0030 |
 | Cost alarm | AWS Budget on gross cost (Credit and Refund excluded), $15 a month, actual and forecast alerts | Default budget (credits hide spend); a Paid plan spend limit | 0030 |
 | When to start the cloud | Now, running only for sessions and demos (~$10 a month) | AWS at the end (the 6-month clock runs anyway; no live demo for placements) | 0011, 0030 |
+| Laptop sign-in to AWS | `aws login` with a named profile + `allowed_account_ids` | IAM user access keys; AWS's Agent Toolkit setup; IAM Identity Center (needs an Organization) | 0031 |
+| Server's public address | Auto-assigned IPv4 + DuckDNS updated at boot | Elastic IP (billed even while stopped, $3.65 a month) | 0032 |
+| Server OS | Ubuntu 26.04 LTS ARM64 | Amazon Linux 2023 (no automatic updates, Compose installed by hand) | 0032 |
+| Forgotten-server guard | Nightly EventBridge Scheduler stop at 23:30 IST | A budget action (fires only after $15 is spent) | 0032 |
 
 ## Mistakes and what I learned
 
@@ -53,13 +58,20 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
 - **A rule I wrote down wasn't the framework's default.** "Never log the error object" was in `secrets.md` and in my own code, but the first unexpected error in a request would have gone through Nest's handler, which logs exactly that. Lesson: a rule about logging has to be enforced at every exit: my code, the framework's handler and the runtime's crash report.
 - **My runbook described an AWS that had changed.** It was written in early November for IAM users and a Mumbai default. The account I opened came from the new experience (September 2026): no IAM users for people, and a Region lock. Lesson: before following cloud steps, look at the real account; providers change their onboarding faster than notes age.
 - **A cost alarm can be blind.** AWS Budgets subtracts credits by default, so an alert at $5 would never fire on a credit-funded account. Lesson: check what a monitor measures, not only that it exists.
+- **My latency guess was half the real number.** ADR 0030 guessed 0.1–0.15 s for Sydney; measured, it's 0.2 s per round trip, which alone breaks the 200 ms scan target. Lesson: measure before it shapes a design; here it changed how the billing screen must look up items.
+- **Old credentials were waiting on the laptop.** A working access key for a finished project was the default AWS profile, one forgotten `--profile` away from building in the wrong account. Lesson: before cloud work, check what credentials the tools will pick up, and pin the account in Terraform.
 
 ## Interview questions I can now answer
 
 - Q: Why is your server in Sydney when your users are in India?
-  A: My AWS Free plan project is locked to Sydney. Mumbai needs a paid plan and an irreversible "advanced features" switch, and my budget is zero. A demo can live with about 0.1 s more per request; real shop data would need the Region reopened. (ADR 0030)
+  A: My AWS Free plan project is locked to Sydney. Mumbai needs a paid plan and an irreversible "advanced features" switch, and my budget is zero. Measured, it adds about 0.2 s per round trip, so the billing screen looks items up in the browser instead of asking the server per scan; real shop data would need the Region reopened. (ADRs 0030, 0032)
 - Q: How do you stop the cloud costing you money?
   A: The Free plan can't charge my card; the risk is burning credits early. A budget that excludes credits alerts at $5, $10 and $15 a month and on forecast, the server and database run only during sessions and demos, and every resource's cost is stated before Terraform creates it. (ADR 0030)
+
+- Q: How does Terraform on your laptop authenticate to AWS?
+  A: `aws login` turns my console sign-in into 12-hour credentials that renew for up to 90 days, and the AWS provider reads them natively, so no access keys exist. The provider also pins the allowed account ID, so wrong credentials make it fail instead of building in the wrong account. (ADR 0031)
+- Q: What does your setup cost, and what still costs money while it's stopped?
+  A: $0.0512 per running hour (server, public IP, database) plus $4.73 a month for the two disks, which bill even while stopped. That's about $8 a month for sessions and demos, $42 around the clock. No Elastic IP, because it bills while stopped too. (ADR 0032)
 
 - Q: What happens to your API when the database restarts in the middle of a request?
   A: That request fails with a 500 and the process keeps running. It used to crash: pg-pool listens for `error` only on idle connections, and Node kills a process on an `error` event with no listener. I listen on every connection the pool opens, and a test terminates the backend mid-transaction to prove it. (`packages/db/src/client.ts`)

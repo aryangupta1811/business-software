@@ -12,6 +12,7 @@ Tools below are **candidates**. The real choice for each stage is made with me a
 - Use the industry names (CI, CD, IaC, staging, runbook…) and explain them the first time.
 - ~~Ask which DevOps tools I've already covered in my course.~~ Answered 2026-10-30: no restriction. Pick the best tool for the job and explain why.
 - When I say "I'll do it", give me the steps and let me type the commands.
+- **Terraform and the AWS CLI: Claude runs them** (owner, 2026-11-12), explaining each step: `plan` first, the cost stated, `apply` only after my OK; nothing destroyed without my explicit OK.
 - After each stage: 3–5 interview questions about what we just did, with short answers, added to the phase journal.
 
 ## Cost rules

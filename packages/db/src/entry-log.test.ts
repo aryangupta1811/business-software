@@ -89,8 +89,9 @@ describe('entry log', () => {
   });
 
   it('keeps businesses apart', async () => {
+    const empty = await signUp('Shop Empty');
     await withBusiness(runtime.db, a.businessId, (tx) => recordEntry(tx, adjust()));
-    expect(await entriesOf(b.businessId)).toEqual([]);
+    expect(await entriesOf(empty.businessId)).toEqual([]);
     await expect(
       withBusiness(runtime.db, b.businessId, (tx) =>
         tx.insert(entryLog).values({
@@ -122,14 +123,29 @@ describe('entry log', () => {
     expect(await entriesOf(a.businessId)).toHaveLength(count);
   });
 
-  // Every real action today needs a reason, so an action not in ENTRY_ACTIONS stands in for
-  // one that doesn't; recordEntry treats an unknown action as reason-optional.
+  // A fresh business, so the test doesn't depend on what other tests wrote.
   it('stores a blank optional reason as null', async () => {
-    const [row] = await withBusiness(runtime.db, b.businessId, async (tx) => {
-      await recordEntry(tx, adjust({ action: 'test.optional' as EntryAction, reason: '  ' }));
+    const { businessId } = await signUp('Shop Optional');
+    const rows = await withBusiness(runtime.db, businessId, async (tx) => {
+      await recordEntry(
+        tx,
+        adjust({ action: 'business.created', entityType: 'business', reason: '  ' }),
+      );
       return tx.select({ reason: entryLog.reason }).from(entryLog);
     });
-    expect(row).toEqual({ reason: null });
+    expect(rows).toEqual([{ reason: null }]);
+  });
+
+  // Untyped code can pass any string; an unknown name would be stored for good and skip the
+  // reason rule, so it's refused before the insert.
+  it('refuses an action that is not in ENTRY_ACTIONS', async () => {
+    const { businessId } = await signUp('Shop Unknown');
+    await expect(
+      withBusiness(runtime.db, businessId, (tx) =>
+        recordEntry(tx, adjust({ action: 'test.unknown' as EntryAction })),
+      ),
+    ).rejects.toThrow('Unknown entry action "test.unknown"');
+    expect(await entriesOf(businessId)).toEqual([]);
   });
 
   it.each(['update entry_log set reason = null', 'delete from entry_log', 'truncate entry_log'])(

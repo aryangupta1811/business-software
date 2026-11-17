@@ -5,6 +5,8 @@ import type { Transaction } from './tenancy.js';
 
 /** Every action the log knows. Each module adds its own names. */
 export const ENTRY_ACTIONS = {
+  'business.created': { reasonRequired: false }, // Module 00 #7, at signup
+  'business.updated': { reasonRequired: false }, // Module 00 #10, settings
   'stock.adjusted': { reasonRequired: true }, // Module 01 #11
 } as const satisfies Record<string, { reasonRequired: boolean }>;
 
@@ -28,11 +30,14 @@ export async function recordEntry(tx: Transaction, entry: EntryInput): Promise<v
   if ((entry.actorId as string | null | undefined) === undefined) {
     throw new Error('recordEntry needs actorId (null for the system)');
   }
-  // Untyped callers can pass a name the list doesn't have; it then needs no reason.
-  const rules: Partial<Record<string, { reasonRequired: boolean }>> = ENTRY_ACTIONS;
+  // Untyped callers can pass a name the list doesn't have: stored, it would stay for good and
+  // skip the reason rule. Object.hasOwn, so 'toString' and friends aren't actions.
+  if (!Object.hasOwn(ENTRY_ACTIONS, entry.action)) {
+    throw new Error(`Unknown entry action "${entry.action}"`);
+  }
   const trimmed = entry.reason?.trim();
   const reason = trimmed === undefined || trimmed === '' ? null : trimmed;
-  if (reason === null && rules[entry.action]?.reasonRequired) {
+  if (reason === null && ENTRY_ACTIONS[entry.action].reasonRequired) {
     throw new Error(`Entry action "${entry.action}" needs a reason`);
   }
   // Fails here, before the insert, on anything JSON can't hold (a BigInt, a cycle).

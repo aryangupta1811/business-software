@@ -1,1 +1,1 @@
-export { formatPaise, parseRupees, type Paise } from './money.js';
+export { allocatePaise, formatPaise, parseRupees, type Paise } from './money.js';

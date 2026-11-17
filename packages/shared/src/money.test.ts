@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatPaise, parseRupees } from './money.js';
+import { allocatePaise, formatPaise, parseRupees } from './money.js';
 
 describe('parseRupees', () => {
   it.each([
@@ -68,5 +68,53 @@ describe('formatPaise', () => {
     expect(() => formatPaise(2 ** 53)).toThrow(
       'Not a safe whole number of paise: 9007199254740992',
     );
+  });
+});
+
+describe('allocatePaise', () => {
+  it.each<[number, number[], number[]]>([
+    [100, [1, 1], [50, 50]],
+    [100, [1, 1, 1], [34, 33, 33]], // the leftover paisa goes to the earliest of the tied lines
+    [1, [5, 5, 5], [1, 0, 0]],
+    [2, [1, 1, 1], [1, 1, 0]],
+    [10, [3, 7], [3, 7]],
+    [10, [1, 2], [3, 7]], // 3.33 and 6.67: the larger remainder (0.67) takes the leftover
+    [7, [0, 5, 0, 5], [0, 4, 0, 3]],
+    [0, [3, 4], [0, 0]],
+    [0, [0, 0], [0, 0]],
+    [0, [], []],
+    [5000, [10000, 20000, 70000], [500, 1000, 3500]],
+    [999, [1, 1000000], [0, 999]],
+  ])('shares %i paise by %j as %j', (total, weights, shares) => {
+    expect(allocatePaise(total, weights)).toEqual(shares);
+  });
+
+  it('always hands out exactly the total', () => {
+    const weights = [1, 2, 3, 5, 8, 13, 21];
+    for (let total = 0; total <= 500; total += 1) {
+      const shares = allocatePaise(total, weights);
+      expect(shares.reduce((sum, share) => sum + share, 0)).toBe(total);
+    }
+  });
+
+  it('stays exact when total × weight is far past the safe range', () => {
+    const big = Number.MAX_SAFE_INTEGER;
+    expect(allocatePaise(big, [big, big])).toEqual([4503599627370496, 4503599627370495]);
+  });
+
+  it('throws when there is something to share but nothing to share it by', () => {
+    expect(() => allocatePaise(1, [0, 0])).toThrow(RangeError);
+    expect(() => allocatePaise(1, [])).toThrow(RangeError);
+  });
+
+  it.each<[number, number[]]>([
+    [-1, [1]],
+    [1.5, [1]],
+    [2 ** 53, [1]],
+    [1, [-1, 2]],
+    [1, [0.5]],
+    [1, [Number.NaN]],
+  ])('throws for a total of %d with weights %j', (total, weights) => {
+    expect(() => allocatePaise(total, weights)).toThrow(RangeError);
   });
 });

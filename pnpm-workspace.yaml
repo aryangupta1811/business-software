@@ -15,10 +15,28 @@ allowBuilds:
 catalog:
   # ~6.0: typescript-eslint supports TypeScript below 6.1 (not 7.x yet).
   typescript: ~6.0.3
-  vitest: ^5.0.5
+  vitest: ^5.1.0
   # Matches the Node major we run (24).
   '@types/node': ^24.19.2
 
 # Don't install a package version until it has been public for a day (in minutes).
 # Hijacked releases are usually caught and pulled within hours.
 minimumReleaseAge: 1440
+
+# Narrow fixes for `pnpm audit` advisories in development tools only, where we
+# can't yet take a parent release that fixes them. Each override applies under
+# one parent only. Remove one when its parent ships (or we take) the fix.
+overrides:
+  # drizzle-kit 0.31 still lists the abandoned @esbuild-kit loader, which pins
+  # esbuild 0.18 (GHSA-67mh-4wv8-2f99, dev server; fixed in 0.25). drizzle-kit
+  # itself already runs on esbuild 0.25.
+  '@esbuild-kit/core-utils>esbuild': ^0.25.0
+  # testcontainers -> archiver -> archiver-utils 5.0.2 (latest) asks for glob 10
+  # (GHSA-3g3m-2fjr-6pw4, fixed in 14.0.2), which also brings minimatch 9
+  # (GHSA-g3hv-75wg-m249). archiver-utils only calls glob.sync(), which glob 14 keeps.
+  'archiver-utils>glob': ^14.0.2
+  # typescript-eslint stays on 8.72 for now (8.73 adds a strict rule that needs its
+  # own task), and 8.72 asks for minimatch 10 (GHSA-g3hv-75wg-m249, fixed in 11.0.1).
+  # 8.73 itself moved to minimatch ^11.0.1 with the same one call, minimatch().
+  # Remove this when typescript-eslint goes to 8.73 or later.
+  '@typescript-eslint/typescript-estree>minimatch': ^11.0.1

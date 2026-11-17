@@ -71,7 +71,7 @@ The 60–75 session estimate came from working one task at a time. The time save
 
 | Sitting | Evening of | Modules | Plus |
 | --- | --- | --- | --- |
-| 1 | Day 1 | 01 open questions, finalize 02 and 03 | Decisions D1, D2, D3 |
+| 1 | Day 1 | 01 open questions, finalize 02 and 03 | Decisions D1, D3 |
 | 2 | Day 2 | Finalize 05, 06 and 07 | D4 |
 | 3 | Day 3 | Finalize 04, 08 and 09 | D5, D6 |
 
@@ -80,8 +80,8 @@ The 60–75 session estimate came from working one task at a time. The time save
 | # | Decision | Needed by | Why it can't wait |
 | --- | --- | --- | --- |
 | D1 | Email for password reset (Module 00 #30, #32): buy a domain (paid outside AWS, about ₹100–1,000 a year; DNS at the registrar, not Route 53, which bills $0.50 a month per zone), or stay on DuckDNS with Amazon SES in its sandbox (email only to verified addresses). The email ADR in P1.4 records the choice | Day 2 evening | P1.4 is on Day 3; SES production access takes about a day to approve |
-| D2 | WhatsApp: real Cloud API with Meta's free test number, or a mock that shows the flow (`product-overview.md` question 2) | Day 1 evening | If real, the owner sets up the Meta developer account and test number by Day 4 |
-| D3 | AI model and monthly spend cap (Module 09, ADR 0015) | Day 1 evening | The owner creates the Claude Console key with a spend limit by Day 7 (two keys: local and demo) |
+| D2 | ~~WhatsApp: real or mock~~ **Already decided** 2026-10-29 (ADR 0010): the real Cloud API with Meta's free test number. Not a decision, only a lead time: the owner sets up the Meta developer account and test number | Day 4 | P2.8 is on Day 5 |
+| D3 | AI model and monthly spend cap. The provider is already decided: the Claude API (ADR 0015) | Day 1 evening | The owner creates the Claude Console key with a spend limit by Day 7 (two keys: local and demo) |
 | D4 | `entry_log`'s `id` and `created_at` set by the database only (P1.4 e) | Day 2 evening | P1.4 adds a migration on `entry_log` on Day 3 |
 | D5 | Public demo rules and how the demo resets (P1.20 a, b) | Day 3 evening | Demo data is on Day 8 |
 | D6 | Which ideas from `ideas-backlog.md` are in | Day 3 evening | Built on Day 8 |
@@ -99,7 +99,7 @@ Lanes are numbered, not named: a lane moves between areas as its work allows. "�
 | 1 | This plan (PR) → **stage 5 part 2**: check `rds.force_ssl`, `init`, `plan`, cost, `apply` after OK, the stage 5 plan's step 7 checks, `fmt -check`/`validate` in CI, `docs/devops/terraform.md`, stop both instances | Bootstrap (done) |
 | 2 | **Dependency refresh** (PR) | — |
 | 3 | Draft recommended answers for sitting 1 | — |
-| Owner | Sitting 1; decisions D1–D3 | — |
+| Owner | Sitting 1; decisions D1, D3 |  — |
 
 ### Day 2: Wednesday 2026-11-18
 
@@ -139,7 +139,7 @@ Stage 7 must come before P1.3 stores real data. So **the live server keeps runni
 | 1 | **P1.9 Excel import** → **P1.11 Branch transfers & stock count** | P1.8, P1.6 |
 | 2 | **P1.14 Saving a bill** (atomic, numbering per branch per year, idempotency, concurrency tests) | P1.8, P1.13 |
 | 3 | **P2.3 Staff records & attendance** | P1.5, P1.6, Module 05 |
-| 4 | **P2.6 Entry-log viewer** → **P2.8 WhatsApp** (real or mock, per D2) | P1.4, Module 06, P2.7 |
+| 4 | **P2.6 Entry-log viewer** → **P2.8 WhatsApp** (real Cloud API, ADR 0010) | P1.4, Module 06, P2.7 |
 
 ### Day 6: Sunday 2026-11-22
 
@@ -209,4 +209,5 @@ If more than one day is lost, the finish moves to Day 11 or 12. The checks in se
 
 ## Change log
 
+- 2026-11-17 (Day 1, later): D2 corrected. WhatsApp real-or-mock was already answered on 2026-10-29 (ADR 0010), so it is only a lead time now; D3 notes the provider is already the Claude API (ADR 0015).
 - 2026-11-17: written at the owner's request ("complete the project in 7 to 10 days, the exact same output, no drop in quality"). Rules 5 and 9 in `CLAUDE.md`, `docs/devops/git-workflow.md` and the `/start-session` skill updated to match.

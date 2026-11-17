@@ -1,7 +1,7 @@
 # Progress
 
 **Current focus:** the **fast track** (`docs/plans/2026-11-17-fast-track.md`): the whole project in 10 days, 2026-11-17 to 2026-11-26, same scope and same checks, up to four tasks in parallel. Day 1: DevOps stage 5 part 2 in the **new AWS account** (ADR 0033: Free plan, **Mumbai** `ap-south-1`, admin IAM user with MFA). The bootstrap root is applied (state bucket + $15 budget, both Terraform) and its state is in the bucket. The demo stack (`infra/terraform/demo/`) is written, validated and not applied
-**Next step:** Day 1 of the fast track: on a new branch, check `rds.force_ssl`'s default, `init` and `plan` the demo root, state the cost, `apply` after the owner's OK; the dependency refresh in parallel; question sitting 1 in the evening (Modules 01, 02, 03 and decisions D1–D3)
+**Next step:** Day 1 of the fast track: on a new branch, check `rds.force_ssl`'s default, `init` and `plan` the demo root, state the cost, `apply` after the owner's OK; the dependency refresh in parallel; question sitting 1 in the evening (Modules 01, 02, 03 and decisions D1, D3)
 **Last updated:** 2026-11-17
 
 Each task below is sized for **one session** when worked alone. DevOps stages (from `docs/devops/DEVOPS_PLAN.md`) are woven in where they're first needed. Tasks for DRAFT modules are provisional: re-cut them after `/finalize-module NN`.
@@ -12,7 +12,7 @@ Owner's decision 2026-11-17. **This table sets the order of work.** It overrides
 
 | Day | Date | Lane 1 | Lane 2 | Lane 3 | Lane 4 | Owner, evening |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | 11-17 | This plan → stage 5 part 2 | Dependency refresh | Drafts for sitting 1 | — | Sitting 1: 01, 02, 03; D1–D3 |
+| 1 | 11-17 | This plan → stage 5 part 2 | Dependency refresh | Drafts for sitting 1 | — | Sitting 1: 01, 02, 03; D1, D3 |
 | 2 | 11-18 | Stage 5 part 3 (skeleton live) | P1.3 Signup | Finalize 01–03 → drafts for sitting 2 | P1.12 GST engine | Sitting 2: 05, 06, 07; D4 |
 | 3 | 11-19 | Stage 7 → stage 6 (every merge deploys) | P1.7 Items | P1.4 Login | Finalize 05–07 → P2.7 part 1 (queue) | Sitting 3: 04, 08, 09; D5, D6 |
 | 4 | 11-20 | P1.8 Stock ledger | P1.13 Billing screen | P1.5 Staff → P1.6 Branches | Finalize 04, 08, 09 → P2.7 part 2 (alerts) | Walkthrough |

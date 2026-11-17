@@ -15,7 +15,7 @@ EC2 and RDS are stopped.
 - lane 4: P1.12 GST engine (Module 02 is decided).
 - evening: sitting 2.
 
-**Last updated:** 2026-11-17
+**Last updated:** 2026-11-18
 
 Each task below is sized for **one session** when worked alone. DevOps stages (from `docs/devops/DEVOPS_PLAN.md`) are woven in where they're first needed. Tasks for DRAFT modules are provisional: re-cut them after `/finalize-module NN`.
 

@@ -187,7 +187,9 @@ Short answers; the Log entry has the full story.
 - **Q: You changed AWS accounts mid-project. What did that cost?**
   A: A sign-in, a new budget and doc updates. The infrastructure was code with no account ID in it, and nothing had been applied yet. The provider's `allowed_account_ids` then pins the new account, so the old one can't be touched by accident.
 - **Q: You had to deliver much faster. How did you keep quality?**
-  A: I parallelised the work, not the checks. A dependency graph gave the critical path, independent tasks ran in separate git worktrees, decisions were batched up front, and merges went through one queue with a rebase and a full re-check each time. Every PR still had tests first, an independent review and five green CI checks. → `docs/plans/2026-11-17-fast-track.md`
+  A: I parallelised the work, not the checks. A dependency graph gave the critical path, independent tasks ran in separate git worktrees, decisions were batched up front, and merges went through one queue with a rebase and a full re-check each time. 
+- **Q: How do you make sure written requirements match what the client decided?**
+  A: Every requirement file gets a review before merge from someone without the conversation's context, checking each point against the client's actual answers. Additions are labelled as additions and confirmed. On my project that review caught a rule nobody had chosen and a note contradicting a newer decision.Every PR still had tests first, an independent review and five green CI checks. → `docs/plans/2026-11-17-fast-track.md`
 
 ---
 
@@ -1395,3 +1397,13 @@ Entry format:
   - **E-invoicing is left out on purpose** (compulsory only above ₹5 crore turnover), but bills keep every field it needs.
 - **Say it in an interview:** "I batched every open requirement into short decision sittings with a recommended answer for each, so building never waited on a question. I also treated GST rules as requirements, not code details: an inter-state branch transfer is a taxable supply, so the app raises an IGST invoice."
 - **Follow-ups to expect:** Why not let users edit a saved bill? (Invoices are legal documents with numbers that must not have gaps or silent changes; a cancel with a reason, or a credit note, keeps the history.) Why Sonnet and not Opus? (It costs half as much as Opus; the eval set will show whether its accuracy is enough, and changing the model is one line.)
+
+### 2026-11-17 — A fresh review caught rules nobody chose inside decided requirements `#requirements` `#process` `#mistake` `#ai`
+- **What happened:** Before merging sitting 1's requirement files, a reviewer with no memory of the chat compared each file with my exact answers. It found 5 important and 8 minor problems. Three are worth remembering: "cheque (number and date)" added a rule I never chose; one task note said both "no domain" and "SES needs a verified domain"; and the AI decision record said Sonnet 5.5 can't turn its thinking off, when the API reference says `thinking: {type: "between_tools"}` does (only `{type: "disabled"}` is refused). It also spotted a schedule clash: branch transfers (Day 5) need purchase entries, which arrive on Day 7.
+- **Why / what I learned:**
+  - **Small words become rules.** A decided requirement is what gets built, so an extra bracket is scope nobody approved. Anything Claude adds is labelled as an addition and confirmed.
+  - **When one decision changes, search for every place that repeats the old version,** not only the file you edited.
+  - **Check API facts against the current reference,** even ones written down the same day.
+  - **Open points go where they'll be read:** the GST edge case (two registrations in one state are CGST+SGST, not IGST) and the Day 5 dependency now sit on task P1.11.
+- **Say it in an interview:** "Requirements get the same review as code. A reviewer with fresh context checks the written decisions against the owner's actual answers, because a note that drifts from what was agreed is a bug that ships."
+- **Follow-ups to expect:** Why a fresh reviewer and not the author? (The author reads what they meant, not what they wrote. Someone without the chat history can only read the file.)

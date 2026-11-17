@@ -1,55 +1,64 @@
 # AWS account: what we have and how to keep it free (DevOps stage 4)
 
-Why each choice: ADR 0011 (Free plan, one server + RDS) and **ADR 0030** (new projects-based experience, Region Sydney, budget without credits). ADR 0029's IAM-user plan is replaced: the account we got has no place for it.
+Why each choice: ADR 0011 (Free plan, one server + RDS) and **ADR 0033** (new account in Mumbai, admin IAM user, guardrails as code; it replaces ADR 0030, the first account). Sign-in method: ADR 0031.
 
-**The repo is public.** The account ID, the sign-in URL, the owner's email and every password stay out of it. Keep them in a password manager.
+**The repo is public.** The account ID, the sign-in URL, the IAM user's name, the owner's email and every password stay out of it. Keep them in a password manager.
 
-## The account (checked in the console, 2026-11-12)
+## The account (checked 2026-11-17)
 
 | What | Value |
 | --- | --- |
-| Plan | **Free** ("Upgrade plan" button shown, not clicked) |
+| Plan | **Free**, `ACTIVE` (`aws freetier get-account-plan-state`; the console's "Upgrade plan" link is never clicked) |
 | Credits | $100, plus up to $100 from 5 activities (below) |
-| Days | 182 left on 2026-11-12; AWS shows the end date **2027-05-12** |
-| Sign-up experience | AWS's new projects-based one (2026-09): sign in with an identity provider into a project; settings at `settings.aws.com` (Projects, Team, Billing, Profile) |
-| Region | **Asia Pacific (Sydney) `ap-southeast-2`**, assigned to the project. Other Regions need Paid + advanced features. |
-| IAM users | none (IAM says people get access through the Team page; IAM users are for programs only) |
-| Resources | none: 0 S3 buckets in any Region, $0 spent |
-| Budget | `monthly-credit-burn`, created 2026-11-12 (below) |
+| Ends | **2027-05-17** |
+| Sign-up | The standard sign-up, not the projects-based one: no project, any Region allowed |
+| Region | **Asia Pacific (Mumbai) `ap-south-1`** for everything the project builds |
+| People | Root (MFA on, billing and emergencies only) and **one IAM user** with `AdministratorAccess`, a console password and MFA, **no access keys** |
+| Built so far | By Terraform on 2026-11-17 (`infra/terraform/bootstrap/`): the state bucket and the budget |
+
+The first account (projects-based, Sydney, "Sign in with Google") is left as it is: Free plan, only its hand-made budget. AWS closes it at the end of its Free period (2027-05-12). Its CLI profile is `business-software-old`.
 
 ## Rules that can't be undone
 
-- **Never click "Upgrade plan" or "Activate advanced features".** Advanced features need the Paid plan and can't be turned off. On the Paid plan AWS can charge your card. On the Free plan it can't: it closes the account when the credits or the 6 months run out.
+- **Never click "Upgrade plan" or "Activate advanced features".** On the Paid plan AWS can charge your card. On the Free plan it can't: it closes the account when the credits or the 6 months run out.
 - **Don't create or join an AWS Organization**, or set up Control Tower.
-- **One account, in your own name.** The Free plan and its credits are only for new AWS customers.
+- **Closing an account** can't be undone, and it's the owner's click.
 
 ## How you sign in
 
-- Through the identity you signed up with (Google, GitHub, Apple or Amazon), then the project. **MFA lives on that identity:** turn on 2-step verification there (for Google: myaccount.google.com → Security). That protects the AWS project too.
-- Bookmark the console after signing in. Don't commit the URL; it contains the account ID.
-- **Laptop (CLI and Terraform), ADR 0031:** `aws login --profile business-software` opens the browser; pick the project and session. Credentials last 12 hours and renew for 90 days. Always name the profile: the laptop has no `[default]` credentials on purpose, so a command without `--profile` fails instead of reaching another account.
+- **Console:** the IAM user, through the account's sign-in URL (in the password manager), with MFA. Root only for billing or if the IAM user is locked out.
+- **Laptop (CLI and Terraform), ADR 0031:** `aws login --profile business-software --region ap-south-1`, approved in the browser **as the IAM user**. `aws login` reuses whoever the browser is signed in as: sign out of root first. Credentials last 12 hours and renew for 90 days. Always name the profile: `[default]` belongs to another project.
+- **Check before every `plan` and `apply`:** `aws sts get-caller-identity --profile business-software` shows `user/…`, not `root`, in the new account (mask the ID: `sed -E 's/[0-9]{12}/<account>/g'`).
 
 ## Keeping it free: the money guardrails
 
-1. **The budget** (Billing and Cost Management → Budgets → `monthly-credit-burn`):
-   - Monthly cost budget, **$15**, unblended cost.
-   - Scope: *Filter specific AWS cost dimensions* → **Charge type → Excludes → Credit, Refund**. By default AWS counts credits as negative cost, so without this filter the budget would show $0 while the credits drain.
-   - Email alerts at **33% (~$5), 66% (~$10), 100% actual**, and **100% forecasted**.
+1. **The budget `monthly-credit-burn`**, as Terraform in `infra/terraform/bootstrap/budget.tf`:
+   - Monthly cost budget, **$15**, with **credits and refunds left out**. By default AWS counts credits as negative cost, so the budget would show $0 while the credits drain.
+   - Email alerts at **33% (~$5), 66% (~$10), 100% actual**, and **100% forecasted**. The address is in the git-ignored `terraform.tfvars`.
    - No actions. An alert-only budget is free. On the Free plan a budget can only warn; it can't stop anything.
    - **Owner:** AWS emails each new recipient a confirmation link. Click it, or no alert arrives.
-2. **Stop the server and the database after every session** until stage 7's automatic schedule exists. A stopped server pays only for its disk; RDS restarts itself after 7 days stopped.
-3. **Before Terraform creates anything**, Claude states its cost per hour and per month against the remaining credits.
-4. Nothing that bills by the hour while idle: no NAT gateway, no load balancer, no extra Elastic IPs.
-5. Target: about **$10 a month** (running only for sessions and demos), about $60 over the 6 months.
+2. **The account lock:** `allowed_account_ids` in each root's git-ignored `terraform.tfvars`. Terraform refuses any other account, whatever the laptop is signed in to.
+3. **Stop the server and the database after every session** until stage 7's automatic schedule exists. A stopped server pays only for its disk; RDS restarts itself after 7 days stopped.
+4. **Before Terraform creates anything**, Claude states its cost per hour and per month against the remaining credits (Mumbai: ADR 0032's dated note, $0.0372 per running hour + $4.44 a month).
+5. Nothing that bills by the hour while idle: no NAT gateway, no load balancer, no Elastic IP, no interface VPC endpoint, no Secrets Manager.
+6. Target: under **$10 a month** (running only for sessions and demos).
+
+## Switching accounts (done once, 2026-11-17; `docs/plans/2026-11-15-aws-account-switch.md`)
+
+1. Rename the old profile in `~/.aws/config` (e.g. `business-software-old`), so the name `business-software` is free.
+2. Sign out of the old account in the browser, then `aws login --profile business-software --region <region>`.
+3. Read the facts before creating anything: `aws freetier get-account-plan-state` (**stop if it isn't `FREE`**), Regions, an empty account, the instance type, the database engine version, the server image.
+4. Root MFA, the IAM user with MFA, `aws login` again as that user.
+5. Put the new account ID in both roots' `terraform.tfvars`, the alert address in the bootstrap one. Comment out the bootstrap backend block, `apply` the bootstrap root, write `infra/terraform/backend.hcl`, uncomment the block, `terraform init -migrate-state -backend-config=../backend.hcl`, and check that a `plan` shows no changes.
 
 ## Credit activities ($20 each, within the 6 months)
 
-Console Home → Explore AWS widget → filter *Earn AWS credits*. Credits earned expire 12 months after sign-up.
+Console Home → Explore AWS widget → filter *Earn AWS credits*. All five start over in the new account. Credits earned expire 12 months after sign-up.
 
-| Activity | Status (2026-11-12) | Plan |
+| Activity | Status (2026-11-17) | Plan |
 | --- | --- | --- |
-| Set up a cost budget using AWS Budgets | Budget created; widget still "Not started" right after | Check next session. If it stays "Not started", open the activity from the widget and follow its own steps. |
-| Launch an instance using EC2 | Not started | Stage 5: launch the real `t4g.small` (or the smallest allowed type) through Terraform. If the activity needs its own launch, use the smallest type and terminate it within the hour (a few cents). |
+| Set up a cost budget using AWS Budgets | Budget created by Terraform | Check the widget. If it stays "Not started", open the activity from the widget and follow its own steps. |
+| Launch an instance using EC2 | Not started | Stage 5: the real `t4g.small` through Terraform. If the activity needs its own launch, use the smallest type and terminate it within the hour (a few cents). |
 | Create an Aurora or RDS database | Not started | Stage 5: the real RDS instance (`db.t4g.micro`), stopped after the session. Never Aurora (costs more). |
 | Create a web app using AWS Lambda | Not started | Later: a tiny function, deleted afterwards. Check its price first; it should cost cents at most. |
 | Use a foundation model in the Amazon Bedrock playground | Not started | Later: one short prompt. Check the model's price per token first; it should cost under a cent. |

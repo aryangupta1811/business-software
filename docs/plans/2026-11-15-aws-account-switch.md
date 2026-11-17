@@ -1,6 +1,6 @@
 # Move the project to a new AWS account: plan
 
-> **Status:** proposed 2026-11-15. The owner decided the same day to move ("Owner's answers" below) and will open the new account later. Nothing in this plan has been run. The owner's OK on the steps is still needed (`CLAUDE.md` rule 5).
+> **Status:** done 2026-11-17 (session 21), except step 7 (winding down the old account), which the owner skipped: it holds only a free budget and can't bill on the Free plan. Result: ADR 0033. The new account is on the Free plan in **Mumbai**; root has MFA, an admin IAM user with MFA does the work; the account lock, the budget and the state bucket exist, built by Terraform. Proposed 2026-11-15; the owner went through it step by step on 2026-11-17.
 
 ## Owner's answers (2026-11-15)
 

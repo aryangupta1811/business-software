@@ -1,7 +1,7 @@
 # 0030 — AWS account: the new projects-based Free plan, Region Sydney (`ap-southeast-2`), a budget that leaves out credits
 
 - **Date:** 2026-11-12
-- **Status:** Accepted
+- **Status:** Replaced by 0033
 
 ## Context
 

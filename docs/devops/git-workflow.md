@@ -14,7 +14,7 @@ git push -u origin HEAD               # first push of the branch
 gh pr create --web                    # opens the PR form with the template loaded
 ```
 
-**Who pushes (since 2026-11-11):** Claude pushes the branch and opens the pull request itself. It first lists what is about to be uploaded (branch, commits, what the secret and personal-data scans found) and doesn't wait for an answer. Merging stays with the owner. The commands above are the same ones Claude runs, with `gh pr create --title … --body-file …` in place of `--web`.
+**Who pushes (since 2026-11-11):** Claude pushes the branch and opens the pull request itself. It first lists what is about to be uploaded (branch, commits, what the secret and personal-data scans found) and doesn't wait for an answer. **Since 2026-11-17 Claude also merges:** once all five checks pass and the PR is mergeable, `gh pr merge <n> --squash`, a check that `gh pr view <n> --json state` says `MERGED`, then the local clean-up below. A red check is never merged; it gets fixed. The commands above are the same ones Claude runs, with `gh pr create --title … --body-file …` in place of `--web`.
 
 In the form, give the PR a Conventional Commit title (it becomes the commit on `main`) and fill in the template. Don't use `gh pr create --fill`: with more than one commit it titles the PR with the branch name and skips the template.
 

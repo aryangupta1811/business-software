@@ -18,6 +18,8 @@ catalog:
   vitest: ^5.1.0
   # Matches the Node major we run (24).
   '@types/node': ^24.19.2
+  # Request and form schemas, shared by the API and the web app (ADRs 0002, 0003).
+  zod: ^4.6.7
 
 # Don't install a package version until it has been public for a day (in minutes).
 # Hijacked releases are usually caught and pulled within hours.

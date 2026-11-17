@@ -1,0 +1,179 @@
+import { describe, expect, it } from 'vitest';
+import type { z } from 'zod';
+import { FEATURE_PRESETS, FEATURES } from './business.js';
+import { fieldErrors, type FieldErrors } from './fields.js';
+import {
+  settingsBusinessSchema,
+  settingsFeaturesSchema,
+  settingsSecuritySchema,
+  signupSchema,
+} from './schemas.js';
+
+function errorsOf(schema: z.ZodType, value: unknown): FieldErrors {
+  const result = schema.safeParse(value);
+  return result.success ? {} : fieldErrors(result.error);
+}
+
+const signup = {
+  businessName: '  Sharma Kirana ',
+  businessType: 'kirana',
+  phone: '+91 91111 11111',
+  stateCode: '27',
+  gstStatus: 'regular',
+  email: ' Owner@Example.COM ',
+  password: 'correct horse',
+};
+
+describe('signupSchema', () => {
+  it('normalises a good signup', () => {
+    expect(signupSchema.parse(signup)).toEqual({
+      businessName: 'Sharma Kirana',
+      businessType: 'kirana',
+      phone: '9111111111',
+      stateCode: '27',
+      gstStatus: 'regular',
+      email: 'owner@example.com',
+      password: 'correct horse',
+    });
+  });
+
+  it('never trims the password', () => {
+    expect(signupSchema.parse({ ...signup, password: ' spaces in it ' }).password).toBe(
+      ' spaces in it ',
+    );
+  });
+
+  it.each([
+    [{ businessName: '' }, { businessName: 'required' }],
+    [{ businessName: 'x'.repeat(101) }, { businessName: 'too_long' }],
+    [{ businessName: 'Shop\u0000' }, { businessName: 'control_character' }],
+    [{ businessType: 'bakery' }, { businessType: 'invalid' }],
+    [{ phone: '12345' }, { phone: 'invalid' }],
+    [{ phone: '' }, { phone: 'required' }],
+    [{ stateCode: '28' }, { stateCode: 'invalid' }],
+    [{ stateCode: '99' }, { stateCode: 'invalid' }],
+    [{ gstStatus: 'exempt' }, { gstStatus: 'invalid' }],
+    [{ email: 'owner' }, { email: 'invalid' }],
+    [{ email: `${'a'.repeat(250)}@b.in` }, { email: 'too_long' }],
+    [{ password: 'short pass'.slice(0, 9) }, { password: 'too_short' }],
+    [{ password: 'x'.repeat(129) }, { password: 'too_long' }],
+    [{ password: 'Owner@Example.com' }, { password: 'same_as_email' }],
+    [{ password: '+91-9111111111' }, { password: 'same_as_phone' }],
+    [{ extra: true }, { extra: 'unknown_field' }],
+  ])('refuses %j', (change, expected) => {
+    expect(errorsOf(signupSchema, { ...signup, ...change })).toEqual(expected);
+  });
+
+  it('says which fields are missing', () => {
+    expect(errorsOf(signupSchema, {})).toEqual({
+      businessName: 'required',
+      businessType: 'invalid',
+      phone: 'required',
+      stateCode: 'required',
+      gstStatus: 'invalid',
+      email: 'required',
+      password: 'required',
+    });
+  });
+});
+
+const business = {
+  businessName: 'Sharma Kirana',
+  businessType: 'kirana',
+  phone: '9111111111',
+  gstStatus: 'regular',
+  pan: 'aapfu0939f',
+  ownerName: '',
+  branchName: 'Sharma Kirana',
+  address: 'Shop 4\nMain road',
+  pinCode: '411001',
+  stateCode: '27',
+  gstin: '27aapfu0939f1zv',
+  drugLicence: null,
+  fssai: '',
+};
+
+describe('settingsBusinessSchema', () => {
+  it('upper-cases PAN and GSTIN and turns blanks into null', () => {
+    expect(settingsBusinessSchema.parse(business)).toEqual({
+      ...business,
+      pan: 'AAPFU0939F',
+      gstin: '27AAPFU0939F1ZV',
+      ownerName: null,
+      fssai: null,
+    });
+  });
+
+  it.each([
+    [{ gstin: '27AAPFU0939F1ZW' }, { gstin: 'invalid' }],
+    // The GSTIN starts with the branch's state code (Module 00 #14).
+    [{ stateCode: '29' }, { gstin: 'state_mismatch' }],
+    // Characters 3–12 of a GSTIN are the business's PAN.
+    [{ pan: 'AAPFU0939G' }, { gstin: 'pan_mismatch' }],
+    [{ pan: 'AAPF0939F' }, { pan: 'invalid' }],
+    [{ pinCode: '011001' }, { pinCode: 'invalid' }],
+    [{ fssai: '1234567890123' }, { fssai: 'invalid' }],
+    [{ address: 'x'.repeat(301) }, { address: 'too_long' }],
+    [{ branchName: '' }, { branchName: 'required' }],
+  ])('refuses %j', (change, expected) => {
+    expect(errorsOf(settingsBusinessSchema, { ...business, ...change })).toEqual(expected);
+  });
+
+  it('accepts a business with no GSTIN or PAN', () => {
+    expect(() =>
+      settingsBusinessSchema.parse({ ...business, gstin: '', pan: null, stateCode: '29' }),
+    ).not.toThrow();
+  });
+});
+
+describe('settingsFeaturesSchema', () => {
+  it('accepts every preset and an empty list', () => {
+    for (const features of Object.values(FEATURE_PRESETS)) {
+      expect(settingsFeaturesSchema.parse({ features: [...features] })).toEqual({
+        features: [...features],
+      });
+    }
+    expect(settingsFeaturesSchema.parse({ features: [] })).toEqual({ features: [] });
+  });
+
+  it('refuses unknown and repeated features', () => {
+    expect(errorsOf(settingsFeaturesSchema, { features: ['teleport'] })).toEqual({
+      'features.0': 'invalid',
+    });
+    expect(errorsOf(settingsFeaturesSchema, { features: ['mrp', 'mrp'] })).toEqual({
+      features: 'duplicate',
+    });
+  });
+
+  it('knows every preset feature', () => {
+    for (const features of Object.values(FEATURE_PRESETS)) {
+      for (const feature of features) expect(FEATURES).toContain(feature);
+    }
+  });
+});
+
+describe('settingsSecuritySchema', () => {
+  it.each([
+    [1, 5],
+    [30, 120],
+    [5, 30],
+  ])('accepts lock %i and idle %i minutes', (ownerLockMinutes, staffIdleMinutes) => {
+    expect(settingsSecuritySchema.parse({ ownerLockMinutes, staffIdleMinutes })).toEqual({
+      ownerLockMinutes,
+      staffIdleMinutes,
+    });
+  });
+
+  it.each([
+    [{ ownerLockMinutes: 0 }, { ownerLockMinutes: 'too_small' }],
+    [{ ownerLockMinutes: 31 }, { ownerLockMinutes: 'too_big' }],
+    [{ ownerLockMinutes: 2.5 }, { ownerLockMinutes: 'invalid' }],
+    [{ staffIdleMinutes: 4 }, { staffIdleMinutes: 'too_small' }],
+    [{ staffIdleMinutes: 121 }, { staffIdleMinutes: 'too_big' }],
+    [{ staffIdleMinutes: '30' }, { staffIdleMinutes: 'invalid' }],
+  ])('refuses %j', (change, expected) => {
+    expect(
+      errorsOf(settingsSecuritySchema, { ownerLockMinutes: 5, staffIdleMinutes: 30, ...change }),
+    ).toEqual(expected);
+  });
+});

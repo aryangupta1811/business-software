@@ -75,6 +75,8 @@ resource "aws_ssm_parameter" "db_master_password" {
 
   # Write the copy only after RDS has accepted the password. The ephemeral password is new
   # on every run, so if RDS failed after SSM was written, the retry would give RDS a
-  # different password than SSM holds (it happened on 2026-11-17).
+  # different password than SSM holds (it happened on 2026-11-17). This doesn't cover SSM
+  # failing after RDS succeeded: after any failed apply touching either, follow the
+  # recovery rule in docs/devops/terraform.md.
   depends_on = [aws_db_instance.main]
 }

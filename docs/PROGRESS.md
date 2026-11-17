@@ -1,7 +1,7 @@
 # Progress
 
 **Current focus:** the **fast track** (`docs/plans/2026-11-17-fast-track.md`): the whole project in 10 days, 2026-11-17 to 2026-11-26, same scope and same checks, up to four tasks in parallel. Day 1: DevOps stage 5 part 2 in the **new AWS account** (ADR 0033: Free plan, **Mumbai** `ap-south-1`, admin IAM user with MFA). The bootstrap root is applied (state bucket + $15 budget, both Terraform) and its state is in the bucket. The demo stack (`infra/terraform/demo/`) is written, validated and not applied
-**Next step:** Day 1 of the fast track: on a new branch, check `rds.force_ssl`'s default, `init` and `plan` the demo root, state the cost, `apply` after the owner's OK; the dependency refresh in parallel; question sitting 1 in the evening (Modules 01, 02, 03 and decisions D1–D3)
+**Next step:** Day 1 of the fast track: on a new branch, check `rds.force_ssl`'s default, `init` and `plan` the demo root, state the cost, `apply` after the owner's OK; the dependency refresh in parallel; question sitting 1 in the evening (Modules 01, 02, 03 and decisions D1, D3)
 **Last updated:** 2026-11-17
 
 Each task below is sized for **one session** when worked alone. DevOps stages (from `docs/devops/DEVOPS_PLAN.md`) are woven in where they're first needed. Tasks for DRAFT modules are provisional: re-cut them after `/finalize-module NN`.
@@ -12,7 +12,7 @@ Owner's decision 2026-11-17. **This table sets the order of work.** It overrides
 
 | Day | Date | Lane 1 | Lane 2 | Lane 3 | Lane 4 | Owner, evening |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | 11-17 | This plan → stage 5 part 2 | Dependency refresh | Drafts for sitting 1 | — | Sitting 1: 01, 02, 03; D1–D3 |
+| 1 | 11-17 | This plan → stage 5 part 2 | Dependency refresh | Drafts for sitting 1 | — | Sitting 1: 01, 02, 03; D1, D3 |
 | 2 | 11-18 | Stage 5 part 3 (skeleton live) | P1.3 Signup | Finalize 01–03 → drafts for sitting 2 | P1.12 GST engine | Sitting 2: 05, 06, 07; D4 |
 | 3 | 11-19 | Stage 7 → stage 6 (every merge deploys) | P1.7 Items | P1.4 Login | Finalize 05–07 → P2.7 part 1 (queue) | Sitting 3: 04, 08, 09; D5, D6 |
 | 4 | 11-20 | P1.8 Stock ledger | P1.13 Billing screen | P1.5 Staff → P1.6 Branches | Finalize 04, 08, 09 → P2.7 part 2 (alerts) | Walkthrough |
@@ -89,7 +89,23 @@ Step 1 — Cloud first. The skeleton goes live, and from then on every merge shi
   - [ ] **Part 2:** state bucket, network, RDS, EC2, nightly stop, `terraform fmt`/`validate` in CI
     - [x] Terraform written (2026-11-15), `fmt` and `validate` clean, **not applied**: `infra/terraform/bootstrap/` (state bucket: versioned, encrypted, TLS-only, old versions expire after 90 days) and `infra/terraform/demo/` (VPC with public and private subnets, security groups without port 22, RDS PostgreSQL 18.6 with a write-only master password also stored in SSM, `t4g.small` Ubuntu 26.04 ARM64 with cloud-init, two nightly stop schedules). `password_wo` and `value_wo` confirmed in provider 6.73.0. Added beyond the plan: `cpu_credits = "standard"` (the `t4g` default, `unlimited`, bills extra), IMDS hop limit 1, `user_data_replace_on_change`, the main route table taken over.
     - [x] Bootstrap `apply` and state migration (2026-11-17, in the account switch)
-    - [ ] Still to do: check `rds.force_ssl`'s default, demo `plan` with the cost, `apply`, the checks in the plan's step 7, `terraform fmt -check`/`validate` in CI, `docs/devops/terraform.md`, stop both instances
+    - [x] Demo `apply` and checks (2026-11-17, fast track Day 1, owner's OK twice):
+      - **`rds.force_ssl` is `1` by default** on PostgreSQL 18 (account defaults and AWS docs), so there's no parameter group.
+      - 29 resources created. The first apply stopped partway:
+        - The **Free plan refused 7 days of RDS backups** (`FreeTierRestrictionError`), so retention is now 1 day (ADR 0011 dated note: stage 7's `pg_dump` is the only copy older than a day).
+        - An **apostrophe** in a security group rule description was rejected.
+      - The step 7 checks found a **password mismatch**: the retry gave RDS a new ephemeral password while SSM kept the first run's. Fixed by raising `db_password_version` to 2 and writing SSM only after RDS (`depends_on`).
+      - Checks passed:
+        - `aarch64`, cloud-init done, Docker 29.10 arm64, Compose 5.8, 2 GB swap, security updates on;
+        - IMDSv1 refused (401);
+        - PostgreSQL 18.6 over **TLS 1.3**, and a connection without TLS refused;
+        - port 22 and RDS unreachable from the laptop;
+        - the password appears 0 times in Terraform state;
+        - both 23:30 IST schedules enabled.
+      - CI's `check` job now runs `terraform fmt -check` and `init -backend=false -lockfile=readonly` + `validate` for both roots (proven in a Linux container first).
+      - Runbook: `docs/devops/terraform.md`. Session Manager plugin installed.
+      - Both instances stopped.
+    - [ ] Still open from part 2: see a nightly stop actually stop a running server (leave both running past 23:30 once, or read the schedules' CloudWatch metrics); the EC2 and RDS credit activities in Console Home (owner)
   - [ ] **Part 3:** DuckDNS, database roles and secrets in SSM, image registry ADR, HTTPS, the skeleton live
   - Notes carried from earlier: **From stage 4 (2026-11-12, ADR 0030):** Region `ap-southeast-2` everywhere; redo ADR 0011's cost estimate with Sydney prices in the Pricing Calculator before creating anything; check that this project can launch `t4g.small` and that RDS offers PostgreSQL 18 in Sydney; measure the extra latency from India; decide the CLI/Terraform sign-in for the new experience (check the console's "Agent Toolkit for AWS" and the CLI's sign-in command; IAM users only for programs, in an ADR if needed); do the EC2 and RDS credit activities with the real resources; consider a budget action that stops EC2 (first two action budgets are free). (moved up 2026-11-10: it deploys today's skeleton, so there is a live URL and a pipeline before any feature; until stage 7's schedule exists, stop the server and database by hand after each session to save credits) remote state in S3, network and security groups, the EC2 server with Docker Compose and Caddy, a free domain with HTTPS. Run `packages/db/bootstrap/create-roles.sql` on RDS once by hand; the master user may first need `GRANT app_owner TO <master>` (ADR 0019). Decide whether to `REVOKE CONNECT, TEMP ON DATABASE postgres FROM PUBLIC` (review minor from P0.3). The queue role `app_queue` (ADR 0022) is added to the bootstrap in P2.7; if RDS is bootstrapped before that, P2.7 adds it to RDS with a one-time script run by hand. Secrets go in SSM as `SecureString`s; `migrate` gets only `MIGRATION_DATABASE_URL`, and `api`/`worker` get only `DATABASE_URL` (ADR 0021). **From the 2026-11-10 scan:** once Caddy serves HTTPS, add `Strict-Transport-Security` to its security headers, with a smoke check; use the server's real host name in `DATABASE_URL` and read one refused-connection log line to see the reason is there. **From the 2026-11-10 plan review:** the server is ARM64 (Graviton) and CI builds x86 images; both images were built and run for `linux/arm64` on the laptop. `t4g.small` is one of the six instance types a Free plan account may launch, and RDS offers PostgreSQL 18.4 (ADR 0011's dated note). Give the 2 GB server a swap file.
 - [ ] **DevOps stage 6 — CD:** deploy through Systems Manager on merge with a manual go-ahead, health checks, rollback to the previous image. **From the 2026-11-10 plan review:** build, smoke-test and push the images on GitHub's ARM64 runner (`ubuntu-24.04-arm`, free for public repos), so the image that was tested is the image that runs on the Graviton server

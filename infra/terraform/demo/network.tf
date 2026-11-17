@@ -88,11 +88,12 @@ resource "aws_security_group" "web" {
 
 resource "aws_vpc_security_group_ingress_rule" "web_http" {
   security_group_id = aws_security_group.web.id
-  description       = "HTTP (Let's Encrypt challenge and redirect to HTTPS)"
-  ip_protocol       = "tcp"
-  from_port         = 80
-  to_port           = 80
-  cidr_ipv4         = "0.0.0.0/0"
+  # AWS allows only a-zA-Z0-9 . _-:/()#,@[]+=&;{}!$* and spaces here: no apostrophe.
+  description = "HTTP (Lets Encrypt challenge and redirect to HTTPS)"
+  ip_protocol = "tcp"
+  from_port   = 80
+  to_port     = 80
+  cidr_ipv4   = "0.0.0.0/0"
 }
 
 resource "aws_vpc_security_group_ingress_rule" "web_https" {

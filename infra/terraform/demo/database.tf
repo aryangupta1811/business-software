@@ -40,7 +40,10 @@ resource "aws_db_instance" "main" {
 
   # Automated backups for point-in-time restore. They run only while the instance runs.
   # Times are UTC: 22:00–22:30 IST backups, Sunday 23:00–23:30 IST maintenance.
-  backup_retention_period = 7
+  # 1 day: the Free plan refused 7 (FreeTierRestrictionError, 2026-11-17; the cap isn't
+  # documented, 1 is the API's own default). Time stopped doesn't count toward it.
+  # Older history comes from stage 7's nightly pg_dump to S3.
+  backup_retention_period = 1
   backup_window           = "16:30-17:00"
   maintenance_window      = "sun:17:30-sun:18:00"
   copy_tags_to_snapshot   = true
@@ -69,4 +72,11 @@ resource "aws_ssm_parameter" "db_master_password" {
   type             = "SecureString"
   value_wo         = ephemeral.random_password.db_master.result
   value_wo_version = var.db_password_version
+
+  # Write the copy only after RDS has accepted the password. The ephemeral password is new
+  # on every run, so if RDS failed after SSM was written, the retry would give RDS a
+  # different password than SSM holds (it happened on 2026-11-17). This doesn't cover SSM
+  # failing after RDS succeeded: after any failed apply touching either, follow the
+  # recovery rule in docs/devops/terraform.md.
+  depends_on = [aws_db_instance.main]
 }

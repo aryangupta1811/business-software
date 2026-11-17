@@ -18,6 +18,16 @@ CREATE ROLE app_owner LOGIN PASSWORD :'owner_password'
 CREATE ROLE app_runtime LOGIN PASSWORD :'runtime_password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 
+-- On RDS the administrator isn't a superuser, and PostgreSQL 16+ lets a non-superuser
+-- create a database owned by another role only if it may switch to that role (SET ROLE).
+-- INHERIT FALSE: it gets none of app_owner's rights unless it switches on purpose.
+GRANT app_owner TO CURRENT_USER WITH INHERIT FALSE, SET TRUE;
+
+-- The app roles have no business in the administrator's own database (the one this script
+-- starts in: `postgres` on RDS and locally).
+SELECT current_database() AS admin_database \gset
+REVOKE CONNECT, TEMPORARY ON DATABASE :"admin_database" FROM PUBLIC;
+
 CREATE DATABASE business_software OWNER app_owner;
 REVOKE ALL ON DATABASE business_software FROM PUBLIC;
 GRANT CONNECT ON DATABASE business_software TO app_runtime;

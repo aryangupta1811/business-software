@@ -10,6 +10,8 @@ const bootstrapFile = fileURLToPath(new URL('../bootstrap/create-roles.sql', imp
 export interface TestDatabase {
   /** The container's superuser on the app's database, for things the app roles may not do. */
   adminUrl: string;
+  /** The database the bootstrap script ran in (the administrator's own, like `postgres` on RDS). */
+  adminDatabase: string;
   ownerUrl: string;
   runtimeUrl: string;
   stop(): Promise<void>;
@@ -38,6 +40,7 @@ export async function startTestDatabase(): Promise<TestDatabase> {
   adminUrl.pathname = '/business_software';
   return {
     adminUrl: adminUrl.toString(),
+    adminDatabase: container.getDatabase(),
     ownerUrl,
     runtimeUrl: `postgresql://app_runtime:runtime-test@${server}`,
     stop: async () => {

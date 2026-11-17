@@ -8,9 +8,9 @@ Imported from the planning chat on claude.ai (29 Oct 2026). **This folder is now
 | --- | --- | --- | --- |
 | — | Product overview (brief, scope, non-functional requirements, architecture questions) | DECIDED (2026-10-29 kickoff) | `product-overview.md` |
 | 00 | Business setup, users & roles | DECIDED | `00-business-setup-users-roles.md` |
-| 01 | Items & inventory | DECIDED | `01-items-inventory.md` |
-| 02 | Billing & GST | DRAFT | `02-billing-gst.md` |
-| 03 | Udhaar (customer credit) | DRAFT | `03-udhaar.md` |
+| 01 | Items & inventory | DECIDED (open questions answered 2026-11-17) | `01-items-inventory.md` |
+| 02 | Billing & GST | DECIDED (2026-11-17) | `02-billing-gst.md` |
+| 03 | Udhaar (customer credit) | DECIDED (2026-11-17) | `03-udhaar.md` |
 | 04 | Suppliers & purchases | DRAFT | `04-suppliers-purchases.md` |
 | 05 | Staff, attendance & salary | DRAFT | `05-staff-attendance-salary.md` |
 | 06 | Entry logs | DRAFT | `06-entry-logs.md` |

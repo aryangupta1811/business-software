@@ -35,7 +35,7 @@ This is where most AI features fail.
 
 ## Questions to settle
 
-- Which AI model/provider and monthly cost limit (open question 3 in `product-overview.md`).
+- ~~Which AI model/provider and monthly cost limit~~ Answered 2026-11-17: Claude Sonnet 5.5, $15 a month (ADR 0015).
 - Voice input in v1, or later?
 - Can staff use the assistant at all, and with which limits?
 - Can it take actions, or only answer?
@@ -43,3 +43,4 @@ This is where most AI features fail.
 ## Change log
 
 - 2026-10-29 — Draft created from the planning chat on claude.ai.
+- 2026-11-17 — Fast-track sitting 1 answered one question early (decision D3): the model is Claude Sonnet 5.5 with a $15 monthly spend limit (ADR 0015 dated note). The rest of the module is still DRAFT, for sitting 3.

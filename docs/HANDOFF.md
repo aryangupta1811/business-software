@@ -24,19 +24,27 @@ Overwritten at the end of every session. Older handoffs are in git history: `git
   - **Modules 02 and 03 DECIDED.** The owner took every recommendation and confirmed the drafts plus Claude's additions.
   - **D1: stay free.** DuckDNS, SES sandbox, and the recovery key for demo visitors.
   - **D3: Claude Sonnet 5.5, $15 a month** (ADR 0015 dated note).
-- Day-end docs: PROGRESS header and status tables; interview log (6 entries this session, plus Pitch and Numbers moved to Mumbai).
+- Day-end docs: PROGRESS header and status tables; interview log (7 entries this session, plus Pitch and Numbers moved to Mumbai).
+- **Sitting 1's files were reviewed before merge** (PR #22) against the owner's exact answers. 5 important and 8 minor findings, 12 fixed:
+  - "cheque (number and date)" was a rule nobody chose; removed.
+  - P1.4's old "SES needs a verified domain" contradicted D1; rewritten.
+  - ADR 0015: Sonnet 5.5 turns thinking off with `{type: "between_tools"}`; `disabled` is the one refused.
+  - Module 01's answers passed on to P1.7, P1.9, P1.10, P1.11.
 
 **Half-done:**
 - **Stage 5 part 2 leftovers:**
   - Watch a nightly stop actually stop a *running* server (both were stopped by hand today, so tonight's schedule only hits stopped instances), or read the schedules' CloudWatch metrics.
   - The owner checks the EC2 and RDS credit activities in Console Home.
 - **The 1-day backup window** (22:00–22:30 IST) may never be reached if sessions stop RDS earlier. After a few sessions, check `EarliestRestorableTime` and the automated snapshots (`terraform.md`, "Still to check").
+- **P1.11 (Day 5), two open points** (written on the task in PROGRESS):
+  - Ask the owner: two GST registrations in the *same* state make a transfer CGST+SGST, not IGST.
+  - Inter-state transfers need purchase entries, which arrive with P2.1 on Day 7. Day 5's plan decides how.
 - **typescript-eslint 8.73** (`no-unsafe-class-instance-assignment` flags 5 NestJS option objects) needs its own small task.
 - **Owner tasks with lead time:**
   - **DuckDNS:** sign in at duckdns.org and pick a subdomain *before Day 2's lane 1*. Claude will say how to get the token into SSM without it passing through the chat.
   - **Meta:** a developer account, an app and the WhatsApp Cloud API test number, by Day 4 (P2.8 on Day 5).
   - **Claude Console:** two API keys (local and demo) in one workspace whose spend limit is $15 a month in total, by Day 7. Check in the Console where spend limits are set.
-  - **Carried over:** delete the other project's old access key; optionally close the old AWS account.
+  - **Delete the other project's old access key;** optionally close the old AWS account.
 
 **Next step:**
 1. `/start-session`. Day 2 (2026-11-18), with plans for all four lanes in one OK:
@@ -52,7 +60,7 @@ Overwritten at the end of every session. Older handoffs are in git history: `git
   - Lane worktrees go in **sibling folders** (`../Business-software-laneN`), made by hand with `git worktree add`. The Agent tool's `isolation: "worktree"` was refused today: the harness wouldn't use `.claude/worktrees`.
   - gitleaks can't read a worktree's `.git` file inside Docker. Scan a lane's commits from the main checkout with `--log-opts="origin/main..<branch>"`.
   - Merge one PR at a time; after each merge, rebase the next branch, regenerate generated files and run `pnpm check` again.
-  - Every PR gets a fresh-context review before merge. Today's two reviews each found a docs claim that went too far.
+  - Every PR gets a fresh-context review before merge. Today's three reviews each found real problems, most of them docs claims that went too far. A review of requirement files compares them with the owner's exact answers.
   - **PR titles ≤ 72 characters.** #20 failed `pr-title` at 74.
 - **No AI attribution, ever** (`CLAUDE.md` rule 6 overrides tool defaults). Today a commit with a `Co-Authored-By` line was blocked; the merged history is clean.
 - **pnpm 12** printed "Agent skills awaiting approval: @tanstack/react-router, @tanstack/router-plugin. Run `pnpm approve`". Don't approve without the owner; read what it installs first.

@@ -35,12 +35,12 @@
 
 ## Payment
 
-10. **Payment modes:** cash, UPI, card, cheque (number and date), and credit (udhaar).
+10. **Payment modes:** cash, UPI, card, cheque, and credit (udhaar).
 11. **Split payment:** one bill can be paid several ways (e.g. part cash, part UPI). Any unpaid part goes to the customer's udhaar balance (Module 03).
 
 ## Who may do what
 
-12. **Staff discounts:** the owner switches discounts on per staff member and sets a maximum % for each. Going above it needs the owner's password at the counter. Every discount is recorded in the entry log.
+12. **Staff discounts:** the owner switches discounts on per staff member and sets a maximum %. Going above it needs the owner's password at the counter. Every discount is recorded in the entry log.
 13. **Cancelling a bill:** the owner by default; the owner can switch it on for a trusted staff member. A reason is always required, stock goes back, and the entry log records who and why.
 
 ## After the bill
@@ -62,4 +62,4 @@ None.
 ## Change log
 
 - 2026-10-29 — Draft created from the planning chat on claude.ai.
-- 2026-11-17 — Finalized with the owner in fast-track sitting 1. The owner confirmed every draft idea, chose Claude's recommendation on every question, and confirmed Claude's additions: #2 GSTIN check and optional B2C details, #3 place of supply, #5 GST after discount, #6 round-off line, #14 never edited.
+- 2026-11-17 — Finalized with the owner in fast-track sitting 1. The owner confirmed every draft idea, chose Claude's recommendation on every question, and confirmed Claude's additions: #2 GSTIN check and optional B2C details, #3 place of supply, #5 per-item and per-bill discounts with GST after discount, #6 round-off line, #14 never edited.

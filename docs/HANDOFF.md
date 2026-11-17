@@ -24,7 +24,7 @@ Overwritten at the end of every session. Older handoffs are in git history: `git
   - **Modules 02 and 03 DECIDED.** The owner took every recommendation and confirmed the drafts plus Claude's additions.
   - **D1: stay free.** DuckDNS, SES sandbox, and the recovery key for demo visitors.
   - **D3: Claude Sonnet 5.5, $15 a month** (ADR 0015 dated note).
-- Day-end docs: PROGRESS header and status tables; interview log (8 entries today, plus Pitch and Numbers moved to Mumbai).
+- Day-end docs: PROGRESS header and status tables; interview log (6 entries this session, plus Pitch and Numbers moved to Mumbai).
 
 **Half-done:**
 - **Stage 5 part 2 leftovers:**
@@ -35,7 +35,7 @@ Overwritten at the end of every session. Older handoffs are in git history: `git
 - **Owner tasks with lead time:**
   - **DuckDNS:** sign in at duckdns.org and pick a subdomain *before Day 2's lane 1*. Claude will say how to get the token into SSM without it passing through the chat.
   - **Meta:** a developer account, an app and the WhatsApp Cloud API test number, by Day 4 (P2.8 on Day 5).
-  - **Claude Console:** two API keys with a $15 spend limit (local and demo), by Day 7.
+  - **Claude Console:** two API keys (local and demo) in one workspace whose spend limit is $15 a month in total, by Day 7. Check in the Console where spend limits are set.
   - **Carried over:** delete the other project's old access key; optionally close the old AWS account.
 
 **Next step:**

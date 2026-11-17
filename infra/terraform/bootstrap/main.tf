@@ -1,9 +1,10 @@
 # The S3 bucket that holds Terraform's state for every root in infra/terraform.
 #
-# Chicken and egg: this root creates the bucket, so its first apply keeps state on the
-# laptop. After that apply, uncomment the backend block below and run
+# Chicken and egg: this root creates the bucket, so its first apply kept state on the
+# laptop. After that apply (2026-11-17) the backend block below was uncommented and
 #   terraform init -migrate-state -backend-config=../backend.hcl
-# to move this root's own state into the bucket (docs/devops/terraform.md).
+# moved this root's own state into the bucket (docs/devops/terraform.md). In a fresh
+# account, comment the block out again for the first apply, then repeat that step.
 
 terraform {
   required_version = ">= 1.15"
@@ -15,13 +16,13 @@ terraform {
     }
   }
 
-  # backend "s3" {
-  #   key          = "bootstrap/terraform.tfstate"
-  #   region       = "ap-southeast-2"
-  #   profile      = "business-software"
-  #   encrypt      = true
-  #   use_lockfile = true
-  # }
+  backend "s3" {
+    key          = "bootstrap/terraform.tfstate"
+    region       = "ap-south-1"
+    profile      = "business-software"
+    encrypt      = true
+    use_lockfile = true
+  }
 }
 
 variable "allowed_account_ids" {
@@ -30,7 +31,7 @@ variable "allowed_account_ids" {
 }
 
 provider "aws" {
-  region              = "ap-southeast-2"
+  region              = "ap-south-1"
   profile             = "business-software"
   allowed_account_ids = var.allowed_account_ids
 

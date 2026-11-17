@@ -50,6 +50,7 @@ It's the only option with no long-lived secret and no extra moving parts, and bo
 
 ## Consequences
 
+- **Changed 2026-11-17 (ADR 0033):** new account. The profile's Region is `ap-south-1` (Mumbai) in Terraform and on the laptop. `aws login` now signs in as an **admin IAM user with MFA** (no access keys), not the projects experience's `AccountFullAccessRole`; root has MFA and isn't used day to day. The method, the named profile and `allowed_account_ids` are unchanged; the old account's profile is now `business-software-old`.
 - When the 12 hours run out mid-session, `terraform plan` fails with an expired-credentials error; run `aws login --profile business-software` again. After 90 days the browser asks again.
 - The laptop session is full access. That's acceptable for the single owner's laptop. CI gets its own narrow role through OIDC in stage 6 (ADR 0012), never this profile.
 - AWS says the account holder is responsible for what an AI coding tool does with these credentials, so Terraform runs as `plan` first, with the cost stated, and `apply` only after the owner's OK. Destroying anything needs the owner's explicit OK (`CLAUDE.md` rule 7).

@@ -61,6 +61,7 @@ At session-only use (about 60 running hours a month) the whole setup costs about
 
 ## Consequences
 
+- **Changed 2026-11-17 (ADR 0033): Mumbai `ap-south-1`.** Same shape; checked in the new account: `t4g.small` (Free plan eligible), RDS PostgreSQL 18.6 on `db.t4g.micro` gp3, Ubuntu 26.04 ARM64. **$0.0372 per running hour + $4.44 a month** (EC2 $0.0112/h, IPv4 $0.005/h, RDS $0.021/h, EBS gp3 $0.0912 and RDS gp3 $0.131 per GB-month): ≈ $6.70 a month at ~60 h, ≈ $31.60 at 24/7. **Latency 0.05–0.07 s** per round trip from India instead of 0.2–0.3 s. The Sydney figures below are history.
 - The server's IP changes at each start, so DuckDNS must be updated before anything depends on the name. DNS takes up to its TTL (60 s on DuckDNS) to follow. Caddy's Let's Encrypt certificate lives on the server's disk, so a restart doesn't request a new one.
 - ADR 0011's estimate of $30–35 a month at 24/7 becomes about **$42** in Sydney (dated note added there). 24/7 for more than about two months would need the extra $100 from the credit activities.
 - **Measured latency is 0.2 s per round trip.** The billing screen (NFR 5: a scanned item on screen in under 200 ms) can't wait for a round trip per scan from India. P1.13 must look items up from a copy in the browser, which is sensible anyway.

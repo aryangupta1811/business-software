@@ -36,7 +36,9 @@ Read files when a task needs them. Don't load everything at once.
 
 ## Stack
 
-TypeScript monorepo (pnpm): React + Vite web app, NestJS modular monolith (api + worker), PostgreSQL + Drizzle with Row-Level Security, Docker Compose locally, GitHub Actions CI/CD, AWS Sydney Free plan (one EC2 server + RDS, ₹0 budget; never upgrade the plan, ADR 0030) via Terraform. Reasons: `docs/architecture.md` and ADRs 0001–0018.
+TypeScript monorepo (pnpm): React + Vite web app, NestJS modular monolith (api + worker), PostgreSQL + Drizzle with Row-Level Security, Docker Compose locally, GitHub Actions CI/CD, AWS Mumbai Free plan (one EC2 server + RDS, ₹0 budget; never upgrade the plan, ADRs 0030 and 0033) via Terraform. Reasons: `docs/architecture.md` and ADRs 0001–0018.
+
+AWS work also follows these rules (Agent Toolkit for AWS, with this project's overrides on top): @docs/devops/aws-agent-rules.md
 
 ## Rules
 
@@ -67,5 +69,5 @@ Run from the repo root. Node 24+, pnpm 12.
 - Type-check: `pnpm typecheck`
 - Format: `pnpm format` (Prettier; `pnpm format:check` only reports)
 - Everything, before a commit: `pnpm check`
-- AWS sign-in (ADR 0031): `aws login --profile business-software`. Always name the profile; Region `ap-southeast-2`. Claude runs Terraform (`terraform plan`, cost stated, `apply` after my OK)
+- AWS sign-in (ADRs 0031, 0033): `aws login --profile business-software`, as the IAM user `admin`, never root. Always name the profile; Region `ap-south-1`. The AWS MCP server (`aws-mcp`) is read-only. Claude runs Terraform (`terraform plan`, cost stated, `apply` after my OK)
 - CI: five required checks on every PR (GitHub Actions, ADR 0024); how to read and reproduce a red one: `docs/devops/git-workflow.md`, CI

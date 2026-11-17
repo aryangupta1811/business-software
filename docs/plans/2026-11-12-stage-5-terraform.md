@@ -1,6 +1,6 @@
 # DevOps stage 5 — Terraform: plan for parts 2 and 3
 
-> **Status:** approved by the owner 2026-11-15. Part 1 (prep) is done: tools installed, sign-in decided (ADR 0031), prices and server shape decided (ADR 0032). Part 2: the Terraform files are written and validated (2026-11-15), **nothing applied**. Paused before the first `apply`: the owner is moving to a new AWS account first (`docs/plans/2026-11-15-aws-account-switch.md`).
+> **Status:** approved by the owner 2026-11-15. Part 1 (prep) is done: tools installed, sign-in decided (ADR 0031), prices and server shape decided (ADR 0032). Part 2: the Terraform files are written and validated (2026-11-15). **2026-11-17: moved to a new account in Mumbai** (ADR 0033; prices and checks there in ADR 0032's dated note). The **bootstrap root is applied** (state bucket and, added since, the budget in `bootstrap/budget.tf`) and its state is in the bucket. Next: `rds.force_ssl`'s default, then the demo root's `plan` with the cost.
 
 **Goal:** every AWS resource for the demo environment comes from Terraform in this repo. At the end of part 3, today's skeleton (web + api + worker, migrations run) is live over HTTPS at a DuckDNS address, with the database on RDS.
 
@@ -10,7 +10,7 @@
 
 ## Global constraints
 
-- Region `ap-southeast-2` everywhere. Provider: `profile = "business-software"`, `allowed_account_ids` from a git-ignored `terraform.tfvars` (ADR 0031). `required_version = ">= 1.15"`, AWS provider `~> 6.73` (≥ 6.23 needed for `aws login`).
+- Region `ap-south-1` (Mumbai, ADR 0033; was `ap-southeast-2`) everywhere. Provider: `profile = "business-software"`, `allowed_account_ids` from a git-ignored `terraform.tfvars` (ADR 0031). `required_version = ">= 1.15"`, AWS provider `~> 6.73` (≥ 6.23 needed for `aws login`).
 - `default_tags`: `Project = business-software`, `Environment = demo`, `ManagedBy = terraform`.
 - **Nothing that bills while idle:** no NAT gateway, no load balancer, no Elastic IP, no interface VPC endpoints ($0.01+/h each), no Secrets Manager (SSM Parameter Store standard tier is free).
 - **The public repo never gets:** the account ID, the state bucket's name if it contains the ID, console URLs, the DuckDNS token, any password. `terraform.tfvars` and `backend.hcl` are git-ignored; `.example` files are committed. `.terraform.lock.hcl` is committed.
@@ -41,13 +41,13 @@ One root module for `demo`. A staging copy (ADR 0011: only to rehearse a risky c
 ## Part 2 (next session): state, network, database, server, nightly stop
 
 1. **Bootstrap the state bucket** (`bootstrap/`, local state first): S3 bucket with versioning, SSE-S3 encryption, all public access blocked, a policy denying non-TLS requests, and a lifecycle rule deleting old state versions after 90 days. Then `terraform init -migrate-state` moves bootstrap's own state into the bucket. **Locking:** the S3 backend's own lock file (`use_lockfile = true`), no DynamoDB table. Cost: cents.
-2. **Network** (`network.tf`): VPC `10.20.0.0/16`; two public subnets (server) and two private subnets (RDS needs a subnet group in two Availability Zones) in `ap-southeast-2a`/`2b`; an internet gateway and a route only for the public subnets. The private subnets have no route out, and RDS doesn't need one. Take over the VPC's default security group with no rules (`aws_default_security_group`), so nothing can use it by accident. Security groups:
+2. **Network** (`network.tf`): VPC `10.20.0.0/16`; two public subnets (server) and two private subnets (RDS needs a subnet group in two Availability Zones) in `ap-south-1a`/`1b` (Sydney's `2a`/`2b` before ADR 0033); an internet gateway and a route only for the public subnets. The private subnets have no route out, and RDS doesn't need one. Take over the VPC's default security group with no rules (`aws_default_security_group`), so nothing can use it by accident. Security groups:
    - `web`: in 80 and 443 from anywhere, **no 22**; out: all (package updates, image pulls, Let's Encrypt, SSM).
    - `db`: in 5432 only from `web`; no other ingress.
 3. **Database** (`database.tf`): `db.t4g.micro`, PostgreSQL **18.6**, gp3 20 GB, `storage_encrypted`, `publicly_accessible = false`, private subnet group, `db` security group, `backup_retention_period = 7`, `deletion_protection = true`, `skip_final_snapshot = false` with a named final snapshot, `copy_tags_to_snapshot`, minor version upgrades on. Master user `postgres_admin`, password write-only and also written (write-only) to SSM as a `SecureString` under `/business-software/demo/`. Check whether RDS's PostgreSQL 18 default already sets `rds.force_ssl = 1`; add a parameter group only if it doesn't.
 4. **Server** (`server.tf`, `cloud-init.yaml`): `t4g.small`, Ubuntu 26.04 LTS ARM64 from Canonical's public SSM parameter (`lifecycle { ignore_changes = [ami] }`), public subnet with an auto-assigned public IPv4, gp3 20 GB encrypted root disk, **IMDSv2 required** (`http_tokens = "required"`), no key pair. Instance role: `AmazonSSMManagedInstanceCore` (Session Manager, later deploys) plus `ssm:GetParameter(s)` on `/business-software/demo/*` only. Cloud-init: Docker from Docker's official apt repository (with the Compose plugin), a 2 GB swap file, unattended security upgrades on (automatic reboot off: the server restarts at every session start anyway), the AWS CLI for reading SSM at boot.
 5. **Nightly stop** (`schedule.tf`): two EventBridge Scheduler schedules, `cron(30 23 * * ? *)` in `Asia/Kolkata`, universal targets `ec2:stopInstances` and `rds:stopDBInstance`, no retries (stopping a stopped instance just fails). One role allowed only `ec2:StopInstances` on this instance and `rds:StopDBInstance` on this database.
-6. **Before `apply`:** run `terraform plan`, list what it creates, and state the cost: about **$0.051 per running hour** and **$4.73 a month** for disks (ADR 0032), plus cents for S3 and the schedule.
+6. **Before `apply`:** run `terraform plan`, list what it creates, and state the cost: about **$0.037 per running hour** and **$4.44 a month** for disks in Mumbai (ADR 0032, dated note; Sydney was $0.051 and $4.73), plus cents for S3 and the schedule.
 7. **Check it works:**
    - Install the Session Manager plugin on the laptop (`winget`), open a shell on the server with `aws ssm start-session`. No SSH key and no port 22.
    - From the server: `docker version`, `docker compose version`, `swapon --show`, `uname -m` = `aarch64`; connect to RDS with `psql` from a `postgres:18` container, check `ssl` is on and `select version()` says 18.6.

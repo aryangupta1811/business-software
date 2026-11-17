@@ -1,10 +1,29 @@
 # Progress
 
-**Current focus:** DevOps stage 5 part 2 in the **new AWS account** (ADR 0033: Free plan, **Mumbai** `ap-south-1`, admin IAM user with MFA). The bootstrap root is applied (state bucket + $15 budget, both Terraform) and its state is in the bucket. The demo stack (`infra/terraform/demo/`) is written, validated and not applied
-**Next step:** (account switch merged as PR #17) on a new branch: check `rds.force_ssl`'s default, `init` and `plan` the demo root, state the cost, `apply` after the owner's OK
+**Current focus:** the **fast track** (`docs/plans/2026-11-17-fast-track.md`): the whole project in 10 days, 2026-11-17 to 2026-11-26, same scope and same checks, up to four tasks in parallel. Day 1: DevOps stage 5 part 2 in the **new AWS account** (ADR 0033: Free plan, **Mumbai** `ap-south-1`, admin IAM user with MFA). The bootstrap root is applied (state bucket + $15 budget, both Terraform) and its state is in the bucket. The demo stack (`infra/terraform/demo/`) is written, validated and not applied
+**Next step:** Day 1 of the fast track: on a new branch, check `rds.force_ssl`'s default, `init` and `plan` the demo root, state the cost, `apply` after the owner's OK; the dependency refresh in parallel; question sitting 1 in the evening (Modules 01, 02, 03 and decisions D1–D3)
 **Last updated:** 2026-11-17
 
-Each task below is sized for **one session**. DevOps stages (from `docs/devops/DEVOPS_PLAN.md`) are woven in where they're first needed. Tasks for DRAFT modules are provisional: re-cut them after `/finalize-module NN`.
+Each task below is sized for **one session** when worked alone. DevOps stages (from `docs/devops/DEVOPS_PLAN.md`) are woven in where they're first needed. Tasks for DRAFT modules are provisional: re-cut them after `/finalize-module NN`.
+
+## Fast track schedule (2026-11-17 to 2026-11-26)
+
+Owner's decision 2026-11-17. **This table sets the order of work.** It overrides the Step order in Phase 1 below. The task texts below stay the detail for each task. How lanes work, the definition of done, the owner's decisions D1–D6 and the risks: `docs/plans/2026-11-17-fast-track.md`.
+
+| Day | Date | Lane 1 | Lane 2 | Lane 3 | Lane 4 | Owner, evening |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 11-17 | This plan → stage 5 part 2 | Dependency refresh | Drafts for sitting 1 | — | Sitting 1: 01, 02, 03; D1–D3 |
+| 2 | 11-18 | Stage 5 part 3 (skeleton live) | P1.3 Signup | Finalize 01–03 → drafts for sitting 2 | P1.12 GST engine | Sitting 2: 05, 06, 07; D4 |
+| 3 | 11-19 | Stage 7 → stage 6 (every merge deploys) | P1.7 Items | P1.4 Login | Finalize 05–07 → P2.7 part 1 (queue) | Sitting 3: 04, 08, 09; D5, D6 |
+| 4 | 11-20 | P1.8 Stock ledger | P1.13 Billing screen | P1.5 Staff → P1.6 Branches | Finalize 04, 08, 09 → P2.7 part 2 (alerts) | Walkthrough |
+| 5 | 11-21 | P1.9 Excel → P1.11 Transfers | P1.14 Saving a bill | P2.3 Staff & attendance | P2.6 Log viewer → P2.8 WhatsApp | Walkthrough |
+| 6 | 11-22 | P1.10 Batches, IMEI | P1.15 Printing → P1.16 Returns | P2.4 Salary & advances | P1.18 Udhaar → P1.19 Views | Walkthrough |
+| 7 | 11-23 | P2.1 → P2.2 Suppliers | P1.17 Rest of billing | P2.5 Salary slips | P2.9 → P2.10 Dashboards | Phase 1 journal |
+| 8 | 11-24 | Demo data P1.20 → P2.11 → P3.1 | Chosen ideas (D6) | P3.2 AI tools | Stage 9 observability | Phase 2 journal |
+| 9 | 11-25 | P3.3 Chat → P3.5 Guardrails | P3.4 Eval set | Stage 10 security | Whole-project deep scan | Walkthrough |
+| 10 | 11-26 | Buffer: slips, scan fixes, live end-to-end run, portfolio polish, Phase 3 journal; stage 11 only if all else is done | | | | Final review |
+
+The live server keeps running the skeleton until stage 7 is done (Day 3), so P1.3 stores no real data before backups exist.
 
 ## Requirements status
 
@@ -42,6 +61,8 @@ Each task below is sized for **one session**. DevOps stages (from `docs/devops/D
 - [x] Phase 0 journal (`docs/journal/phase-0.md`, done 2026-11-01): status and summary, a new "Looking back" section (added to the journal template), the 2-minute pitch and Phase 0 numbers in `INTERVIEW_LOG.md`
 
 ## Phase 1 — Core selling
+
+**Order changed again 2026-11-17: the fast track schedule above sets the order now.** The Steps below are kept for their task texts and history.
 
 **Order changed 2026-11-10 (owner's decision; reasons in `docs/plans/2026-11-10-plan-review.md`, section 4): demo-first.** The tasks, their numbers and the requirements are unchanged; only the order is. Placement interviews are 1 to 3 months away and the AWS Free plan's 6 months start when the account opens. So the cloud stages come first (every merge after that deploys), then the shortest path to a printed bill, then demo data, then the features a first demo doesn't need. Work from top to bottom.
 
@@ -93,7 +114,7 @@ Step 3 — Something to show:
 - [ ] **Finalize Module 03** (`/finalize-module 03`), then re-cut P1.18–P1.19
 - [ ] **P1.18 Udhaar ledger:** running balance, payments, credit-limit check at billing
 - [ ] **P1.20 Demo data v1:** seed a kirana shop with items, bills and udhaar [ADR 0016]. **From the 2026-11-10 scan (raise with the owner before building):** (a) the one-click demo login is public, so decide what a visitor may not do in the demo business: change its password or email, create staff logins, send WhatsApp messages, spend the AI budget; (b) "reset on a schedule" can't delete rows (ADR 0007: the app has no DELETE and the entry log is append-only): choose between a fresh demo business per reset (old ones stay) and a reset run as the owner role outside the app, with the owner's OK each time; (c) months of history need the services to take the business date from a clock the seed can set; `entry_log.created_at` stays the seeding time
-- [ ] **Decide with the owner:** a thin slice of the AI assistant now (three or four read-only tools over bills and udhaar, Module 09 finalized first), or keep it for Phase 3 as planned. It is the most distinctive feature and the last one built (`docs/plans/2026-11-10-plan-review.md`, section 4).
+- [x] **Decide with the owner** (answered by the fast track, 2026-11-17: the full assistant is built on Days 8–9, so no thin slice): a thin slice of the AI assistant now (three or four read-only tools over bills and udhaar, Module 09 finalized first), or keep it for Phase 3 as planned. It is the most distinctive feature and the last one built (`docs/plans/2026-11-10-plan-review.md`, section 4).
 
 Step 4 — The rest of Phase 1 (deferred 2026-11-10; none of it blocks a first demo):
 

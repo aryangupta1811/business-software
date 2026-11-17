@@ -4,7 +4,7 @@ How a change gets from my laptop to `main`. DevOps stage 1. The reasons for each
 
 ## Every task, step by step
 
-One session = one task = one branch = one pull request.
+One session = one task = one branch = one pull request. During the fast track (2026-11-17 to 2026-11-26, `docs/plans/2026-11-17-fast-track.md`, section 4), a day's session runs up to four tasks at once, each in its own git worktree, branch and pull request. Claude merges them one at a time; after each merge, the next branch rebases onto `main`, regenerates generated files (Drizzle migration and snapshot, `routeTree.gen.ts`) and runs `pnpm check` again.
 
 ```bash
 git switch main && git pull           # start from the latest main

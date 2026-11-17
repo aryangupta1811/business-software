@@ -17,12 +17,12 @@ Overwritten at the end of every session. Older handoffs are in git history: `git
 **Half-done:**
 - **Stage 5 part 2:** the demo root (`infra/terraform/demo/`) is written and validated, **not planned or applied** in the new account. Its `terraform init -backend=false` returned 1 this session (likely the IPv6 provider-download problem; `validate` still passed with the providers it had). The real `init` with `-backend-config=../backend.hcl` hasn't run.
 - **Not checked yet:** RDS PostgreSQL 18's `rds.force_ssl` default (now possible with the new account); the cloud-init file has never booted.
-- **Owner tasks:** click AWS's **budget confirmation email**; deactivate and delete the other project's old access key in its own IAM console (carried over); optionally close the old account (the owner's click, irreversible).
+- **Owner tasks:** the budget confirmation email is done (owner, end of session). Still: deactivate and delete the other project's old access key in its own IAM console (carried over); optionally close the old account (the owner's click, irreversible).
 - **Credit activities:** check whether the Terraform-made budget counted for the "budget" activity (Console Home → Explore AWS widget).
 - The Gemini CLI's `aws-mcp` entry was left as AWS generated it; it will hit the same Windows block if used.
 
 **Next step:**
-1. Owner: squash-merge the account-switch PR once CI is green; `git switch main`, `git pull`, `git branch -D docs/aws-account-switch`.
+1. Done: PR #17 (account switch) squash-merged by Claude on the owner's word (`cb465bb`); local branch deleted.
 2. Next session: `/start-session`, then **stage 5 part 2 continued** on a new branch from `main` (e.g. `feat/stage-5-demo-stack`): check `rds.force_ssl`; `terraform init -backend-config=../backend.hcl` in `demo/` (rebuild the provider mirror if IPv6 breaks the download, see below); `plan`; state the cost (about $0.0372 per running hour + $4.44 a month); `apply` after the owner's OK; the checks in the stage 5 plan's step 7; stop both instances.
 3. A small PR any time: the **dependency refresh** in PROGRESS.
 4. **Owner decisions waiting** (in PROGRESS): `entry_log`'s `id`/`created_at` database-only (P1.4 e); public demo rules and reset (P1.20); thin AI slice after demo data v1.

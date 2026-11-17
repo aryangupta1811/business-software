@@ -24,3 +24,8 @@ output "db_master_password_parameter" {
   description = "SSM parameter holding the master password."
   value       = aws_ssm_parameter.db_master_password.name
 }
+
+output "duckdns_token_parameter" {
+  description = "SSM parameter the owner overwrites with the DuckDNS token."
+  value       = aws_ssm_parameter.duckdns_token.name
+}

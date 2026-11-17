@@ -49,6 +49,21 @@ jobs:
           docker run --rm -v "$PWD:/repo:ro" -w /repo
           rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
           -color
+      # Terraform (ADR 0031): formatting and a validate of each root, with no AWS access.
+      # `-backend=false` skips the state bucket; `-lockfile=readonly` fails if the committed
+      # .terraform.lock.hcl doesn't match the providers the code asks for.
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.17.1
+          terraform_wrapper: false
+      - name: Check Terraform
+        working-directory: infra/terraform
+        run: |
+          terraform fmt -check -recursive -diff
+          for root in bootstrap demo; do
+            terraform -chdir="$root" init -backend=false -input=false -lockfile=readonly
+            terraform -chdir="$root" validate
+          done
 
   # gitleaks over the whole history: push protection only knows well-known token formats.
   secrets:

@@ -67,7 +67,8 @@ Console Home → Explore AWS widget → filter *Earn AWS credits*. All five star
 
 - AWS CLI v2 (2.40.0) and Terraform (1.17.1), installed 2026-11-12 with `winget install --id Amazon.AWSCLI` / `Hashicorp.Terraform`. Open a new terminal after installing so PATH is fresh.
 - The old AWS CLI v1 launchers in Python's `Scripts` folder were deleted the same day.
-- Prices and the server shape: ADR 0032. Terraform's plan: `docs/plans/2026-11-12-stage-5-terraform.md`.
+- Prices and the server shape: ADR 0032. Terraform's plan: `docs/plans/2026-11-12-stage-5-terraform.md`. Day-to-day Terraform, start/stop and server access: `terraform.md`.
+- Session Manager plugin (2026-11-17, `winget install --id Amazon.SessionManagerPlugin`): needed for `aws ssm start-session`, the only way onto the server (no SSH).
 - **Agent Toolkit for AWS** (2026-11-17): `uv` 0.13.8 (`winget install --id astral-sh.uv`), then `aws configure agent-toolkit --yes --region us-east-1 --profile business-software`. It installed 25 AWS skills into `~/.claude/skills` (and `~/.agents/skills` for Codex) and an `aws-mcp` server in `~/.claude.json` (and the Gemini CLI's settings, left as generated). Free: only the AWS calls it makes are billed. Rules: `docs/devops/aws-agent-rules.md`.
   - The generated `aws-mcp` entry was replaced (`claude mcp add-json aws-mcp -s user …`) with: `uvx --from mcp-proxy-for-aws==1.8.0 python ~/.aws-mcp/run_ipv4.py https://aws-mcp.us-east-1.api.aws/mcp --profile business-software --read-only --disable-telemetry --metadata AWS_REGION=ap-south-1 INSTALL_SOURCE=aws-cli`, with `uvx` by its full winget path (`%LOCALAPPDATA%\Microsoft\WinGet\Packages\astral-sh.uv_…\uvx.exe`).
   - Why `python …` and not the tool's own command: Windows Application Control blocks the unsigned `.exe` launcher uv makes for each tool ("An Application Control policy has blocked this file").

@@ -60,7 +60,9 @@ variable "db_disk_gb" {
 variable "db_password_version" {
   description = "Bump by one to make a new RDS master password (it's write-only, so Terraform can't see a change otherwise)."
   type        = number
-  default     = 1
+  # 2 (2026-11-17): the first apply failed after writing SSM but before RDS existed, so the
+  # retry gave RDS a different password than SSM held. Bumped to resend one to both.
+  default = 2
 }
 
 variable "nightly_stop_cron" {

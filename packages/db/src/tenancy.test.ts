@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createDatabase, type Database } from './client.js';
 import { branches, businesses } from './schema.js';
 import { withBusiness, withNewBusiness } from './tenancy.js';
-import { startTestDatabase, type TestDatabase } from './testing.js';
+import { startTestDatabase, testBranch, testBusiness, type TestDatabase } from './testing.js';
 
 // Drizzle wraps driver errors; the PostgreSQL error code is on `cause`.
 // 42501 insufficient_privilege (also RLS WITH CHECK), 22P02 invalid text, 23503 foreign key.
@@ -26,10 +26,10 @@ describe('tenancy', () => {
 
   async function signUp(name: string): Promise<{ businessId: string; branchId: string }> {
     return withNewBusiness(runtime.db, async (tx, businessId) => {
-      await tx.insert(businesses).values({ id: businessId, name });
+      await tx.insert(businesses).values(testBusiness(name, businessId));
       const [branch] = await tx
         .insert(branches)
-        .values({ businessId, name: `${name} main` })
+        .values(testBranch(businessId, `${name} main`))
         .returning({ id: branches.id });
       if (branch === undefined) throw new Error('no branch returned');
       return { businessId, branchId: branch.id };
@@ -82,7 +82,7 @@ describe('tenancy', () => {
   it('refuses to insert a row for another business', async () => {
     await expect(
       withBusiness(runtime.db, b.businessId, (tx) =>
-        tx.insert(branches).values({ businessId: a.businessId, name: 'sneaky' }),
+        tx.insert(branches).values(testBranch(a.businessId, 'sneaky')),
       ),
     ).rejects.toMatchObject(failsWith('42501'));
   });
@@ -98,7 +98,7 @@ describe('tenancy', () => {
   it('shows nothing and refuses inserts when no business is set', async () => {
     expect(await runtime.db.select().from(branches)).toEqual([]);
     await expect(
-      runtime.db.insert(businesses).values({ name: 'No business set' }),
+      runtime.db.insert(businesses).values(testBusiness('No business set')),
     ).rejects.toMatchObject(failsWith('42501'));
   });
 
@@ -151,7 +151,7 @@ describe('tenancy', () => {
     });
     await expect(
       withBusiness(runtime.db, unknownBusiness, (tx) =>
-        tx.insert(branches).values({ businessId: unknownBusiness, name: 'Orphan' }),
+        tx.insert(branches).values(testBranch(unknownBusiness, 'Orphan')),
       ),
     ).rejects.toMatchObject(failsWith('23503'));
   });

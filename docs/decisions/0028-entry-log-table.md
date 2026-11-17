@@ -53,6 +53,7 @@ The database, not the code, makes the log trustworthy (ADR 0007). Keeping the ta
 - P1.4 must add a migration: a composite foreign key from `entry_log` to the users table (`(business_id, actor_id) → users(business_id, id)`, with the unique key on users), and the guard's rules apply.
 - `app_owner` can still update the table (it owns it). That is acceptable because it is the migration role and never runs at runtime; data migrations still must not touch log rows.
 - JSON values hold money as integer paise (ADR 0008).
+- **Changed 2026-11-18 (P1.3): the actor key arrived with P1.3, not P1.4.** P1.3 creates the `users` table (signup makes the owner), so migration `0003` adds `entry_log_actor_fk`, `(business_id, actor_id) → users(business_id, id)`, with `unique (business_id, id)` on users. A NULL actor (the system) still passes. `recordEntry` now also refuses an action name that isn't in `ENTRY_ACTIONS`.
 
 ## Interview note
 

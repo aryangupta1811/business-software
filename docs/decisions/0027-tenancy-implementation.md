@@ -85,6 +85,7 @@ The database is the guarantee (ADR 0006), and the guard test guarantees that the
 - Querying tenant tables by hand (psql) shows nothing until `select set_config('app.business_id', '<id>', false)` is run (`docs/devops/local-database.md`).
 - P1.4 must look up a user's business at login, before any business is set: probably a narrow `SECURITY DEFINER` function with PUBLIC's EXECUTE revoked. Decided there.
 - P2.7's worker calls `withBusiness` per job, with the business stored in the job.
+- **Added 2026-11-18 (P1.3): one unique key without `business_id`, on purpose.** Module 00 #27 makes an owner's email unique across the whole app, so `users_owner_email_unique` is a partial unique index on `users (email) where role = 'owner'`. PostgreSQL checks a unique index against every row, including rows RLS hides, so a second signup with the same email fails with `23505` inside its own transaction: signup needs no cross-business read and no `SECURITY DEFINER` function. The cost is that the error reveals the email has an account, which #27 accepts (P1.4's rate limit covers signup). P1.7's planned guard rule ("every unique key on a tenant table includes `business_id`") must list this index as its one exception, with this reason.
 
 ## Interview note
 

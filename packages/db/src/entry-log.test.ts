@@ -1,11 +1,18 @@
 // Integration test on a throwaway PostgreSQL (ADR 0013): the entry log is append-only, belongs
 // to one business, and commits or rolls back with the action it describes (ADRs 0007, 0028).
+import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createDatabase, type Database } from './client.js';
 import { recordEntry, type EntryAction, type EntryInput } from './entry-log.js';
-import { branches, businesses, entryLog } from './schema.js';
+import { entryLog } from './schema.js';
 import { withBusiness, withNewBusiness } from './tenancy.js';
-import { startTestDatabase, type TestDatabase } from './testing.js';
+import {
+  insertTestBusiness,
+  startTestDatabase,
+  testBusiness,
+  type TestDatabase,
+} from './testing.js';
+import { businesses } from './schema.js';
 
 // Drizzle wraps driver errors; the PostgreSQL error code is on `cause`.
 // 42501 insufficient_privilege (also RLS WITH CHECK), 22P02 invalid text, 23503 foreign key.
@@ -13,8 +20,9 @@ function failsWith(code: string) {
   return { cause: expect.objectContaining({ code }) as unknown };
 }
 
+// The system (null) by default; tests that need a person use a business's owner.
 const adjust = (overrides: Partial<EntryInput> = {}): EntryInput => ({
-  actorId: '0190f0f0-0000-7000-8000-00000000a001',
+  actorId: null,
   action: 'stock.adjusted',
   entityType: 'item',
   entityId: '0190f0f0-0000-7000-8000-00000000e001',
@@ -27,20 +35,12 @@ const adjust = (overrides: Partial<EntryInput> = {}): EntryInput => ({
 describe('entry log', () => {
   let server: TestDatabase;
   let runtime: Database;
-  let a: { businessId: string; branchId: string };
-  let b: { businessId: string; branchId: string };
+  type Shop = Awaited<ReturnType<typeof insertTestBusiness>>;
+  let a: Shop;
+  let b: Shop;
 
-  async function signUp(name: string): Promise<{ businessId: string; branchId: string }> {
-    return withNewBusiness(runtime.db, async (tx, businessId) => {
-      await tx.insert(businesses).values({ id: businessId, name });
-      const [branch] = await tx
-        .insert(branches)
-        .values({ businessId, name: `${name} main` })
-        .returning({ id: branches.id });
-      if (branch === undefined) throw new Error('no branch returned');
-      return { businessId, branchId: branch.id };
-    });
-  }
+  const signUp = (name: string): Promise<Shop> =>
+    withNewBusiness(runtime.db, (tx, businessId) => insertTestBusiness(tx, businessId, name));
 
   const entriesOf = (businessId: string) =>
     withBusiness(runtime.db, businessId, (tx) => tx.select().from(entryLog));
@@ -182,6 +182,26 @@ describe('entry log', () => {
     ).rejects.toThrow('recordEntry needs actorId (null for the system)');
   });
 
+  it('records the acting user', async () => {
+    const [row] = await withBusiness(runtime.db, a.businessId, async (tx) => {
+      await recordEntry(tx, adjust({ actorId: a.ownerId, reason: 'by the owner' }));
+      return tx
+        .select({ actorId: entryLog.actorId })
+        .from(entryLog)
+        .where(eq(entryLog.reason, 'by the owner'));
+    });
+    expect(row).toEqual({ actorId: a.ownerId });
+  });
+
+  // ADR 0028: the actor key pairs business_id, so another business's user is refused.
+  it('refuses an actor from another business', async () => {
+    await expect(
+      withBusiness(runtime.db, b.businessId, (tx) =>
+        recordEntry(tx, adjust({ actorId: a.ownerId })),
+      ),
+    ).rejects.toMatchObject(failsWith('23503'));
+  });
+
   it('refuses a malformed actor ID', async () => {
     await expect(
       withBusiness(runtime.db, a.businessId, (tx) =>
@@ -192,7 +212,7 @@ describe('entry log', () => {
 
   it('logs at signup once the business exists', async () => {
     await withNewBusiness(runtime.db, async (tx, businessId) => {
-      await tx.insert(businesses).values({ id: businessId, name: 'Shop C' });
+      await tx.insert(businesses).values(testBusiness('Shop C', businessId));
       await recordEntry(tx, adjust());
     });
     await expect(

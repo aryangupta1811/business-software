@@ -2,57 +2,57 @@
 
 Overwritten at the end of every session. Older handoffs are in git history: `git log -p docs/HANDOFF.md`.
 
-**Session:** 19 — DevOps stage 5 part 1: tools, AWS sign-in, Sydney prices, Terraform plan, 2026-11-12
+**Session:** 20 — DevOps stage 5 part 2 started: Terraform written, then paused for an AWS account switch, 2026-11-15
 
 **Done:**
-- PR #14 (stage 4) was merged before this session.
-- **Owner's rule (2026-11-12): Claude runs Terraform and the AWS CLI**, explaining as it goes; `plan` first, cost stated, `apply` after the owner's OK. Recorded in `DEVOPS_PLAN.md`, `CLAUDE.md` and the plan.
-- **Tools:** AWS CLI 2.40.0 and Terraform 1.17.1 installed with `winget` (1.17.2 exists; upgrade any time). The old CLI v1 launchers in Python's `Scripts` folder were deleted (owner's OK).
-- **Sign-in (ADR 0031):** `aws login --profile business-software` (profile Region `ap-southeast-2`). It gives an assumed role, `AccountFullAccessRole`, with 12-hour credentials renewed for up to 90 days. No access keys. Terraform ≥ 1.15 with AWS provider ≥ 6.23 reads it, S3 backend included (from a Classmethod article; the first `terraform init` proves it).
-- **Old credentials found:** `~/.aws/credentials` had a working long-lived key for a finished project's IAM user in another account as `[default]`. With the owner's OK, `[default]` was renamed to a named profile; a command without `--profile` now fails with `NoCredentials`. Deactivating the key from the laptop failed (the key may not manage itself; the second old profile's key was already invalid).
-- **Checked in Sydney:** `t4g.small` offered and on the Free plan list (which now also has `t8i.micro`/`t8i.small`); RDS PostgreSQL 18.1–18.6 on `db.t4g.micro` with gp3; Ubuntu 26.04 ARM64 image in Canonical's public SSM parameter; Docker's apt repo has `resolute` for arm64.
-- **Prices (Pricing API, ADR 0032):** $0.0512 per running hour (EC2 $0.0212, IPv4 $0.005, RDS $0.025) + $4.73 a month (EBS 20 GB $1.92, RDS gp3 20 GB $2.76). ≈ $7.80 a month at ~60 h, ≈ $42 at 24/7. ADR 0011 has a dated note.
-- **Latency:** Mumbai ~55–80 ms, Sydney ~270–300 ms, so +0.2 s per round trip. P1.13 now has a note: look items up in the browser.
-- **Owner chose (ADR 0032):** auto-assigned IP + DuckDNS, Ubuntu 26.04 LTS ARM64, nightly EventBridge Scheduler stop at 23:30 IST, no budget action.
-- **Plan** `docs/plans/2026-11-12-stage-5-terraform.md` for parts 2 and 3.
-- Updated: PROGRESS (stage 5 split in three parts, part 1 ticked), `aws-account.md`, `DEVOPS_PLAN.md`, `CLAUDE.md` (AWS sign-in line), `phase-1.md`, interview log (5 entries, 2 questions, 7 glossary terms, Numbers, Pitch).
-- **PR #15** (`docs: prepare terraform for stage 5 and record adrs 0031-0032`), branch `docs/devops-stage-5-prep`. All five checks were green; this end-session commit goes on the same PR.
+- **PR #15** (stage 5 part 1) squash-merged by Claude on the owner's word; `main` updated, the old branch deleted.
+- **The owner approved** `docs/plans/2026-11-12-stage-5-terraform.md`.
+- **Terraform written, not applied** (`infra/terraform/`):
+  - `bootstrap/`: the state bucket (versioning, SSE-S3, public access blocked, TLS-only policy, old versions expire after 90 days). Its backend block is commented out until the first apply; then `terraform init -migrate-state -backend-config=../backend.hcl`.
+  - `demo/`: `versions.tf`, `backend.tf` (S3 with `use_lockfile`), `variables.tf`, `network.tf`, `database.tf`, `server.tf`, `cloud-init.yaml`, `schedule.tf`, `outputs.tf`.
+  - `backend.hcl.example` and two `terraform.tfvars.example`; `backend.hcl` added to `.gitignore`. Both `.terraform.lock.hcl` files are committed, with hashes for `windows_amd64` and `linux_amd64`.
+  - `terraform fmt -check` and `terraform validate` pass on both roots (with `init -backend=false`).
+- **Confirmed in AWS provider 6.73.0's schema:** `password_wo` (RDS) and `value_wo` (SSM) are write-only; `ephemeral "random_password"` exists in `random` 3.9.1. The plan's open question is closed.
+- **Added beyond the plan:** `cpu_credits = "standard"` on the server (`t4g` defaults to `unlimited`, which bills for extra CPU); IMDS hop limit 1 (containers can't reach the instance's credentials); `user_data_replace_on_change = true` (cloud-init runs only at first boot); the VPC's main route table taken over.
+- **The owner decided to move to a new AWS account** before anything is created: signing in to the current project has become difficult. Plan written: `docs/plans/2026-11-15-aws-account-switch.md` (8 steps, with a gate that stops if the new account isn't on the Free plan).
+- Unrelated: the Claude desktop app once failed to start a session with `Script not found "stream-json"`. That was the app's own Claude Code binary (probably caught mid-update), not this repo. Restarting the app clears it.
 
 **Half-done:**
-- **PR #15** is open, not merged.
-- **The plan is waiting for the owner's OK** (`docs/plans/2026-11-12-stage-5-terraform.md`). Nothing has been created in AWS yet; the only resource is stage 4's budget.
-- **Owner tasks:**
-  - Deactivate, then delete, the old project's access key in *that* account's IAM console (IAM → Users → the user → Security credentials → Access keys). Optionally remove the dead second profile from `~/.aws/credentials`.
-  - From stage 4: click the AWS Budgets verification email; turn on 2-step verification on the identity used to sign in to AWS.
-  - Check Console Home → Explore AWS → "Earn AWS credits": the budget activity still showed "Not started".
+- **Nothing exists in AWS** except the old account's budget. No `terraform.tfvars`, no `backend.hcl`, no state file anywhere.
+- **Stage 5 part 2** stopped before the first `plan`: the laptop's `aws login` session had expired (normal after 12 hours), and then the owner chose to switch accounts.
+- **The account switch plan needs the owner's OK and three answers** (top of the plan): what exactly fails at sign-in; new account or new project; what happens to the old account.
+- **ADR 0033** (the account switch) is not written yet: it waits for the new account's facts (plan step 4).
+- **Not checked yet:** whether RDS PostgreSQL 18 sets `rds.force_ssl = 1` by default (needs AWS access); the cloud-init file has never booted.
+- **Owner tasks carried over:** deactivate and delete the other project's old access key in its IAM console; from stage 4, the budget email and 2-step verification now apply to the **new** account.
 
 **Next step:**
-1. Owner: squash-merge PR #15 when green, then `git switch main`, `git pull`, `git branch -D docs/devops-stage-5-prep`. Read and OK the plan.
-2. Next session: `/start-session`, then **stage 5 part 2** on branch `feat/stage-5-network-db-server`, following the plan:
-   - `aws login --profile business-software` first if 12 hours have passed.
-   - Add `backend.hcl` to `.gitignore` (and commit `backend.hcl.example`); `*.tfvars` is already ignored.
-   - Confirm `password_wo` (RDS) and `value_wo` (SSM) exist in AWS provider 6.73 before writing `database.tf`.
-   - Bootstrap the state bucket, then network, database, server, schedule. `plan`, state the cost, wait for OK, `apply`.
-   - Install the Session Manager plugin (`winget`) to get onto the server.
-   - Stop EC2 and RDS at the end; check the next morning that the schedule works.
-3. A small PR any time: the **dependency refresh** in PROGRESS.
-4. **Owner decisions waiting** (in PROGRESS): `entry_log`'s `id`/`created_at` database-only (P1.4 e); public demo rules and reset (P1.20); thin AI slice after demo data v1.
+1. Owner: open the new AWS account (plan step 1: never click "Upgrade plan" or "Activate advanced features"; note the plan, the credits, the end date and the Region; keep the account ID in the password manager).
+2. Next session: `/start-session`, then the **account switch** on branch `docs/aws-account-switch`, following the plan from step 2: rename the old profile to `business-software-old`, owner signs out of the old account in the browser, `aws login --profile business-software`, read the facts, the gate, the guardrails, ADR 0033 and the doc updates.
+3. Then **stage 5 part 2** on a new branch from `main`, at "plan the bootstrap bucket, state the cost, wait for OK".
+4. A small PR any time: the **dependency refresh** in PROGRESS.
+5. **Owner decisions waiting** (in PROGRESS): `entry_log`'s `id`/`created_at` database-only (P1.4 e); public demo rules and reset (P1.20); thin AI slice after demo data v1.
 
 **Watch out for:**
-- **AWS, which account:** always `--profile business-software` (or `AWS_PROFILE`). The laptop has no `[default]` credentials on purpose. Terraform's provider gets `allowed_account_ids` from a git-ignored `terraform.tfvars`.
-- **AWS, one-way doors:** never click "Upgrade plan" or "Activate advanced features"; never create or join an Organization or set up Control Tower. On the Free plan AWS can't charge the card; it closes the account when credits or the 6 months (2027-05-12) run out.
+- **AWS, which account:** from the switch on there are two accounts. Before every `plan` and `apply`, run `aws sts get-caller-identity --profile business-software` (masked). `allowed_account_ids` gets the **new** ID only. The old account stays empty.
+- **AWS, the new account's plan:** the Free plan is for new AWS customers only. If the new account shows the Paid plan, stop: the card can then be charged (switch plan, step 4).
+- **AWS, sign-in:** `aws login` uses whatever account the browser is signed in to. Sign out of the old one first.
+- **AWS, one-way doors:** never click "Upgrade plan" or "Activate advanced features"; never create or join an Organization or set up Control Tower. Closing an account can't be undone and is the owner's click.
 - **AWS, money:**
-  - State each resource's cost per hour and per month before `apply` (ADR 0032 has the prices).
+  - State each resource's cost per hour and per month before `apply` (ADR 0032 has Sydney's prices; redo them if the Region changes).
   - Stop EC2 and RDS after every session. Disks still bill while stopped ($4.73 a month). RDS restarts itself after 7 days stopped.
   - Nothing that bills while idle: no NAT gateway, load balancer, Elastic IP, interface VPC endpoint or Secrets Manager.
-- **AWS, Region:** `ap-southeast-2` everywhere. The Pricing API is called with `--region us-east-1` (its endpoint); that works despite the Region lock.
-- **AWS, privacy:** console URLs, error messages and `sts` output contain the account ID; mask it (`sed -E 's/[0-9]{12}/<account>/g'`) and never commit it. The state bucket's name goes in git-ignored `backend.hcl` if it contains the ID.
-- **Terraform:** secrets never in state (write-only arguments with ephemeral passwords). `terraform destroy`, or deleting anything, needs the owner's explicit OK and, for RDS, a fresh snapshot. RDS has deletion protection.
+- **AWS, Region:** `ap-southeast-2` is written in 4 places (`bootstrap/main.tf`, `demo/backend.tf`, `demo/variables.tf`, and the laptop's profile). Change them only if the new account's Region differs. The Pricing API is called with `--region us-east-1`.
+- **AWS, privacy:** console URLs, error messages and `sts` output contain the account ID; mask it (`sed -E 's/[0-9]{12}/<account>/g'`) and never commit it. The state bucket's name contains the ID, so it lives in git-ignored `backend.hcl`.
+- **Terraform:**
+  - Secrets never in state (write-only arguments with ephemeral passwords). To rotate the RDS master password, raise `db_password_version` by one.
+  - `terraform destroy`, or deleting anything, needs the owner's explicit OK and, for RDS, a fresh snapshot. RDS has deletion protection.
+  - **Provider downloads fail on this network over IPv6** (`releases.hashicorp.com` resets the connection; IPv4 works). `terraform init` then fails with "connection was forcibly closed". Workaround used: download the provider zips with `curl -4`, check them against HashiCorp's `SHA256SUMS`, and point Terraform at the folder with a `filesystem_mirror` in a file named by `TF_CLI_CONFIG_FILE`. The mirror was in a temporary folder and is gone; rebuild it if `init` fails again. Lock files: `terraform providers lock -fs-mirror=<folder> -platform=windows_amd64 -platform=linux_amd64`.
 - **Git Bash mangles `/aws/...` arguments** into Windows paths: prefix `MSYS_NO_PATHCONV=1`. After `winget` installs, open a new terminal (or reload PATH).
-- **Credit activities, $20 each:** budget (done, not yet credited); EC2 and RDS with part 2's real resources; Lambda and Bedrock later, tiny, priced first. Never Aurora.
+- **"Merged" isn't merged until GitHub says so:** check `gh pr view <n> --json state` before switching to `main`.
+- **Credit activities, $20 each:** all five restart in a new account. Budget; EC2 and RDS with part 2's real resources; Lambda and Bedrock later, tiny, priced first. Never Aurora.
 - **Docker Desktop must be running** for the local gitleaks scan and for `pnpm test`/`check`/`db:up`/`app:up`. It was off again; the PR's `secrets` check covered it.
-- **Demo-first order (2026-11-10):** keep P1.3's signup creating the first branch, every route naming its permission from P1.4, P1.8's ledger leaving room for batches and serials, stage 7 before P1.3 stores real data. New: P1.13 looks items up in the browser (latency).
-- **Checked facts not to rediscover:** pg-boss needs `createSchema: false`; images are `linux/arm64`; no SWC plugin; `crypto.argon2` exists; TypeScript stays `~6.0`; Drizzle stays 0.45; RDS has PostgreSQL 18.6; Ubuntu 26.04 ARM64 is in Sydney.
+- **Demo-first order (2026-11-10):** keep P1.3's signup creating the first branch, every route naming its permission from P1.4, P1.8's ledger leaving room for batches and serials, stage 7 before P1.3 stores real data. P1.13 looks items up in the browser (latency).
+- **Checked facts not to rediscover:** pg-boss needs `createSchema: false`; images are `linux/arm64`; no SWC plugin; `crypto.argon2` exists; TypeScript stays `~6.0`; Drizzle stays 0.45; AWS provider 6.73.0 has `password_wo` and `value_wo`; in the old account's Region, RDS has PostgreSQL 18.6 and Ubuntu 26.04 ARM64 exists (recheck in the new account).
 - **Failure paths (2026-11-10 scan):** throw Nest `HttpException`s for client answers; never `logger.error(error)` with an object, use `describeError(error)`; `createDatabase` listens on every connection; `runProcess` owns `uncaughtException`/`unhandledRejection`; test "the database goes away" with a connection in use.
 - **No AI attribution, ever** (`CLAUDE.md` rule 6 overrides tool defaults).
 - **Module 00 rules for P1.3/P1.4:**

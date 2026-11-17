@@ -1,6 +1,6 @@
 # DevOps stage 5 — Terraform: plan for parts 2 and 3
 
-> **Status:** proposed 2026-11-12, waiting for the owner's OK (`CLAUDE.md` rule 5). Part 1 (prep) is done: tools installed, sign-in decided (ADR 0031), prices and server shape decided (ADR 0032).
+> **Status:** approved by the owner 2026-11-15. Part 1 (prep) is done: tools installed, sign-in decided (ADR 0031), prices and server shape decided (ADR 0032). Part 2: the Terraform files are written and validated (2026-11-15), **nothing applied**. Paused before the first `apply`: the owner is moving to a new AWS account first (`docs/plans/2026-11-15-aws-account-switch.md`).
 
 **Goal:** every AWS resource for the demo environment comes from Terraform in this repo. At the end of part 3, today's skeleton (web + api + worker, migrations run) is live over HTTPS at a DuckDNS address, with the database on RDS.
 

@@ -36,3 +36,5 @@ test-results/
 *.tfplan
 *.tfvars
 !*.tfvars.example
+# The state bucket's name contains the account ID
+backend.hcl

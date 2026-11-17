@@ -178,6 +178,14 @@ Short answers; the Log entry has the full story.
   A: A rejected promise nobody awaited and an `error` event nobody listens to. Neither travels up the call stack. Node reports them on `process` as `unhandledRejection` and `uncaughtException`, so I handle them there: log, exit 1, let Docker restart a clean process. → `apps/api/src/run.ts`
 - **Q: With Row-Level Security forced on everyone, how does a background worker find work?**
   A: It can't by itself: with no tenant set it sees zero rows, even of the tenants table. I plan one narrow `SECURITY DEFINER` function that returns only IDs of pending work, on an allowed list my guard test checks, and the worker then enters each tenant with the normal `withBusiness`. → PROGRESS P2.7
+- **Q: Where does Terraform keep its state, and what stops two runs at once?**
+  A: In an S3 bucket with versioning, encryption, no public access and a policy that refuses plain HTTP. Locking is S3's own lock file (`use_lockfile`), so there's no DynamoDB table. A tiny bootstrap root creates the bucket with local state first, then its state is migrated into the bucket it made.
+- **Q: The database password has to exist somewhere. Is it in your Terraform state?**
+  A: No. An ephemeral `random_password` exists only while Terraform runs, and it's passed through write-only arguments to RDS and to an SSM SecureString. Terraform can't see a value it never stored, so a version number tells it when to send a new one.
+- **Q: How do you get a shell on a server with no SSH key and port 22 closed?**
+  A: AWS Systems Manager Session Manager. The server's agent makes an outbound HTTPS connection, so nothing listens for inbound logins, access is an IAM permission and sessions can be logged.
+- **Q: You changed AWS accounts mid-project. What did that cost?**
+  A: A sign-in, a new budget and doc updates. The infrastructure was code with no account ID in it, and nothing had been applied yet. The provider's `allowed_account_ids` then pins the new account, so the old one can't be touched by accident.
 
 ---
 
@@ -290,6 +298,15 @@ Terms I learned on this project, in one line each.
 | EventBridge Scheduler | AWS's cron service: calls an AWS API on a schedule (ours stops EC2 and RDS nightly) through a role |
 | DuckDNS | A free dynamic-DNS service: a subdomain whose IP the server updates through a URL with a token |
 | Write-only argument (Terraform) | An argument such as `password_wo` that Terraform sends to the provider but never stores in state or plan files |
+| Remote state (Terraform) | The state file kept in shared storage (an S3 bucket) instead of on one laptop, with a lock so two runs can't write at once |
+| Ephemeral resource (Terraform) | A value that exists only during a run, such as a generated password; never written to state or plan files |
+| Dependency lock file | `.terraform.lock.hcl`: the exact provider versions and their checksums, committed so every machine installs the same ones |
+| Filesystem mirror (Terraform) | A local folder Terraform installs providers from, instead of downloading them from the registry |
+| Session Manager | AWS Systems Manager feature: a shell on a server through its agent's outbound connection, with no SSH key or open port |
+| IMDSv2 | The EC2 metadata service's token-based version; a plain forwarded request can't read the instance's credentials |
+| Burstable instance (CPU credits) | `t` types earn credits while idle and spend them under load; `standard` slows down at zero credits, `unlimited` bills for the extra |
+| Security group | A stateful firewall on an AWS resource: you allow traffic in, and replies get out by themselves |
+| cloud-init | The first-boot setup script Ubuntu cloud images run from the instance's user data |
 
 ---
 
@@ -1261,3 +1278,43 @@ Entry format:
 - **Why / what I learned:** on Windows, check *which* binary runs and what the shell did to your arguments before debugging the tool.
 - **Say it in an interview:** "When a command behaves strangely on Windows, I check `Get-Command -All` for the binary and whether Git Bash rewrote a path argument."
 - **Follow-ups to expect:** Why not install the CLI with pip? (v2 isn't on PyPI; v1 is old and needs a Python environment.)
+
+### 2026-11-15 — Wrote the Terraform: a bootstrap root for state, one root for the demo `#cloud` `#devops` `#architecture`
+- **What happened:** Stage 5 part 2 began. Two roots under `infra/terraform/`. `bootstrap/` makes only the S3 bucket for Terraform's state: versioned, encrypted, public access blocked, a policy refusing non-HTTPS requests, old versions deleted after 90 days. `demo/` makes the VPC (public subnets for the server, private ones with no route out for RDS), security groups, RDS PostgreSQL 18.6, the `t4g.small` server and two nightly stop schedules. The backend uses S3's own lock file (`use_lockfile`), so there's no DynamoDB table. `fmt` and `validate` pass; nothing has been applied.
+- **Why / what I learned:** State is the map between my code and the real resources, so it's protected first. The bucket can't be stored in a bucket that doesn't exist yet: the bootstrap root applies with local state, then `init -migrate-state` moves that state into the bucket it created.
+- **Say it in an interview:** "My Terraform state is in a versioned, encrypted S3 bucket with S3-native locking, created by a small bootstrap root whose own state is migrated into it."
+- **Follow-ups to expect:** Why versioning? (A bad apply or a corrupted state can be rolled back.) Why two subnets for one database? (An RDS subnet group must cover two Availability Zones, even for Single-AZ.) Why no NAT gateway? (It bills by the hour, and nothing in the private subnets needs the internet.)
+
+### 2026-11-15 — Proved the password stays out of state before writing the code `#security` `#cloud` `#devops`
+- **What happened:** The plan depended on write-only arguments. Instead of trusting a blog post, Claude downloaded provider 6.73.0 and read its schema (`terraform providers schema -json`): `password_wo` on `aws_db_instance` and `value_wo` on `aws_ssm_parameter` are both marked write-only, and `random` 3.9.1 has an ephemeral `random_password`. The master password is generated during the run, sent to RDS and to an SSM SecureString, and stored in neither state nor plan. `db_password_version` tells Terraform when to send a new one.
+- **Why / what I learned:** Ordinary Terraform arguments are saved in state in plain text, so anyone who can read the bucket reads the password. Write-only arguments (Terraform 1.11+) remove that. Check a feature in the tool's own schema; it takes a minute.
+- **Say it in an interview:** "No password is in my Terraform state: it's an ephemeral value passed through write-only arguments, with a version number to rotate it."
+- **Follow-ups to expect:** How do you rotate it? (Raise the version; RDS and SSM both get the new value in the same apply.) Why SSM and not Secrets Manager? (Standard parameters are free; Secrets Manager bills per secret.)
+
+### 2026-11-15 — Four small settings that close a cost or security gap `#cloud` `#cost` `#security`
+- **What happened:** While writing the server, four defaults turned out to be wrong for this project. (1) `t4g` instances default to `unlimited` CPU credits, which bills for CPU above the baseline; set to `standard`. (2) The metadata service is IMDSv2-only with hop limit 1, so containers can't fetch the instance's credentials. (3) Cloud-init runs only at first boot, so a changed file must replace the server (`user_data_replace_on_change`); safe because the server keeps no data. (4) The VPC's default security group is taken over with no rules, and the `web` group has no port 22: shell access is Session Manager.
+- **Why / what I learned:** Defaults are chosen for convenience, not for a ₹0 budget or least privilege. Read each resource's defaults once.
+- **Say it in an interview:** "My server has no SSH port and no key. I use Session Manager, IMDSv2 with hop limit 1, and standard CPU credits so a busy loop can't create a bill."
+- **Follow-ups to expect:** What does hop limit 1 do? (The metadata reply can't cross the extra network hop into a container.) What breaks with `standard` credits? (The CPU is throttled to its baseline when credits run out; measure before a demo.)
+
+### 2026-11-15 — `terraform init` failed: my network's IPv6 route to HashiCorp was broken `#devops` `#gotcha`
+- **What happened:** `terraform init` failed with "An existing connection was forcibly closed by the remote host" while downloading providers. `curl -4` to `releases.hashicorp.com` returned 200 and `curl -6` failed, so only the IPv6 path was broken. Terraform has no "use IPv4" switch, and changing Windows' network settings wasn't worth it. Claude downloaded the provider zips with `curl -4`, checked each against HashiCorp's `SHA256SUMS`, and pointed Terraform at the folder with a `filesystem_mirror` block in a config file named by `TF_CLI_CONFIG_FILE`. `terraform providers lock -fs-mirror=… -platform=windows_amd64 -platform=linux_amd64` then wrote lock files that work on the laptop and in CI.
+- **Why / what I learned:** Split a network failure by protocol before blaming the tool. The lock file records checksums per platform: a lock made on Windows alone fails on CI's Linux.
+- **Say it in an interview:** "When provider downloads failed, I showed it was IPv6-only with `curl -4` and `-6`, installed from a checksum-verified local mirror, and locked the providers for both my laptop's and CI's platforms."
+- **Follow-ups to expect:** Why commit `.terraform.lock.hcl`? (Everyone gets the same provider build, and a tampered download fails its checksum.)
+
+### 2026-11-15 — Changing AWS accounts cost almost nothing, because nothing was clicked together `#cloud` `#process` `#devops`
+- **What happened:** Signing in to my AWS project had become difficult, so I decided to open a new one. Claude listed everything tied to the old account: one budget in AWS, one profile on the laptop, and account facts in the docs. The Terraform files contain no account ID (the bucket name is built from whoever is signed in), no state existed, and GitHub knew nothing about AWS. The plan (`docs/plans/2026-11-15-aws-account-switch.md`): re-point the same profile name, read the new account's plan, credits and Region, **stop if it isn't on the Free plan**, set `allowed_account_ids` to the new ID, recreate the budget in Terraform this time, write ADR 0033.
+- **Why / what I learned:** Infrastructure as code and "no account ID in the repo" made the account a parameter. The one hand-made resource, the budget, is the one that has to be redone by hand, so it moves into code. The Free plan is per customer, not per account, so a second account's plan must be checked before creating anything.
+- **Say it in an interview:** "I moved the project to a new AWS account before the first apply. It took a sign-in and a doc update, because the infrastructure was code and the account was only a guarded parameter."
+- **Follow-ups to expect:** And after the first apply? (Rebuild with Terraform, then move the data: snapshot or dump and restore, and change DNS.) How do you avoid building in the old account? (Named profile, `allowed_account_ids`, and checking `sts get-caller-identity` before each apply.)
+
+### 2026-11-15 — Small gotchas in session 20 `#gotcha` `#git` `#devops`
+- **What happened:**
+  - I said the PR was merged; GitHub said `OPEN`. Claude checked `gh pr view 15 --json state` before switching to `main`, then merged it on my word.
+  - `aws sts get-caller-identity` said "Your session has expired": `aws login` credentials last 12 hours. That's normal, not a broken account.
+  - The Claude desktop app once showed `Script not found "stream-json"`. Its own Claude Code binary had started without its program (probably mid-update), and the Bun runtime inside it read a startup flag as a script name. Nothing in the repo caused it; restarting the app fixed it.
+  - Prettier checks the cloud-init YAML too (`pnpm format:check`), but not `.tf` files: those need `terraform fmt`.
+- **Why / what I learned:** Check the system of record (GitHub, `sts`) instead of memory, and read an error for which program is speaking before looking in my own code.
+- **Say it in an interview:** "Before I build on a merge, I ask GitHub for the PR's state. I don't trust my memory of clicking the button."
+- **Follow-ups to expect:** Why squash-merge? (One commit per task on `main`, with the PR title as its message.)

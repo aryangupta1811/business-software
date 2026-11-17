@@ -31,7 +31,7 @@
 
 ## Business details
 
-7. **Asked at signup** (kept short so signup is quick): business name, business type, phone, state, GST status, owner's email. Email is the owner's login (#27) and the way to reset a forgotten password (#30).
+7. **Asked at signup** (kept short so signup is quick): business name, business type, phone, state, GST status, owner's email, and the owner's password. Email is the owner's login (#27) and the way to reset a forgotten password (#30). The password has at least 10 characters, with no forced symbols, and can't be the email or the phone number; one box with a show/hide button.
 8. **Filled later in settings:** owner name, address, PIN code, logo, GSTIN, PAN (optional), drug licence number (medical), FSSAI number (kirana / food), invoice number format (e.g. `ABC/2026-27/001`, restarting every April), terms & conditions footer, signature.
 9. **Not included:** bank name, account number, IFSC and UPI ID. Shop owners keep their own payment QR separately.
 10. The owner can edit these details later in settings, where a change is needed.
@@ -62,7 +62,7 @@ Numbered from 27 so earlier numbers keep their meaning.
 
 27. **The owner logs in with email and password.** One email belongs to one owner account across the whole app.
 28. **Staff log in with username and password.** A username only has to be unique within its business. After the owner logs in once on a counter computer, that computer remembers which business it belongs to, so staff type only their username and password.
-29. A staff session doesn't lock like the owner's (#21). It **ends after 30 minutes of inactivity** by default, so a forgotten login isn't left open overnight. The owner can change the time in settings.
+29. A staff session doesn't lock like the owner's (#21). It **ends after 30 minutes of inactivity** by default, so a forgotten login isn't left open overnight. The owner can change the time in settings, from 5 to 120 minutes.
 30. **Forgotten owner password:** the owner gets a reset link by email. This works only once the email is confirmed (#31).
 31. **Recovery key:** at signup the owner is shown a recovery key to print or write down. It can also reset the password, as a backup when the email account is lost. *Proposed by Claude, owner did not object:* once used, it stops working and a new key is shown.
 32. **Email confirmation** happens after signup, not during it, so signup stays quick. A banner asks the owner to confirm their email until they do. Until then, only the recovery key can reset the password.
@@ -85,3 +85,4 @@ None. The five raised while importing were answered on 2026-11-02 (see the Chang
 - 2026-10-29 — Kickoff session: added the open question on #18 vs #22. No decided point changed.
 - 2026-10-30 — Owner (session 6, P0.5): #25 now includes Hinglish as a third interface language, next to English and Hindi.
 - 2026-11-02 — Owner answered the open questions (session 15). Auto-lock: #21 now says 5 minutes by default, owner-settable from 1 to 30. Counters: #18 reworded (each counter is shared; a shop can have several). Password reset: by email link plus a printed recovery key (#30–#33). SMS OTP was rejected because of its per-message cost and DLT registration. **#7 changed:** the owner's email moved from settings (#8) to signup, which now has 6 fields. Deactivation confirmed (#34). Staff branches (#35). Two follow-ups Claude raised: login identifiers (#27, #28) and staff idle logout (#29).
+- 2026-11-18 — Owner's answers for P1.3 (fast track Day 2). **#7 changed:** signup also asks for the owner's password (7 fields), at least 10 characters, no forced symbols, not the email or the phone number. Reason: email delivery is limited (D1, SES sandbox), so the owner needs a password from the start. **#29:** the staff idle time is settable from 5 to 120 minutes. Also settled, no decided line changed: address, PIN code, state, GSTIN, drug licence and FSSAI number are kept per branch (#8, #14); logo and signature arrive with printing (P1.15), the invoice number format with saving a bill (P1.14), the terms footer with printing (P1.15).

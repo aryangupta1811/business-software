@@ -39,3 +39,4 @@ Create one with `/record-decision <title>`. Template: `0000-template.md`.
 | [0031](0031-laptop-aws-sign-in.md) | Laptop sign-in for the AWS CLI and Terraform: `aws login` with a named profile, `allowed_account_ids` guard, no access keys | Accepted | 2026-11-12 |
 | [0032](0032-stage-5-server-shape-and-cost.md) | Stage 5 server shape: Ubuntu 26.04 ARM64, auto-assigned IP + DuckDNS, nightly stop; Sydney cost ≈ $0.05 per running hour + $4.73 a month | Accepted | 2026-11-12 |
 | [0033](0033-new-aws-account-mumbai.md) | New AWS account: Free plan in Mumbai (`ap-south-1`), root locked away, an admin IAM user with MFA through `aws login`, budget and account lock as Terraform, read-only Agent Toolkit for AWS | Accepted | 2026-11-17 |
+| [0035](0035-password-hashing.md) | Passwords: Node's built-in Argon2id (19 MiB, 2 passes), stored as PHC strings, checked against RFC 9106's test vector | Accepted | 2026-11-18 |

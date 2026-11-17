@@ -97,7 +97,7 @@ Full detail is in `00-business-setup-users-roles.md`. Summary:
 2. **WhatsApp.** The official WhatsApp Business API needs a verified business and charges per message. For a portfolio: a real integration with a test number, or a mock that shows the flow?
    **Answer:** a real WhatsApp Cloud API integration using Meta's free test number, sent through an outbox, plus an in-app Outbox page and a log-only sender for local use. → ADR 0010
 3. **AI assistant.** Which AI model/provider, and what monthly cost limit?
-   **Answer:** the Claude API (owner's choice), answering only through permission-checked tools. The model and monthly cap are chosen at the start of Phase 3. A Claude subscription does not include API access: the app needs a Claude Console API key, billed separately. → ADR 0015
+   **Answer:** the Claude API (owner's choice), answering only through permission-checked tools. The model and monthly cap are chosen at the start of Phase 3 (2026-11-17: Claude Sonnet 5.5, $15 a month, chosen early in fast-track sitting 1). A Claude subscription does not include API access: the app needs a Claude Console API key, billed separately. → ADR 0015
 4. **Hosting budget.** How much can be spent per month? Free tiers and student credits change what's possible.
    **Answer:** ₹0 (owner, 2026-10-29). Everything runs locally until the cloud stage in Phase 1. Then an AWS Free plan account (up to $200 credits over 6 months, no charges possible), timed to placement season, running one EC2 server + RDS. The only cost that can't be zero is a few dollars of Claude API credit in Phase 3. → ADRs 0011, 0015
 5. **Printing.** Thermal receipt printer (58/80 mm), A4 invoices, or both?
@@ -144,3 +144,4 @@ Full detail is in `00-business-setup-users-roles.md`. Summary:
 - 2026-10-29 — Kickoff session: non-functional requirements confirmed, with measurable targets; the six architecture questions answered (ADRs 0001, 0010, 0011, 0014, 0015, 0016); build phases decided, with demo data starting at the end of Phase 1.
 - 2026-10-29 — Owner: hosting budget is ₹0 (AWS Free plan), not the ₹1,000/month first proposed; v1 runs online. ADR 0011 redesigned before it was committed.
 - 2026-10-30 — Owner (session 6, P0.5): Hinglish added as a third interface language (scope and NFR 7).
+- 2026-11-17 — Owner (fast-track sitting 1, D3): question 3 now names the model and cap, Claude Sonnet 5.5 with $15 a month (ADR 0015 dated note).

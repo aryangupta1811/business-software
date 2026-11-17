@@ -20,7 +20,7 @@ Create one with `/record-decision <title>`. Template: `0000-template.md`.
 | [0012](0012-ci-cd-github-actions.md) | CI/CD: GitHub Actions with OIDC to AWS | Accepted | 2026-10-29 |
 | [0013](0013-testing-strategy.md) | Testing: Vitest, Testcontainers, Playwright | Accepted | 2026-10-29 |
 | [0014](0014-printing-and-pdfs.md) | Printing and PDFs: print stylesheets, kiosk printing, headless Chromium | Accepted | 2026-10-29 |
-| [0015](0015-ai-assistant-claude-tool-calling.md) | AI assistant: Claude API through permission-checked tools | Accepted (model chosen in Phase 3) | 2026-10-29 |
+| [0015](0015-ai-assistant-claude-tool-calling.md) | AI assistant: Claude API through permission-checked tools | Accepted (Sonnet 5.5, $15/month cap, 2026-11-17) | 2026-10-29 |
 | [0016](0016-demo-data-seed.md) | Demo data: deterministic seed through the app's services | Accepted | 2026-10-29 |
 | [0017](0017-git-workflow.md) | Git workflow: GitHub flow, squash merges, Conventional Commits, public repo | Accepted | 2026-10-30 |
 | [0018](0018-code-quality-and-dependency-tooling.md) | Code quality and dependency tooling: ESLint + Prettier, pnpm catalogs, supply-chain guards | Accepted | 2026-10-30 |

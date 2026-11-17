@@ -20,9 +20,9 @@ Update this as the project grows.
 
 - **The problem:** a small Indian shop runs on a billing app, a paper udhaar register and a staff notebook. I'm building one web app that does all of it, for many shops at once, each seeing only its own data, in English, Hindi and Hinglish.
 - **What makes it hard:** correctness, not the feature list. A bill must save the invoice, the stock change and the udhaar entry together or not at all. Two counters can sell the last unit at the same moment. GST maths must be exact to the paisa. And the owner can't lose a single record.
-- **My architecture:** a TypeScript monorepo with a React single-page app, a NestJS modular monolith (so a bill is one database transaction, not a saga across services) and PostgreSQL. The safety rules live in the database, not only in my code: money is stored as whole paise, the app's database user has no DELETE permission, and Row-Level Security keeps businesses apart. Every choice has a written decision record with the alternatives I rejected; there are 32 so far.
+- **My architecture:** a TypeScript monorepo with a React single-page app, a NestJS modular monolith (so a bill is one database transaction, not a saga across services) and PostgreSQL. The safety rules live in the database, not only in my code: money is stored as whole paise, the app's database user has no DELETE permission, and Row-Level Security keeps businesses apart. Every choice has a written decision record with the alternatives I rejected; there are 33 so far.
 - **One hard bug:** my background worker kept dying after exactly 10 seconds. That was the database driver's idle timeout. Waiting for the shutdown signal doesn't keep Node's event loop alive, so when the pool's last idle connection closed, the process simply ended. I reproduced it in a test, held the process open until SIGTERM, and confirmed it in Docker with zero restarts.
-- **How it's shipped:** the same Docker Compose stack runs on my laptop and in CI. Every pull request must pass five required checks: lint, types and 272 tests against a real PostgreSQL; a secret scan of the whole history; a migration-order check; the PR title; and a smoke test that starts the real images. Next is Terraform on AWS in Sydney: one EC2 server plus RDS with point-in-time restore, priced at about 5 cents per running hour and run only for sessions and demos, because my budget is ₹0.
+- **How it's shipped:** the same Docker Compose stack runs on my laptop and in CI. Every pull request must pass five required checks: lint, types and 272 tests against a real PostgreSQL; a secret scan of the whole history; a migration-order check; the PR title; and a smoke test that starts the real images. The cloud is Terraform on AWS in Mumbai: one ARM64 EC2 server plus RDS PostgreSQL with point-in-time restore, no SSH (Systems Manager only), priced at about 4 cents per running hour and run only for sessions and demos, because my budget is ₹0. CI also checks the Terraform on every PR.
 - **Where it stands:** the foundations are done (Phase 0). In Phase 1 the database already keeps businesses apart (forced Row-Level Security, with a test that scans every table), and an append-only audit log records every change in the same transaction; logins and billing come next.
 - **What I'd do differently:** pin down the real constraints first. I designed hosting for a budget I didn't have and had to redesign it. And test what you ship: the production CSS minifier broke a page my unit tests said was fine.
 
@@ -36,14 +36,14 @@ Update this as the project grows.
 | Max time to recover (RTO) | 1 hour | Restore runbook + monthly drill |
 | Scanned item appears on screen | < 200 ms | NFR 5 |
 | Bill save | < 1 second | NFR 5 |
-| Cloud budget | ₹0: AWS Free plan, $100 credits now + up to $100 from 5 activities, until 2027-05-12; Region Sydney `ap-southeast-2` | ADRs 0011, 0030 |
-| Hosting cost (Sydney) | $0.0512 per running hour + $4.73 a month for disks: ≈ $7.80 a month at ~60 h, ≈ $42 at 24/7 | ADRs 0011, 0032 |
-| Extra latency, India → Sydney | ~0.2 s per round trip (Mumbai ~55–80 ms, Sydney ~270–300 ms) | ADR 0032 |
+| Cloud budget | ₹0: AWS Free plan, $100 credits now + up to $100 from 5 activities, until 2027-05-17; Region Mumbai `ap-south-1` (Sydney 2026-11-12 to 11-17 in the first account) | ADRs 0011, 0033 |
+| Hosting cost (Mumbai) | $0.0372 per running hour + $4.44 a month for disks: ≈ $6.70 a month at ~60 h, ≈ $31.60 at 24/7 (Sydney was $0.0512 + $4.73) | ADRs 0011, 0032, 0033 |
+| Latency, India → the server | Mumbai ~55–80 ms per round trip (Sydney was ~270–300 ms, the reason to move) | ADRs 0032, 0033 |
 | Money stored as | whole paise (₹12.50 = 1250) | ADR 0008 |
 | Largest exact amount in JavaScript | ≈ ₹90 lakh crore in paise (2^53) | ADR 0008 |
 | Business types in v1 | 5 | Module 00 |
 | Modules | 10 (00–09) | `docs/requirements/` |
-| ADRs | 32 (16 at kickoff) | `docs/decisions/` |
+| ADRs | 33 (16 at kickoff) | `docs/decisions/` |
 | Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
 | Automated tests | 272: 45 shared (money), 60 db (roles, client, 15 tenancy, 17 entry log, 6 guard), 37 api (health, config, shutdown, worker, error logging), 130 web (routing, connection badge, three languages, error screen, 44 contrast checks, Hindi line height, components, theme, 24 keyboard-shortcut tests, layout, `/design`) | `pnpm test` |
 | Interface languages | 3: English, Hindi, Hinglish (`en`, `hi`, `hi-Latn`) | Module 00 #25, ADR 0023 |
@@ -92,8 +92,8 @@ Short answers; the Log entry has the full story.
   A: Root can do anything, including closing the account, and no policy can limit it, so a leaked root password is the worst possible leak. My plan was MFA on root and daily work as an IAM user (ADR 0029). The account I actually got came from AWS's new sign-up flow: I sign in through my identity provider into a project, MFA lives on that identity, and IAM users are only for programs. → ADR 0030
 - **Q: Why an IAM user and not IAM Identity Center?**
   A: Identity Center's account access needs AWS Organizations, and joining Organizations upgrades a Free plan account to Paid, which can't be undone. That's why I first planned an IAM user with MFA (ADR 0029). AWS's new sign-up flow then made it moot: people sign in through the project's Team page, and AWS manages the structure behind it. → ADR 0030
-- **Q: Why is your server in Sydney and not Mumbai?**
-  A: My Free plan project is locked to the Region AWS assigned, Sydney. Mumbai needs the Paid plan plus "advanced features", which can't be undone and can charge my card. My budget is zero, so I accepted about 0.2 s more per round trip (measured) for a demo, and wrote down that real shop data would need the Region question reopened. → ADR 0030
+- **Q: Why was your server going to be in Sydney and not Mumbai?** (History: since 2026-11-17 it is in Mumbai, in a new account that isn't locked to a Region, ADR 0033.)
+  A: My first Free plan project was locked to the Region AWS assigned, Sydney. Mumbai needs the Paid plan plus "advanced features", which can't be undone and can charge my card. My budget is zero, so I accepted about 0.2 s more per round trip (measured) for a demo, and wrote down that real shop data would need the Region question reopened. → ADR 0030
 - **Q: How do you make sure the cloud doesn't cost you money?**
   A: On the Free plan AWS can't charge the card; it closes the account when credits run out. So the risk is burning credits early. I have a monthly budget that excludes credits (by default AWS subtracts them, so a normal budget shows $0 while credits drain), alerting at $5, $10, $15 and on forecast. I also stop the server and database when idle and state each resource's cost before Terraform creates it. → ADR 0030
 - **Q: How do you and your AI assistant get into AWS without access keys?**
@@ -1384,3 +1384,14 @@ Entry format:
   - I ran the server checks with Systems Manager Run Command (`send-command` + `get-command-invocation`), not SSH: no key, port 22 closed, and every command is recorded.
   - CI now runs `terraform validate` with `init -backend=false -lockfile=readonly`. The committed lock file must hold Linux hashes too, so I proved the step in a `hashicorp/terraform` Linux container before pushing.
 - **Say it in an interview:** "I verify infrastructure from the inside: architecture, swap, IMDSv2, a real TLS login to the database, and that the database refuses plain-text connections and is unreachable from the internet."
+
+### 2026-11-17 — Sixteen requirement questions settled in one sitting `#requirements` `#gst` `#process`
+- **What happened:** Sitting 1 of the fast track settled Module 01's four open questions and finalized Modules 02 (Billing & GST) and 03 (Udhaar) in about half an hour. Claude brought a recommended answer with a reason for every question; I took the recommendations and confirmed the draft ideas plus ten additions that cover edge cases. Two early decisions came with it: no paid domain (email stays in Amazon SES's sandbox, and the printed recovery key is the reset path for demo visitors), and Claude Sonnet 5.5 with a $15 monthly cap for the assistant.
+- **Why / what I learned:**
+  - **Medical profit uses the batch actually sold.** The old rule ("oldest stock first") clashed with selling the batch that expires soonest.
+  - **Moving stock to a branch in another state is a taxable supply under GST,** because branches with different GSTINs are "distinct persons". The app makes an IGST invoice and a matching purchase entry.
+  - **A saved bill is never edited:** a mistake is cancelled with a reason, or fixed with a credit note.
+  - **Udhaar payments clear the oldest bills first,** so the overdue buckets stay right.
+  - **E-invoicing is left out on purpose** (compulsory only above ₹5 crore turnover), but bills keep every field it needs.
+- **Say it in an interview:** "I batched every open requirement into short decision sittings with a recommended answer for each, so building never waited on a question. I also treated GST rules as requirements, not code details: an inter-state branch transfer is a taxable supply, so the app raises an IGST invoice."
+- **Follow-ups to expect:** Why not let users edit a saved bill? (Invoices are legal documents with numbers that must not have gaps or silent changes; a cancel with a reason, or a credit note, keeps the history.) Why Sonnet and not Opus? (It costs half as much as Opus; the eval set will show whether its accuracy is enough, and changing the model is one line.)

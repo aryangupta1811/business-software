@@ -4,9 +4,9 @@ variable "allowed_account_ids" {
 }
 
 variable "region" {
-  description = "AWS Region (ADR 0030: Sydney)."
+  description = "AWS Region (ADR 0033: Mumbai)."
   type        = string
-  default     = "ap-southeast-2"
+  default     = "ap-south-1"
 }
 
 variable "aws_profile" {

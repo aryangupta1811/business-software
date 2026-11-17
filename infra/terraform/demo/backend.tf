@@ -5,7 +5,7 @@
 terraform {
   backend "s3" {
     key          = "demo/terraform.tfstate"
-    region       = "ap-southeast-2"
+    region       = "ap-south-1"
     profile      = "business-software"
     encrypt      = true
     use_lockfile = true

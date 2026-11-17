@@ -6,7 +6,36 @@
 
 - **Why:** signing in to the current project has become difficult (sign-in problems), so the owner will open a new one and start from there. It isn't about the Region or the credits.
 - **Not created yet.** The owner will do it later; the session ended here.
-- **Still open, ask at the start of the next session:**
+- **Answered 2026-11-17 (session 21):**
+  - The old account was opened with "Sign in with Google", and that sign-in is what keeps failing. So the fix is a new account, not a new project under the same sign-in.
+  - The new account is open. Whose it is stays the owner's private matter; it isn't asked again or written down.
+  - The old account: the owner first asked for a cleanup prompt (written, for a separate Claude Code session), then chose to **skip the cleanup** and start with the new account. The old account holds only the budget, which costs nothing, and a Free plan account can't charge the card; AWS closes it at the end of its Free period. Step 7 stays optional.
+  - Step 3's Free plan check still runs on the new account before anything is created.
+- **New account, first look in the console (Claude, read-only, 2026-11-17):** Billing → Free Tier says "Your free plan account does not get charged": **Free plan, $100.00 credits remaining, free access ends 2027-05-17**. Month-to-date cost: no data. The console opened in `us-west-2` (Oregon), not a project locked to Sydney, so this account may come from the classic sign-up rather than the projects-based experience. Which Regions it may use (Mumbai?) is checked with the CLI in step 3. The page also shows an "Upgrade plan" link: never click it.
+- **Step 2 done (2026-11-17):** old profile renamed to `business-software-old` (backup `~/.aws/config.bak-2026-11-17`); the owner ran `aws login --profile business-software`. `sts get-caller-identity`: the new account (last 4 digits differ from the old one), **signed in as the root user** (`arn:aws:iam::<account>:root`).
+- **Step 3 results (2026-11-17, CLI, read-only):**
+  - `freetier get-account-plan-state`: `FREE`, `ACTIVE`, $100.00 credits, ends 2027-05-17. **Gate passed.**
+  - Regions: `ap-south-1` (Mumbai) and `ap-southeast-2` (Sydney) both "opt-in-not-required"; calls in both work. **This account is not locked to Sydney.**
+  - Empty in both: 0 instances, volumes, addresses, RDS instances; only the default VPC. Global: 0 S3 buckets, 0 budgets, 0 IAM users, no root access keys. **Root MFA: off** (`AccountMFAEnabled` 0).
+  - Both Regions: `t4g.small` offered and Free plan eligible (with `t4g.micro`, `t3.micro/small`, `t8i.micro/small`, `c7i-flex.large`, `m7i-flex.large`); RDS PostgreSQL 18.1–18.6 on `db.t4g.micro` gp3; Ubuntu 26.04 ARM64 image in Canonical's SSM parameter.
+  - Prices (Pricing API, on-demand):
+
+    | | Mumbai | Sydney |
+    | --- | --- | --- |
+    | EC2 `t4g.small` | $0.0112/h | $0.0212/h |
+    | Public IPv4 | $0.005/h | $0.005/h |
+    | RDS `db.t4g.micro` PostgreSQL Single-AZ | $0.021/h | $0.025/h |
+    | EBS gp3 | $0.0912/GB-month | $0.096/GB-month |
+    | RDS gp3 | $0.131/GB-month | $0.138/GB-month |
+    | S3 Standard | $0.025/GB-month | $0.025/GB-month |
+    | **Per running hour + per month (20 GB each)** | **$0.0372/h + $4.44** | **$0.0512/h + $4.73** |
+    | ~60 h a month | ≈ $6.70 | ≈ $7.80 |
+    | 24/7 | ≈ $31.60 | ≈ $42.10 |
+  - Latency from the laptop (TCP connect to `ec2.<region>.amazonaws.com`, 5 tries): **Mumbai 0.05–0.07 s, Sydney 0.29–0.32 s**.
+- **Step 4, owner's decisions (2026-11-17):**
+  - **Region: Mumbai `ap-south-1`.** Replaces ADR 0030's Sydney choice (ADR 0033). Change the Region in the 4 Terraform/profile places; ADR 0032's prices get a dated note with the Mumbai table above.
+  - **Sign-in: an admin IAM user, not root.** Owner turns on MFA for root, creates one IAM user with `AdministratorAccess`, a console password and MFA, and runs `aws login` as that user. No access keys. Root is kept for billing and emergencies. This replaces ADR 0031's `AccountFullAccessRole` (that role belonged to the projects-based experience), in ADR 0033; least privilege is revisited at stage 10.
+- **Was open on 2026-11-15:**
   - What exactly fails at sign-in (the identity provider, the console, or `aws login`)? On 2026-11-15 the laptop's `aws login` session had only expired after its 12 hours, which is normal. If the identity itself is the problem, a new *project* under the same sign-in won't fix it; it needs a new account under another identity.
   - Account or project (question 2 below), and what happens to the old one (question 3).
   - The Free plan caution in question 1 stands: check the plan before creating anything (step 4's gate).

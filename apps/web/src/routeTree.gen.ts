@@ -8,93 +8,160 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './routes/__root';
-import { Route as AppRouteImport } from './routes/_app';
-import { Route as AppIndexRouteImport } from './routes/_app/index';
-import { Route as AppDesignRouteImport } from './routes/_app/design';
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as AppRouteImport } from './routes/_app'
+import { Route as PublicRouteImport } from './routes/_public'
+import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as AppDesignRouteImport } from './routes/_app/design'
+import { Route as PublicSignupRouteImport } from './routes/_public/signup'
+import { Route as PublicSignupRecoveryKeyRouteImport } from './routes/_public/signup_.recovery-key'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
+const PublicRoute = PublicRouteImport.update({
+  id: '/_public',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppDesignRoute = AppDesignRouteImport.update({
   id: '/design',
   path: '/design',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
+const PublicSignupRoute = PublicSignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => PublicRoute,
+} as any)
+const PublicSignupRecoveryKeyRoute = PublicSignupRecoveryKeyRouteImport.update({
+  id: '/signup_/recovery-key',
+  path: '/signup/recovery-key',
+  getParentRoute: () => PublicRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof AppIndexRoute;
-  '/design': typeof AppDesignRoute;
+  '/': typeof AppIndexRoute
+  '/design': typeof AppDesignRoute
+  '/signup': typeof PublicSignupRoute
+  '/signup/recovery-key': typeof PublicSignupRecoveryKeyRoute
 }
 export interface FileRoutesByTo {
-  '/design': typeof AppDesignRoute;
-  '/': typeof AppIndexRoute;
+  '/': typeof AppIndexRoute
+  '/design': typeof AppDesignRoute
+  '/signup': typeof PublicSignupRoute
+  '/signup/recovery-key': typeof PublicSignupRecoveryKeyRoute
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport;
-  '/_app': typeof AppRouteWithChildren;
-  '/_app/design': typeof AppDesignRoute;
-  '/_app/': typeof AppIndexRoute;
+  __root__: typeof rootRouteImport
+  '/_app': typeof AppRouteWithChildren
+  '/_public': typeof PublicRouteWithChildren
+  '/_app/design': typeof AppDesignRoute
+  '/_public/signup': typeof PublicSignupRoute
+  '/_app/': typeof AppIndexRoute
+  '/_public/signup_/recovery-key': typeof PublicSignupRecoveryKeyRoute
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: '/' | '/design';
-  fileRoutesByTo: FileRoutesByTo;
-  to: '/design' | '/';
-  id: '__root__' | '/_app' | '/_app/design' | '/_app/';
-  fileRoutesById: FileRoutesById;
+  fileRoutesByFullPath: FileRoutesByFullPath
+  fullPaths: '/' | '/design' | '/signup' | '/signup/recovery-key'
+  fileRoutesByTo: FileRoutesByTo
+  to: '/' | '/design' | '/signup' | '/signup/recovery-key'
+  id:
+    | '__root__'
+    | '/_app'
+    | '/_public'
+    | '/_app/design'
+    | '/_public/signup'
+    | '/_app/'
+    | '/_public/signup_/recovery-key'
+  fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  AppRoute: typeof AppRouteWithChildren;
+  AppRoute: typeof AppRouteWithChildren
+  PublicRoute: typeof PublicRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
     '/_app': {
-      id: '/_app';
-      path: '';
-      fullPath: '/';
-      preLoaderRoute: typeof AppRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_public': {
+      id: '/_public'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof PublicRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/': {
-      id: '/_app/';
-      path: '/';
-      fullPath: '/';
-      preLoaderRoute: typeof AppIndexRouteImport;
-      parentRoute: typeof AppRoute;
-    };
+      id: '/_app/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/design': {
-      id: '/_app/design';
-      path: '/design';
-      fullPath: '/design';
-      preLoaderRoute: typeof AppDesignRouteImport;
-      parentRoute: typeof AppRoute;
-    };
+      id: '/_app/design'
+      path: '/design'
+      fullPath: '/design'
+      preLoaderRoute: typeof AppDesignRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_public/signup': {
+      id: '/_public/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof PublicSignupRouteImport
+      parentRoute: typeof PublicRoute
+    }
+    '/_public/signup_/recovery-key': {
+      id: '/_public/signup_/recovery-key'
+      path: '/signup/recovery-key'
+      fullPath: '/signup/recovery-key'
+      preLoaderRoute: typeof PublicSignupRecoveryKeyRouteImport
+      parentRoute: typeof PublicRoute
+    }
   }
 }
 
 interface AppRouteChildren {
-  AppDesignRoute: typeof AppDesignRoute;
-  AppIndexRoute: typeof AppIndexRoute;
+  AppDesignRoute: typeof AppDesignRoute
+  AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppDesignRoute: AppDesignRoute,
   AppIndexRoute: AppIndexRoute,
-};
+}
 
-const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren);
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
+interface PublicRouteChildren {
+  PublicSignupRoute: typeof PublicSignupRoute
+  PublicSignupRecoveryKeyRoute: typeof PublicSignupRecoveryKeyRoute
+}
+
+const PublicRouteChildren: PublicRouteChildren = {
+  PublicSignupRoute: PublicSignupRoute,
+  PublicSignupRecoveryKeyRoute: PublicSignupRecoveryKeyRoute,
+}
+
+const PublicRouteWithChildren =
+  PublicRoute._addFileChildren(PublicRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
-};
+  PublicRoute: PublicRouteWithChildren,
+}
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>();
+  ._addFileTypes<FileRouteTypes>()

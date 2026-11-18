@@ -7,10 +7,20 @@ export default defineConfig({
   plugins: [
     // Before react(): it writes src/routeTree.gen.ts from src/routes/ and splits each page
     // into its own file.
-    tanstackRouter({ target: 'react', autoCodeSplitting: true }),
+    tanstackRouter({
+      target: 'react',
+      autoCodeSplitting: true,
+      // Tests sit next to the page they test; they are not routes.
+      routeFileIgnorePattern: String.raw`\.test\.tsx?$`,
+    }),
     react(),
     tailwindcss(),
   ],
+  resolve: {
+    // Vite's default browser conditions, plus 'source': the shared package is bundled from
+    // its TypeScript files, so it needs no build first (ADR 0020).
+    conditions: ['source', 'module', 'browser', 'development|production'],
+  },
   server: {
     host: '127.0.0.1',
     port: 5173,

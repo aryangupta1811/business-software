@@ -12,10 +12,13 @@ WORKDIR /repo
 # Manifests first: the install layer is reused until a dependency changes.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/
+COPY packages/shared/package.json packages/shared/
 RUN pnpm install --frozen-lockfile --filter @business-software/web...
 
 COPY tsconfig.base.json ./
 COPY apps/web apps/web
+# The form schemas, read from their TypeScript source (vite.config.ts, 'source' condition).
+COPY packages/shared packages/shared
 RUN pnpm --filter @business-software/web build
 
 # Caddy is one static Go binary, so Alpine's musl doesn't matter here (unlike Node and

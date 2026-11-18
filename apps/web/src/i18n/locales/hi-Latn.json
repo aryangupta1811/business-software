@@ -88,5 +88,144 @@
     "title": "Kuch gadbad ho gayi",
     "body": "Connection check karein, phir page dobara load karein.",
     "reload": "Page dobara load karein"
+  },
+  "signup": {
+    "title": "Apne business ka account banayein",
+    "lead": "Bas ek minute lagega. Baaki sab baad mein Settings mein.",
+    "pitch": {
+      "title": "Ek counter se poori dukaan chalayein",
+      "billing": "Seconds mein GST bill, keyboard ya scanner se",
+      "stock": "Har bill ke saath apne aap update hota stock",
+      "udhaar": "Udhaar jo kabhi gum nahi hota"
+    },
+    "fields": {
+      "businessName": "Business ka naam",
+      "businessType": "Business ka type",
+      "phone": "Phone",
+      "state": "State",
+      "statePlaceholder": "Apna state chunein",
+      "gstStatus": "GST registration",
+      "email": "Aapka email",
+      "emailHint": "Aap isi se login karenge.",
+      "password": "Password",
+      "passwordHint": "Kam se kam 10 akshar. Ek chhota vaakya yaad rakhna aasaan hai."
+    },
+    "showPassword": "Password dikhayein",
+    "hidePassword": "Password chhupayein",
+    "submit": "Account banayein",
+    "submitting": "Account ban raha hai…",
+    "failed": "Account nahi ban saka. Connection check karein aur phir koshish karein."
+  },
+  "businessTypes": {
+    "kirana": {
+      "name": "Kirana / grocery",
+      "hint": "Taul wala saamaan, expiry, udhaar saamne"
+    },
+    "medical": {
+      "name": "Medical",
+      "hint": "Batch, expiry aur MRP"
+    },
+    "clothing": {
+      "name": "Kapde / joote",
+      "hint": "Size aur rang, exchange, barcode label"
+    },
+    "electronics": {
+      "name": "Electronics / mobile",
+      "hint": "IMEI aur serial number, warranty, repair"
+    },
+    "hardware": {
+      "name": "Hardware",
+      "hint": "Bori, piece aur feet, wholesale daam"
+    }
+  },
+  "gstStatuses": {
+    "unregistered": {
+      "name": "Registered nahi",
+      "hint": "Saada bill, GST nahi"
+    },
+    "regular": {
+      "name": "Regular",
+      "hint": "CGST + SGST ya IGST wala tax invoice"
+    },
+    "composition": {
+      "name": "Composition scheme",
+      "hint": "Bill of supply, tax alag nahi dikhta"
+    }
+  },
+  "errors": {
+    "required": "Yeh bharein",
+    "too_long": "Yeh bahut lamba hai",
+    "too_short": "Yeh bahut chhota hai",
+    "invalid": "Ise check karein",
+    "control_character": "Khaas nishaan hatayein",
+    "same_as_email": "Password mein apna email na rakhein",
+    "same_as_phone": "Password mein apna phone number na rakhein",
+    "email_taken": "Is email ka account pehle se hai",
+    "fields": {
+      "phone": {
+        "invalid": "10 ankon ka phone number likhein"
+      },
+      "email": {
+        "invalid": "name@example.com jaisa email likhein"
+      },
+      "password": {
+        "too_short": "Kam se kam 10 akshar rakhein"
+      }
+    }
+  },
+  "recoveryKey": {
+    "title": "Apni recovery key sambhaal kar rakhein",
+    "body": "Agar aap password bhool jaayein aur email na khule, to yahi key waapas aane ka akela raasta hai. Yeh sirf ek baar dikhti hai.",
+    "keep": "Ise likh lein ya print kar lein, aur counter se door rakhein.",
+    "label": "Aapki recovery key",
+    "print": "Print karein",
+    "copy": "Copy karein",
+    "copied": "Copy ho gayi",
+    "confirm": "Maine yeh key likh li hai ya print kar li hai",
+    "continue": "Aage badhein",
+    "printedFor": "{{business}} ki recovery key, {{date}} ko bani",
+    "gone": {
+      "title": "Key sirf ek baar dikhti hai",
+      "body": "Aapki suraksha ke liye ise dobara kholne laayak kahin nahi rakha jaata. Login karne ke baad aap nayi key bana sakte hain.",
+      "home": "Home par jaayein"
+    }
+  },
+  "states": {
+    "01": "Jammu and Kashmir",
+    "02": "Himachal Pradesh",
+    "03": "Punjab",
+    "04": "Chandigarh",
+    "05": "Uttarakhand",
+    "06": "Haryana",
+    "07": "Delhi",
+    "08": "Rajasthan",
+    "09": "Uttar Pradesh",
+    "10": "Bihar",
+    "11": "Sikkim",
+    "12": "Arunachal Pradesh",
+    "13": "Nagaland",
+    "14": "Manipur",
+    "15": "Mizoram",
+    "16": "Tripura",
+    "17": "Meghalaya",
+    "18": "Assam",
+    "19": "West Bengal",
+    "20": "Jharkhand",
+    "21": "Odisha",
+    "22": "Chhattisgarh",
+    "23": "Madhya Pradesh",
+    "24": "Gujarat",
+    "26": "Dadra and Nagar Haveli and Daman and Diu",
+    "27": "Maharashtra",
+    "29": "Karnataka",
+    "30": "Goa",
+    "31": "Lakshadweep",
+    "32": "Kerala",
+    "33": "Tamil Nadu",
+    "34": "Puducherry",
+    "35": "Andaman and Nicobar Islands",
+    "36": "Telangana",
+    "37": "Andhra Pradesh",
+    "38": "Ladakh"
   }
 }

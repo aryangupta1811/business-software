@@ -88,5 +88,144 @@
     "title": "Something went wrong",
     "body": "Check the connection, then reload the page.",
     "reload": "Reload the page"
+  },
+  "signup": {
+    "title": "Create your business account",
+    "lead": "It takes a minute. Everything else can wait for Settings.",
+    "pitch": {
+      "title": "Run your shop from one counter",
+      "billing": "GST bills in seconds, by keyboard or scanner",
+      "stock": "Stock that updates itself with every bill",
+      "udhaar": "Udhaar that never goes missing"
+    },
+    "fields": {
+      "businessName": "Business name",
+      "businessType": "Type of business",
+      "phone": "Phone",
+      "state": "State",
+      "statePlaceholder": "Choose your state",
+      "gstStatus": "GST registration",
+      "email": "Your email",
+      "emailHint": "You'll log in with this.",
+      "password": "Password",
+      "passwordHint": "At least 10 characters. A short sentence is easy to remember."
+    },
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "submit": "Create account",
+    "submitting": "Creating account…",
+    "failed": "Couldn't create the account. Check the connection and try again."
+  },
+  "businessTypes": {
+    "kirana": {
+      "name": "Kirana / grocery",
+      "hint": "Loose items by weight, expiry dates, udhaar up front"
+    },
+    "medical": {
+      "name": "Medical",
+      "hint": "Batches, expiry dates and MRP"
+    },
+    "clothing": {
+      "name": "Clothing / footwear",
+      "hint": "Sizes and colours, exchanges, barcode labels"
+    },
+    "electronics": {
+      "name": "Electronics / mobile",
+      "hint": "IMEI and serial numbers, warranty, repairs"
+    },
+    "hardware": {
+      "name": "Hardware",
+      "hint": "Bags, pieces and feet, wholesale prices"
+    }
+  },
+  "gstStatuses": {
+    "unregistered": {
+      "name": "Not registered",
+      "hint": "Plain bills, no GST"
+    },
+    "regular": {
+      "name": "Regular",
+      "hint": "Tax invoices with CGST + SGST or IGST"
+    },
+    "composition": {
+      "name": "Composition scheme",
+      "hint": "Bills of supply, no tax shown"
+    }
+  },
+  "errors": {
+    "required": "Fill this in",
+    "too_long": "This is too long",
+    "too_short": "This is too short",
+    "invalid": "Check this",
+    "control_character": "Remove the special characters",
+    "same_as_email": "Don't use your email as the password",
+    "same_as_phone": "Don't use your phone number as the password",
+    "email_taken": "This email already has an account",
+    "fields": {
+      "phone": {
+        "invalid": "Enter a 10-digit phone number"
+      },
+      "email": {
+        "invalid": "Enter an email like name@example.com"
+      },
+      "password": {
+        "too_short": "Use at least 10 characters"
+      }
+    }
+  },
+  "recoveryKey": {
+    "title": "Save your recovery key",
+    "body": "If you forget your password and can't open your email, this key is the only way back in. It's shown only once.",
+    "keep": "Write it down or print it, and keep it away from the counter.",
+    "label": "Your recovery key",
+    "print": "Print",
+    "copy": "Copy",
+    "copied": "Copied",
+    "confirm": "I have written down or printed this key",
+    "continue": "Continue",
+    "printedFor": "Recovery key for {{business}}, made on {{date}}",
+    "gone": {
+      "title": "The key is shown only once",
+      "body": "For your safety it isn't kept anywhere you can open again. You can make a new one after you log in.",
+      "home": "Go to home"
+    }
+  },
+  "states": {
+    "01": "Jammu and Kashmir",
+    "02": "Himachal Pradesh",
+    "03": "Punjab",
+    "04": "Chandigarh",
+    "05": "Uttarakhand",
+    "06": "Haryana",
+    "07": "Delhi",
+    "08": "Rajasthan",
+    "09": "Uttar Pradesh",
+    "10": "Bihar",
+    "11": "Sikkim",
+    "12": "Arunachal Pradesh",
+    "13": "Nagaland",
+    "14": "Manipur",
+    "15": "Mizoram",
+    "16": "Tripura",
+    "17": "Meghalaya",
+    "18": "Assam",
+    "19": "West Bengal",
+    "20": "Jharkhand",
+    "21": "Odisha",
+    "22": "Chhattisgarh",
+    "23": "Madhya Pradesh",
+    "24": "Gujarat",
+    "26": "Dadra and Nagar Haveli and Daman and Diu",
+    "27": "Maharashtra",
+    "29": "Karnataka",
+    "30": "Goa",
+    "31": "Lakshadweep",
+    "32": "Kerala",
+    "33": "Tamil Nadu",
+    "34": "Puducherry",
+    "35": "Andaman and Nicobar Islands",
+    "36": "Telangana",
+    "37": "Andhra Pradesh",
+    "38": "Ladakh"
   }
 }

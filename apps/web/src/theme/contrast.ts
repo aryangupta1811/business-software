@@ -14,19 +14,30 @@ export function contrastRatio(foreground: string, background: string): number {
   return ((lighter ?? 0) + 0.05) / ((darker ?? 0) + 0.05);
 }
 
-/** The hex colour tokens of the `:root` (light) and `.dark` blocks of `styles.css`. */
+/** Tokens in the blocks that aren't colours, so they may hold other values. */
+const NOT_COLOURS = new Set(['card-shadow']);
+
+/**
+ * The colour tokens of the `:root` (light) and `.dark` blocks of `styles.css`. Every other
+ * token must be a 6-digit hex colour: one written another way would slip past the contrast
+ * test, so it throws instead.
+ */
 export function readTokens(css: string): {
   light: Record<string, string>;
   dark: Record<string, string>;
 } {
   const block = (selector: string) => {
     const body = new RegExp(`^\\s*${selector}\\s*\\{([^}]*)\\}`, 'm').exec(css)?.[1] ?? '';
-    return Object.fromEntries(
-      [...body.matchAll(/--([\w-]+):\s*(#[0-9a-f]{6})\s*;/gi)].map(([, name = '', value = '']) => [
-        name,
-        value.toLowerCase(),
-      ]),
-    );
+    const tokens: Record<string, string> = {};
+    for (const [, name = '', raw = ''] of body.matchAll(/--([\w-]+):\s*([^;]+);/g)) {
+      if (NOT_COLOURS.has(name)) continue;
+      const value = raw.trim();
+      if (!/^#[0-9a-f]{6}$/i.test(value)) {
+        throw new Error(`--${name} is not a 6-digit hex colour: ${value}`);
+      }
+      tokens[name] = value.toLowerCase();
+    }
+    return tokens;
   };
   return { light: block(':root'), dark: block('\\.dark') };
 }

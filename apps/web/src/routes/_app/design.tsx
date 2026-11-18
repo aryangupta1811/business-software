@@ -1,16 +1,18 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { Printer } from 'lucide-react';
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Badge } from '../components/ui/badge';
-import { Button } from '../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Field } from '../components/ui/field';
-import { Input } from '../components/ui/input';
-import { Kbd, KbdGroup } from '../components/ui/kbd';
-import { contrastRatio } from '../theme/contrast';
+import { Badge } from '../../components/ui/badge';
+import { Button } from '../../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Field } from '../../components/ui/field';
+import { Input } from '../../components/ui/input';
+import { Kbd, KbdGroup } from '../../components/ui/kbd';
+import { Tooltip } from '../../components/ui/tooltip';
+import { contrastRatio } from '../../theme/contrast';
 
 /** The design system on one page, to check every part in both modes and three languages. */
-export const Route = createFileRoute('/design')({
+export const Route = createFileRoute('/_app/design')({
   component: DesignSystem,
   staticData: { titleKey: 'design.title' },
 });
@@ -129,6 +131,11 @@ function DesignSystem() {
           <Button variant="danger">{t('design.buttons.cancelBill')}</Button>
           <Button size="sm">{t('design.buttons.save')}</Button>
           <Button disabled>{t('design.buttons.unavailable')}</Button>
+          <Tooltip label={t('design.buttons.print')} repeatsName>
+            <Button variant="secondary" size="icon" aria-label={t('design.buttons.print')}>
+              <Printer aria-hidden="true" />
+            </Button>
+          </Tooltip>
         </div>
       </Section>
 
@@ -157,7 +164,7 @@ function DesignSystem() {
       <Section title={t('design.sections.cards')}>
         <Card className="max-w-sm">
           <CardHeader>
-            <CardTitle>{t('design.cards.title')}</CardTitle>
+            <CardTitle level={3}>{t('design.cards.title')}</CardTitle>
           </CardHeader>
           <CardContent className="text-muted">{t('design.cards.body')}</CardContent>
         </Card>
@@ -185,7 +192,7 @@ function DesignSystem() {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>{t('design.sample.bill')}</CardTitle>
+              <CardTitle level={3}>{t('design.sample.bill')}</CardTitle>
             </CardHeader>
             <CardContent>
               <table className="w-full tabular-nums">

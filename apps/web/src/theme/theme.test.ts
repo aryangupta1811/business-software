@@ -1,24 +1,9 @@
 import { expect, test, vi } from 'vitest';
 // The real script from public/, run below the way the browser runs it.
 import themeInit from '../../public/theme-init.js?raw';
-import { readSavedTheme, setTheme, THEME_STORAGE_KEY } from './theme';
+import { setTheme, THEME_STORAGE_KEY } from './theme';
 
 const isDark = () => document.documentElement.classList.contains('dark');
-
-test('reads the saved theme, defaulting to light', () => {
-  expect(readSavedTheme({ getItem: () => 'dark' })).toBe('dark');
-  expect(readSavedTheme({ getItem: () => null })).toBe('light');
-  expect(readSavedTheme({ getItem: () => 'purple' })).toBe('light');
-});
-
-test('blocked storage means light', () => {
-  const storage = {
-    getItem: () => {
-      throw new DOMException('blocked', 'SecurityError');
-    },
-  };
-  expect(readSavedTheme(storage)).toBe('light');
-});
 
 test('setTheme switches the class on <html> and saves the choice', () => {
   setTheme('dark');

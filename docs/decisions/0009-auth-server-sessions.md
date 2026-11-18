@@ -42,6 +42,7 @@ Instant revocation is a hard requirement on a shared computer, and server sessio
 - Deactivating a user deletes nothing: their sessions are revoked and their login is disabled (ADR 0007).
 - Answered 2026-11-02 (Module 00 #30–#33): the owner resets a forgotten password by an emailed link (once the email is confirmed) or a printed recovery key; the owner resets staff passwords. Sending email is a new dependency, so P1.4 records an ADR for the email service.
 - Session rows are business data for the entry log ("who was logged in") and are kept, not deleted.
+- **Settled 2026-11-18 (P1.3, ADR 0035): how Argon2id is computed.** Node 24's built-in `crypto.argon2` (no native package), OWASP's parameters (19 MiB, 2 passes), stored as a PHC string so each hash carries its own settings, checked against RFC 9106's test vector. Signup is the first place a password is hashed (Module 00 #7, changed 2026-11-18).
 
 ## Interview note
 

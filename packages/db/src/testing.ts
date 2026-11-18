@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { runMigrations } from './migrate.js';
+import { branches, businesses, users } from './schema.js';
+import type { Transaction } from './tenancy.js';
 
 const bootstrapFile = fileURLToPath(new URL('../bootstrap/create-roles.sql', import.meta.url));
 
@@ -47,4 +49,40 @@ export async function startTestDatabase(): Promise<TestDatabase> {
       await container.stop();
     },
   };
+}
+
+/** A valid `businesses` row with the fields signup always fills; no `id` means the default. */
+export function testBusiness(name: string, id?: string) {
+  return {
+    ...(id !== undefined && { id }),
+    name,
+    businessType: 'kirana',
+    phone: '9111111111',
+    gstStatus: 'unregistered',
+    features: [] as string[],
+  };
+}
+
+/** A valid `branches` row. */
+export function testBranch(businessId: string, name: string) {
+  return { businessId, name, stateCode: '27' };
+}
+
+/** Inside `withNewBusiness`: the business, its first branch and its owner, as signup makes them. */
+export async function insertTestBusiness(
+  tx: Transaction,
+  businessId: string,
+  name: string,
+): Promise<{ businessId: string; branchId: string; ownerId: string }> {
+  await tx.insert(businesses).values(testBusiness(name, businessId));
+  const [branch] = await tx
+    .insert(branches)
+    .values(testBranch(businessId, `${name} main`))
+    .returning({ id: branches.id });
+  const [owner] = await tx
+    .insert(users)
+    .values({ businessId, role: 'owner', email: `owner-${businessId}@example.test` })
+    .returning({ id: users.id });
+  if (branch === undefined || owner === undefined) throw new Error('no row returned');
+  return { businessId, branchId: branch.id, ownerId: owner.id };
 }

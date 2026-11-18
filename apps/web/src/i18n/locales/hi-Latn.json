@@ -1,12 +1,26 @@
 {
-  "app": { "name": "Business Software" },
-  "language": { "label": "Bhasha" },
-  "nav": { "label": "Mukhya", "home": "Home" },
-  "theme": { "toDark": "Dark mode chalu karein", "toLight": "Light mode chalu karein" },
+  "app": {
+    "name": "Business Software"
+  },
+  "language": {
+    "label": "Bhasha"
+  },
+  "nav": {
+    "label": "Mukhya",
+    "home": "Home",
+    "settings": "Settings"
+  },
+  "theme": {
+    "toDark": "Dark mode chalu karein",
+    "toLight": "Light mode chalu karein"
+  },
   "shortcuts": {
     "title": "Keyboard shortcuts",
     "close": "Band karein",
-    "groups": { "general": "Saamanya", "navigation": "Navigation" },
+    "groups": {
+      "general": "Saamanya",
+      "navigation": "Navigation"
+    },
     "openHelp": "Keyboard shortcuts dikhayein",
     "goHome": "Home par jaayein"
   },
@@ -39,7 +53,8 @@
       "hold": "Hold karein",
       "more": "Aur",
       "cancelBill": "Bill radd karein",
-      "unavailable": "Uplabdh nahi"
+      "unavailable": "Uplabdh nahi",
+      "print": "Bill print karein"
     },
     "inputs": {
       "customer": "Grahak ka naam",
@@ -54,7 +69,10 @@
       "udhaar": "Udhaar",
       "cancelled": "Radd"
     },
-    "cards": { "title": "Aaj ki bikri", "body": "Kal se 8% zyada" },
+    "cards": {
+      "title": "Aaj ki bikri",
+      "body": "Kal se 8% zyada"
+    },
     "sample": {
       "bill": "Haal ka bill",
       "item": "Saamaan",
@@ -71,5 +89,228 @@
     "title": "Kuch gadbad ho gayi",
     "body": "Connection check karein, phir page dobara load karein.",
     "reload": "Page dobara load karein"
+  },
+  "signup": {
+    "title": "Apne business ka account banayein",
+    "lead": "Bas ek minute lagega. Baaki sab baad mein Settings mein.",
+    "pitch": {
+      "title": "Ek counter se poori dukaan chalayein",
+      "billing": "Seconds mein GST bill, keyboard ya scanner se",
+      "stock": "Har bill ke saath apne aap update hota stock",
+      "udhaar": "Udhaar jo kabhi gum nahi hota"
+    },
+    "fields": {
+      "businessName": "Business ka naam",
+      "businessType": "Business ka type",
+      "phone": "Phone",
+      "state": "State",
+      "statePlaceholder": "Apna state chunein",
+      "gstStatus": "GST registration",
+      "email": "Aapka email",
+      "emailHint": "Aap isi se login karenge.",
+      "password": "Password",
+      "passwordHint": "Kam se kam 10 akshar. Ek chhota vaakya yaad rakhna aasaan hai."
+    },
+    "showPassword": "Password dikhayein",
+    "hidePassword": "Password chhupayein",
+    "submit": "Account banayein",
+    "submitting": "Account ban raha hai…",
+    "failed": "Account nahi ban saka. Connection check karein aur phir koshish karein."
+  },
+  "businessTypes": {
+    "kirana": {
+      "name": "Kirana / grocery",
+      "hint": "Taul wala saamaan, expiry, udhaar saamne"
+    },
+    "medical": {
+      "name": "Medical",
+      "hint": "Batch, expiry aur MRP"
+    },
+    "clothing": {
+      "name": "Kapde / joote",
+      "hint": "Size aur rang, exchange, barcode label"
+    },
+    "electronics": {
+      "name": "Electronics / mobile",
+      "hint": "IMEI aur serial number, warranty, repair"
+    },
+    "hardware": {
+      "name": "Hardware",
+      "hint": "Bori, piece aur feet, wholesale daam"
+    }
+  },
+  "gstStatuses": {
+    "unregistered": {
+      "name": "Registered nahi",
+      "hint": "Saada bill, GST nahi"
+    },
+    "regular": {
+      "name": "Regular",
+      "hint": "CGST + SGST ya IGST wala tax invoice"
+    },
+    "composition": {
+      "name": "Composition scheme",
+      "hint": "Bill of supply, tax alag nahi dikhta"
+    }
+  },
+  "errors": {
+    "required": "Yeh bharein",
+    "choose": "Ek chunein",
+    "too_long": "Yeh bahut lamba hai",
+    "too_short": "Yeh bahut chhota hai",
+    "invalid": "Ise check karein",
+    "control_character": "Khaas nishaan hatayein",
+    "same_as_email": "Password mein apna email na rakhein",
+    "same_as_phone": "Password mein apna phone number na rakhein",
+    "email_taken": "Is email ka account pehle se hai",
+    "fields": {
+      "phone": {
+        "invalid": "10 ankon ka phone number likhein"
+      },
+      "email": {
+        "invalid": "name@example.com jaisa email likhein"
+      },
+      "password": {
+        "too_short": "Kam se kam 10 akshar rakhein"
+      },
+      "gstin": {
+        "invalid": "GSTIN check karein: 15 akshar, state code se shuru",
+        "state_mismatch": "GSTIN ke pehle do ank state se milne chahiye",
+        "pan_mismatch": "GSTIN mein PAN hona chahiye"
+      },
+      "pan": {
+        "invalid": "ABCDE1234F jaisa PAN likhein"
+      },
+      "pinCode": {
+        "invalid": "6 ankon ka PIN code likhein"
+      },
+      "fssai": {
+        "invalid": "14 ankon ka FSSAI number likhein"
+      },
+      "ownerLockMinutes": {
+        "invalid": "1 se 30 minute likhein",
+        "too_small": "1 se 30 minute likhein",
+        "too_big": "1 se 30 minute likhein"
+      },
+      "staffIdleMinutes": {
+        "invalid": "5 se 120 minute likhein",
+        "too_small": "5 se 120 minute likhein",
+        "too_big": "5 se 120 minute likhein"
+      }
+    }
+  },
+  "recoveryKey": {
+    "title": "Apni recovery key sambhaal kar rakhein",
+    "body": "Agar aap password bhool jaayein aur email na khule, to yahi key waapas aane ka akela raasta hai. Yeh sirf ek baar dikhti hai.",
+    "keep": "Ise likh lein ya print kar lein, aur counter se door rakhein.",
+    "label": "Aapki recovery key",
+    "print": "Print karein",
+    "copy": "Copy karein",
+    "copied": "Copy ho gayi",
+    "confirm": "Maine yeh key likh li hai ya print kar li hai",
+    "continue": "Aage badhein",
+    "printedFor": "{{business}} ki recovery key, {{date}} ko bani",
+    "gone": {
+      "title": "Key sirf ek baar dikhti hai",
+      "body": "Aapki suraksha ke liye ise dobara kholne laayak kahin nahi rakha jaata. Login karne ke baad aap nayi key bana sakte hain.",
+      "home": "Home par jaayein"
+    }
+  },
+  "states": {
+    "01": "Jammu and Kashmir",
+    "02": "Himachal Pradesh",
+    "03": "Punjab",
+    "04": "Chandigarh",
+    "05": "Uttarakhand",
+    "06": "Haryana",
+    "07": "Delhi",
+    "08": "Rajasthan",
+    "09": "Uttar Pradesh",
+    "10": "Bihar",
+    "11": "Sikkim",
+    "12": "Arunachal Pradesh",
+    "13": "Nagaland",
+    "14": "Manipur",
+    "15": "Mizoram",
+    "16": "Tripura",
+    "17": "Meghalaya",
+    "18": "Assam",
+    "19": "West Bengal",
+    "20": "Jharkhand",
+    "21": "Odisha",
+    "22": "Chhattisgarh",
+    "23": "Madhya Pradesh",
+    "24": "Gujarat",
+    "26": "Dadra and Nagar Haveli and Daman and Diu",
+    "27": "Maharashtra",
+    "29": "Karnataka",
+    "30": "Goa",
+    "31": "Lakshadweep",
+    "32": "Kerala",
+    "33": "Tamil Nadu",
+    "34": "Puducherry",
+    "35": "Andaman and Nicobar Islands",
+    "36": "Telangana",
+    "37": "Andhra Pradesh",
+    "38": "Ladakh",
+    "97": "Other Territory"
+  },
+  "settings": {
+    "loading": "Settings load ho rahi hain…",
+    "loggedOut": {
+      "title": "Settings dekhne ke liye login karein",
+      "body": "Settings maalik ke liye hain. Maalik ke email se login karke inhe dekhein."
+    },
+    "loadFailed": "Settings load nahi ho sakin. Connection check karein aur phir koshish karein.",
+    "retry": "Phir koshish karein",
+    "save": "Save karein",
+    "saving": "Save ho raha hai…",
+    "saved": "Save ho gaya",
+    "saveFailed": "Save nahi ho saka. Connection check karein aur phir koshish karein.",
+    "business": {
+      "title": "Business ki jaankari",
+      "lead": "Yeh aapke bills par chhapti hai. Purane bills par wahi jaankari rehti hai jiske saath woh chhape the.",
+      "branchTitle": "Yeh dukaan",
+      "fields": {
+        "pan": "PAN",
+        "ownerName": "Maalik ka naam",
+        "branchName": "Dukaan ka naam",
+        "address": "Pata",
+        "pinCode": "PIN code",
+        "gstin": "GSTIN",
+        "drugLicence": "Drug licence number",
+        "fssai": "FSSAI number"
+      }
+    },
+    "features": {
+      "title": "Features",
+      "lead": "Jo aapki dukaan ko chahiye, woh chaalu karein. Band features ki screens chhupi rehti hain.",
+      "useDefaults": "{{type}} ke liye default features lagayein"
+    },
+    "security": {
+      "title": "Security",
+      "lead": "Counter kab apne aap lock ho.",
+      "ownerLock": "Maalik ka lock",
+      "ownerLockHint": "Itne minute istemaal na hone par maalik ka login lock ho jaata hai.",
+      "staffIdle": "Staff ka logout",
+      "staffIdleHint": "Itne minute istemaal na hone par staff ka login band ho jaata hai."
+    }
+  },
+  "features": {
+    "loose_weight": "Khula saamaan vazan se bechein",
+    "expiry_dates": "Expiry date",
+    "udhaar_prominent": "Udhaar saamne rakhein",
+    "batches": "Batch number",
+    "mrp": "Saamaan par MRP",
+    "expiry_alerts": "Expiry ki chetavani",
+    "variants": "Size aur rang",
+    "exchanges": "Saamaan badalna",
+    "barcode_labels": "Barcode label",
+    "serial_numbers": "Serial number",
+    "warranty": "Warranty",
+    "service_items": "Marammat aur service",
+    "multiple_units": "Kai units (piece, dibba, kilo)",
+    "wholesale_price": "Thok daam",
+    "large_credit": "Thekedaaron ko bada udhaar"
   }
 }

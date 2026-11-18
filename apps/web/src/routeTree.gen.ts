@@ -9,68 +9,177 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as DesignRouteImport } from './routes/design'
+import { Route as AppRouteImport } from './routes/_app'
+import { Route as PublicRouteImport } from './routes/_public'
+import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as AppDesignRouteImport } from './routes/_app/design'
+import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as PublicSignupRouteImport } from './routes/_public/signup'
+import { Route as PublicSignupRecoveryKeyRouteImport } from './routes/_public/signup_.recovery-key'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DesignRoute = DesignRouteImport.update({
+const PublicRoute = PublicRouteImport.update({
+  id: '/_public',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDesignRoute = AppDesignRouteImport.update({
   id: '/design',
   path: '/design',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const PublicSignupRoute = PublicSignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => PublicRoute,
+} as any)
+const PublicSignupRecoveryKeyRoute = PublicSignupRecoveryKeyRouteImport.update({
+  id: '/signup_/recovery-key',
+  path: '/signup/recovery-key',
+  getParentRoute: () => PublicRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/design': typeof DesignRoute
+  '/': typeof AppIndexRoute
+  '/design': typeof AppDesignRoute
+  '/settings': typeof AppSettingsRoute
+  '/signup': typeof PublicSignupRoute
+  '/signup/recovery-key': typeof PublicSignupRecoveryKeyRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/design': typeof DesignRoute
+  '/': typeof AppIndexRoute
+  '/design': typeof AppDesignRoute
+  '/settings': typeof AppSettingsRoute
+  '/signup': typeof PublicSignupRoute
+  '/signup/recovery-key': typeof PublicSignupRecoveryKeyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/design': typeof DesignRoute
+  '/_app': typeof AppRouteWithChildren
+  '/_public': typeof PublicRouteWithChildren
+  '/_app/design': typeof AppDesignRoute
+  '/_app/settings': typeof AppSettingsRoute
+  '/_public/signup': typeof PublicSignupRoute
+  '/_app/': typeof AppIndexRoute
+  '/_public/signup_/recovery-key': typeof PublicSignupRecoveryKeyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/design'
+  fullPaths: '/' | '/design' | '/settings' | '/signup' | '/signup/recovery-key'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/design'
-  id: '__root__' | '/' | '/design'
+  to: '/' | '/design' | '/settings' | '/signup' | '/signup/recovery-key'
+  id:
+    | '__root__'
+    | '/_app'
+    | '/_public'
+    | '/_app/design'
+    | '/_app/settings'
+    | '/_public/signup'
+    | '/_app/'
+    | '/_public/signup_/recovery-key'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  DesignRoute: typeof DesignRoute
+  AppRoute: typeof AppRouteWithChildren
+  PublicRoute: typeof PublicRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
+    '/_app': {
+      id: '/_app'
+      path: ''
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/design': {
-      id: '/design'
+    '/_public': {
+      id: '/_public'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof PublicRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app/': {
+      id: '/_app/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/design': {
+      id: '/_app/design'
       path: '/design'
       fullPath: '/design'
-      preLoaderRoute: typeof DesignRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AppDesignRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings': {
+      id: '/_app/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_public/signup': {
+      id: '/_public/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof PublicSignupRouteImport
+      parentRoute: typeof PublicRoute
+    }
+    '/_public/signup_/recovery-key': {
+      id: '/_public/signup_/recovery-key'
+      path: '/signup/recovery-key'
+      fullPath: '/signup/recovery-key'
+      preLoaderRoute: typeof PublicSignupRecoveryKeyRouteImport
+      parentRoute: typeof PublicRoute
     }
   }
 }
 
+interface AppRouteChildren {
+  AppDesignRoute: typeof AppDesignRoute
+  AppSettingsRoute: typeof AppSettingsRoute
+  AppIndexRoute: typeof AppIndexRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppDesignRoute: AppDesignRoute,
+  AppSettingsRoute: AppSettingsRoute,
+  AppIndexRoute: AppIndexRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
+interface PublicRouteChildren {
+  PublicSignupRoute: typeof PublicSignupRoute
+  PublicSignupRecoveryKeyRoute: typeof PublicSignupRecoveryKeyRoute
+}
+
+const PublicRouteChildren: PublicRouteChildren = {
+  PublicSignupRoute: PublicSignupRoute,
+  PublicSignupRecoveryKeyRoute: PublicSignupRecoveryKeyRoute,
+}
+
+const PublicRouteWithChildren =
+  PublicRoute._addFileChildren(PublicRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  DesignRoute: DesignRoute,
+  AppRoute: AppRouteWithChildren,
+  PublicRoute: PublicRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

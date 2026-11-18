@@ -8,5 +8,8 @@
   },
   "include": ["src"],
   "exclude": ["src/**/*.test.ts"],
-  "references": [{ "path": "../../packages/db/tsconfig.build.json" }]
+  "references": [
+    { "path": "../../packages/db/tsconfig.build.json" },
+    { "path": "../../packages/shared/tsconfig.build.json" }
+  ]
 }

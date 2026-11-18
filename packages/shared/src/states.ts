@@ -18,7 +18,9 @@ export interface IndianState {
   readonly utgst: boolean;
 }
 
-export const INDIAN_STATES: readonly IndianState[] = [
+// `as const`: TypeScript keeps each exact code ('01', '27'…), so StateCode is the list of
+// real codes and the web app's translation keys (`states.27`) are checked.
+export const INDIAN_STATES = [
   { code: '01', name: 'Jammu and Kashmir', utgst: false },
   { code: '02', name: 'Himachal Pradesh', utgst: false },
   { code: '03', name: 'Punjab', utgst: false },
@@ -56,15 +58,34 @@ export const INDIAN_STATES: readonly IndianState[] = [
   { code: '37', name: 'Andhra Pradesh', utgst: false },
   { code: '38', name: 'Ladakh', utgst: true },
   { code: '97', name: 'Other Territory', utgst: true },
-];
+] as const satisfies readonly IndianState[];
+
+/** One of the GST state codes in `INDIAN_STATES`. */
+export type StateCode = (typeof INDIAN_STATES)[number]['code'];
 
 const BY_CODE: ReadonlyMap<string, IndianState> = new Map(
   INDIAN_STATES.map((state) => [state.code, state]),
 );
 
 /** True when `code` is one of the GST state codes in `INDIAN_STATES`. */
-export function isStateCode(code: string): boolean {
+export function isStateCode(code: string): code is StateCode {
   return BY_CODE.has(code);
+}
+
+/**
+ * The states a shop's branch can stand in: every code but 97, Other Territory, which is a
+ * place of supply outside any state (offshore areas), never a shop's address.
+ */
+export const BRANCH_STATES = INDIAN_STATES.filter(
+  (state): state is Exclude<(typeof INDIAN_STATES)[number], { code: '97' }> => state.code !== '97',
+);
+
+/** A state code a branch can have. */
+export type BranchStateCode = (typeof BRANCH_STATES)[number]['code'];
+
+/** True when `code` is a state a branch can stand in (not 97, Other Territory). */
+export function isBranchStateCode(code: string): code is BranchStateCode {
+  return isStateCode(code) && code !== '97';
 }
 
 /** The state or UT with this GST code, or undefined. */

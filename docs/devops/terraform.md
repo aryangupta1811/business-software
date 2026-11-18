@@ -85,6 +85,8 @@ There's no SSH key and port 22 is closed. Use Systems Manager instead:
 | `bootstrap-db.sh` | Server | Once: if `business_software` doesn't exist, runs `create-roles.sql` as the master user |
 | `business-software.service` → `start.sh` | Server, every boot and deploy | Updates DuckDNS, writes the connection strings to `/run/business-software` (memory, root only), `docker compose up --wait` |
 
+**Hold deploys from P1.3 until P1.4 is merged.** P1.3 adds `POST /api/signup` with no rate limit yet: each call costs an Argon2 hash (about 19 MiB, ADR 0035), so a burst could fill the 2 GB server, and anyone could create businesses on the public site. P1.4 brings the limiter. Until it's on `main`, deploy only commits from before P1.3 (`git log --oneline origin/main`).
+
 **Deploy** (the server and RDS running, `aws login` fresh):
 ```bash
 git fetch origin

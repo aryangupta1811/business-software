@@ -8,12 +8,11 @@ export const Route = createRootRoute({
   notFoundComponent: NotFound,
 });
 
+// Each layout route (_app, _public) brings its own frame around the page.
 function Root() {
   return (
     <ShortcutProvider>
-      <AppShell>
-        <Outlet />
-      </AppShell>
+      <Outlet />
     </ShortcutProvider>
   );
 }
@@ -21,11 +20,11 @@ function Root() {
 function NotFound() {
   const { t } = useTranslation();
   return (
-    <>
+    <AppShell>
       <h1 className="text-title font-semibold">{t('notFound.title')}</h1>
       <Link to="/" className="mt-4 inline-block text-accent underline-offset-4 hover:underline">
         {t('notFound.home')}
       </Link>
-    </>
+    </AppShell>
   );
 }

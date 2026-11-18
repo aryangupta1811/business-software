@@ -1,5 +1,5 @@
 import { Link, useMatches, useNavigate } from '@tanstack/react-router';
-import { House, Keyboard } from 'lucide-react';
+import { House, Keyboard, Settings } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keyLabels } from '../shortcuts/keys';
@@ -11,6 +11,8 @@ import { Button } from './ui/button';
 import { Kbd, KbdGroup } from './ui/kbd';
 
 const HOME_KEYS = 'Alt+H';
+const NAV_LINK =
+  'flex min-h-10 items-center gap-2.5 rounded-lg px-2 text-muted hover:bg-surface-muted data-[status=active]:bg-surface-muted data-[status=active]:font-semibold data-[status=active]:text-foreground';
 
 /** Sidebar on the left, top bar with the page title and settings, then the page. */
 export function AppShell({ children }: { children: ReactNode }) {
@@ -30,7 +32,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-sidebar px-3 py-4">
+      <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col overflow-y-auto border-r border-border bg-sidebar px-3 py-4">
         <Link to="/" className="mb-6 flex items-center gap-2.5 px-2 font-semibold">
           <img src="/favicon.svg" alt="" className="size-6" />
           {t('app.name')}
@@ -38,7 +40,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         <nav aria-label={t('nav.label')}>
           <Link
             to="/"
-            className="flex h-10 items-center gap-2.5 rounded-lg px-2 text-muted hover:bg-surface-muted data-[status=active]:bg-surface-muted data-[status=active]:font-semibold data-[status=active]:text-foreground"
+            activeOptions={{ exact: true }}
+            aria-keyshortcuts={HOME_KEYS}
+            className={NAV_LINK}
           >
             <House aria-hidden="true" className="size-4" />
             <span className="flex-1">{t('nav.home')}</span>
@@ -47,6 +51,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Kbd key={label}>{label}</Kbd>
               ))}
             </KbdGroup>
+          </Link>
+          <Link to="/settings" className={NAV_LINK}>
+            <Settings aria-hidden="true" className="size-4" />
+            {t('nav.settings')}
           </Link>
         </nav>
         {/* The ? key alone is invisible to mouse users, so the list has a button too. */}
@@ -62,7 +70,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Button>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center justify-between gap-6 border-b border-border px-8">
+        <header className="sticky top-0 z-10 flex min-h-14 items-center justify-between gap-6 border-b border-border bg-background px-8 py-2">
           {titleKey ? <h1 className="text-title font-semibold">{t(titleKey)}</h1> : <span />}
           <div className="flex items-center gap-4">
             <ConnectionBadge />

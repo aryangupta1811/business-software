@@ -26,8 +26,10 @@
     "vitest": "catalog:"
   },
   "dependencies": {
+    "@business-software/shared": "workspace:*",
     "@fontsource/ibm-plex-sans": "^5.3.0",
     "@fontsource/ibm-plex-sans-devanagari": "^5.3.0",
+    "@hookform/resolvers": "^7.0.6",
     "@radix-ui/react-tooltip": "^1.4.1",
     "@tanstack/react-query": "^5.107.1",
     "@tanstack/react-router": "^1.170.46",
@@ -37,7 +39,9 @@
     "lucide-react": "^1.73.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "react-hook-form": "^7.92.0",
     "react-i18next": "^17.1.13",
-    "tailwind-merge": "^3.7.0"
+    "tailwind-merge": "^3.7.0",
+    "zod": "catalog:"
   }
 }

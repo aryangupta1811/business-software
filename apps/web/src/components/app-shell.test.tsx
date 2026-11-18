@@ -35,3 +35,26 @@ test('the top bar has the language switcher and the theme button', async () => {
   expect(await screen.findByRole('group', { name: 'Language' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Switch to dark mode' })).toBeInTheDocument();
 });
+
+test('the Home link announces its shortcut to screen readers', async () => {
+  renderAt('/');
+  const nav = await screen.findByRole('navigation', { name: 'Main' });
+  expect(within(nav).getByRole('link', { name: /Home/ })).toHaveAttribute(
+    'aria-keyshortcuts',
+    'Alt+H',
+  );
+});
+
+// jsdom has no layout, so these check the classes that give the behaviour.
+test('the sidebar and top bar stay in view, and grow with long Hindi text', async () => {
+  renderAt('/');
+  const header = await screen.findByRole('banner');
+  expect(header).toHaveClass('sticky', 'min-h-14');
+  expect(header).not.toHaveClass('h-14');
+  expect(screen.getByRole('complementary')).toHaveClass('sticky', 'h-screen');
+  const home = within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', {
+    name: /Home/,
+  });
+  expect(home).toHaveClass('min-h-10');
+  expect(home).not.toHaveClass('h-10');
+});

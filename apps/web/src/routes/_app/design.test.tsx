@@ -1,10 +1,10 @@
 import { createMemoryHistory } from '@tanstack/react-router';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import { expect, test } from 'vitest';
-import { App } from '../app';
-import { changeLanguage } from '../i18n';
-import { createQueryClient } from '../query-client';
-import { createAppRouter } from '../router';
+import { App } from '../../app';
+import { changeLanguage } from '../../i18n';
+import { createQueryClient } from '../../query-client';
+import { createAppRouter } from '../../router';
 
 function renderDesign() {
   const router = createAppRouter(createMemoryHistory({ initialEntries: ['/design'] }));
@@ -48,4 +48,21 @@ test('is translated', async () => {
   renderDesign();
   expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('डिज़ाइन सिस्टम');
   expect(screen.getByRole('region', { name: 'रंग' })).toBeInTheDocument();
+});
+
+test('card titles sit one level below their section heading', async () => {
+  renderDesign();
+  const cards = await screen.findByRole('region', { name: 'Cards' });
+  expect(within(cards).getByRole('heading', { level: 3 })).toHaveTextContent("Today's sales");
+  expect(within(cards).queryByRole('heading', { level: 2, name: "Today's sales" })).toBeNull();
+});
+
+test('shows an icon button that names itself, with a tooltip', async () => {
+  renderDesign();
+  const region = await screen.findByRole('region', { name: 'Buttons' });
+  const icon = within(region).getByRole('button', { name: 'Print bill' });
+  act(() => {
+    icon.focus();
+  });
+  expect(await screen.findByRole('tooltip')).toHaveTextContent('Print bill');
 });

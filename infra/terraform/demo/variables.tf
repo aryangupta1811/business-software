@@ -65,6 +65,12 @@ variable "db_password_version" {
   default = 2
 }
 
+variable "app_password_version" {
+  description = "Bump by one to make new passwords for app_owner and app_runtime in SSM (then ALTER ROLE on RDS, see terraform.md)."
+  type        = number
+  default     = 1
+}
+
 variable "nightly_stop_cron" {
   description = "EventBridge Scheduler cron for the nightly stop (ADR 0032)."
   type        = string

@@ -58,10 +58,13 @@ resource "aws_instance" "server" {
   ami           = data.aws_ssm_parameter.ubuntu_arm64.insecure_value
   instance_type = var.server_instance_type
 
-  subnet_id                   = aws_subnet.public[0].id
-  vpc_security_group_ids      = [aws_security_group.web.id]
-  associate_public_ip_address = true
-  iam_instance_profile        = aws_iam_instance_profile.server.name
+  # The public subnet gives every server a public IP (map_public_ip_on_launch). Not set here
+  # as associate_public_ip_address: a stopped instance has no public IP, AWS then reports
+  # false, and Terraform would replace the server on every plan made while it's stopped
+  # (seen 2026-11-18).
+  subnet_id              = aws_subnet.public[0].id
+  vpc_security_group_ids = [aws_security_group.web.id]
+  iam_instance_profile   = aws_iam_instance_profile.server.name
 
   # "standard": the CPU slows down when burst credits run out. The default for t4g,
   # "unlimited", keeps it fast and bills for the extra.

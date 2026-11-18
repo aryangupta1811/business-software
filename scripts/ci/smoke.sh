@@ -43,7 +43,9 @@ headers=$(head_request "$url")
 expect_status "$headers" "$url" 200
 expect_header "$headers" "$url" 'cache-control: no-cache'
 expect_header "$headers" "$url" 'content-security-policy: '
-echo "ok: / is no-cache with a csp"
+# HSTS belongs on HTTPS answers only (apps/web/Caddyfile); this stack is plain HTTP.
+! grep -q '^strict-transport-security' <<<"$headers" || fail "$url: HSTS sent over plain HTTP"
+echo "ok: / is no-cache with a csp, no hsts over http"
 
 # 4. A deep link gets the app (the router shows its own not-found page).
 url=http://127.0.0.1:8080/no-such-page

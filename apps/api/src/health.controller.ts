@@ -2,11 +2,13 @@ import { Controller, Get, Inject, Logger, ServiceUnavailableException } from '@n
 import type { Database } from '@business-software/db';
 import { DATABASE } from './database.module.js';
 import { describeError } from './errors.js';
+import { Public } from './http/permission.decorator.js';
 
 /**
  * Liveness (`/health`): the process answers, so there's no reason to restart it.
  * Readiness (`/health/ready`): it can also reach the database, so it can serve requests.
  */
+@Public()
 @Controller('health')
 export class HealthController {
   private readonly logger = new Logger(HealthController.name);

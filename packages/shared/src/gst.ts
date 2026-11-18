@@ -54,10 +54,15 @@ export interface BillLine extends TaxAmounts {
   readonly hsn: string;
   /** The rate charged: the item's rate, or 0 when the business charges no GST. */
   readonly rateBasisPoints: number;
-  /** Price × quantity, in the line's own price basis (with or without tax). */
+  /** Price × quantity, in the line's own price basis (with or without tax), as printed on it. */
   readonly amountPaise: Paise;
+  /** The item discount, in the line's own price basis, as printed on it. */
   readonly itemDiscountPaise: Paise;
-  /** This line's share of the bill discount. */
+  /** What the customer would pay for this line with no discount at all, tax included. */
+  readonly grossPaise: Paise;
+  /** What the customer would pay for this line after its item discount, before the bill discount. */
+  readonly subtotalPaise: Paise;
+  /** How much less the customer pays for this line because of the bill discount. */
   readonly billDiscountPaise: Paise;
 }
 
@@ -69,14 +74,23 @@ export interface HsnSummary extends RateSummary {
   readonly hsn: string;
 }
 
+/**
+ * A worked-out bill. Every money field means what the customer pays, tax included, except the
+ * taxable value and the taxes themselves, so the printed bill adds up:
+ * gross − item discounts (gross − subtotal) − bill discount = total = taxable + taxes,
+ * and total + round-off = grand total.
+ */
 export interface Bill extends TaxAmounts {
   /** Which taxes this bill charges: 'none' for composition and unregistered businesses. */
   readonly tax: 'cgst-sgst' | 'igst' | 'none';
-  /** What the state half is called at the place of supply. */
-  readonly stateTaxName: 'SGST' | 'UTGST';
+  /** What the state half is called (UTGST in a Union Territory), or null when none is charged. */
+  readonly stateTaxName: 'SGST' | 'UTGST' | null;
   readonly lines: readonly BillLine[];
-  readonly amountPaise: Paise;
-  readonly itemDiscountPaise: Paise;
+  /** What the customer would pay with no discount at all. */
+  readonly grossPaise: Paise;
+  /** What the customer would pay after item discounts, before the bill discount. */
+  readonly subtotalPaise: Paise;
+  /** How much less the customer pays because of the bill discount: subtotal − total. */
   readonly billDiscountPaise: Paise;
   /** Between −49 and +50 paise, so the grand total is a whole number of rupees. */
   readonly roundOffPaise: Paise;
@@ -88,6 +102,8 @@ export interface Bill extends TaxAmounts {
 }
 
 const SCHEMES: readonly TaxScheme[] = ['regular', 'composition', 'unregistered'];
+/** HSN codes are 4, 6 or 8 digits (at least 4 on a tax invoice, Notification 78/2020-CT). */
+const HSN = /^(?:\d{4}|\d{6}|\d{8})$/;
 const BASIS_POINTS = 10000n;
 const THOUSANDTHS = 1000n;
 
@@ -121,6 +137,21 @@ function state(code: string, what: string): IndianState {
     );
   }
   return found;
+}
+
+/** A tax invoice needs an HSN code; a bill of supply or a plain bill may leave it empty. */
+function hsnCode(value: unknown, scheme: TaxScheme, what: string): string {
+  if (typeof value === 'string' && (HSN.test(value) || (scheme !== 'regular' && value === ''))) {
+    return value;
+  }
+  throw new RangeError(`${what} HSN code must be 4, 6 or 8 digits: ${JSON.stringify(value)}`);
+}
+
+function yesOrNo(value: unknown, what: string): boolean {
+  if (typeof value !== 'boolean') {
+    throw new RangeError(`${what} must be true or false: ${JSON.stringify(value)}`);
+  }
+  return value;
 }
 
 /** How much a discount takes off `amount`; an amount discount can't be more than `amount`. */
@@ -161,6 +192,11 @@ function taxOn(net: bigint, rate: bigint, includesTax: boolean, tax: Bill['tax']
   }
   const half = divideHalfUp(net * rate, 2n * base);
   return { taxable: includesTax ? net - 2n * half : net, cgst: half, sgst: half, igst: 0n };
+}
+
+/** What the customer pays for a line: its taxable value plus every tax. */
+function payable({ taxable, cgst, sgst, igst }: LineTax): bigint {
+  return taxable + cgst + sgst + igst;
 }
 
 type Totals = { -readonly [K in keyof TaxAmounts]: bigint };
@@ -232,14 +268,15 @@ export function calculateBill(input: BillInput): Bill {
   }
   const supplier = state(input.supplierStateCode, 'The supplier state');
   const placeOfSupply = state(input.placeOfSupplyStateCode, 'The place of supply');
-  const tax: Bill['tax'] =
-    input.scheme !== 'regular'
-      ? 'none'
-      : supplier.code === placeOfSupply.code
-        ? 'cgst-sgst'
-        : 'igst';
+  const sameState = supplier.code === placeOfSupply.code;
+  if (input.scheme !== 'regular' && !sameState) {
+    // CGST Act s. 10(2)(c): no inter-state supplies under composition; s. 24(i): a seller of
+    // goods to another state must register.
+    throw new RangeError(`A ${input.scheme} business can't sell to another state`);
+  }
+  const tax: Bill['tax'] = input.scheme !== 'regular' ? 'none' : sameState ? 'cgst-sgst' : 'igst';
 
-  // 1–2. Each line's amount (half up) and its item discount.
+  // 1–2. Each line's amount (half up) and its item discount, then what the customer would pay.
   const priced = input.lines.map((line, index) => {
     const what = `Line ${String(index + 1)}`;
     const price = wholeNumber(line.unitPricePaise, 0, Number.MAX_SAFE_INTEGER, `${what} price`);
@@ -249,71 +286,99 @@ export function calculateBill(input: BillInput): Bill {
       Number.MAX_SAFE_INTEGER,
       `${what} quantity`,
     );
-    const rate = wholeNumber(line.rateBasisPoints, 0, 10000, `${what} GST rate`);
+    const itemRate = wholeNumber(line.rateBasisPoints, 0, 10000, `${what} GST rate`);
+    const includesTax = yesOrNo(line.priceIncludesTax, `${what} priceIncludesTax`);
+    const hsn = hsnCode(line.hsn, input.scheme, what);
+    const rate = tax === 'none' ? 0n : itemRate;
     const amount = divideHalfUp(price * quantity, THOUSANDTHS);
-    toPaise(amount, `${what} amount`);
     const itemDiscount = discountOff(line.discount, amount, `${what} discount`);
-    return { line, rate, amount, itemDiscount, afterItemDiscount: amount - itemDiscount };
+    const afterItemDiscount = amount - itemDiscount;
+    const beforeBillDiscount = taxOn(afterItemDiscount, rate, includesTax, tax);
+    return {
+      what,
+      hsn,
+      rate,
+      includesTax,
+      amount,
+      itemDiscount,
+      afterItemDiscount,
+      gross: payable(taxOn(amount, rate, includesTax, tax)),
+      subtotal: payable(beforeBillDiscount),
+      beforeBillDiscount,
+    };
   });
 
-  // 3. The bill discount, worked out once on the subtotal, then shared by largest remainder.
-  const subtotal = priced.reduce((sum, p) => sum + p.afterItemDiscount, 0n);
-  const billDiscount = toPaise(
-    discountOff(input.billDiscount, subtotal, 'The bill discount'),
-    'The bill discount',
-  );
-  const shares = allocatePaise(
-    billDiscount,
-    priced.map((p) => toPaise(p.afterItemDiscount, 'A line after its discount')),
-  );
-
-  // 4–8. GST on what's left of each line.
-  const lines = priced.map(({ line, rate, amount, itemDiscount, afterItemDiscount }, index) => {
-    const what = `Line ${String(index + 1)}`;
-    const share = BigInt(shares[index] ?? 0);
-    const chargedRate = tax === 'none' ? 0n : rate;
-    const { taxable, cgst, sgst, igst } = taxOn(
-      afterItemDiscount - share,
-      chargedRate,
-      line.priceIncludesTax,
-      tax,
+  // 3–8. The bill discount, then GST on what's left of each line.
+  const billDiscount = input.billDiscount;
+  let taxes: LineTax[];
+  if (billDiscount === undefined) {
+    taxes = priced.map((p) => p.beforeBillDiscount);
+  } else if (billDiscount.kind === 'percent') {
+    // Worked out once on the subtotal and shared by each line's own-basis value, so every line
+    // loses that percent of its own price.
+    const ownSubtotal = priced.reduce((sum, p) => sum + p.afterItemDiscount, 0n);
+    const off = discountOff(billDiscount, ownSubtotal, 'The bill discount');
+    const shares = allocatePaise(
+      toPaise(off, 'The bill discount'),
+      priced.map((p) => toPaise(p.afterItemDiscount, `${p.what} after its discount`)),
     );
+    taxes = priced.map((p, index) =>
+      taxOn(p.afterItemDiscount - BigInt(shares[index] ?? 0), p.rate, p.includesTax, tax),
+    );
+  } else {
+    // Owner's decision 2026-11-18: ₹X off the bill means the customer pays exactly ₹X less.
+    // X is shared by what the customer pays for each line. A line's new price is then treated
+    // as tax-inclusive, so its tax is taken out of it and its total drops by exactly its share.
+    const subtotal = priced.reduce((sum, p) => sum + p.subtotal, 0n);
+    const off = discountOff(billDiscount, subtotal, 'The bill discount');
+    const shares = allocatePaise(
+      toPaise(off, 'The bill discount'),
+      priced.map((p) => toPaise(p.subtotal, `${p.what} subtotal`)),
+    );
+    taxes = priced.map((p, index) => {
+      const share = BigInt(shares[index] ?? 0);
+      return share === 0n ? p.beforeBillDiscount : taxOn(p.subtotal - share, p.rate, true, tax);
+    });
+  }
+
+  const lines = priced.map((p, index): BillLine => {
+    const lineTax = taxes[index] ?? p.beforeBillDiscount;
+    const total = payable(lineTax);
     return {
-      hsn: line.hsn,
-      rateBasisPoints: Number(chargedRate),
-      amountPaise: toPaise(amount, `${what} amount`),
-      itemDiscountPaise: toPaise(itemDiscount, `${what} discount`),
-      billDiscountPaise: Number(share),
-      taxablePaise: toPaise(taxable, `${what} taxable value`),
-      cgstPaise: toPaise(cgst, `${what} CGST`),
-      sgstPaise: toPaise(sgst, `${what} SGST`),
-      igstPaise: toPaise(igst, `${what} IGST`),
-      totalPaise: toPaise(taxable + cgst + sgst + igst, `${what} total`),
-    } satisfies BillLine;
+      hsn: p.hsn,
+      rateBasisPoints: Number(p.rate),
+      amountPaise: toPaise(p.amount, `${p.what} amount`),
+      itemDiscountPaise: toPaise(p.itemDiscount, `${p.what} discount`),
+      grossPaise: toPaise(p.gross, `${p.what} gross`),
+      subtotalPaise: toPaise(p.subtotal, `${p.what} subtotal`),
+      billDiscountPaise: toPaise(p.subtotal - total, `${p.what} bill discount`),
+      taxablePaise: toPaise(lineTax.taxable, `${p.what} taxable value`),
+      cgstPaise: toPaise(lineTax.cgst, `${p.what} CGST`),
+      sgstPaise: toPaise(lineTax.sgst, `${p.what} SGST`),
+      igstPaise: toPaise(lineTax.igst, `${p.what} IGST`),
+      totalPaise: toPaise(total, `${p.what} total`),
+    };
   });
 
   // 9. Totals are sums of the lines, so lines, totals and summaries always agree.
   const totals = emptyTotals();
   for (const line of lines) addLine(totals, line);
-  const sumOf = (field: (line: BillLine) => number) =>
-    lines.reduce((sum, line) => sum + BigInt(field(line)), 0n);
+  const sumOf = (field: (line: BillLine) => number, what: string) =>
+    toPaise(
+      lines.reduce((sum, line) => sum + BigInt(field(line)), 0n),
+      what,
+    );
 
   // 11. Round off to the nearest rupee, 50 paise and up going up.
   const grandTotal = divideHalfUp(totals.totalPaise, 100n) * 100n;
 
   return {
     tax,
-    stateTaxName: placeOfSupply.utgst ? 'UTGST' : 'SGST',
+    stateTaxName: tax === 'cgst-sgst' ? (placeOfSupply.utgst ? 'UTGST' : 'SGST') : null,
     lines,
-    amountPaise: toPaise(
-      sumOf((line) => line.amountPaise),
-      'The bill amount',
-    ),
-    itemDiscountPaise: toPaise(
-      sumOf((line) => line.itemDiscountPaise),
-      'The item discounts',
-    ),
-    billDiscountPaise: billDiscount,
+    grossPaise: sumOf((line) => line.grossPaise, 'The bill gross'),
+    subtotalPaise: sumOf((line) => line.subtotalPaise, 'The bill subtotal'),
+    billDiscountPaise: sumOf((line) => line.billDiscountPaise, 'The bill discount'),
     ...totalsToPaise(totals, 'The bill'),
     roundOffPaise: toPaise(grandTotal - totals.totalPaise, 'The round-off'),
     grandTotalPaise: toPaise(grandTotal, 'The grand total'),

@@ -117,6 +117,18 @@ describe('calculateBill: tax-inclusive prices', () => {
       totalPaise: paid,
     });
   });
+  it('keeps the price exact and the halves equal, so a half may be a paisa off rate × taxable', () => {
+    // ₹52.12 at 0.25%: each half is 5212 × 25 ÷ 20050 = 6.4988 → 6, taxable 5212 − 12 = 5200.
+    // 0.125% of 5200 is 6.5, which would round to 7: the printed half is 1 paisa under it.
+    const result = calculateBill(
+      bill([line({ unitPricePaise: 5212, rateBasisPoints: 25, priceIncludesTax: true })]),
+    );
+    const l = only(result.lines);
+    expect(l).toMatchObject({ taxablePaise: 5200, cgstPaise: 6, sgstPaise: 6, totalPaise: 5212 });
+    const fromTaxable = Math.round((l.taxablePaise * l.rateBasisPoints) / 20000);
+    expect(fromTaxable).toBe(7);
+    expect(Math.abs(l.cgstPaise - fromTaxable)).toBeLessThanOrEqual(1);
+  });
 });
 
 describe('calculateBill: item discounts (GST after discount)', () => {
@@ -134,19 +146,24 @@ describe('calculateBill: item discounts (GST after discount)', () => {
     expect(only(result.lines)).toMatchObject({
       amountPaise: 11800,
       itemDiscountPaise: 1180,
+      grossPaise: 11800,
+      subtotalPaise: 10620,
       billDiscountPaise: 0,
       taxablePaise: 9000,
       cgstPaise: 810,
       sgstPaise: 810,
       totalPaise: 10620,
     });
-    expect(result.itemDiscountPaise).toBe(1180);
+    expect(result).toMatchObject({ grossPaise: 11800, subtotalPaise: 10620, totalPaise: 10620 });
   });
 
-  it('takes an amount discount off a tax-exclusive line', () => {
+  it('takes an amount discount off a tax-exclusive line, in the line’s own price basis', () => {
     const result = calculateBill(bill([line({ discount: { kind: 'amount', paise: 500 } })]));
     expect(only(result.lines)).toMatchObject({
+      amountPaise: 10000,
       itemDiscountPaise: 500,
+      grossPaise: 11800, // ₹100 + 18%, what the customer would pay with no discount
+      subtotalPaise: 11210,
       taxablePaise: 9500,
       cgstPaise: 855,
       sgstPaise: 855,
@@ -187,28 +204,127 @@ describe('calculateBill: item discounts (GST after discount)', () => {
   });
 });
 
-describe('calculateBill: bill discounts', () => {
-  const twoRates = [
-    line({ unitPricePaise: 10000, rateBasisPoints: 1800, hsn: '3304' }),
-    line({ unitPricePaise: 30000, rateBasisPoints: 500, hsn: '0401' }),
-  ];
-
-  it('shares an amount off the bill across lines with different rates, then taxes each line', () => {
-    const result = calculateBill(bill(twoRates, { billDiscount: { kind: 'amount', paise: 1000 } }));
-    const [first, second] = result.lines;
-    expect(first).toMatchObject({ billDiscountPaise: 250, taxablePaise: 9750, cgstPaise: 878 });
-    expect(first?.totalPaise).toBe(11506);
-    expect(second).toMatchObject({ billDiscountPaise: 750, taxablePaise: 29250, cgstPaise: 731 });
-    expect(second?.totalPaise).toBe(30712);
-    expect(result).toMatchObject({
+describe('calculateBill: an amount off the bill (the customer pays exactly that much less)', () => {
+  // Owner's decision 2026-11-18 (Module 02 #5): ₹X off the bill means the payable drops by ₹X.
+  it('takes ₹10 off a tax-exclusive line: ₹118 becomes ₹108, tax taken out of it', () => {
+    const result = calculateBill(bill([line()], { billDiscount: { kind: 'amount', paise: 1000 } }));
+    // 10800 × 1800 ÷ 23600 = 823.73 → 824 each; taxable 10800 − 1648 = 9152
+    expect(only(result.lines)).toMatchObject({
+      grossPaise: 11800,
+      subtotalPaise: 11800,
       billDiscountPaise: 1000,
-      totalPaise: 42218,
-      roundOffPaise: -18,
-      grandTotalPaise: 42200,
+      taxablePaise: 9152,
+      cgstPaise: 824,
+      sgstPaise: 824,
+      totalPaise: 10800,
+    });
+    expect(result).toMatchObject({ billDiscountPaise: 1000, totalPaise: 10800 });
+  });
+
+  it('takes ₹10 off the same line sold to another state', () => {
+    const result = calculateBill(
+      bill([line()], { ...INTER_STATE, billDiscount: { kind: 'amount', paise: 1000 } }),
+    );
+    // 10800 × 1800 ÷ 11800 = 1647.46 → 1647; taxable 9153
+    expect(only(result.lines)).toMatchObject({
+      taxablePaise: 9153,
+      igstPaise: 1647,
+      totalPaise: 10800,
     });
   });
 
-  it('works out a percent off the bill once on the subtotal, then shares it', () => {
+  it('takes ₹20 off a mixed bill (₹118 inclusive + ₹100 exclusive, both 18%)', () => {
+    const lines = [line({ unitPricePaise: 11800, priceIncludesTax: true }), line()];
+    const full = calculateBill(bill(lines));
+    const result = calculateBill(bill(lines, { billDiscount: { kind: 'amount', paise: 2000 } }));
+    expect(full).toMatchObject({ grossPaise: 23600, totalPaise: 23600 });
+    expect(result.lines.map((l) => l.billDiscountPaise)).toEqual([1000, 1000]);
+    expect(result).toMatchObject({
+      grossPaise: 23600,
+      subtotalPaise: 23600,
+      billDiscountPaise: 2000,
+      totalPaise: 21600,
+    });
+  });
+
+  it('shares it by what the customer pays for each line, then takes the tax out', () => {
+    const twoRates = [
+      line({ unitPricePaise: 10000, rateBasisPoints: 1800, hsn: '3304' }), // pays ₹118
+      line({ unitPricePaise: 30000, rateBasisPoints: 500, hsn: '0401' }), // pays ₹315
+    ];
+    const result = calculateBill(bill(twoRates, { billDiscount: { kind: 'amount', paise: 1000 } }));
+    // ₹10 by 11800 : 31500 = 272.52 and 727.48; the leftover paisa goes to the bigger remainder
+    const [first, second] = result.lines;
+    expect(first).toMatchObject({
+      billDiscountPaise: 273,
+      totalPaise: 11527,
+      cgstPaise: 879, // 11527 × 1800 ÷ 23600 = 879.17
+      taxablePaise: 9769,
+    });
+    expect(second).toMatchObject({
+      billDiscountPaise: 727,
+      totalPaise: 30773,
+      cgstPaise: 733, // 30773 × 500 ÷ 21000 = 732.69
+      taxablePaise: 29307,
+    });
+    expect(result).toMatchObject({
+      subtotalPaise: 43300,
+      billDiscountPaise: 1000,
+      totalPaise: 42300,
+      roundOffPaise: 0,
+      grandTotalPaise: 42300,
+    });
+  });
+
+  it('shares one paisa to the first of equal lines', () => {
+    const threeLines = [1, 2, 3].map(() => line({ rateBasisPoints: 0 }));
+    const result = calculateBill(bill(threeLines, { billDiscount: { kind: 'amount', paise: 1 } }));
+    expect(result.lines.map((l) => l.billDiscountPaise)).toEqual([1, 0, 0]);
+  });
+
+  it('shares by what is left after each item discount', () => {
+    const lines = [line({ discount: { kind: 'percent', basisPoints: 10000 } }), line()];
+    const result = calculateBill(bill(lines, { billDiscount: { kind: 'amount', paise: 500 } }));
+    expect(result.lines.map((l) => l.billDiscountPaise)).toEqual([0, 500]);
+  });
+
+  it('can take off the whole bill', () => {
+    const result = calculateBill(
+      bill([line()], { billDiscount: { kind: 'amount', paise: 11800 } }),
+    );
+    expect(result).toMatchObject({ taxablePaise: 0, cgstPaise: 0, totalPaise: 0 });
+  });
+
+  it.each<Discount>([
+    { kind: 'amount', paise: 11801 },
+    { kind: 'amount', paise: -5 },
+    { kind: 'amount', paise: 1.5 },
+  ])('refuses %j off a bill of ₹118', (billDiscount) => {
+    expect(() => calculateBill(bill([line()], { billDiscount }))).toThrow(RangeError);
+  });
+
+  it('refuses an amount off an empty bill', () => {
+    expect(() => calculateBill(bill([], { billDiscount: { kind: 'amount', paise: 1 } }))).toThrow(
+      RangeError,
+    );
+  });
+});
+
+describe('calculateBill: a percent off the bill', () => {
+  it('takes the percent off each line in its own price basis', () => {
+    // 10% off ₹100 + 18%: taxable ₹90, so the customer pays ₹106.20, ₹11.80 less
+    const result = calculateBill(
+      bill([line()], { billDiscount: { kind: 'percent', basisPoints: 1000 } }),
+    );
+    expect(only(result.lines)).toMatchObject({
+      taxablePaise: 9000,
+      cgstPaise: 810,
+      totalPaise: 10620,
+      billDiscountPaise: 1180, // how much less the customer pays
+    });
+  });
+
+  it('works it out once on the subtotal, then shares it', () => {
     // 10% of ₹9.99 is 99.9 paise → 100 paise; 10% of each ₹3.33 line separately would give only 99
     const threeLines = [1, 2, 3].map(() => line({ unitPricePaise: 333, rateBasisPoints: 0 }));
     const result = calculateBill(
@@ -218,49 +334,19 @@ describe('calculateBill: bill discounts', () => {
     expect(result.lines.map((l) => l.billDiscountPaise)).toEqual([34, 33, 33]);
   });
 
-  it('shares one paisa to the first of equal lines', () => {
-    const threeLines = [1, 2, 3].map(() => line({ rateBasisPoints: 0 }));
-    const result = calculateBill(bill(threeLines, { billDiscount: { kind: 'amount', paise: 1 } }));
-    expect(result.lines.map((l) => l.billDiscountPaise)).toEqual([1, 0, 0]);
-  });
-
-  it('shares by the amount left after each item discount', () => {
-    const lines = [line({ discount: { kind: 'percent', basisPoints: 10000 } }), line()];
-    const result = calculateBill(bill(lines, { billDiscount: { kind: 'amount', paise: 500 } }));
-    expect(result.lines.map((l) => l.billDiscountPaise)).toEqual([0, 500]);
-  });
-
-  it('keeps a tax-inclusive bill exactly the discount cheaper', () => {
-    const inclusive = [
-      line({ unitPricePaise: 11800, priceIncludesTax: true }),
-      line({ unitPricePaise: 5250, priceIncludesTax: true, rateBasisPoints: 500 }),
-    ];
-    const full = calculateBill(bill(inclusive));
-    const discounted = calculateBill(
-      bill(inclusive, { billDiscount: { kind: 'amount', paise: 1700 } }),
-    );
-    expect(full.totalPaise - discounted.totalPaise).toBe(1700);
-  });
-
-  it.each<Discount>([
-    { kind: 'amount', paise: 40001 },
-    { kind: 'percent', basisPoints: 10001 },
-    { kind: 'amount', paise: -5 },
-  ])('refuses the bill discount %j on a ₹400 bill', (billDiscount) => {
-    expect(() => calculateBill(bill(twoRates, { billDiscount }))).toThrow(RangeError);
-  });
-
-  it('refuses an amount off an empty bill', () => {
-    expect(() => calculateBill(bill([], { billDiscount: { kind: 'amount', paise: 1 } }))).toThrow(
-      RangeError,
-    );
-  });
-
-  it('allows a 100% bill discount', () => {
+  it('allows 100%', () => {
     const result = calculateBill(
-      bill(twoRates, { billDiscount: { kind: 'percent', basisPoints: 10000 } }),
+      bill([line(), line({ priceIncludesTax: true })], {
+        billDiscount: { kind: 'percent', basisPoints: 10000 },
+      }),
     );
     expect(result).toMatchObject({ taxablePaise: 0, cgstPaise: 0, grandTotalPaise: 0 });
+  });
+
+  it.each([10001, -1, 0.5])('refuses %d basis points', (basisPoints) => {
+    expect(() =>
+      calculateBill(bill([line()], { billDiscount: { kind: 'percent', basisPoints } })),
+    ).toThrow(RangeError);
   });
 });
 
@@ -270,9 +356,22 @@ describe('calculateBill: place of supply', () => {
     expect(result).toMatchObject({ tax: 'cgst-sgst', stateTaxName: 'SGST' });
   });
 
-  it('charges IGST across states', () => {
+  it('charges IGST across states, with no state tax name', () => {
     const result = calculateBill(bill([line()], INTER_STATE));
-    expect(result).toMatchObject({ tax: 'igst', cgstPaise: 0, sgstPaise: 0, igstPaise: 1800 });
+    expect(result).toMatchObject({
+      tax: 'igst',
+      stateTaxName: null,
+      cgstPaise: 0,
+      sgstPaise: 0,
+      igstPaise: 1800,
+    });
+  });
+
+  it('gives no state tax name on IGST from a Union Territory', () => {
+    const result = calculateBill(
+      bill([line()], { supplierStateCode: '04', placeOfSupplyStateCode: '07' }),
+    );
+    expect(result).toMatchObject({ tax: 'igst', stateTaxName: null });
   });
 
   it.each(['04', '26', '31', '35', '38', '97'])(
@@ -308,15 +407,17 @@ describe('calculateBill: place of supply', () => {
 
 describe('calculateBill: composition and unregistered businesses', () => {
   it.each(['composition', 'unregistered'] as const)(
-    'a %s business charges no tax, whatever the price basis or place of supply',
+    'a %s business charges no tax, whatever the price basis',
     (scheme) => {
       const lines = [
         line({ priceIncludesTax: false }),
         line({ priceIncludesTax: true, unitPricePaise: 11800 }),
       ];
-      const result = calculateBill(bill(lines, { scheme, ...INTER_STATE }));
+      const result = calculateBill(bill(lines, { scheme }));
       expect(result).toMatchObject({
         tax: 'none',
+        stateTaxName: null,
+        grossPaise: 21800,
         taxablePaise: 21800,
         cgstPaise: 0,
         sgstPaise: 0,
@@ -338,6 +439,24 @@ describe('calculateBill: composition and unregistered businesses', () => {
     },
   );
 
+  it.each(['composition', 'unregistered'] as const)(
+    'a %s business can’t sell to another state (CGST Act ss. 10(2)(c) and 24(i))',
+    (scheme) => {
+      expect(() => calculateBill(bill([line()], { scheme, ...INTER_STATE }))).toThrow(RangeError);
+    },
+  );
+
+  it('gives no state tax name in a Union Territory either', () => {
+    const result = calculateBill(
+      bill([line()], {
+        scheme: 'composition',
+        supplierStateCode: '04',
+        placeOfSupplyStateCode: '04',
+      }),
+    );
+    expect(result.stateTaxName).toBeNull();
+  });
+
   it('still rounds off and takes discounts', () => {
     const result = calculateBill(
       bill([line({ unitPricePaise: 10099, discount: { kind: 'amount', paise: 49 } })], {
@@ -346,12 +465,18 @@ describe('calculateBill: composition and unregistered businesses', () => {
       }),
     );
     expect(result).toMatchObject({
-      itemDiscountPaise: 49,
+      grossPaise: 10099,
+      subtotalPaise: 10050,
       billDiscountPaise: 1005,
       totalPaise: 9045,
       roundOffPaise: -45,
       grandTotalPaise: 9000,
     });
+  });
+
+  it('accepts an item with no HSN code', () => {
+    const result = calculateBill(bill([line({ hsn: '' })], { scheme: 'unregistered' }));
+    expect(only(result.lines).hsn).toBe('');
   });
 });
 
@@ -375,7 +500,9 @@ describe('calculateBill: round-off to the nearest rupee', () => {
   it('gives an empty bill zero everywhere', () => {
     expect(calculateBill(bill([]))).toMatchObject({
       lines: [],
-      amountPaise: 0,
+      grossPaise: 0,
+      subtotalPaise: 0,
+      billDiscountPaise: 0,
       totalPaise: 0,
       roundOffPaise: 0,
       grandTotalPaise: 0,
@@ -426,7 +553,9 @@ describe('calculateBill: summaries by rate and by HSN', () => {
   it('keeps the totals equal to the sum of the lines', () => {
     const result = calculateBill(bill(lines));
     expect(result).toMatchObject({
-      amountPaise: 36000,
+      grossPaise: 39880,
+      subtotalPaise: 39880,
+      billDiscountPaise: 0,
       taxablePaise: 36000,
       cgstPaise: 1940,
       sgstPaise: 1940,
@@ -458,8 +587,31 @@ describe('calculateBill: bad input', () => {
     ['a rate over 100%', { rateBasisPoints: 10001 }],
     ['a fractional rate', { rateBasisPoints: 1.5 }],
     ['a NaN price', { unitPricePaise: Number.NaN }],
+    ['no HSN code on a tax invoice', { hsn: '' }],
+    ['a 3-digit HSN code', { hsn: '100' }],
+    ['a 5-digit HSN code', { hsn: '10061' }],
+    ['a 9-digit HSN code', { hsn: '100610109' }],
+    ['an HSN code with a space', { hsn: '1006 ' }],
+    ['an HSN code with letters', { hsn: '10a6' }],
   ])('refuses %s', (_name, overrides) => {
     expect(() => calculateBill(bill([line(overrides)]))).toThrow(RangeError);
+  });
+
+  it.each(['1006', '100630', '10063020'])('accepts the HSN code %s', (hsn) => {
+    expect(only(calculateBill(bill([line({ hsn })])).lines).hsn).toBe(hsn);
+  });
+
+  it.each(['false', 'true', 0, 1, null, undefined])(
+    'refuses %j for priceIncludesTax from untyped code',
+    (value) => {
+      const untyped = { ...line(), priceIncludesTax: value } as unknown as BillLineInput;
+      expect(() => calculateBill(bill([untyped]))).toThrow(RangeError);
+    },
+  );
+
+  it('refuses an HSN code that isn’t a string', () => {
+    const untyped = { ...line(), hsn: 1006 } as unknown as BillLineInput;
+    expect(() => calculateBill(bill([untyped]))).toThrow(RangeError);
   });
 
   it('refuses an amount past the safe range', () => {
@@ -489,13 +641,20 @@ function seeded(seed: number): () => number {
   };
 }
 
+/** How a generated cart is discounted; an amount is a fraction of the subtotal, known later. */
+type BillDiscountChoice =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'percent'; readonly basisPoints: number }
+  | { readonly kind: 'amount'; readonly fraction: number };
+
 describe('calculateBill: invariants over generated carts', () => {
   const random = seeded(20261118);
   const int = (max: number) => Math.floor(random() * (max + 1));
   const pick = <T>(items: readonly T[]): T => items[int(items.length - 1)] as T;
   const RATES = [0, 25, 300, 500, 1800, 4000];
+  const STATES = ['09', '27', '04', '26'];
 
-  const carts = Array.from({ length: 400 }, (): BillInput => {
+  const carts = Array.from({ length: 400 }, (): [BillInput, BillDiscountChoice] => {
     const lines = Array.from({ length: int(8) }, (): BillLineInput => {
       const unitPricePaise = int(500000);
       const quantityThousandths = 1 + int(50000);
@@ -510,62 +669,95 @@ describe('calculateBill: invariants over generated carts', () => {
         quantityThousandths,
         rateBasisPoints: pick(RATES),
         priceIncludesTax: random() < 0.5,
-        hsn: pick(['1006', '0401', '3304']),
+        hsn: pick(['1006', '040110', '33049910']),
         ...(discount ? { discount } : {}),
       };
     });
-    return {
-      scheme: pick(['regular', 'regular', 'regular', 'composition', 'unregistered'] as const),
-      supplierStateCode: '09',
-      placeOfSupplyStateCode: pick(['09', '27']),
-      lines,
-      ...(random() < 0.5 ? { billDiscount: { kind: 'percent', basisPoints: int(3000) } } : {}),
-    };
+    const scheme = pick(['regular', 'regular', 'regular', 'composition', 'unregistered'] as const);
+    const supplierStateCode = pick(STATES);
+    // Composition and unregistered businesses sell only within their own state.
+    const placeOfSupplyStateCode = scheme === 'regular' ? pick(STATES) : supplierStateCode;
+    const choice = pick<BillDiscountChoice>([
+      { kind: 'none' },
+      { kind: 'percent', basisPoints: int(3000) },
+      { kind: 'amount', fraction: random() },
+    ]);
+    return [{ scheme, supplierStateCode, placeOfSupplyStateCode, lines }, choice];
   });
 
   const total = <T>(items: readonly T[], field: (item: T) => number) =>
     items.reduce((sum, item) => sum + field(item), 0);
 
-  it.each(carts.map((cart, index) => [index, cart] as const))('cart %i', (_index, cart) => {
-    const result = calculateBill(cart);
+  function withDiscount(plain: BillInput, choice: BillDiscountChoice, subtotal: number): BillInput {
+    if (choice.kind === 'none') return plain;
+    if (choice.kind === 'percent') return { ...plain, billDiscount: choice };
+    const paise = Math.floor(subtotal * choice.fraction);
+    return { ...plain, billDiscount: { kind: 'amount', paise } };
+  }
 
-    expect(result.lines).toHaveLength(cart.lines.length);
-    for (const [index, l] of result.lines.entries()) {
-      const input = cart.lines[index];
-      if (input === undefined) throw new Error(`No input for line ${String(index)}`);
-      const net = l.amountPaise - l.itemDiscountPaise - l.billDiscountPaise;
-      expect(net).toBeGreaterThanOrEqual(0);
-      expect(l.totalPaise).toBe(l.taxablePaise + l.cgstPaise + l.sgstPaise + l.igstPaise);
-      expect(l.cgstPaise).toBe(l.sgstPaise);
-      if (result.tax === 'none' || input.priceIncludesTax) {
-        expect(l.totalPaise).toBe(net);
-      } else {
-        expect(l.taxablePaise).toBe(net);
+  it.each(carts.map(([cart, choice], index) => [index, cart, choice] as const))(
+    'cart %i',
+    (_index, plain, choice) => {
+      const undiscounted = calculateBill(plain);
+      const cart = withDiscount(plain, choice, undiscounted.subtotalPaise);
+      const result = calculateBill(cart);
+
+      // The owner's rule: ₹X off the bill means the customer pays exactly ₹X less.
+      if (cart.billDiscount?.kind === 'amount') {
+        expect(result.billDiscountPaise).toBe(cart.billDiscount.paise);
+        expect(undiscounted.totalPaise - result.totalPaise).toBe(cart.billDiscount.paise);
       }
-      if (result.tax !== 'none' && input.priceIncludesTax) {
-        // The taxable value is within one paisa of the exact net ÷ (1 + rate).
-        const exact = (net * 10000) / (10000 + l.rateBasisPoints);
+      expect(result.subtotalPaise).toBe(undiscounted.totalPaise);
+
+      expect(result.lines).toHaveLength(cart.lines.length);
+      for (const [index, l] of result.lines.entries()) {
+        const input = cart.lines[index];
+        if (input === undefined) throw new Error(`No input for line ${String(index)}`);
+        const afterItemDiscount = l.amountPaise - l.itemDiscountPaise;
+        expect(afterItemDiscount).toBeGreaterThanOrEqual(0);
+        expect(l.grossPaise).toBeGreaterThanOrEqual(l.subtotalPaise);
+        expect(l.billDiscountPaise).toBe(l.subtotalPaise - l.totalPaise);
+        expect(l.totalPaise).toBeGreaterThanOrEqual(0);
+        expect(l.totalPaise).toBe(l.taxablePaise + l.cgstPaise + l.sgstPaise + l.igstPaise);
+        expect(l.cgstPaise).toBe(l.sgstPaise);
+        if (result.tax === 'none' || input.priceIncludesTax) {
+          expect(l.subtotalPaise).toBe(afterItemDiscount);
+        }
+        if (result.tax !== 'none' && !input.priceIncludesTax && l.billDiscountPaise === 0) {
+          expect(l.taxablePaise).toBe(afterItemDiscount);
+        }
+        // The taxable value is within one paisa of the exact total ÷ (1 + rate) …
+        const exact = (l.totalPaise * 10000) / (10000 + l.rateBasisPoints);
         expect(Math.abs(l.taxablePaise - exact)).toBeLessThanOrEqual(1);
+        // … and each tax within one paisa of rate × taxable, rounded.
+        const half = Math.round((l.taxablePaise * l.rateBasisPoints) / 20000);
+        const full = Math.round((l.taxablePaise * l.rateBasisPoints) / 10000);
+        if (result.tax === 'cgst-sgst') expect(Math.abs(l.cgstPaise - half)).toBeLessThanOrEqual(1);
+        if (result.tax === 'igst') expect(Math.abs(l.igstPaise - full)).toBeLessThanOrEqual(1);
       }
-    }
 
-    expect(result.amountPaise).toBe(total(result.lines, (l) => l.amountPaise));
-    expect(result.itemDiscountPaise).toBe(total(result.lines, (l) => l.itemDiscountPaise));
-    expect(result.billDiscountPaise).toBe(total(result.lines, (l) => l.billDiscountPaise));
-    expect(result.taxablePaise).toBe(total(result.lines, (l) => l.taxablePaise));
-    expect(result.cgstPaise).toBe(total(result.lines, (l) => l.cgstPaise));
-    expect(result.igstPaise).toBe(total(result.lines, (l) => l.igstPaise));
-    expect(result.totalPaise).toBe(total(result.lines, (l) => l.totalPaise));
-    expect(result.roundOffPaise).toBeGreaterThanOrEqual(-49);
-    expect(result.roundOffPaise).toBeLessThanOrEqual(50);
-    expect(result.grandTotalPaise % 100).toBe(0);
-    expect(result.grandTotalPaise).toBe(result.totalPaise + result.roundOffPaise);
+      expect(result.stateTaxName === null).toBe(result.tax !== 'cgst-sgst');
+      expect(result.grossPaise).toBe(total(result.lines, (l) => l.grossPaise));
+      expect(result.subtotalPaise).toBe(total(result.lines, (l) => l.subtotalPaise));
+      expect(result.billDiscountPaise).toBe(total(result.lines, (l) => l.billDiscountPaise));
+      expect(result.totalPaise).toBe(result.subtotalPaise - result.billDiscountPaise);
+      expect(result.taxablePaise).toBe(total(result.lines, (l) => l.taxablePaise));
+      expect(result.cgstPaise).toBe(total(result.lines, (l) => l.cgstPaise));
+      expect(result.sgstPaise).toBe(total(result.lines, (l) => l.sgstPaise));
+      expect(result.igstPaise).toBe(total(result.lines, (l) => l.igstPaise));
+      expect(result.totalPaise).toBe(total(result.lines, (l) => l.totalPaise));
+      expect(result.roundOffPaise).toBeGreaterThanOrEqual(-49);
+      expect(result.roundOffPaise).toBeLessThanOrEqual(50);
+      expect(result.grandTotalPaise % 100).toBe(0);
+      expect(result.grandTotalPaise).toBe(result.totalPaise + result.roundOffPaise);
 
-    for (const summary of [result.byRate, result.byHsn]) {
-      expect(total(summary, (s) => s.taxablePaise)).toBe(result.taxablePaise);
-      expect(total(summary, (s) => s.sgstPaise)).toBe(result.sgstPaise);
-      expect(total(summary, (s) => s.igstPaise)).toBe(result.igstPaise);
-      expect(total(summary, (s) => s.totalPaise)).toBe(result.totalPaise);
-    }
-  });
+      for (const summary of [result.byRate, result.byHsn]) {
+        expect(total(summary, (s) => s.taxablePaise)).toBe(result.taxablePaise);
+        expect(total(summary, (s) => s.cgstPaise)).toBe(result.cgstPaise);
+        expect(total(summary, (s) => s.sgstPaise)).toBe(result.sgstPaise);
+        expect(total(summary, (s) => s.igstPaise)).toBe(result.igstPaise);
+        expect(total(summary, (s) => s.totalPaise)).toBe(result.totalPaise);
+      }
+    },
+  );
 });

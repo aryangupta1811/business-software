@@ -8,9 +8,11 @@ import { UnhandledErrorFilter } from './error-filter.js';
 import { HealthController } from './health.controller.js';
 import { HttpRulesModule } from './http/http-rules.module.js';
 import type { SessionResolver } from './http/session.js';
+import { SignupController } from './signup/signup.controller.js';
+import { SignupService } from './signup/signup.service.js';
 
 /** Every controller the API serves; the route census test reads this list. */
-export const API_CONTROLLERS = [HealthController];
+export const API_CONTROLLERS = [HealthController, SignupController];
 
 export interface AppOptions {
   /** Who is calling; tests pass a fake. Defaults to nobody until P1.4. */
@@ -27,6 +29,7 @@ class ApiModule {
         HttpRulesModule.register(options.sessions),
       ],
       controllers: API_CONTROLLERS,
+      providers: [SignupService],
     };
   }
 }

@@ -18,14 +18,15 @@ Overwritten at the end of every session. Older handoffs are in git history: `git
   - **Fresh-context review:** 1 important finding (look-alike and invisible characters in emails made a second owner for one mailbox) and 6 minor ones, all fixed test-first. One claim was disproved. A re-review of the fixes was clean.
   - **Real-app check in Chrome:** three languages, light and dark, 1024 px, the database and log contents, a forced failure, the CSP. It found 3 bugs, all fixed.
   - **CI had been red on every push of the branch:** the db tests needed `shared/dist`, which only my laptop had. Fixed with Vite's `source` condition.
-- **Sitting 2 sheet** (PR #24, lane 3), plus G1–G6 GST questions (this PR).
-- **This PR:**
+- **Sitting 2 sheet** (PR #24, lane 3), plus G1–G6 GST questions (PR #28).
+- **PR #28 (day close):**
   - `demo.sh` prints the server's output in UTF-8 (it crashed on `→` after a successful deploy);
   - the ADR 0034 correction;
   - two new rows in the runbook's errors table;
   - interview log entries;
   - `PROGRESS.md`;
   - the README status line with the live URL.
+- **End of session (this PR):** the Phase 1 journal gains Day 2 (stage 5 part 3, P1.12, P1.3), and the interview log's Pitch, Numbers (1,082 tests, 36 ADRs, the live demo), Question bank and Glossary are updated.
 
 **Half-done:**
 - **Sitting 2 with the owner** hasn't happened: `docs/plans/2026-11-18-sitting-2.md`, items 1–17. Day 3's lane 4 (finalize 05–07) and lane 3 (P1.4, D4) need its answers.

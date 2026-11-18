@@ -8,8 +8,8 @@
 # start.sh from SSM; this file and release.env hold no secret.
 name: business-software
 
+# Docker keeps container logs on the server's 20 GB disk: cap them.
 x-logging: &logging
-  # Docker keeps container logs on the server's 20 GB disk: cap them.
   driver: json-file
   options:
     max-size: 10m

@@ -1407,3 +1407,29 @@ Entry format:
   - **Open points go where they'll be read:** the GST edge case (two registrations in one state are CGST+SGST, not IGST) and the Day 5 dependency now sit on task P1.11.
 - **Say it in an interview:** "Requirements get the same review as code. A reviewer with fresh context checks the written decisions against the owner's actual answers, because a note that drifts from what was agreed is a bug that ships."
 - **Follow-ups to expect:** Why a fresh reviewer and not the author? (The author reads what they meant, not what they wrote. Someone without the chat history can only read the file.)
+
+### 2026-11-18 — Terraform wanted to replace my stopped server `#devops` `#cloud` `#gotcha`
+- **What happened:** A plan that only added four SSM parameters also said `aws_instance.server must be replaced`, with `associate_public_ip_address = false -> true # forces replacement`. The server was stopped. A stopped instance has no public IP, so AWS reports `false`, and Terraform saw a difference in an argument that can only be set at launch.
+- **Why / what I learned:** Read the "forces replacement" line of every plan, even a small one. The fix was to drop the argument: the public subnet's `map_public_ip_on_launch` already gives the server its IP, and an argument left unset has nothing to drift from. Plan again and check it shows only what you meant (4 to add, 0 to change, 0 to destroy).
+- **Say it in an interview:** "A plan is a diff, and the dangerous lines are the replacements. I caught one that would have rebuilt my server every time I planned while it was stopped, and fixed the code instead of starting the server to make the plan look clean."
+- **Follow-ups to expect:** Why not `ignore_changes`? (It would hide real changes too. Not setting a value that the subnet already decides is simpler and leaves nothing to ignore.)
+
+### 2026-11-18 — Secrets that Terraform creates but never sees `#security` `#devops` `#cloud`
+- **What happened:** The server needs two database passwords and a DuckDNS token. The passwords are `ephemeral` random values written with `value_wo` (write-only). The token parameter is created with a placeholder through `value_wo`, and the owner overwrites it from their own PowerShell with `Read-Host -AsSecureString`, so it never appears in the chat, a shell history or Terraform state. I checked the state afterwards: every SecureString has `has_value_wo = true` and an empty `value`.
+- **Why / what I learned:** A normal SSM parameter resource reads its value back on every refresh, so even a value typed in by hand would end up in state. Write-only arguments are the only way to let Terraform own the parameter but not the secret.
+- **Say it in an interview:** "Terraform owns the parameter, the person owns the secret. The token goes straight from the owner's keyboard into SSM, and the state file only knows the parameter exists."
+
+### 2026-11-18 — Deploying by commit hash, with no SSH `#devops` `#cloud` `#security` → ADR 0034
+- **What happened:** The `images` workflow builds both images on GitHub's free ARM64 runner on every push to `main` and pushes them to GHCR tagged with the commit. A deploy script sends a Systems Manager Run Command: the server downloads the repo at exactly that commit, installs the deploy files, creates the database roles once, and restarts a systemd service. At every boot that service updates DuckDNS, reads the passwords from SSM into memory-only files, and starts the stack.
+- **Why / what I learned:**
+  - **No long-lived push credential:** the workflow's own token expires with the job. My laptop's token can't push packages, and that's how I want it.
+  - **One commit hash names everything that runs:** the deploy files and both images.
+  - **`set -e` doesn't see failures inside `$(…)` used as an argument.** `printf '%s' "$(read_password)"` would write an empty password and carry on; reading into a variable first stops the script.
+  - **Never put a secret on a command line,** where any user can read it in the process list: the DuckDNS token goes to curl on stdin (`-K -`), and passwords go to Docker as bare `-e NAME`.
+  - **TLS to the database checks the certificate** (`sslmode=verify-full` with Amazon's certificate bundle), not just encryption.
+- **Say it in an interview:** "Each merge produces images tagged with its commit, and a deploy is 'run commit X': the server fetches that commit's files and images over Systems Manager. There's no SSH port, no push token on a laptop, and the database connection verifies the server's certificate."
+- **Follow-ups to expect:** Why GHCR and not ECR? (The images are public and free on GHCR; ECR bills storage and needs an AWS role for GitHub. With private images I'd move to ECR and pull with the instance role.)
+
+### 2026-11-18 — RDS's admin isn't a superuser `#database` `#cloud` `#gotcha`
+- **What happened:** The roles script runs as the local superuser everywhere else, but on RDS the master user only has `rds_superuser`. From PostgreSQL 16, a non-superuser can create a database owned by another role only if it may `SET ROLE` to it. The script now grants `app_owner` to the admin `WITH INHERIT FALSE, SET TRUE`, and also stops the app roles connecting to the admin's own database. Both have tests (red first).
+- **Say it in an interview:** "Managed databases don't give you a superuser, so bootstrap scripts written against local Docker need checking. I gave the admin the right to switch into the owner role on purpose, without inheriting its rights automatically."

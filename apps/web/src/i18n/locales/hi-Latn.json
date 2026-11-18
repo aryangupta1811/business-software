@@ -155,6 +155,7 @@
   },
   "errors": {
     "required": "Yeh bharein",
+    "choose": "Ek chunein",
     "too_long": "Yeh bahut lamba hai",
     "too_short": "Yeh bahut chhota hai",
     "invalid": "Ise check karein",

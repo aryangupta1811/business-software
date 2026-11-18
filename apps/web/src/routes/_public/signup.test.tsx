@@ -1,5 +1,5 @@
 import { createMemoryHistory } from '@tanstack/react-router';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, test, vi } from 'vitest';
 import { App } from '../../app';
@@ -66,8 +66,17 @@ test('says what is missing, next to each field', async () => {
     "Fill this in You'll log in with this.",
   );
   expect(screen.getByRole('radiogroup', { name: 'Type of business' })).toHaveAccessibleDescription(
-    'Check this',
+    'Choose one',
   );
+  expect(screen.getByLabelText('State')).toHaveAccessibleDescription('Choose one');
+});
+
+test('offers only states a shop can stand in', async () => {
+  stubApi(201, {});
+  renderAt('/signup');
+  const state = await screen.findByLabelText('State');
+  expect(within(state).getByRole('option', { name: 'Maharashtra' })).toBeInTheDocument();
+  expect(within(state).queryByRole('option', { name: 'Other Territory' })).toBeNull();
 });
 
 test('says it in Hindi too', async () => {
@@ -184,6 +193,27 @@ test('copies the key', async () => {
   await user.click(copy);
   expect(writeText).toHaveBeenCalledWith(MADE_UP_CODE);
   expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument();
+});
+
+// Browser Back to the form, then Forward: the shared counter's next person mustn't see it.
+test('the key is gone once the form is back on screen', async () => {
+  stubApi(201, { businessId: 'b-1', recoveryKey: MADE_UP_CODE });
+  const history = renderAt('/signup');
+  const user = await fillIn();
+  await user.click(screen.getByRole('button', { name: 'Create account' }));
+  await screen.findByLabelText('Your recovery key');
+
+  act(() => {
+    history.back();
+  });
+  await screen.findByRole('heading', { level: 1, name: 'Create your business account' });
+  act(() => {
+    history.forward();
+  });
+  expect(
+    await screen.findByRole('heading', { name: 'The key is shown only once' }),
+  ).toBeInTheDocument();
+  expect(screen.queryByLabelText('Your recovery key')).toBeNull();
 });
 
 test('a fresh visit to the key screen explains the key is gone', async () => {

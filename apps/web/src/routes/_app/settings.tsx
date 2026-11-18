@@ -3,8 +3,8 @@ import {
   BUSINESS_TYPES,
   FEATURE_PRESETS,
   FEATURES,
+  BRANCH_STATES,
   GST_STATUSES,
-  INDIAN_STATES,
   settingsBusinessSchema,
   settingsFeaturesSchema,
   settingsSecuritySchema,
@@ -195,7 +195,7 @@ function BusinessCard({ saved }: { saved: SettingsBusinessInput }) {
     form.reset(businessForm(view.business));
   });
   const error = (field: keyof BusinessForm) => errorText(field, formState.errors[field]?.message);
-  const states = INDIAN_STATES.map(({ code }) => ({ code, name: t(`states.${code}`) })).sort(
+  const states = BRANCH_STATES.map(({ code }) => ({ code, name: t(`states.${code}`) })).sort(
     (a, b) => a.name.localeCompare(b.name, i18n.language),
   );
   const text = (field: keyof BusinessForm, label: string, extra: object = {}) => (

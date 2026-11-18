@@ -155,6 +155,7 @@
   },
   "errors": {
     "required": "Fill this in",
+    "choose": "Choose one",
     "too_long": "This is too long",
     "too_short": "This is too short",
     "invalid": "Check this",

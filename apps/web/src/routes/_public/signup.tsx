@@ -1,8 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   BUSINESS_TYPES,
+  BRANCH_STATES,
   GST_STATUSES,
-  INDIAN_STATES,
   signupSchema,
   type SignupInput,
   type SignupResult,
@@ -20,7 +20,7 @@ import {
   ShoppingBasket,
   Smartphone,
 } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import type { z } from 'zod';
@@ -32,7 +32,7 @@ import { Field } from '../../components/ui/field';
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { useFieldError } from '../../lib/field-error';
-import { holdRecoveryKey } from '../../signup/pending-key';
+import { forgetRecoveryKey, holdRecoveryKey } from '../../signup/pending-key';
 
 /** Module 00 #7: seven fields, then the recovery key (#31). */
 export const Route = createFileRoute('/_public/signup')({ component: Signup });
@@ -63,7 +63,12 @@ function Signup() {
     defaultValues: { businessName: '', phone: '', stateCode: '', email: '', password: '' },
   });
 
-  const states = INDIAN_STATES.map(({ code }) => ({
+  // Back from the key screen lands here: drop the key, so Forward can't show it again.
+  useEffect(() => {
+    forgetRecoveryKey();
+  }, []);
+
+  const states = BRANCH_STATES.map(({ code }) => ({
     code,
     name: t(`states.${code}`),
   })).sort((a, b) => a.name.localeCompare(b.name, i18n.language));
@@ -89,8 +94,13 @@ function Signup() {
   };
 
   return (
-    <div className="grid w-full max-w-5xl grid-cols-1 items-start gap-10 lg:grid-cols-[2fr_3fr]">
-      <section className="flex flex-col gap-6 lg:sticky lg:top-10" aria-labelledby="pitch">
+    // Side by side from 960px, not Tailwind's lg (1024px): a 1024px counter screen loses the
+    // scrollbar's width and would otherwise stack the form below the pitch.
+    <div className="grid w-full max-w-5xl grid-cols-1 items-start gap-10 min-[60rem]:grid-cols-[2fr_3fr]">
+      <section
+        className="flex flex-col gap-6 min-[60rem]:sticky min-[60rem]:top-10"
+        aria-labelledby="pitch"
+      >
         <h2 id="pitch" className="text-figure font-semibold">
           {t('signup.pitch.title')}
         </h2>

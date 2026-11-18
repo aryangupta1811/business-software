@@ -4,11 +4,13 @@ import { z } from 'zod';
 
 export type FieldErrors = Record<string, string>;
 
-// Unicode's control characters (C0, DEL and C1), which include NUL: PostgreSQL refuses \u0000
-// in text and jsonb.
-const CONTROL = /\p{Cc}/u;
+// Unicode's control characters (Cc: C0, DEL and C1, which include NUL, refused by PostgreSQL
+// in text and jsonb) and its invisible format characters (Cf: right-to-left overrides that
+// make a name on a bill read differently from what's stored, zero-width spaces, BOMs). Except
+// the zero-width joiner and non-joiner (U+200D, U+200C), which Devanagari spelling needs.
+const CONTROL = /(?![‌‍])[\p{Cc}\p{Cf}]/u;
 // The same, but allowing tab, line feed and carriage return in multi-line fields.
-const CONTROL_EXCEPT_LINES = /(?![\t\n\r])\p{Cc}/u;
+const CONTROL_EXCEPT_LINES = /(?![\t\n\r‌‍])[\p{Cc}\p{Cf}]/u;
 
 interface TextOptions {
   /** Allow new lines (an address). */
@@ -65,7 +67,10 @@ export const email = () =>
     .min(1, { error: 'required' })
     .max(254, { error: 'too_long' })
     .regex(/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/, { error: 'invalid' })
-    .refine((value) => !CONTROL.test(value), { error: 'control_character' });
+    // Printable ASCII only, so one address has one spelling: a zero-width space copied from a
+    // chat, a fullwidth or Cyrillic look-alike letter would otherwise make a second owner
+    // account for the same mailbox (Module 00 #27). The database checks the same.
+    .regex(/^[!-~]+$/, { error: 'invalid' });
 
 const GSTIN_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const GSTIN_FORMAT = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;

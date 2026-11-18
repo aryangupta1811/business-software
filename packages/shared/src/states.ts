@@ -72,6 +72,22 @@ export function isStateCode(code: string): code is StateCode {
   return BY_CODE.has(code);
 }
 
+/**
+ * The states a shop's branch can stand in: every code but 97, Other Territory, which is a
+ * place of supply outside any state (offshore areas), never a shop's address.
+ */
+export const BRANCH_STATES = INDIAN_STATES.filter(
+  (state): state is Exclude<(typeof INDIAN_STATES)[number], { code: '97' }> => state.code !== '97',
+);
+
+/** A state code a branch can have. */
+export type BranchStateCode = (typeof BRANCH_STATES)[number]['code'];
+
+/** True when `code` is a state a branch can stand in (not 97, Other Territory). */
+export function isBranchStateCode(code: string): code is BranchStateCode {
+  return isStateCode(code) && code !== '97';
+}
+
 /** The state or UT with this GST code, or undefined. */
 export function stateByCode(code: string): IndianState | undefined {
   return BY_CODE.get(code);

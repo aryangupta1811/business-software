@@ -24,10 +24,14 @@ export const FEATURES = [
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
-/** What each business type switches on at signup (#1). The owner can change any later (#3). */
+/**
+ * What each business type switches on at signup (#1). The owner can change any later (#3).
+ * Each list is in `FEATURES` order, the order settings saves in, so a first save of the same
+ * features isn't logged as a change.
+ */
 export const FEATURE_PRESETS: Record<BusinessType, readonly Feature[]> = {
   kirana: ['loose_weight', 'expiry_dates', 'udhaar_prominent'],
-  medical: ['batches', 'expiry_dates', 'mrp', 'expiry_alerts'],
+  medical: ['expiry_dates', 'batches', 'mrp', 'expiry_alerts'],
   clothing: ['variants', 'exchanges', 'barcode_labels'],
   electronics: ['serial_numbers', 'warranty', 'service_items'],
   hardware: ['multiple_units', 'wholesale_price', 'large_credit'],

@@ -18,7 +18,7 @@ import type {
   SettingsFeaturesInput,
   SettingsSecurityInput,
   SettingsView,
-  StateCode,
+  BranchStateCode,
 } from '@business-software/shared';
 import { DATABASE } from '../database.module.js';
 import type { Caller } from '../http/session.js';
@@ -168,7 +168,7 @@ export class SettingsService {
           branchName: branch.name,
           address: branch.address,
           pinCode: branch.pinCode,
-          stateCode: branch.stateCode as StateCode,
+          stateCode: branch.stateCode as BranchStateCode,
           gstin: branch.gstin,
           drugLicence: branch.drugLicence,
           fssai: branch.fssai,

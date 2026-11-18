@@ -48,14 +48,27 @@ describe('signupSchema', () => {
     [{ businessName: 'x'.repeat(101) }, { businessName: 'too_long' }],
     [{ businessName: 'Shop\u0000' }, { businessName: 'control_character' }],
     [{ businessType: 'bakery' }, { businessType: 'invalid' }],
+    // An empty radio group (null) or select ('') asks to choose one.
+    [{ businessType: null }, { businessType: 'choose' }],
+    [{ stateCode: '' }, { stateCode: 'choose' }],
     [{ phone: '12345' }, { phone: 'invalid' }],
     [{ phone: '' }, { phone: 'required' }],
     [{ stateCode: '28' }, { stateCode: 'invalid' }],
     [{ stateCode: '99' }, { stateCode: 'invalid' }],
+    // 97 is "Other Territory": a supply outside India, never where a shop stands.
+    [{ stateCode: '97' }, { stateCode: 'invalid' }],
     [{ gstStatus: 'exempt' }, { gstStatus: 'invalid' }],
     [{ email: 'owner' }, { email: 'invalid' }],
     [{ email: `${'a'.repeat(250)}@b.in` }, { email: 'too_long' }],
+    // Look-alikes that would give one real address a second owner account (Module 00 #27):
+    // zero-width space, soft hyphen, fullwidth o, Cyrillic o.
+    [{ email: '​owner@example.com' }, { email: 'invalid' }],
+    [{ email: 'owner­@example.com' }, { email: 'invalid' }],
+    [{ email: 'ｏwner@example.com' }, { email: 'invalid' }],
+    [{ email: 'оwner@example.com' }, { email: 'invalid' }],
     [{ password: 'short pass'.slice(0, 9) }, { password: 'too_short' }],
+    // Characters, not UTF-16 units: five emoji are 10 units but 5 characters.
+    [{ password: '\u{1F600}'.repeat(5) }, { password: 'too_short' }],
     [{ password: 'x'.repeat(129) }, { password: 'too_long' }],
     [{ password: 'Owner@Example.com' }, { password: 'same_as_email' }],
     [{ password: '+91-9111111111' }, { password: 'same_as_phone' }],
@@ -67,10 +80,10 @@ describe('signupSchema', () => {
   it('says which fields are missing', () => {
     expect(errorsOf(signupSchema, {})).toEqual({
       businessName: 'required',
-      businessType: 'invalid',
+      businessType: 'choose',
       phone: 'required',
-      stateCode: 'required',
-      gstStatus: 'invalid',
+      stateCode: 'choose',
+      gstStatus: 'choose',
       email: 'required',
       password: 'required',
     });
@@ -142,6 +155,14 @@ describe('settingsFeaturesSchema', () => {
     });
     expect(errorsOf(settingsFeaturesSchema, { features: ['mrp', 'mrp'] })).toEqual({
       features: 'duplicate',
+    });
+  });
+
+  // Order carries no meaning, so a reordered list must not count as a change in the entry log.
+  it('puts features in one fixed order', () => {
+    const reversed = [...FEATURE_PRESETS.kirana].reverse();
+    expect(settingsFeaturesSchema.parse({ features: reversed })).toEqual({
+      features: FEATURES.filter((feature) => reversed.includes(feature)),
     });
   });
 

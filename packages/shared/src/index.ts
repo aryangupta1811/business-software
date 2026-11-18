@@ -45,9 +45,12 @@ export {
 } from './gst.js';
 export { allocatePaise, formatPaise, parseRupees, type Paise } from './money.js';
 export {
+  BRANCH_STATES,
   INDIAN_STATES,
+  isBranchStateCode,
   isStateCode,
   stateByCode,
+  type BranchStateCode,
   type IndianState,
   type StateCode,
 } from './states.js';

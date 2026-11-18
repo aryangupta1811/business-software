@@ -108,7 +108,11 @@ export const branches = pgTable(
   (t) => [
     tenantPolicy(t.businessId),
     unique('branches_business_id_id_unique').on(t.businessId, t.id),
-    check('branches_state_code_check', sql`${t.stateCode} ~ '^[0-9]{2}$'`),
+    // Not 97 (Other Territory): a place of supply outside any state, never a shop's address.
+    check(
+      'branches_state_code_check',
+      sql`${t.stateCode} ~ '^[0-9]{2}$' and ${t.stateCode} <> '97'`,
+    ),
     check('branches_pin_code_check', sql`${t.pinCode} ~ '^[1-9][0-9]{5}$'`),
     // The GSTIN starts with the branch's own state code.
     check(
@@ -146,7 +150,12 @@ export const users = pgTable(
       .on(t.businessId)
       .where(sql`${t.role} = 'owner'`),
     check('users_role_check', sql`${t.role} in ('owner', 'staff')`),
-    check('users_email_check', sql`${t.email} = lower(btrim(${t.email}))`),
+    // Lower case, trimmed, printable ASCII only: one mailbox has one spelling, so a look-alike
+    // letter or a zero-width space can't make a second owner for it (#27).
+    check(
+      'users_email_check',
+      sql`${t.email} = lower(btrim(${t.email})) and ${t.email} ~ '^[!-~]+$'`,
+    ),
     check('users_owner_email_check', sql`${t.role} <> 'owner' or ${t.email} is not null`),
   ],
 );

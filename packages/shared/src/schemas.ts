@@ -3,13 +3,19 @@
 import { z } from 'zod';
 import { BUSINESS_TYPES, FEATURES, GST_STATUSES } from './business.js';
 import { email, isValidGstin, normalizePhone, optionalText, phone, text } from './fields.js';
-import { isStateCode } from './states.js';
+import { isBranchStateCode, isStateCode } from './states.js';
 
+// A pick-one field left empty says `choose`, not `invalid`: missing from the body, an empty
+// select (''), or a radio group with nothing picked (the form library sends null).
+const choose = (issue: { input?: unknown }) =>
+  issue.input === undefined || issue.input === null || issue.input === '' ? 'choose' : 'invalid';
+
+/** Where the business's branch stands. */
 const stateCode = () =>
   z
-    .string({ error: 'required' })
-    .refine((value) => value !== '', { error: 'required' })
-    .refine(isStateCode, { error: 'invalid' });
+    .string({ error: 'choose' })
+    .refine((value) => value !== '', { error: 'choose' })
+    .refine(isBranchStateCode, { error: 'invalid' });
 
 /** An optional upper-case code (PAN, GSTIN): blank is null, otherwise it must pass `valid`. */
 function optionalCode(max: number, valid: (value: string) => boolean) {
@@ -26,8 +32,8 @@ const optionalPattern = (max: number, pattern: RegExp) =>
 
 const PAN = /^[A-Z]{5}\d{4}[A-Z]$/;
 const businessName = () => text(100);
-const businessType = () => z.enum(BUSINESS_TYPES, { error: 'invalid' });
-const gstStatus = () => z.enum(GST_STATUSES, { error: 'invalid' });
+const businessType = () => z.enum(BUSINESS_TYPES, { error: choose });
+const gstStatus = () => z.enum(GST_STATUSES, { error: choose });
 
 /** Module 00 #7: seven fields. */
 export const signupSchema = z
@@ -98,7 +104,9 @@ export type SettingsBusinessInput = z.infer<typeof settingsBusinessSchema>;
 export const settingsFeaturesSchema = z.strictObject({
   features: z
     .array(z.enum(FEATURES, { error: 'invalid' }), { error: 'invalid' })
-    .refine((features) => new Set(features).size === features.length, { error: 'duplicate' }),
+    .refine((features) => new Set(features).size === features.length, { error: 'duplicate' })
+    // One fixed order, so a reordered list isn't a change (and no entry-log row).
+    .transform((features) => FEATURES.filter((feature) => features.includes(feature))),
 });
 export type SettingsFeaturesInput = z.infer<typeof settingsFeaturesSchema>;
 

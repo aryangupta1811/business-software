@@ -177,11 +177,20 @@ describe('settings', () => {
   it('saves the feature switches', async () => {
     const response = await call('PUT', '/settings/features', a, { features: ['mrp', 'batches'] });
     expect(response.status).toBe(200);
-    expect((response.body as { features: string[] }).features).toEqual(['mrp', 'batches']);
+    // Stored in the one fixed feature order, whatever order they came in.
+    expect((response.body as { features: string[] }).features).toEqual(['batches', 'mrp']);
     expect((await updates(a.businessId)).at(-1)).toMatchObject({
       before: { features: ['loose_weight', 'expiry_dates', 'udhaar_prominent'] },
-      after: { features: ['mrp', 'batches'] },
+      after: { features: ['batches', 'mrp'] },
     });
+  });
+
+  it('writes nothing when only the order of the features changed', async () => {
+    await call('PUT', '/settings/features', a, { features: ['batches', 'mrp'] });
+    const before = (await updates(a.businessId)).length;
+    const response = await call('PUT', '/settings/features', a, { features: ['mrp', 'batches'] });
+    expect(response.status).toBe(200);
+    expect(await updates(a.businessId)).toHaveLength(before);
   });
 
   it('saves the lock times (#21, #29)', async () => {

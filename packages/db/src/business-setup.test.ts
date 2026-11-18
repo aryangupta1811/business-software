@@ -91,7 +91,10 @@ describe('business setup tables', () => {
     it.each([
       ['a GSTIN from another state', { stateCode: '29', gstin: '27ABCDE1234F1Z0' }],
       ['a malformed GSTIN', { gstin: '27ABCDE1234F1YV' }],
-      ['a one-digit state code', { stateCode: '7' }],
+      // No GSTIN on these two, so only the state check can refuse them.
+      ['a one-digit state code', { stateCode: '7', gstin: null }],
+      // 97, Other Territory, is a place of supply, never where a shop stands.
+      ['state 97, Other Territory', { stateCode: '97', gstin: null }],
       ['a PIN code starting with 0', { pinCode: '011001' }],
       ['an FSSAI number of 13 digits', { fssai: '1234567890123' }],
     ])('refuses %s', async (_, change) => {
@@ -129,14 +132,19 @@ describe('business setup tables', () => {
     it('refuses a second owner in one business', async () => {
       await expect(
         withBusiness(runtime.db, a.businessId, (tx) =>
-          tx.insert(users).values({ businessId: a.businessId, role: 'owner', email: 'two@a.in' }),
+          tx
+            .insert(users)
+            .values({ businessId: a.businessId, role: 'owner', email: 'two@example.test' }),
         ),
       ).rejects.toMatchObject(failsWith('23505'));
     });
 
     it.each([
-      ['an email with capitals', { role: 'staff', email: 'Staff@A.in' }],
-      ['an email with spaces', { role: 'staff', email: ' staff@a.in' }],
+      ['an email with capitals', { role: 'staff', email: 'Staff@Example.test' }],
+      ['an email with spaces', { role: 'staff', email: ' staff@example.test' }],
+      // One mailbox, one spelling (#27): printable ASCII only.
+      ['an email with a zero-width space', { role: 'staff', email: 'sta​ff@example.test' }],
+      ['an email with a Cyrillic letter', { role: 'staff', email: 'stаff@example.test' }],
       ['an owner without an email', { role: 'owner', email: null }],
       ['an unknown role', { role: 'admin', email: null }],
     ])('refuses %s', async (_, change) => {
@@ -154,7 +162,9 @@ describe('business setup tables', () => {
         withNewBusiness(runtime.db, async (tx, id) => {
           await tx.insert(businesses).values(testBusiness(name, id));
           await tx.insert(branches).values(testBranch(id, name));
-          await tx.insert(users).values({ businessId: id, role: 'owner', email: 'race@a.in' });
+          await tx
+            .insert(users)
+            .values({ businessId: id, role: 'owner', email: 'race@example.test' });
           await tx.execute(sql`select pg_sleep(0.2)`);
         });
       const results = await Promise.allSettled([attempt('Race 1'), attempt('Race 2')]);

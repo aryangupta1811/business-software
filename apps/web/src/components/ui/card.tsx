@@ -9,11 +9,18 @@ export function CardHeader({ className, ...props }: ComponentProps<'div'>) {
   return <div className={cn('px-5 pt-4', className)} {...props} />;
 }
 
-export function CardTitle({ className, children, ...props }: ComponentProps<'h2'>) {
+/** A card's heading: `h2` on a page, `h3` when the card sits under a section's own `h2`. */
+export function CardTitle({
+  className,
+  children,
+  level = 2,
+  ...props
+}: ComponentProps<'h2'> & { level?: 2 | 3 }) {
+  const Heading = level === 3 ? 'h3' : 'h2';
   return (
-    <h2 className={cn('text-section font-semibold', className)} {...props}>
+    <Heading className={cn('text-section font-semibold', className)} {...props}>
       {children}
-    </h2>
+    </Heading>
   );
 }
 

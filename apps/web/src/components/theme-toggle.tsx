@@ -13,7 +13,7 @@ export function ThemeToggle() {
   const label = t(next === 'dark' ? 'theme.toDark' : 'theme.toLight');
 
   return (
-    <Tooltip label={label}>
+    <Tooltip label={label} repeatsName>
       <Button
         variant="ghost"
         size="icon"

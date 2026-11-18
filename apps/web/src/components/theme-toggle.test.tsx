@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, test } from 'vitest';
 import { changeLanguage } from '../i18n';
@@ -22,4 +22,16 @@ test('its label is translated', async () => {
   await changeLanguage('hi');
   render(<ThemeToggle />);
   expect(screen.getByRole('button', { name: 'डार्क मोड चालू करें' })).toBeInTheDocument();
+});
+
+// The tooltip says what the button's name already says, so screen readers shouldn't hear it
+// twice: the button gets no description from it.
+test("its tooltip doesn't repeat its name to screen readers", async () => {
+  render(<ThemeToggle />);
+  const button = screen.getByRole('button', { name: 'Switch to dark mode' });
+  act(() => {
+    button.focus();
+  });
+  expect(await screen.findByRole('tooltip')).toHaveTextContent('Switch to dark mode');
+  expect(button).not.toHaveAttribute('aria-describedby');
 });

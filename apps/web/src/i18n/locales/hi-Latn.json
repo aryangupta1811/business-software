@@ -1,12 +1,25 @@
 {
-  "app": { "name": "Business Software" },
-  "language": { "label": "Bhasha" },
-  "nav": { "label": "Mukhya", "home": "Home" },
-  "theme": { "toDark": "Dark mode chalu karein", "toLight": "Light mode chalu karein" },
+  "app": {
+    "name": "Business Software"
+  },
+  "language": {
+    "label": "Bhasha"
+  },
+  "nav": {
+    "label": "Mukhya",
+    "home": "Home"
+  },
+  "theme": {
+    "toDark": "Dark mode chalu karein",
+    "toLight": "Light mode chalu karein"
+  },
   "shortcuts": {
     "title": "Keyboard shortcuts",
     "close": "Band karein",
-    "groups": { "general": "Saamanya", "navigation": "Navigation" },
+    "groups": {
+      "general": "Saamanya",
+      "navigation": "Navigation"
+    },
     "openHelp": "Keyboard shortcuts dikhayein",
     "goHome": "Home par jaayein"
   },
@@ -39,7 +52,8 @@
       "hold": "Hold karein",
       "more": "Aur",
       "cancelBill": "Bill radd karein",
-      "unavailable": "Uplabdh nahi"
+      "unavailable": "Uplabdh nahi",
+      "print": "Bill print karein"
     },
     "inputs": {
       "customer": "Grahak ka naam",
@@ -54,7 +68,10 @@
       "udhaar": "Udhaar",
       "cancelled": "Radd"
     },
-    "cards": { "title": "Aaj ki bikri", "body": "Kal se 8% zyada" },
+    "cards": {
+      "title": "Aaj ki bikri",
+      "body": "Kal se 8% zyada"
+    },
     "sample": {
       "bill": "Haal ka bill",
       "item": "Saamaan",

@@ -1,12 +1,25 @@
 {
-  "app": { "name": "Business Software" },
-  "language": { "label": "Language" },
-  "nav": { "label": "Main", "home": "Home" },
-  "theme": { "toDark": "Switch to dark mode", "toLight": "Switch to light mode" },
+  "app": {
+    "name": "Business Software"
+  },
+  "language": {
+    "label": "Language"
+  },
+  "nav": {
+    "label": "Main",
+    "home": "Home"
+  },
+  "theme": {
+    "toDark": "Switch to dark mode",
+    "toLight": "Switch to light mode"
+  },
   "shortcuts": {
     "title": "Keyboard shortcuts",
     "close": "Close",
-    "groups": { "general": "General", "navigation": "Navigation" },
+    "groups": {
+      "general": "General",
+      "navigation": "Navigation"
+    },
     "openHelp": "Show keyboard shortcuts",
     "goHome": "Go to Home"
   },
@@ -39,7 +52,8 @@
       "hold": "Hold",
       "more": "More",
       "cancelBill": "Cancel bill",
-      "unavailable": "Unavailable"
+      "unavailable": "Unavailable",
+      "print": "Print bill"
     },
     "inputs": {
       "customer": "Customer name",
@@ -54,7 +68,10 @@
       "udhaar": "Udhaar",
       "cancelled": "Cancelled"
     },
-    "cards": { "title": "Today's sales", "body": "8% more than yesterday" },
+    "cards": {
+      "title": "Today's sales",
+      "body": "8% more than yesterday"
+    },
     "sample": {
       "bill": "Recent bill",
       "item": "Item",

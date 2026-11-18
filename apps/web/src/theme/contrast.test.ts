@@ -32,6 +32,16 @@ test('reads the light and dark token blocks, hex values only', () => {
   });
 });
 
+// A colour token the contrast test can't read would silently escape it.
+test.each(['#abcd', '#fff', 'rgb(0 0 0)', 'red'])(
+  'refuses a colour token written as %s',
+  (value) => {
+    expect(() => readTokens(`:root { --background: ${value}; }`)).toThrow(
+      `--background is not a 6-digit hex colour: ${value}`,
+    );
+  },
+);
+
 const tokens = readTokens(styles);
 
 test('finds the colour tokens in styles.css', () => {

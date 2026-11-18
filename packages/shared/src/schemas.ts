@@ -111,3 +111,10 @@ export const settingsSecuritySchema = z.strictObject({
   staffIdleMinutes: minutes(5, 120),
 });
 export type SettingsSecurityInput = z.infer<typeof settingsSecuritySchema>;
+
+/** What `GET /api/settings` answers, and every save returns. */
+export interface SettingsView {
+  business: SettingsBusinessInput;
+  features: SettingsFeaturesInput['features'];
+  security: SettingsSecurityInput;
+}

@@ -28,6 +28,7 @@ export {
   type SettingsBusinessInput,
   type SettingsFeaturesInput,
   type SettingsSecurityInput,
+  type SettingsView,
   type SignupInput,
   type SignupResult,
 } from './schemas.js';

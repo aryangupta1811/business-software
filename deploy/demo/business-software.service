@@ -1,0 +1,26 @@
+# Starts the demo stack at every boot (installed by install.sh into /etc/systemd/system).
+# The server gets a new public IP at each start, so start.sh first updates DuckDNS.
+[Unit]
+Description=Business Software demo stack
+# Up to 30 tries in 20 minutes (enough for RDS to finish starting), then give up and stay
+# failed, so a broken release doesn't retry for ever.
+StartLimitIntervalSec=1200
+StartLimitBurst=30
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/business-software/start.sh
+# A clean stop before shutdown, so the containers stay stopped and the next boot starts them
+# through start.sh (fresh DuckDNS update and connection strings), not by Docker's restart policy.
+ExecStop=/usr/bin/docker compose -f /opt/business-software/compose.yaml --env-file /opt/business-software/release.env stop
+# RDS is often still starting when the server boots: try again every 30 s until it's up.
+Restart=on-failure
+RestartSec=30
+TimeoutStartSec=420
+
+[Install]
+WantedBy=multi-user.target

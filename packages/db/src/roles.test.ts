@@ -61,6 +61,39 @@ describe('app database roles', () => {
     ]);
   });
 
+  // The bootstrap runs in the administrator's own database (`postgres` on RDS). The app roles
+  // have no business there, so they can't even connect (42501, insufficient_privilege).
+  it.each(['ownerUrl', 'runtimeUrl'] as const)(
+    'keeps the %s role out of the administrator database',
+    async (which) => {
+      const url = new URL(server[which]);
+      url.pathname = `/${server.adminDatabase}`;
+      const pool = new Pool({ connectionString: url.toString() });
+      try {
+        await expect(pool.query('select 1')).rejects.toMatchObject({ code: '42501' });
+      } finally {
+        await pool.end();
+      }
+    },
+  );
+
+  // On RDS the administrator isn't a superuser, so it may create a database owned by
+  // app_owner only if it can switch to that role (PostgreSQL 16+). It must not inherit
+  // app_owner's rights, though: switching is a deliberate act.
+  it('lets the administrator switch to app_owner without inheriting its rights', async () => {
+    const admin = new Pool({ connectionString: server.adminUrl });
+    try {
+      const { rows } = await admin.query(
+        `select m.inherit_option, m.set_option, m.admin_option
+           from pg_auth_members m
+          where m.roleid = 'app_owner'::regrole and m.member = current_user::regrole`,
+      );
+      expect(rows).toEqual([{ inherit_option: false, set_option: true, admin_option: false }]);
+    } finally {
+      await admin.end();
+    }
+  });
+
   it('lets the runtime role insert, read and update rows in new tables', async () => {
     await runtime.query("insert into probe (note) values ('a')");
     await runtime.query("update probe set note = 'b' where note = 'a'");

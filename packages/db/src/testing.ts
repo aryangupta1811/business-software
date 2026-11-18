@@ -12,13 +12,15 @@ const bootstrapFile = fileURLToPath(new URL('../bootstrap/create-roles.sql', imp
 export interface TestDatabase {
   /** The container's superuser on the app's database, for things the app roles may not do. */
   adminUrl: string;
+  /** The database the bootstrap script ran in (the administrator's own, like `postgres` on RDS). */
+  adminDatabase: string;
   ownerUrl: string;
   runtimeUrl: string;
   stop(): Promise<void>;
 }
 
 // The same image as local development: compose.yaml is the one place the version is written.
-function composePostgresImage(): string {
+export function composePostgresImage(): string {
   const compose = readFileSync(new URL('../../../compose.yaml', import.meta.url), 'utf8');
   const image = /^\s*image:\s*(postgres:\S+)\s*$/m.exec(compose)?.[1];
   if (image === undefined) throw new Error('No postgres image found in compose.yaml');
@@ -40,6 +42,7 @@ export async function startTestDatabase(): Promise<TestDatabase> {
   adminUrl.pathname = '/business_software';
   return {
     adminUrl: adminUrl.toString(),
+    adminDatabase: container.getDatabase(),
     ownerUrl,
     runtimeUrl: `postgresql://app_runtime:runtime-test@${server}`,
     stop: async () => {

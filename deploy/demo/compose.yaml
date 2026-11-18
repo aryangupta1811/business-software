@@ -1,0 +1,82 @@
+# The demo server's stack (stage 5 part 3): the same services as the root compose.yaml, with
+# three differences:
+# - no database container: PostgreSQL is RDS, reached over TLS that checks RDS's certificate;
+# - images come from GHCR by commit hash (ADR 0034), never built here;
+# - Caddy serves the real name over HTTPS on 80 and 443.
+# start.sh runs it at every boot: docker compose -f compose.yaml --env-file release.env up.
+# The connection strings are in /run/business-software (in memory, root only), written by
+# start.sh from SSM; Docker also keeps them in each container's config on the root-only
+# encrypted disk. This file and release.env hold no secret.
+name: business-software
+
+# Docker keeps container logs on the server's 20 GB disk: cap them.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: '3'
+
+x-app: &app
+  image: ghcr.io/aryangupta1811/business-software-app:${IMAGE_TAG:?set IMAGE_TAG in release.env}
+  init: true
+  logging: *logging
+  volumes:
+    # Amazon's RDS certificate authority for Mumbai, read by sslrootcert in the URLs.
+    - /opt/business-software/certs/rds-ca.pem:/certs/rds-ca.pem:ro
+
+services:
+  # One-shot: applies migrations as app_owner, then exits. api and worker wait for it.
+  migrate:
+    <<: *app
+    command: [node, dist/migrate.js]
+    env_file: /run/business-software/migrate.env
+
+  api:
+    <<: *app
+    env_file: /run/business-software/runtime.env
+    environment:
+      # Every interface inside the container; nothing publishes port 3000 on the server.
+      HOST: 0.0.0.0
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    <<: *app
+    command: [node, dist/worker.js]
+    env_file: /run/business-software/runtime.env
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    image: ghcr.io/aryangupta1811/business-software-web:${IMAGE_TAG:?set IMAGE_TAG in release.env}
+    logging: *logging
+    environment:
+      # A host name switches on Caddy's automatic HTTPS (apps/web/Caddyfile).
+      SITE_ADDRESS: business-software.duckdns.org
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      # The Let's Encrypt account and certificate survive restarts and redeploys, so Caddy
+      # doesn't ask for a new certificate each time (Let's Encrypt limits how often).
+      - caddy-data:/data
+    restart: unless-stopped
+    # No healthcheck: over HTTPS the check would need the public name to resolve to this
+    # server first. start.sh checks the site from outside the container instead.
+
+volumes:
+  caddy-data:

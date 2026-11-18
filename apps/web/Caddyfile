@@ -4,8 +4,11 @@
 	# No admin API and no config written to disk: this file is the whole config.
 	admin off
 	persist_config off
-	# Plain HTTP inside Docker. On the server, Caddy gets HTTPS for the real domain (stage 5).
-	auto_https off
+	# HTTP/1.1 and HTTP/2 only. HTTP/3 needs UDP 443, which the server's firewall doesn't
+	# open, so advertising it would only make browsers try and wait.
+	servers {
+		protocols h1 h2
+	}
 }
 
 (security_headers) {
@@ -17,9 +20,20 @@
 		Referrer-Policy strict-origin-when-cross-origin
 		-Server
 	}
+	# HSTS: once a browser has seen this over HTTPS, it uses only HTTPS for this name for a
+	# year, even if someone types http:// or a network tries to downgrade it. Only on HTTPS
+	# responses: over plain HTTP the header means nothing (browsers ignore it there).
+	# @https is defined once in the site below: handle_errors shares the site's matchers,
+	# so defining it here would define it twice.
+	header @https Strict-Transport-Security "max-age=31536000"
 }
 
-:8080 {
+# Locally and in CI there's no SITE_ADDRESS: plain HTTP on :8080 inside Docker. On the
+# server it is the DuckDNS name (deploy/demo/compose.yaml). Caddy then gets and renews a
+# Let's Encrypt certificate itself, serves HTTPS on 443 and redirects port 80 to it
+# ("automatic HTTPS" switches on only for a site with a host name).
+{$SITE_ADDRESS::8080} {
+	@https protocol https
 	encode zstd gzip
 	import security_headers
 

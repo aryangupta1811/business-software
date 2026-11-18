@@ -9,7 +9,7 @@ Every AWS resource in this project comes from the Terraform in `infra/terraform/
 | Folder | What it holds | State |
 | --- | --- | --- |
 | `infra/terraform/bootstrap/` | The S3 bucket for Terraform's state, and the `monthly-credit-burn` budget | In the bucket it made (`bootstrap/terraform.tfstate`) |
-| `infra/terraform/demo/` | VPC, subnets, security groups, RDS, the EC2 server, its role, the SSM copy of the master password, the two nightly stop schedules | In the same bucket (`demo/terraform.tfstate`) |
+| `infra/terraform/demo/` | VPC, subnets, security groups, RDS, the EC2 server, its role, the SSM parameters (master password, app role passwords, database host, DuckDNS token placeholder), the two nightly stop schedules | In the same bucket (`demo/terraform.tfstate`) |
 
 Git-ignored files each root needs:
 - `terraform.tfvars`, holding `allowed_account_ids` (and the budget's alert email in `bootstrap/`);
@@ -60,7 +60,9 @@ aws rds stop-db-instance --profile business-software --region ap-south-1 --db-in
 - `terraform output` prints `server_instance_id`, `server_public_dns`, `db_address`, `db_identifier` and the SSM name of the master password. It never prints secrets.
 - RDS takes several minutes to start or stop; check with `aws rds describe-db-instances … --query "DBInstances[0].DBInstanceStatus"`.
 - **Safety net:** two EventBridge Scheduler schedules stop both every night at 23:30 IST.
-- The server gets a new public IP at every start (no Elastic IP: it bills while idle). DuckDNS follows it from stage 5 part 3.
+- **Start RDS first, then the server.** At boot the server's `business-software` service runs migrations; if RDS isn't `available` yet it fails and retries every 30 s, so the other order also works, just slower.
+- The server gets a new public IP at every start (no Elastic IP: it bills while idle). At boot, `start.sh` points `business-software.duckdns.org` at it (DuckDNS answers in about a minute).
+- After a start: `scripts/deploy/check-live.sh` checks the site from outside.
 - RDS starts itself again after 7 days stopped; the nightly schedule stops it again the same night.
 
 ## Getting onto the server
@@ -70,6 +72,42 @@ There's no SSH key and port 22 is closed. Use Systems Manager instead:
 - **A shell:** `aws ssm start-session --profile business-software --region ap-south-1 --target <server_instance_id>`. Needs the Session Manager plugin on the laptop (`winget install --id Amazon.SessionManagerPlugin`, installed 2026-11-17).
 - **A script without a shell:** Run Command, `aws ssm send-command … --document-name AWS-RunShellScript --parameters file://params.json`. Read the output with `aws ssm get-command-invocation`. Stage 5's checks ran this way.
 - **Reading a secret on the server:** the instance role can read `/business-software/demo/*` in SSM. Read the value into a variable inside the script and never print it.
+
+## The live site (stage 5 part 3)
+
+**https://business-software.duckdns.org** serves the app: Caddy with a Let's Encrypt certificate, the api, the worker and migrations, with the database on RDS. How it fits together (ADR 0034):
+
+| Piece | Where | What it does |
+| --- | --- | --- |
+| `images` workflow | GitHub Actions, ARM64 runner | On every push to `main`: builds both images, pushes `ghcr.io/aryangupta1811/business-software-{app,web}:<commit>` |
+| `scripts/deploy/demo.sh [commit]` | Laptop (Git Bash) | Refuses a commit not on `main` or without images, then sends a Run Command |
+| `deploy/demo/install.sh` | Server, from GitHub at that commit | Installs the files below into `/opt/business-software`, downloads Amazon's RDS certificates, runs `bootstrap-db.sh`, writes `release.env` (the commit), restarts the service |
+| `bootstrap-db.sh` | Server | Once: if `business_software` doesn't exist, runs `create-roles.sql` as the master user |
+| `business-software.service` → `start.sh` | Server, every boot and deploy | Updates DuckDNS, writes the connection strings to `/run/business-software` (memory, root only), `docker compose up --wait` |
+
+**Deploy** (the server and RDS running, `aws login` fresh):
+```bash
+git fetch origin
+scripts/deploy/demo.sh            # origin/main, or a commit hash on main
+scripts/deploy/check-live.sh
+```
+
+**Logs on the server** (Session Manager shell): `journalctl -u business-software` for the boot and deploy steps; `docker compose -f /opt/business-software/compose.yaml --env-file /opt/business-software/release.env logs api` for a service.
+
+**The DuckDNS token** lives only in SSM. Terraform made the parameter with a placeholder (`value_wo`, so it never reads the real value back). The owner sets it from their own PowerShell, so it never passes through the chat, a shell history or Terraform state:
+```powershell
+$s = Read-Host "DuckDNS token" -AsSecureString
+$t = [System.Net.NetworkCredential]::new('', $s).Password
+aws ssm put-parameter --name /business-software/demo/duckdns/token --type SecureString --value $t --overwrite --profile business-software --region ap-south-1
+Remove-Variable s, t
+```
+A new token (duckdns.org can make one) goes in the same way; the next boot or deploy uses it.
+
+**The connection strings** use `sslmode=verify-full` with `sslrootcert` (Amazon's Mumbai certificate bundle), so the app checks it's talking to RDS and not to an impostor. `migrate` gets only `MIGRATION_DATABASE_URL` (app_owner), `api` and `worker` only `DATABASE_URL` (app_runtime) (ADR 0021). Docker keeps each container's environment in its own config under `/var/lib/docker`, readable by root only.
+
+**App role passwords** (`/business-software/demo/db/app-owner-password`, `…/app-runtime-password`) are write-only like the master's. To rotate one: raise `app_password_version`, plan and apply (new values in SSM only), then in a Session Manager shell run `ALTER ROLE app_runtime PASSWORD …` as the master with the new value read from SSM into a variable, then restart the service. Until the `ALTER ROLE`, the app can't log in.
+
+**If `bootstrap-db.sh` stopped halfway** (roles created, database not): it fails at `CREATE ROLE` on the next deploy. Finish by hand as the master in a Session Manager shell (the rest of `create-roles.sql`), then deploy again.
 
 ## The database
 
@@ -107,5 +145,6 @@ This puts one fresh password in both places, whichever step failed.
 | Error | Cause | Fix |
 | --- | --- | --- |
 | `FreeTierRestrictionError: The specified backup retention period exceeds the maximum available to free tier customers` | The Free plan caps RDS backup retention below 7 days (the exact cap isn't documented) | `backup_retention_period = 1`. Never "upgrade your account plan" (ADR 0033) |
+| `aws_instance.server must be replaced`, `associate_public_ip_address = false -> true # forces replacement` (plan made while the server was stopped) | A stopped instance has no public IP, so AWS reports `false` | Don't set `associate_public_ip_address`; the public subnet's `map_public_ip_on_launch` gives the IP (2026-11-18). Always read why a plan replaces something |
 | `InvalidParameterValue: Invalid rule description` | An apostrophe in a security group rule description; AWS allows only `a-zA-Z0-9. _-:/()#,@[]+=&;{}!$*` | Reword it ("Lets Encrypt") |
 | `password authentication failed for user "postgres_admin"` with the password from SSM | A partial apply left RDS and SSM with different random passwords | The recovery rule above (raise `db_password_version`, verify with a login). `depends_on` now prevents the case where RDS fails first |

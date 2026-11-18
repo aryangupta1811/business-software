@@ -27,4 +27,6 @@ COPY apps/web/Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /repo/apps/web/dist /srv
 RUN caddy validate --config /etc/caddy/Caddyfile
 USER web
-EXPOSE 8080
+# 8080 locally (plain HTTP). On the server, SITE_ADDRESS is set and Caddy listens on 80 and
+# 443 instead: Docker lets a non-root process bind ports below 1024 inside a container.
+EXPOSE 8080 80 443

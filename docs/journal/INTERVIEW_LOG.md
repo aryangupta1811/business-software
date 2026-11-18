@@ -1407,3 +1407,44 @@ Entry format:
   - **Open points go where they'll be read:** the GST edge case (two registrations in one state are CGST+SGST, not IGST) and the Day 5 dependency now sit on task P1.11.
 - **Say it in an interview:** "Requirements get the same review as code. A reviewer with fresh context checks the written decisions against the owner's actual answers, because a note that drifts from what was agreed is a bug that ships."
 - **Follow-ups to expect:** Why a fresh reviewer and not the author? (The author reads what they meant, not what they wrote. Someone without the chat history can only read the file.)
+
+### 2026-11-18 — Passwords hashed with Argon2id from Node's own crypto `#security` `#backend` → ADR 0035
+- **What happened:** Signup now takes a password. It is hashed with Argon2id using `crypto.argon2`, which Node 24 has built in, with OWASP's minimum settings (19 MiB of memory, 2 passes, 1 lane) and a 16-byte random salt. The result is stored as a PHC string (`$argon2id$v=19$m=19456,t=2,p=1$salt$hash`), so the settings travel with each hash. A test checks the function against the official RFC 9106 test vector.
+- **Why / what I learned:**
+  - **A password hash must be slow on purpose.** SHA-256 is built to be fast, so a stolen table can be guessed billions of times a second. Argon2id makes every guess cost memory, which graphics cards don't have much of per core.
+  - **The PHC string lets the settings change later.** Verifying reads the settings from the stored hash; P1.4 can rehash at login when the settings go up.
+  - **Compare hashes with `timingSafeEqual`,** so the time taken doesn't reveal how many bytes matched.
+  - **A built-in beats a native package:** no compiled `argon2` addon to break on Alpine or ARM images.
+- **Say it in an interview:** "Passwords are Argon2id with OWASP's settings, stored as PHC strings so I can raise the cost later and rehash at the next login. I tested it against the RFC's own test vector rather than trusting that my wrapper was right."
+- **Follow-ups to expect:** Why not bcrypt? (It truncates at 72 bytes and only costs CPU time; Argon2id is the current OWASP first choice.) Why no symbol rules? (NIST 800-63B: length helps, forced symbols lead to `Password1!`. The rule is 10+ characters, not the email or phone.)
+
+### 2026-11-18 — Every API route must say who may call it `#security` `#backend` `#testing` → ADR 0036
+- **What happened:** A global guard refuses any route that has neither `@Public()` nor `@Permission('...')`: it fails with a 500 instead of quietly letting everyone in. A "route census" test lists every controller method and checks each one has exactly one of the two, and that every request body goes through a Zod pipe. Request bodies are checked with the same Zod schemas the web forms use, from `packages/shared`, and errors are codes (`required`, `state_mismatch`), never sentences; each screen turns a code into words in English, Hindi or Hinglish.
+- **Why / what I learned:**
+  - **Fail closed.** Forgetting a decorator should break loudly in a test, not open a route to everyone.
+  - **One schema, two places.** The form and the API can't disagree about what a valid GSTIN is, because there is only one definition.
+  - **Codes, not messages, cross the wire,** so the API doesn't need to know the user's language.
+  - **Gotcha:** Zod's `superRefine` runs even when a field's own check failed, so a malformed PAN also reported "GSTIN doesn't match the PAN". The cross-field checks now compare only values that passed their own checks.
+- **Say it in an interview:** "Authorization is opt-out-proof: a route without a declared permission can't be served, and a test counts every route to prove it. Validation is one Zod schema shared by the React form and the NestJS API, returning codes the UI translates."
+- **Follow-ups to expect:** How does the API know who's calling before login exists? (A `SessionResolver` interface; until P1.4 it never finds anyone, so owner routes answer 401.) Why 401 and not 403? (401: we don't know who you are. 403: we know, and you can't.)
+
+### 2026-11-18 — A unique email across every business, with Row-Level Security on `#database` `#security` `#gotcha`
+- **What happened:** Owner emails must be unique across all businesses (login is by email). But RLS means a query only sees its own business's rows, so "check if the email exists, then insert" can't see other businesses, and would race anyway. A partial unique index, `users (email) where role = 'owner'`, does it: PostgreSQL checks unique indexes against every row, whatever the policies say. A duplicate fails with error `23505` on that named constraint, which the API turns into `409 email_taken`.
+- **Why / what I learned:** Constraints are enforced below RLS, so they're the safe way to check something across tenants without a privileged function. The database settles the race too: two signups with one email at the same moment give one 201 and one 409, and a test does exactly that.
+- **Say it in an interview:** "I let the database enforce uniqueness instead of checking first in code. That's race-free, and it works across tenants even with Row-Level Security, because unique indexes see every row."
+- **Follow-ups to expect:** Doesn't the 409 reveal that an email is registered? (Yes, as on most signup pages; the rate limit in P1.4 keeps it from being used to list emails.)
+
+### 2026-11-18 — The recovery key is shown once and kept only in memory `#security` `#frontend`
+- **What happened:** Signup returns a 32-character recovery key (20 random bytes in Crockford base32, which avoids look-alike letters such as I, L, O and U). The database keeps only its SHA-256. The web app holds the key in a JavaScript variable, never in the URL, `localStorage` or `sessionStorage`, and a test checks all three. After a reload the screen says the key is gone, by design. The owner can print it (the printout says which business and when) or copy it, and must tick "I have written down or printed this key" before continuing.
+- **Why / what I learned:** Anything the browser saves can be read later by whoever sits at the counter computer. A key that exists only on paper and as a hash can't leak from the app. A plain SHA-256 is enough here, unlike passwords, because the key is 160 random bits: there's nothing to guess.
+- **Say it in an interview:** "The recovery key is like a GitHub recovery code: shown once, stored as a hash, never written to browser storage. A slow hash isn't needed because the key is random, not chosen by a person."
+- **Follow-ups to expect:** What if the response is lost before the owner sees the key? (The account exists but the key was never seen; P1.4 adds "make a new key" after login.)
+
+### 2026-11-18 — Small front-end gotchas while building signup and settings `#frontend` `#gotcha` `#accessibility`
+- **What happened:**
+  - **Radix's `Slot` always merges `aria-describedby`,** so a tooltip on a button that already has a visible name made screen readers read the name twice. The tooltip now wraps such buttons in a span and puts its trigger there.
+  - **TanStack Router marks a link active for every path under it,** so "Home" (`/`) was highlighted on `/settings` too. Home now uses `activeOptions={{ exact: true }}`, and a test checks `aria-current`.
+  - **React Compiler skips a component that calls React Hook Form's `watch()`.** `useWatch` gives the same value in a form it can optimise.
+  - **The locale test caught Hindi labels with no Hindi in them** ("PAN", "GSTIN"); they're now "PAN नंबर" and "GSTIN नंबर".
+  - **The route generator treated `*.test.tsx` next to a page as a route.** A `routeFileIgnorePattern` keeps tests beside their pages.
+- **Say it in an interview:** "I test accessibility with the same queries a screen reader uses, by role and accessible name, so a label read twice or a wrong `aria-current` fails a test instead of slipping through."

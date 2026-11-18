@@ -22,8 +22,8 @@ Update this as the project grows.
 - **What makes it hard:** correctness, not the feature list. A bill must save the invoice, the stock change and the udhaar entry together or not at all. Two counters can sell the last unit at the same moment. GST maths must be exact to the paisa. And the owner can't lose a single record.
 - **My architecture:** a TypeScript monorepo with a React single-page app, a NestJS modular monolith (so a bill is one database transaction, not a saga across services) and PostgreSQL. The safety rules live in the database, not only in my code: money is stored as whole paise, the app's database user has no DELETE permission, and Row-Level Security keeps businesses apart. Every choice has a written decision record with the alternatives I rejected; there are 33 so far.
 - **One hard bug:** my background worker kept dying after exactly 10 seconds. That was the database driver's idle timeout. Waiting for the shutdown signal doesn't keep Node's event loop alive, so when the pool's last idle connection closed, the process simply ended. I reproduced it in a test, held the process open until SIGTERM, and confirmed it in Docker with zero restarts.
-- **How it's shipped:** the same Docker Compose stack runs on my laptop and in CI. Every pull request must pass five required checks: lint, types and 272 tests against a real PostgreSQL; a secret scan of the whole history; a migration-order check; the PR title; and a smoke test that starts the real images. The cloud is Terraform on AWS in Mumbai: one ARM64 EC2 server plus RDS PostgreSQL with point-in-time restore, no SSH (Systems Manager only), priced at about 4 cents per running hour and run only for sessions and demos, because my budget is ₹0. CI also checks the Terraform on every PR.
-- **Where it stands:** the foundations are done (Phase 0). In Phase 1 the database already keeps businesses apart (forced Row-Level Security, with a test that scans every table), and an append-only audit log records every change in the same transaction; logins and billing come next.
+- **How it's shipped:** the same Docker Compose stack runs on my laptop and in CI. Every pull request must pass five required checks: lint, types and 1,082 tests against a real PostgreSQL; a secret scan of the whole history; a migration-order check; the PR title; and a smoke test that starts the real images. The cloud is Terraform on AWS in Mumbai: one ARM64 EC2 server plus RDS PostgreSQL with point-in-time restore, no SSH (Systems Manager only), priced at about 4 cents per running hour and run only for sessions and demos, because my budget is ₹0. CI also checks the Terraform on every PR. Every commit on `main` gets ARM64 images on GHCR, tagged by its hash, and the demo at https://business-software.duckdns.org deploys one commit at a time over Systems Manager.
+- **Where it stands:** the foundations are done (Phase 0). In Phase 1 the database already keeps businesses apart (forced Row-Level Security, with a test that scans every table), and an append-only audit log records every change in the same transaction. The GST engine computes every number on a bill, and a shop can sign up (Argon2id passwords, a recovery key kept only in memory); logins, items and billing come next.
 - **What I'd do differently:** pin down the real constraints first. I designed hosting for a budget I didn't have and had to redesign it. And test what you ship: the production CSS minifier broke a page my unit tests said was fine.
 
 ---
@@ -43,9 +43,9 @@ Update this as the project grows.
 | Largest exact amount in JavaScript | ≈ ₹90 lakh crore in paise (2^53) | ADR 0008 |
 | Business types in v1 | 5 | Module 00 |
 | Modules | 10 (00–09) | `docs/requirements/` |
-| ADRs | 33 (16 at kickoff) | `docs/decisions/` |
+| ADRs | 36 (16 at kickoff) | `docs/decisions/` |
 | Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
-| Automated tests | 272: 45 shared (money), 60 db (roles, client, 15 tenancy, 17 entry log, 6 guard), 37 api (health, config, shutdown, worker, error logging), 130 web (routing, connection badge, three languages, error screen, 44 contrast checks, Hindi line height, components, theme, 24 keyboard-shortcut tests, layout, `/design`) | `pnpm test` |
+| Automated tests | 1,082 (2026-11-19): 731 shared (money, GST engine, states, field and body schemas), 104 db (roles, RDS bootstrap, tenancy, entry log, guard, business setup), 91 api (signup, settings, Argon2id, route census, health, shutdown), 156 web (signup, recovery key, settings, three languages, contrast, components) | `pnpm test` |
 | Interface languages | 3: English, Hindi, Hinglish (`en`, `hi`, `hi-Latn`) | Module 00 #25, ADR 0023 |
 | Web app download | ~160 KB gzipped JavaScript; fonts 307 KB (woff2, six files, cached for a year); web image 95 MB (Caddy) | P0.7, `vite build` |
 | Readability floor | text ≥ 4.5:1 contrast (main text ≥ 7:1), input edges and focus ring ≥ 3:1, both modes; body text 15 px, nothing under 13 px | ADR 0025 |
@@ -61,6 +61,10 @@ Update this as the project grows.
 | Entry log | append-only: `app_runtime` may only INSERT and SELECT; one write helper, `recordEntry(tx, …)` | P1.2, ADR 0028 |
 | Phase 0 (foundations) | 3 days (2026-10-29 to 31), 9 work sessions, 7 pull requests, 0 business features on purpose | `phase-0.md` |
 | How often the screen checks the server | every 30 s, 10 s timeout (the API waits 5 s for the database) | P0.5, ADR 0001 |
+| Live demo | https://business-software.duckdns.org: HTTPS (Let's Encrypt), page in ~0.12 s from India, back 73 s after a start on a new IP | Stage 5, ADR 0034 |
+| Demo server memory | 773 MB used of 1.8 GB with the whole stack running (containers ~100 MB) | Stage 5 part 3 |
+| Password hashing | Argon2id, 19 MiB, 2 passes, 1 lane (OWASP), ~30 ms and ~19 MiB per hash | ADR 0035 |
+| Recovery key | 160 random bits, 32 Crockford base32 characters, stored as SHA-256 | Module 00 #31 |
 
 ---
 
@@ -188,6 +192,12 @@ Short answers; the Log entry has the full story.
   A: A sign-in, a new budget and doc updates. The infrastructure was code with no account ID in it, and nothing had been applied yet. The provider's `allowed_account_ids` then pins the new account, so the old one can't be touched by accident.
 - **Q: You had to deliver much faster. How did you keep quality?**
   A: I parallelised the work, not the checks. A dependency graph gave the critical path, independent tasks ran in separate git worktrees, decisions were batched up front, and merges went through one queue with a rebase and a full re-check each time. 
+- **Q: How do you stop two accounts for one email when text can look identical?**
+  A: Uniqueness is only as good as the comparison. Zero-width spaces and look-alike letters made a second owner for one mailbox, so login emails are printable ASCII only, checked in the shared schema and by a database CHECK under the unique index.
+- **Q: CI fails but it passes on your machine. What do you do?**
+  A: Ask what my machine has that a clean checkout doesn't. Here it was an old build of a workspace package; moving `dist/` aside reproduced CI in one command, and one test-config line fixed it.
+- **Q: How do you deploy without SSH?**
+  A: A script sends a Systems Manager Run Command. The server downloads the repo at one commit hash, installs that commit's files and pulls that commit's images, so what runs is identified by one hash.
 - **Q: How do you make sure written requirements match what the client decided?**
   A: Every requirement file gets a review before merge from someone without the conversation's context, checking each point against the client's actual answers. Additions are labelled as additions and confirmed. On my project that review caught a rule nobody had chosen and a note contradicting a newer decision.Every PR still had tests first, an independent review and five green CI checks. → `docs/plans/2026-11-17-fast-track.md`
 
@@ -310,6 +320,10 @@ Terms I learned on this project, in one line each.
 | IMDSv2 | The EC2 metadata service's token-based version; a plain forwarded request can't read the instance's credentials |
 | Burstable instance (CPU credits) | `t` types earn credits while idle and spend them under load; `standard` slows down at zero credits, `unlimited` bills for the extra |
 | Security group | A stateful firewall on an AWS resource: you allow traffic in, and replies get out by themselves |
+| Code page (cp1252) | The character set the Windows console uses by default; it has no `→`, so printing one crashes a program unless it runs in UTF-8 mode |
+| Format character (Unicode `Cf`) | An invisible character that changes how text displays, such as a zero-width space or a right-to-left override |
+| Export condition (`source`) | A key in a package's `exports` that lets a tool pick another entry point, here the TypeScript source instead of the build |
+| PHC string | The standard text form of a password hash: algorithm, version, parameters, salt and hash in one string |
 | cloud-init | The first-boot setup script Ubuntu cloud images run from the instance's user data |
 
 ---

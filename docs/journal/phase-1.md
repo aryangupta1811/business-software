@@ -22,6 +22,14 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
 - **2026-11-10 (plan and technology review, no feature code):** every technology checked with evidence (`docs/plans/2026-11-10-plan-review.md`). The stack stays. Experiments corrected four assumptions: pg-boss needs `createSchema: false` to run as its restricted role; the Graviton server is ARM64 while CI builds x86 images (both images were built and run on ARM64); tests don't need the SWC plugin; Argon2id is built into Node 24. The order of work changed to **demo-first**: cloud stages 5, 6 and 7 before any feature, then the shortest path to a printed bill, then demo data, then the rest.
 - **2026-11-12 (DevOps stage 4, cloud guardrails, no code):** the owner opened the AWS account and Claude checked it in the console (read-only, except one budget). Free plan, $100 of credits until 2027-05-12, nothing running. The account came from AWS's new projects-based sign-up experience. It has no IAM users for people, and the Free plan project is locked to **Sydney**, so the runbook written for the old experience no longer fitted. To keep the project fully free, the owner chose Sydney over an irreversible upgrade. A $15 monthly budget alerts on real spend, with credits filtered out. ADR 0030 replaces ADR 0029, and the runbook was rewritten.
 - **2026-11-12 (DevOps stage 5 part 1, prep, no resources created):** AWS CLI v2 and Terraform installed. The laptop signs in with `aws login` (temporary credentials from the console session, no access keys; ADR 0031). Checked in Sydney that the server type, PostgreSQL 18.6 and Ubuntu 26.04 ARM64 are available; priced every resource with the Pricing API ($0.0512 per running hour + $4.73 a month); measured 0.2 s extra latency from India. The owner chose an auto-assigned IP with DuckDNS, Ubuntu, and a nightly stop (ADR 0032). The Terraform plan for parts 2 and 3 waits for the owner's OK.
+- **2026-11-18 (DevOps stage 5 part 3, the skeleton live, PR #26):** https://business-software.duckdns.org serves the app over HTTPS (Caddy, Let's Encrypt), with the database on RDS.
+  - ARM64 images are built on GitHub Actions for every commit on `main` and stored on GHCR, tagged by the commit hash.
+  - A deploy is one Systems Manager Run Command: the server fetches the repo at that commit and runs its install script. No SSH.
+  - App passwords and the DuckDNS token are SSM SecureStrings that Terraform writes but never stores.
+  - The RDS admin isn't a superuser, so the roles script switches to `app_owner` for its grants, and a new test runs it as a non-superuser.
+  - A stop and start brought the site back on a new IP in 73 s. ADR 0034.
+- **2026-11-18 (P1.12 GST engine, PR #25):** one pure function computes every number on a bill (inclusive and exclusive prices, CGST+SGST or IGST, composition, item and bill discounts, round-off) in whole paise, plus Indian state codes. Owner's answer: a ₹X bill discount means the customer pays exactly ₹X less.
+- **2026-11-19 (P1.3 Signup & business setup, PR #27):** signup creates the business, its head-office branch, the owner (Argon2id, ADR 0035) and a recovery key shown once, in one transaction with an entry-log row. The settings page and API save business, feature and lock-time settings, logging only what changed. Every route must declare a permission or `@Public()`, and a census test proves it (ADR 0036). Two reviews and a real-app check found 13 problems, all fixed test-first. 1,082 tests.
 
 ## Stack choices vs alternatives
 
@@ -43,6 +51,10 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
 | Server's public address | Auto-assigned IPv4 + DuckDNS updated at boot | Elastic IP (billed even while stopped, $3.65 a month) | 0032 |
 | Server OS | Ubuntu 26.04 LTS ARM64 | Amazon Linux 2023 (no automatic updates, Compose installed by hand) | 0032 |
 | Forgotten-server guard | Nightly EventBridge Scheduler stop at 23:30 IST | A budget action (fires only after $15 is spent) | 0032 |
+| Image registry | GHCR, public, pushed by the workflow's own token | Amazon ECR (billed storage, needs OIDC first); pushing from the laptop | 0034 |
+| Deploying | Run Command by commit hash: the repo's files and the images at one hash | SSH and `git pull`; a deploy agent | 0034 |
+| Password hashing | Argon2id from Node's built-in `crypto` | bcrypt; an argon2 npm package with native code | 0035 |
+| Login email alphabet | Printable ASCII, in the schema and a database CHECK | Unicode normalisation (NFKC) plus look-alike detection | P1.3 review |
 
 ## Mistakes and what I learned
 
@@ -60,6 +72,10 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
 - **A cost alarm can be blind.** AWS Budgets subtracts credits by default, so an alert at $5 would never fire on a credit-funded account. Lesson: check what a monitor measures, not only that it exists.
 - **My latency guess was half the real number.** ADR 0030 guessed 0.1–0.15 s for Sydney; measured, it's 0.2 s per round trip, which alone breaks the 200 ms scan target. Lesson: measure before it shapes a design; here it changed how the billing screen must look up items.
 - **Old credentials were waiting on the laptop.** A working access key for a finished project was the default AWS profile, one forgotten `--profile` away from building in the wrong account. Lesson: before cloud work, check what credentials the tools will pick up, and pin the account in Terraform.
+- **CI was red for four pushes and I didn't look.** The db tests needed a build of the shared package that only my laptop had. Lesson: read CI on every push, and when local and CI disagree, look for local state first.
+- **Two of my "failing" tests had never failed.** Leftover data or a no-op input made them pass without the fix. Lesson: run each new test against the old code first.
+- **My editing tool decoded the escapes I wrote**, so tests held invisible characters a reviewer couldn't see. A scan for format characters found them. Lesson: check the bytes of what you test, not how it looks.
+- **My first deploy-script fix didn't work**: `python -I` ignores `PYTHONUTF8`. The review reproduced it. Lesson: test a fix in the same conditions as the bug (piped, not on a terminal).
 
 ## Interview questions I can now answer
 
@@ -96,3 +112,10 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
   A: No: foreign-key checks skip RLS. Keys between tenant tables are composite, `(business_id, branch_id) → branches(business_id, id)`. (ADR 0027)
 - Q: What does `FORCE ROW LEVEL SECURITY` change, and what does it break?
   A: Table owners skip RLS without it. With it, the owner is filtered too, so data migrations must lift it inside their transaction, and backups need a `BYPASSRLS` role, or `pg_dump` fails or comes out empty. (ADR 0027)
+
+- Q: How does your demo server get a new version?
+  A: A script sends a Systems Manager Run Command naming one commit. The server downloads the repo at that commit, installs its files and pulls the images built from it, so what runs is one hash. No SSH, no open port. (ADR 0034)
+- Q: How do you keep one email from becoming two owner accounts?
+  A: A partial unique index on owner emails, which sees every tenant's rows despite RLS, plus a CHECK that emails are lower-case printable ASCII, so zero-width spaces and look-alike letters can't make a second spelling. (Module 00 #27)
+- Q: Why Argon2id from Node itself?
+  A: Node 24 ships it in `crypto`, so there's no native npm package to build for ARM64. OWASP's parameters (19 MiB, 2 passes) cost about 30 ms per hash, and the PHC string stores them with the hash so they can change later. (ADR 0035)

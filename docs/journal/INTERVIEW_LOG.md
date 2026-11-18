@@ -1532,3 +1532,21 @@ Entry format:
   The same check confirmed what tests can't: the password is stored only as an Argon2id hash, the server log holds no email, phone, password or key, a forced database failure logs only the cause, and the strict CSP reports nothing.
 - **Why / what I learned:** Unit tests check what I thought of. Using the real app at the shop's screen size, with the real CSP, finds what I didn't.
 - **Say it in an interview:** "Before merging a feature I use it the way a shop owner would, at their screen size and in their language, and I read the server log and the database while I do. It found three bugs the 1,000 tests didn't."
+
+### 2026-11-19 — The live site after a stop and start, and three deploy gotchas `#devops` `#cloud` `#gotcha`
+- **What happened:** After the first deploy, I stopped and started the server to test the nightly routine. It came back with a new public IP; `start.sh` told DuckDNS, and the site answered over HTTPS 73 seconds after boot, with the same Let's Encrypt certificate (Caddy keeps it in a Docker volume). Pages load in about 0.12 s from India. Three gotchas on the way:
+  - **DuckDNS answered `KO`:** the token in SSM had the right shape, a 36-character UUID, but wasn't the account's token. Re-entering it fixed it. A shape check can't tell you a secret is the right one; only the service can.
+  - **The images were public without anyone switching them:** ADR 0034 said a new GitHub package starts private. The ones our public repo's workflow pushed came out public, and the server pulled them with no login. The ADR now says so.
+  - **The deploy script crashed after a successful deploy,** printing the server's output: the AWS CLI on Windows writes in the cp1252 code page, which has no `→`. `PYTHONUTF8=1` fixes it.
+- **Why / what I learned:** Test the routine you'll actually run (stop, start, new IP), not just the first deploy. And when a doc predicts how a service behaves, check it against what happened and correct the doc.
+- **Say it in an interview:** "I proved the restart path: a stopped server comes back on a new IP, updates its DNS name and serves HTTPS again in about a minute, without me touching it."
+
+### 2026-11-19 — "Works on my machine" because of a leftover build `#testing` `#devops` `#mistake`
+- **What happened:** Every CI run on the signup PR failed while `pnpm check` passed on my laptop. The database package had started importing the shared package, but its test config lacked the `source` condition that tells Vite to read the shared package's TypeScript files. Without it, Vite looks for the built `dist/`, which my laptop had from an earlier build and CI never builds before testing. Moving `dist/` aside reproduced the failure in one command; one config line fixed it.
+- **Why / what I learned:** A local pass can depend on files that git doesn't track: build output, caches, a running container. When CI and my laptop disagree, the first question is "what does my machine have that a clean checkout doesn't?". Also, I had merged nothing yet but had ignored the red CI on earlier pushes: read CI on every push, not just before merge.
+- **Say it in an interview:** "CI failing while local passes usually means local state. I reproduce CI's clean slate by moving build outputs aside, and that found it in a minute: a test config resolving a workspace package to its build instead of its source."
+
+### 2026-11-18 — Updating a branch without rewriting it `#git` `#process`
+- **What happened:** Two lanes needed `main`'s new commits. Rebasing would have rewritten their published commits and needed a force push, which the project allows only with the owner's OK. For the GST engine branch I merged `main` into it instead: the files ended up identical to the rebased version, the branch's history stayed as published, and a normal push worked. The one rewrite we did (removing a test value gitleaks flagged) was approved first, used `--force-with-lease` and kept a local backup branch.
+- **Why / what I learned:** With squash merges, a branch's own history is thrown away at merge time anyway, so a merge commit on it costs nothing, and it never invalidates what others may have pulled.
+- **Say it in an interview:** "On a branch others can see, I merge `main` in rather than rebase. With squash merges the result on `main` is identical, and nobody's copy of the branch breaks."

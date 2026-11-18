@@ -121,6 +121,10 @@ describe('settingsBusinessSchema', () => {
     [{ gstin: '27ABCDE1234F1ZW' }, { gstin: 'invalid' }],
     // The GSTIN starts with the branch's state code (Module 00 #14).
     [{ stateCode: '29' }, { gstin: 'state_mismatch' }],
+    // A state a branch can't have is the only problem reported, not a GSTIN mismatch too.
+    [{ stateCode: '97' }, { stateCode: 'invalid' }],
+    // Sent, but not as text: invalid, not "choose one".
+    [{ stateCode: 27 }, { stateCode: 'invalid' }],
     // Characters 3–12 of a GSTIN are the business's PAN.
     [{ pan: 'ABCDE1234G' }, { gstin: 'pan_mismatch' }],
     [{ pan: 'AAPF0939F' }, { pan: 'invalid' }],

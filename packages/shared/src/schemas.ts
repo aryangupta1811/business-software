@@ -3,7 +3,7 @@
 import { z } from 'zod';
 import { BUSINESS_TYPES, FEATURES, GST_STATUSES } from './business.js';
 import { email, isValidGstin, normalizePhone, optionalText, phone, text } from './fields.js';
-import { isBranchStateCode, isStateCode } from './states.js';
+import { isBranchStateCode } from './states.js';
 
 // A pick-one field left empty says `choose`, not `invalid`: missing from the body, an empty
 // select (''), or a radio group with nothing picked (the form library sends null).
@@ -13,7 +13,7 @@ const choose = (issue: { input?: unknown }) =>
 /** Where the business's branch stands. */
 const stateCode = () =>
   z
-    .string({ error: 'choose' })
+    .string({ error: choose })
     .refine((value) => value !== '', { error: 'choose' })
     .refine(isBranchStateCode, { error: 'invalid' });
 
@@ -86,7 +86,7 @@ export const settingsBusinessSchema = z
   })
   // Zod runs this even when a field's own check failed, so only checked values are compared.
   .superRefine((value, context) => {
-    if (value.gstin === null || !isValidGstin(value.gstin) || !isStateCode(value.stateCode)) {
+    if (value.gstin === null || !isValidGstin(value.gstin) || !isBranchStateCode(value.stateCode)) {
       return;
     }
     if (value.gstin.slice(0, 2) !== value.stateCode) {

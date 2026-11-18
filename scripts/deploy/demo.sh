@@ -11,6 +11,11 @@ set -euo pipefail
 
 readonly profile=business-software region=ap-south-1
 readonly repo=aryangupta1811/business-software
+# The AWS CLI and Python write to the console in Windows' code page (cp1252), which has no
+# "→": printing the server's output crashed the script after a successful deploy (seen
+# 2026-11-18). UTF-8 mode fixes both: this variable for the CLI, `-X utf8` for our own
+# `python -I` below, which ignores PYTHON* variables.
+export PYTHONUTF8=1
 
 sha=$(git rev-parse --verify "${1:-origin/main}^{commit}")
 git merge-base --is-ancestor "$sha" origin/main ||
@@ -59,7 +64,11 @@ for _ in $(seq 1 90); do
 done
 
 aws ssm get-command-invocation --profile "$profile" --region "$region" \
-  --command-id "$command_id" --instance-id "$instance" \
-  --query '[StandardOutputContent, StandardErrorContent]' --output text
+  --command-id "$command_id" --instance-id "$instance" --output json |
+  python -X utf8 -I -c 'import json, sys
+result = json.load(sys.stdin)
+print(result["StandardOutputContent"])
+if result["StandardErrorContent"]:
+    print(result["StandardErrorContent"], file=sys.stderr)'
 echo "status: $status"
 [[ $status == Success ]]

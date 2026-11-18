@@ -17,7 +17,7 @@ Stage 5 part 3 puts the skeleton live, so the server needs the two images (ADR 0
 
 ### Option A — GitHub Container Registry (GHCR), public packages, pushed by GitHub Actions
 - Pros: free storage and pulls for public packages; the server pulls without any credential; pushed with the workflow's own `GITHUB_TOKEN`, which expires when the job ends, so no personal token exists anywhere; GitHub's ARM64 runner (`ubuntu-24.04-arm`) is free for public repositories and builds natively (no emulation); the package links to the repository.
-- Cons: a second provider in the deploy path (GitHub as well as AWS); a new package starts **private**, so the owner switches each of the two packages to public once; pulls come over the internet, not from inside AWS.
+- Cons: a second provider in the deploy path (GitHub as well as AWS); pulls come over the internet, not from inside AWS. (This first said a new package starts private and needs the owner to make it public. Corrected 2026-11-19: a package pushed by a public repository's workflow came out public, see Consequences.)
 
 ### Option B — Amazon ECR, private repositories
 - Pros: inside AWS; pulls from the server use the instance role; image scanning built in.
@@ -48,7 +48,7 @@ Stage 6 then only has to call the same deploy from a workflow, with a manual go-
 
 ## Consequences
 
-- **Owner, once:** after the first `images` run, open each package's settings on GitHub and set its visibility to **public**. This can't be undone, and it doesn't need to be.
+- **Package visibility (corrected 2026-11-19):** this first asked the owner to set both packages public after the first `images` run. It wasn't needed: both came out public, because the workflow of a public repository pushed them and they're linked to it, and the server pulled them with no login. If one ever shows as private, set it public in the package's settings on GitHub.
 - Every merge to `main` publishes images, docs-only merges included (about 3–5 minutes of free runner time). Old tags are never deleted; at about 0.4 GB per commit this is free on GHCR, but a cleanup can come later.
 - The smoke job still tests x86 images built from the same commit. Stage 6 moves the smoke test onto the ARM64 build, so the image that was tested is the image that runs (2026-11-10 plan review).
 - A deploy restarts the stack: a few seconds of downtime, acceptable for the demo.

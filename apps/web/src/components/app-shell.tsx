@@ -1,5 +1,5 @@
 import { Link, useMatches, useNavigate } from '@tanstack/react-router';
-import { House, Keyboard } from 'lucide-react';
+import { House, Keyboard, Settings } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keyLabels } from '../shortcuts/keys';
@@ -11,6 +11,8 @@ import { Button } from './ui/button';
 import { Kbd, KbdGroup } from './ui/kbd';
 
 const HOME_KEYS = 'Alt+H';
+const NAV_LINK =
+  'flex min-h-10 items-center gap-2.5 rounded-lg px-2 text-muted hover:bg-surface-muted data-[status=active]:bg-surface-muted data-[status=active]:font-semibold data-[status=active]:text-foreground';
 
 /** Sidebar on the left, top bar with the page title and settings, then the page. */
 export function AppShell({ children }: { children: ReactNode }) {
@@ -38,8 +40,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         <nav aria-label={t('nav.label')}>
           <Link
             to="/"
+            activeOptions={{ exact: true }}
             aria-keyshortcuts={HOME_KEYS}
-            className="flex min-h-10 items-center gap-2.5 rounded-lg px-2 text-muted hover:bg-surface-muted data-[status=active]:bg-surface-muted data-[status=active]:font-semibold data-[status=active]:text-foreground"
+            className={NAV_LINK}
           >
             <House aria-hidden="true" className="size-4" />
             <span className="flex-1">{t('nav.home')}</span>
@@ -48,6 +51,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Kbd key={label}>{label}</Kbd>
               ))}
             </KbdGroup>
+          </Link>
+          <Link to="/settings" className={NAV_LINK}>
+            <Settings aria-hidden="true" className="size-4" />
+            {t('nav.settings')}
           </Link>
         </nav>
         {/* The ? key alone is invisible to mouse users, so the list has a button too. */}

@@ -7,7 +7,8 @@
   },
   "nav": {
     "label": "Mukhya",
-    "home": "Home"
+    "home": "Home",
+    "settings": "Settings"
   },
   "theme": {
     "toDark": "Dark mode chalu karein",
@@ -170,6 +171,30 @@
       },
       "password": {
         "too_short": "Kam se kam 10 akshar rakhein"
+      },
+      "gstin": {
+        "invalid": "GSTIN check karein: 15 akshar, state code se shuru",
+        "state_mismatch": "GSTIN ke pehle do ank state se milne chahiye",
+        "pan_mismatch": "GSTIN mein PAN hona chahiye"
+      },
+      "pan": {
+        "invalid": "ABCDE1234F jaisa PAN likhein"
+      },
+      "pinCode": {
+        "invalid": "6 ankon ka PIN code likhein"
+      },
+      "fssai": {
+        "invalid": "14 ankon ka FSSAI number likhein"
+      },
+      "ownerLockMinutes": {
+        "invalid": "1 se 30 minute likhein",
+        "too_small": "1 se 30 minute likhein",
+        "too_big": "1 se 30 minute likhein"
+      },
+      "staffIdleMinutes": {
+        "invalid": "5 se 120 minute likhein",
+        "too_small": "5 se 120 minute likhein",
+        "too_big": "5 se 120 minute likhein"
       }
     }
   },
@@ -227,5 +252,63 @@
     "36": "Telangana",
     "37": "Andhra Pradesh",
     "38": "Ladakh"
+  },
+  "settings": {
+    "loading": "Settings load ho rahi hain…",
+    "loggedOut": {
+      "title": "Settings dekhne ke liye login karein",
+      "body": "Settings maalik ke liye hain. Maalik ke email se login karke inhe dekhein."
+    },
+    "loadFailed": "Settings load nahi ho sakin. Connection check karein aur phir koshish karein.",
+    "retry": "Phir koshish karein",
+    "save": "Save karein",
+    "saving": "Save ho raha hai…",
+    "saved": "Save ho gaya",
+    "saveFailed": "Save nahi ho saka. Connection check karein aur phir koshish karein.",
+    "business": {
+      "title": "Business ki jaankari",
+      "lead": "Yeh aapke bills par chhapti hai. Purane bills par wahi jaankari rehti hai jiske saath woh chhape the.",
+      "branchTitle": "Yeh dukaan",
+      "fields": {
+        "pan": "PAN",
+        "ownerName": "Maalik ka naam",
+        "branchName": "Dukaan ka naam",
+        "address": "Pata",
+        "pinCode": "PIN code",
+        "gstin": "GSTIN",
+        "drugLicence": "Drug licence number",
+        "fssai": "FSSAI number"
+      }
+    },
+    "features": {
+      "title": "Features",
+      "lead": "Jo aapki dukaan ko chahiye, woh chaalu karein. Band features ki screens chhupi rehti hain.",
+      "useDefaults": "{{type}} ke liye default features lagayein"
+    },
+    "security": {
+      "title": "Security",
+      "lead": "Counter kab apne aap lock ho.",
+      "ownerLock": "Maalik ka lock",
+      "ownerLockHint": "Itne minute istemaal na hone par maalik ka login lock ho jaata hai.",
+      "staffIdle": "Staff ka logout",
+      "staffIdleHint": "Itne minute istemaal na hone par staff ka login band ho jaata hai."
+    }
+  },
+  "features": {
+    "loose_weight": "Khula saamaan vazan se bechein",
+    "expiry_dates": "Expiry date",
+    "udhaar_prominent": "Udhaar saamne rakhein",
+    "batches": "Batch number",
+    "mrp": "Saamaan par MRP",
+    "expiry_alerts": "Expiry ki chetavani",
+    "variants": "Size aur rang",
+    "exchanges": "Saamaan badalna",
+    "barcode_labels": "Barcode label",
+    "serial_numbers": "Serial number",
+    "warranty": "Warranty",
+    "service_items": "Marammat aur service",
+    "multiple_units": "Kai units (piece, dibba, kilo)",
+    "wholesale_price": "Thok daam",
+    "large_credit": "Thekedaaron ko bada udhaar"
   }
 }

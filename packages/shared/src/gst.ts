@@ -64,6 +64,17 @@ export interface BillLine extends TaxAmounts {
   readonly subtotalPaise: Paise;
   /** How much less the customer pays for this line because of the bill discount. */
   readonly billDiscountPaise: Paise;
+  /**
+   * For a tax invoice (CGST Act s. 15(3)(a)), the line in before-tax terms, so it adds up:
+   * taxableBeforeDiscounts − discountOffTaxable = taxable. The value before discounts is the
+   * amount itself for a tax-exclusive price or a business that charges no GST, and the amount
+   * with its tax taken out for a tax-inclusive price. The discount is every discount (item and
+   * bill) in before-tax terms. Never negative: on a tiny tax-inclusive line, rounding the two
+   * tax halves can raise the taxable value by a paisa, and then the value before discounts is
+   * raised with it (plan, rule 8).
+   */
+  readonly taxableBeforeDiscountsPaise: Paise;
+  readonly discountOffTaxablePaise: Paise;
 }
 
 export interface RateSummary extends TaxAmounts {
@@ -157,6 +168,11 @@ function yesOrNo(value: unknown, what: string): boolean {
 /** How much a discount takes off `amount`; an amount discount can't be more than `amount`. */
 function discountOff(discount: Discount | undefined, amount: bigint, what: string): bigint {
   if (discount === undefined) return 0n;
+  // Untyped callers (the server's check of a saved bill) could send any kind.
+  const kind: unknown = discount.kind;
+  if (kind !== 'percent' && kind !== 'amount') {
+    throw new RangeError(`${what} kind must be "percent" or "amount": ${JSON.stringify(kind)}`);
+  }
   if (discount.kind === 'percent') {
     const basisPoints = wholeNumber(discount.basisPoints, 0, 10000, `${what} percent`);
     return divideHalfUp(amount * basisPoints, BASIS_POINTS);
@@ -294,6 +310,7 @@ export function calculateBill(input: BillInput): Bill {
     const itemDiscount = discountOff(line.discount, amount, `${what} discount`);
     const afterItemDiscount = amount - itemDiscount;
     const beforeBillDiscount = taxOn(afterItemDiscount, rate, includesTax, tax);
+    const undiscounted = taxOn(amount, rate, includesTax, tax);
     return {
       what,
       hsn,
@@ -302,7 +319,8 @@ export function calculateBill(input: BillInput): Bill {
       amount,
       itemDiscount,
       afterItemDiscount,
-      gross: payable(taxOn(amount, rate, includesTax, tax)),
+      taxableBeforeDiscounts: undiscounted.taxable,
+      gross: payable(undiscounted),
       subtotal: payable(beforeBillDiscount),
       beforeBillDiscount,
     };
@@ -344,6 +362,8 @@ export function calculateBill(input: BillInput): Bill {
   const lines = priced.map((p, index): BillLine => {
     const lineTax = taxes[index] ?? p.beforeBillDiscount;
     const total = payable(lineTax);
+    const taxableBeforeDiscounts =
+      p.taxableBeforeDiscounts > lineTax.taxable ? p.taxableBeforeDiscounts : lineTax.taxable;
     return {
       hsn: p.hsn,
       rateBasisPoints: Number(p.rate),
@@ -352,6 +372,11 @@ export function calculateBill(input: BillInput): Bill {
       grossPaise: toPaise(p.gross, `${p.what} gross`),
       subtotalPaise: toPaise(p.subtotal, `${p.what} subtotal`),
       billDiscountPaise: toPaise(p.subtotal - total, `${p.what} bill discount`),
+      taxableBeforeDiscountsPaise: toPaise(taxableBeforeDiscounts, `${p.what} value before tax`),
+      discountOffTaxablePaise: toPaise(
+        taxableBeforeDiscounts - lineTax.taxable,
+        `${p.what} discount before tax`,
+      ),
       taxablePaise: toPaise(lineTax.taxable, `${p.what} taxable value`),
       cgstPaise: toPaise(lineTax.cgst, `${p.what} CGST`),
       sgstPaise: toPaise(lineTax.sgst, `${p.what} SGST`),

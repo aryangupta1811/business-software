@@ -575,6 +575,96 @@ describe('calculateBill: summaries by rate and by HSN', () => {
   });
 });
 
+describe('calculateBill: the discount off the taxable value, for printing a tax invoice', () => {
+  // A tax invoice shows each line's value, its discount and its taxable value before tax
+  // (CGST Act s. 15(3)(a)), so a line must add up: value − discount = taxable.
+  it('gives an exclusive line with an item and a rupee bill discount in pre-tax terms', () => {
+    // ₹100 + 18%, ₹5 off the item, ₹10 off the bill: the customer pays ₹112.10 − ₹10 = ₹102.10;
+    // 10210 × 1800 ÷ 23600 = 778.73 → 779 each, taxable 10210 − 1558 = 8652
+    const result = calculateBill(
+      bill([line({ discount: { kind: 'amount', paise: 500 } })], {
+        billDiscount: { kind: 'amount', paise: 1000 },
+      }),
+    );
+    const l = only(result.lines);
+    expect(l).toMatchObject({
+      amountPaise: 10000,
+      itemDiscountPaise: 500,
+      billDiscountPaise: 1000,
+      taxableBeforeDiscountsPaise: 10000,
+      discountOffTaxablePaise: 1348,
+      taxablePaise: 8652,
+      totalPaise: 10210,
+    });
+  });
+
+  it('gives a percent bill discount on an exclusive line in pre-tax terms', () => {
+    const result = calculateBill(
+      bill([line()], { billDiscount: { kind: 'percent', basisPoints: 1000 } }),
+    );
+    expect(only(result.lines)).toMatchObject({
+      taxableBeforeDiscountsPaise: 10000,
+      discountOffTaxablePaise: 1000,
+      taxablePaise: 9000,
+      billDiscountPaise: 1180,
+    });
+  });
+
+  it('takes the tax out of an inclusive line’s price and its discount', () => {
+    // ₹118 MRP at 18%, 10% off: worth ₹100 before tax, ₹10 off, taxable ₹90
+    const result = calculateBill(
+      bill([
+        line({
+          unitPricePaise: 11800,
+          priceIncludesTax: true,
+          discount: { kind: 'percent', basisPoints: 1000 },
+        }),
+      ]),
+    );
+    expect(only(result.lines)).toMatchObject({
+      taxableBeforeDiscountsPaise: 10000,
+      discountOffTaxablePaise: 1000,
+      taxablePaise: 9000,
+    });
+  });
+
+  it('gives a line with no discount no discount off its taxable value', () => {
+    const result = calculateBill(
+      bill([line(), line({ unitPricePaise: 10000, priceIncludesTax: true })]),
+    );
+    expect(result.lines.map((l) => l.discountOffTaxablePaise)).toEqual([0, 0]);
+    expect(result.lines.map((l) => l.taxableBeforeDiscountsPaise)).toEqual([10000, 8474]);
+  });
+
+  it('uses the plain price for a business that charges no tax', () => {
+    const result = calculateBill(
+      bill([line({ priceIncludesTax: true, discount: { kind: 'amount', paise: 300 } })], {
+        scheme: 'composition',
+        billDiscount: { kind: 'amount', paise: 200 },
+      }),
+    );
+    expect(only(result.lines)).toMatchObject({
+      taxableBeforeDiscountsPaise: 10000,
+      discountOffTaxablePaise: 500,
+      taxablePaise: 9500,
+    });
+  });
+
+  it('never prints a negative discount, even when rounding moves a tiny line’s taxable value', () => {
+    // 11 paise at 40% inclusive: 2 + 2 paise tax, taxable 7. One paisa off the bill leaves
+    // 10 paise: 1 + 1 paise tax, taxable 8. The taxable value went up by a paisa.
+    const result = calculateBill(
+      bill([line({ unitPricePaise: 11, rateBasisPoints: 4000, priceIncludesTax: true })], {
+        billDiscount: { kind: 'amount', paise: 1 },
+      }),
+    );
+    const l = only(result.lines);
+    expect(l).toMatchObject({ taxablePaise: 8, cgstPaise: 1, totalPaise: 10 });
+    expect(l.discountOffTaxablePaise).toBe(0);
+    expect(l.taxableBeforeDiscountsPaise - l.discountOffTaxablePaise).toBe(l.taxablePaise);
+  });
+});
+
 describe('calculateBill: bad input', () => {
   it.each<[string, Partial<BillLineInput>]>([
     ['a negative price', { unitPricePaise: -1 }],
@@ -622,6 +712,13 @@ describe('calculateBill: bad input', () => {
   it('refuses a bill whose total is past the safe range, even when each line is safe', () => {
     const big = line({ unitPricePaise: 2 ** 52, rateBasisPoints: 0 });
     expect(() => calculateBill(bill([big, big, big]))).toThrow(RangeError);
+  });
+
+  it('refuses an unknown discount kind on an item or the bill, naming it', () => {
+    const unknown = { kind: 'pct', basisPoints: 1000 } as unknown as Discount;
+    expect(() => calculateBill(bill([line({ discount: unknown })]))).toThrow(/kind.*"pct"/);
+    expect(() => calculateBill(bill([line()], { billDiscount: unknown }))).toThrow(/kind.*"pct"/);
+    expect(() => calculateBill(bill([line()], { billDiscount: unknown }))).toThrow(RangeError);
   });
 
   it('refuses an unknown scheme from untyped code', () => {
@@ -717,6 +814,15 @@ describe('calculateBill: invariants over generated carts', () => {
         expect(afterItemDiscount).toBeGreaterThanOrEqual(0);
         expect(l.grossPaise).toBeGreaterThanOrEqual(l.subtotalPaise);
         expect(l.billDiscountPaise).toBe(l.subtotalPaise - l.totalPaise);
+        // A printed tax invoice line adds up: value before tax − discount = taxable value.
+        expect(l.discountOffTaxablePaise).toBeGreaterThanOrEqual(0);
+        expect(l.taxableBeforeDiscountsPaise - l.discountOffTaxablePaise).toBe(l.taxablePaise);
+        if (result.tax === 'none' || !input.priceIncludesTax) {
+          expect(l.taxableBeforeDiscountsPaise).toBe(l.amountPaise);
+        }
+        if (l.amountPaise === l.totalPaise && result.tax === 'none') {
+          expect(l.discountOffTaxablePaise).toBe(0);
+        }
         expect(l.totalPaise).toBeGreaterThanOrEqual(0);
         expect(l.totalPaise).toBe(l.taxablePaise + l.cgstPaise + l.sgstPaise + l.igstPaise);
         expect(l.cgstPaise).toBe(l.sgstPaise);

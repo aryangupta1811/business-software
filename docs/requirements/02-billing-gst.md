@@ -27,7 +27,7 @@
 2. **B2B and B2C:** a B2B tax invoice needs the customer's GSTIN, and the app checks its format. A B2C bill can be simple: customer name and phone are optional.
 3. **Place of supply** decides the tax: same state → CGST + SGST; another state → IGST.
 4. **Prices** can be tax-inclusive or tax-exclusive.
-5. **Discounts** per item and on the whole bill. GST is worked out on the price after the discount.
+5. **Discounts** per item and on the whole bill. GST is worked out on the price after the discount. A bill discount in rupees means the customer pays exactly ₹X less.
 6. **Round-off** to the nearest rupee, shown on its own line.
 7. **Customer capture:** name and phone can be taken at billing (needed for udhaar, and for the assistant's "who is our top customer", Module 09).
 8. **Hold a bill:** a counter can hold several open bills, serve the next customer and bring a held bill back. A held bill doesn't touch stock until it is saved.
@@ -63,4 +63,4 @@ None.
 
 - 2026-10-29 — Draft created from the planning chat on claude.ai.
 - 2026-11-17 — Finalized with the owner in fast-track sitting 1. The owner confirmed every draft idea, chose Claude's recommendation on every question, and confirmed Claude's additions: #2 GSTIN check and optional B2C details, #3 place of supply, #5 per-item and per-bill discounts with GST after discount, #6 round-off line, #14 never edited.
-- 2026-11-18 — #5: a bill discount in rupees means the customer pays exactly ₹X less (owner, 2026-11-18, while reviewing the P1.12 GST engine). It holds for tax-inclusive and tax-exclusive prices alike.
+- 2026-11-18 — #5: a bill discount in rupees means the customer pays exactly ₹X less (owner, 2026-11-18, while reviewing the P1.12 GST engine). Added to #5's text.

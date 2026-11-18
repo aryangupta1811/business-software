@@ -143,8 +143,8 @@ describe('business setup tables', () => {
       ['an email with capitals', { role: 'staff', email: 'Staff@Example.test' }],
       ['an email with spaces', { role: 'staff', email: ' staff@example.test' }],
       // One mailbox, one spelling (#27): printable ASCII only.
-      ['an email with a zero-width space', { role: 'staff', email: 'sta​ff@example.test' }],
-      ['an email with a Cyrillic letter', { role: 'staff', email: 'stаff@example.test' }],
+      ['an email with a zero-width space', { role: 'staff', email: 'sta\u200Bff@example.test' }],
+      ['an email with a Cyrillic letter', { role: 'staff', email: 'st\u0430ff@example.test' }],
       ['an owner without an email', { role: 'owner', email: null }],
       ['an unknown role', { role: 'admin', email: null }],
     ])('refuses %s', async (_, change) => {

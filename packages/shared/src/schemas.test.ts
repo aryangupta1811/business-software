@@ -62,10 +62,10 @@ describe('signupSchema', () => {
     [{ email: `${'a'.repeat(250)}@b.in` }, { email: 'too_long' }],
     // Look-alikes that would give one real address a second owner account (Module 00 #27):
     // zero-width space, soft hyphen, fullwidth o, Cyrillic o.
-    [{ email: '​owner@example.com' }, { email: 'invalid' }],
-    [{ email: 'owner­@example.com' }, { email: 'invalid' }],
-    [{ email: 'ｏwner@example.com' }, { email: 'invalid' }],
-    [{ email: 'оwner@example.com' }, { email: 'invalid' }],
+    [{ email: '\u200Bowner@example.com' }, { email: 'invalid' }],
+    [{ email: 'owner\u00AD@example.com' }, { email: 'invalid' }],
+    [{ email: '\uFF4Fwner@example.com' }, { email: 'invalid' }],
+    [{ email: '\u043Ewner@example.com' }, { email: 'invalid' }],
     [{ password: 'short pass'.slice(0, 9) }, { password: 'too_short' }],
     // Characters, not UTF-16 units: five emoji are 10 units but 5 characters.
     [{ password: '\u{1F600}'.repeat(5) }, { password: 'too_short' }],

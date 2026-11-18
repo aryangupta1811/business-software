@@ -31,9 +31,9 @@ describe('text', () => {
     ['a\nb', 'control_character'],
     // Invisible format characters: a right-to-left override makes a name on a bill read
     // differently from what is stored; a zero-width space or BOM hides in copied text.
-    ['a‮b', 'control_character'],
-    ['a​b', 'control_character'],
-    ['a﻿b', 'control_character'],
+    ['a\u202Eb', 'control_character'],
+    ['a\u200Bb', 'control_character'],
+    ['a\uFEFFb', 'control_character'],
     [42, 'required'],
   ])('refuses %j with %s', (value, code) => {
     expect(errorsOf(name, { name: value })).toEqual({ name: code });
@@ -45,8 +45,8 @@ describe('text', () => {
 
   // Devanagari needs the zero-width joiner and non-joiner to choose a conjunct's shape.
   it('keeps the joiners Hindi spelling uses', () => {
-    expect(name.parse({ name: 'क्‍ष' })).toEqual({ name: 'क्‍ष' });
-    expect(name.parse({ name: 'क्‌ष' })).toEqual({ name: 'क्‌ष' });
+    expect(name.parse({ name: 'क्\u200Dष' })).toEqual({ name: 'क्\u200Dष' });
+    expect(name.parse({ name: 'क्\u200Cष' })).toEqual({ name: 'क्\u200Cष' });
   });
 
   it('allows new lines only when asked', () => {

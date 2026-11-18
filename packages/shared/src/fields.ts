@@ -8,9 +8,9 @@ export type FieldErrors = Record<string, string>;
 // in text and jsonb) and its invisible format characters (Cf: right-to-left overrides that
 // make a name on a bill read differently from what's stored, zero-width spaces, BOMs). Except
 // the zero-width joiner and non-joiner (U+200D, U+200C), which Devanagari spelling needs.
-const CONTROL = /(?![‌‍])[\p{Cc}\p{Cf}]/u;
+const CONTROL = /(?![\u200C\u200D])[\p{Cc}\p{Cf}]/u;
 // The same, but allowing tab, line feed and carriage return in multi-line fields.
-const CONTROL_EXCEPT_LINES = /(?![\t\n\r‌‍])[\p{Cc}\p{Cf}]/u;
+const CONTROL_EXCEPT_LINES = /(?![\t\n\r\u200C\u200D])[\p{Cc}\p{Cf}]/u;
 
 interface TextOptions {
   /** Allow new lines (an address). */

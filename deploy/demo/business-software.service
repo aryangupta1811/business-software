@@ -2,6 +2,10 @@
 # The server gets a new public IP at each start, so start.sh first updates DuckDNS.
 [Unit]
 Description=Business Software demo stack
+# Up to 30 tries in 20 minutes (enough for RDS to finish starting), then give up and stay
+# failed, so a broken release doesn't retry for ever.
+StartLimitIntervalSec=1200
+StartLimitBurst=30
 Requires=docker.service
 After=docker.service network-online.target
 Wants=network-online.target

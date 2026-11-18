@@ -35,7 +35,7 @@ The demo server deploys **one commit at a time**. `scripts/deploy/demo.sh <commi
 1. downloads the repository at exactly that commit from GitHub;
 2. runs `deploy/demo/install.sh`, which installs the server files, creates the database roles once (`bootstrap-db.sh`) and restarts the `business-software` systemd service.
 
-At every boot that service runs `start.sh`. It updates DuckDNS, writes the connection strings from SSM into memory-only files and starts the stack.
+At every boot that service runs `start.sh`. It updates DuckDNS, writes the connection strings from SSM into root-only files in memory (`/run`) and starts the stack. Docker also keeps them in each container's config on the server's encrypted disk, readable by root only.
 
 ## Why
 
@@ -52,7 +52,7 @@ Stage 6 then only has to call the same deploy from a workflow, with a manual go-
 - Every merge to `main` publishes images, docs-only merges included (about 3–5 minutes of free runner time). Old tags are never deleted; at about 0.4 GB per commit this is free on GHCR, but a cleanup can come later.
 - The smoke job still tests x86 images built from the same commit. Stage 6 moves the smoke test onto the ARM64 build, so the image that was tested is the image that runs (2026-11-10 plan review).
 - A deploy restarts the stack: a few seconds of downtime, acceptable for the demo.
-- The server trusts GitHub to serve the right files for a commit hash; a hash names exactly one tree, so a changed file would have a different hash.
+- The server trusts GitHub, over HTTPS, to serve the right files for a commit; nothing on the server re-checks the download against the hash. Images are pulled by tag, not by digest, and a tag can be pushed again by anyone who can write the package (only `main`'s workflow can). Stage 6 can pin images by digest.
 
 ## Interview note
 

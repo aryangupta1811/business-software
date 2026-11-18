@@ -2,7 +2,8 @@
 # Starts the demo stack. Run as root by business-software.service at every boot and after
 # every deploy (install.sh restarts the service).
 #   1. Points business-software.duckdns.org at this server's new public IP.
-#   2. Writes the two connection strings from SSM into memory-only files.
+#   2. Writes the two connection strings from SSM into files in memory (/run), root only.
+#      (Docker also copies them into each container's config on the root-only disk.)
 #   3. Starts the containers and waits for them.
 # Never prints a secret: values go from `aws ssm` straight into files or curl's stdin.
 set -euo pipefail

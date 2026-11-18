@@ -4,8 +4,9 @@
 # - images come from GHCR by commit hash (ADR 0034), never built here;
 # - Caddy serves the real name over HTTPS on 80 and 443.
 # start.sh runs it at every boot: docker compose -f compose.yaml --env-file release.env up.
-# The connection strings are in /run/business-software (memory only, root only), written by
-# start.sh from SSM; this file and release.env hold no secret.
+# The connection strings are in /run/business-software (in memory, root only), written by
+# start.sh from SSM; Docker also keeps them in each container's config on the root-only
+# encrypted disk. This file and release.env hold no secret.
 name: business-software
 
 # Docker keeps container logs on the server's 20 GB disk: cap them.

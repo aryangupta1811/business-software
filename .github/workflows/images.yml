@@ -20,6 +20,9 @@ concurrency:
 
 jobs:
   publish:
+    # workflow_dispatch can name any branch: publish only from main, which changes only
+    # through reviewed pull requests.
+    if: github.ref == 'refs/heads/main'
     # Free for public repositories. Native ARM64: no emulation, and the image built here is
     # the architecture the server runs.
     runs-on: ubuntu-24.04-arm

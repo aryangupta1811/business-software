@@ -18,7 +18,7 @@ export interface TestDatabase {
 }
 
 // The same image as local development: compose.yaml is the one place the version is written.
-function composePostgresImage(): string {
+export function composePostgresImage(): string {
   const compose = readFileSync(new URL('../../../compose.yaml', import.meta.url), 'utf8');
   const image = /^\s*image:\s*(postgres:\S+)\s*$/m.exec(compose)?.[1];
   if (image === undefined) throw new Error('No postgres image found in compose.yaml');

@@ -31,7 +31,21 @@ mv "$dir/certs/rds-ca.pem.new" "$dir/certs/rds-ca.pem"
 printf 'IMAGE_TAG=%s\n' "$sha" >"$dir/release.env"
 systemctl daemon-reload
 systemctl enable business-software.service
-# restart = stop the old containers, then start.sh with the new images. A few seconds of
-# downtime; stage 6 can make this smoother.
-systemctl restart business-software.service
-echo "deployed: $sha"
+systemctl reset-failed business-software.service || true
+# restart = stop the old containers, then start.sh with the new images: a few seconds of
+# downtime (stage 6 can make this smoother). --no-block, then wait for the outcome: a first
+# attempt can fail while RDS is still starting, and systemd tries again every 30 s.
+systemctl restart --no-block business-software.service
+for _ in $(seq 1 60); do # up to 10 minutes
+  sleep 10
+  case $(systemctl is-active business-software.service) in
+    active)
+      echo "deployed: $sha"
+      exit 0
+      ;;
+    failed) break ;;
+  esac
+done
+echo "deploy of $sha did not come up; last log lines:" >&2
+journalctl -u business-software.service -n 40 --no-pager >&2
+exit 1

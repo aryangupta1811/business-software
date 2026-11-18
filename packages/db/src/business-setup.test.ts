@@ -53,7 +53,7 @@ describe('business setup tables', () => {
       ['an unknown GST status', { gstStatus: 'exempt' }],
       ['a phone that is not 10 digits', { phone: '+919111111111' }],
       ['a phone starting with 0', { phone: '0111111111' }],
-      ['a lower-case PAN', { pan: 'aapfu0939f' }],
+      ['a lower-case PAN', { pan: 'abcde1234f' }],
       ['an unknown feature', { features: ['teleport'] }],
       ['a null feature', { features: [null as unknown as string] }],
       ['an auto-lock of 0 minutes', { ownerLockMinutes: 0 }],
@@ -85,12 +85,12 @@ describe('business setup tables', () => {
       );
 
     it('accepts a GSTIN that starts with its own state code', async () => {
-      await update({ stateCode: '27', gstin: '27AAPFU0939F1ZV' });
+      await update({ stateCode: '27', gstin: '27ABCDE1234F1Z0' });
     });
 
     it.each([
-      ['a GSTIN from another state', { stateCode: '29', gstin: '27AAPFU0939F1ZV' }],
-      ['a malformed GSTIN', { gstin: '27AAPFU0939F1YV' }],
+      ['a GSTIN from another state', { stateCode: '29', gstin: '27ABCDE1234F1Z0' }],
+      ['a malformed GSTIN', { gstin: '27ABCDE1234F1YV' }],
       ['a one-digit state code', { stateCode: '7' }],
       ['a PIN code starting with 0', { pinCode: '011001' }],
       ['an FSSAI number of 13 digits', { fssai: '1234567890123' }],

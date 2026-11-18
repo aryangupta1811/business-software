@@ -111,7 +111,7 @@ test("refuses a GSTIN from another state, in the GSTIN field's own words", async
   renderSettings();
   const user = userEvent.setup();
   const business = within(await card('Business details'));
-  await user.type(business.getByLabelText('GSTIN'), '27aapfu0939f1zv');
+  await user.type(business.getByLabelText('GSTIN'), '27abcde1234f1z0');
   await user.click(business.getByRole('button', { name: 'Save' }));
   expect(await business.findByLabelText('GSTIN')).toHaveAccessibleDescription(
     "The GSTIN's first two digits must match the state",

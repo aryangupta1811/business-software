@@ -127,7 +127,9 @@ test('sends the cleaned-up form and shows the recovery key, kept only in memory'
     email: 'owner@example.com',
     password: 'correct horse battery',
   });
-  expect(screen.getByLabelText('Your recovery key')).toHaveTextContent(MADE_UP_CODE.replaceAll('-', ''));
+  expect(screen.getByLabelText('Your recovery key')).toHaveTextContent(
+    MADE_UP_CODE.replaceAll('-', ''),
+  );
   expect(history.location.href).not.toContain('ABCD');
   expect(storedValues(localStorage)).not.toContain('ABCD');
   expect(storedValues(sessionStorage)).not.toContain('ABCD');

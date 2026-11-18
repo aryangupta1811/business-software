@@ -87,18 +87,19 @@ describe('normalizePhone', () => {
 });
 
 describe('isValidGstin', () => {
-  // Published examples from GST guides; their check digits are right.
-  it.each(['27AAPFU0939F1ZV', '29AAGCB7383J1Z4'])('accepts %s', (gstin) => {
+  // Made-up GSTINs (no real business), check digits computed with the mod-36 algorithm.
+  // Each refused one below has a correct check digit, so it fails only for its own reason.
+  it.each(['27ABCDE1234F1Z0', '29PQRST5678K1ZY'])('accepts %s', (gstin) => {
     expect(isValidGstin(gstin)).toBe(true);
   });
 
   it.each([
-    ['27AAPFU0939F1ZW', 'wrong check digit'],
-    ['27AAPFU0939F1Z', 'too short'],
-    ['27aapfu0939f1zv', 'lower case'],
-    ['2AAAPFU0939F1ZV', 'state code not digits'],
-    ['27AAPFU0939F1YV', 'no Z in the 14th place'],
-    ['27AAPFU0939F0ZV', 'entity number 0'],
+    ['27ABCDE1234F1ZW', 'wrong check digit'],
+    ['27ABCDE1234F1Z', 'too short'],
+    ['27abcde1234f1z0', 'lower case'],
+    ['2AABCDE1234F1ZU', 'state code not digits'],
+    ['27ABCDE1234F1Y2', 'no Z in the 14th place'],
+    ['27ABCDE1234F0Z1', 'entity number 0'],
   ])('refuses %s (%s)', (gstin) => {
     expect(isValidGstin(gstin)).toBe(false);
   });

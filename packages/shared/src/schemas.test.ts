@@ -82,13 +82,13 @@ const business = {
   businessType: 'kirana',
   phone: '9111111111',
   gstStatus: 'regular',
-  pan: 'aapfu0939f',
+  pan: 'abcde1234f',
   ownerName: '',
   branchName: 'Sharma Kirana',
   address: 'Shop 4\nMain road',
   pinCode: '411001',
   stateCode: '27',
-  gstin: '27aapfu0939f1zv',
+  gstin: '27abcde1234f1z0',
   drugLicence: null,
   fssai: '',
 };
@@ -97,19 +97,19 @@ describe('settingsBusinessSchema', () => {
   it('upper-cases PAN and GSTIN and turns blanks into null', () => {
     expect(settingsBusinessSchema.parse(business)).toEqual({
       ...business,
-      pan: 'AAPFU0939F',
-      gstin: '27AAPFU0939F1ZV',
+      pan: 'ABCDE1234F',
+      gstin: '27ABCDE1234F1Z0',
       ownerName: null,
       fssai: null,
     });
   });
 
   it.each([
-    [{ gstin: '27AAPFU0939F1ZW' }, { gstin: 'invalid' }],
+    [{ gstin: '27ABCDE1234F1ZW' }, { gstin: 'invalid' }],
     // The GSTIN starts with the branch's state code (Module 00 #14).
     [{ stateCode: '29' }, { gstin: 'state_mismatch' }],
     // Characters 3–12 of a GSTIN are the business's PAN.
-    [{ pan: 'AAPFU0939G' }, { gstin: 'pan_mismatch' }],
+    [{ pan: 'ABCDE1234G' }, { gstin: 'pan_mismatch' }],
     [{ pan: 'AAPF0939F' }, { pan: 'invalid' }],
     [{ pinCode: '011001' }, { pinCode: 'invalid' }],
     [{ fssai: '1234567890123' }, { fssai: 'invalid' }],

@@ -82,7 +82,8 @@ There's no SSH key and port 22 is closed. Use Systems Manager instead:
 | `images` workflow | GitHub Actions, ARM64 runner | On every push to `main`: builds both images, pushes `ghcr.io/aryangupta1811/business-software-{app,web}:<commit>` |
 | `scripts/deploy/demo.sh [commit]` | Laptop (Git Bash) | Refuses a commit not on `main` or without images, then sends a Run Command |
 | `deploy/demo/install.sh` | Server, from GitHub at that commit | Installs the files below into `/opt/business-software`, downloads Amazon's RDS certificates, runs `bootstrap-db.sh`, writes `release.env` (the commit), restarts the service |
-| `bootstrap-db.sh` | Server | Once: if `business_software` doesn't exist, runs `create-roles.sql` as the master user |
+| `bootstrap-db.sh` | Server | Once: if `business_software` doesn't exist, runs `create-roles.sql` as the master user. Every deploy: `create-backup-role.sql` (does nothing once `app_backup` exists) |
+| `business-software-backup.timer` → `backup.sh` | Server, 22:45 IST or the next boot | The nightly backup to S3 (ADR 0037, `docs/devops/backup-restore.md`) |
 | `business-software.service` → `start.sh` | Server, every boot and deploy | Updates DuckDNS, writes the connection strings to `/run/business-software` (memory, root only), `docker compose up --wait` |
 
 **Hold deploys from P1.3 until P1.4 is merged.** P1.3 adds `POST /api/signup` with no rate limit yet: each call costs an Argon2 hash (about 19 MiB, ADR 0035), so a burst could fill the 2 GB server, and anyone could create businesses on the public site. P1.4 brings the limiter. Until it's on `main`, deploy only commits from before P1.3 (`git log --oneline origin/main`).
@@ -107,7 +108,7 @@ A new token (duckdns.org can make one) goes in the same way; the next boot or de
 
 **The connection strings** use `sslmode=verify-full` with `sslrootcert` (Amazon's Mumbai certificate bundle), so the app checks it's talking to RDS and not to an impostor. `migrate` gets only `MIGRATION_DATABASE_URL` (app_owner), `api` and `worker` only `DATABASE_URL` (app_runtime) (ADR 0021). Docker keeps each container's environment in its own config under `/var/lib/docker`, readable by root only.
 
-**App role passwords** (`/business-software/demo/db/app-owner-password`, `…/app-runtime-password`) are write-only like the master's. To rotate one: raise `app_password_version`, plan and apply (new values in SSM only), then in a Session Manager shell run `ALTER ROLE app_runtime PASSWORD …` as the master with the new value read from SSM into a variable, then restart the service. Until the `ALTER ROLE`, the app can't log in.
+**App role passwords** (`/business-software/demo/db/app-owner-password`, `…/app-runtime-password`, and since stage 7 `…/app-backup-password`) are write-only like the master's. To rotate one: raise `app_password_version`, plan and apply (new values in SSM only), then in a Session Manager shell run `ALTER ROLE app_runtime PASSWORD …` as the master with the new value read from SSM into a variable, then restart the service. Until the `ALTER ROLE`, the app can't log in.
 
 **If `bootstrap-db.sh` stopped halfway** (roles created, database not): it fails at `CREATE ROLE` on the next deploy. Finish by hand as the master in a Session Manager shell (the rest of `create-roles.sql`), then deploy again.
 
@@ -115,7 +116,7 @@ A new token (duckdns.org can make one) goes in the same way; the next boot or de
 
 - PostgreSQL 18.6 on `db.t4g.micro`, in private subnets. Port 5432 is open only to the server's security group; from the laptop the name resolves to a private `10.20.x.x` address and nothing answers.
 - **TLS is required.** `rds.force_ssl` is `1` by default from PostgreSQL 15 (checked in the account's `postgres18` defaults). A connection with `sslmode=disable` is refused with `no pg_hba.conf entry … no encryption`.
-- **Backups:** automated backups for **1 day**. The Free plan refused 7 days (`FreeTierRestrictionError`). Point-in-time restore covers the last day the database ran; time stopped doesn't count. Stage 7 adds a nightly `pg_dump` to S3 for older history.
+- **Backups:** automated backups for **1 day**. The Free plan refused 7 days (`FreeTierRestrictionError`). Point-in-time restore covers the last day the database ran; time stopped doesn't count. Stage 7's nightly `pg_dump` to S3 keeps 90 days (`docs/devops/backup-restore.md`).
   - **Still to check:** the backup window is 22:00–22:30 IST, and a session that stops RDS before then never reaches it. After a few sessions, read `EarliestRestorableTime` and `LatestRestorableTime` (`describe-db-instances`) and `describe-db-snapshots --snapshot-type automated`, and write down here whether point-in-time restore still has a base snapshot.
 - **Master password:** `postgres_admin`'s password is write-only. It went to RDS and to the SSM `SecureString` `/business-software/demo/db/master-password`, and it is never in Terraform state (checked 2026-11-17: 0 matches in `terraform state pull`).
   - **To rotate:**

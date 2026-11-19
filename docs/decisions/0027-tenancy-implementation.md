@@ -77,9 +77,10 @@ The database is the guarantee (ADR 0006), and the guard test guarantees that the
 
 ## Consequences
 
-- Every new tenant table: `businessId()`, `tenantPolicy(…)`, and `FORCE` added in its migration. The guard test fails until all three are there.
+- Every new tenant table: `businessId()`, `tenantPolicy(…)` (since ADR 0037: `...tenantPolicies(…)`), and `FORCE` added in its migration. The guard test fails until all three are there.
 - **`FORCE` filters the migration role too.** A data migration (an `UPDATE` or backfill) run as `app_owner` with no business set changes **0 rows, with no error**: a later "copy the column, then drop the old one" migration would lose data. A data migration must, inside its own transaction, `ALTER TABLE … NO FORCE ROW LEVEL SECURITY`, run the statement, then `FORCE` again (DDL is transactional), or run per business with `set_config`, and its test must check the row count.
 - **`pg_dump` as `app_owner` fails** ("query would be affected by row-level security policy"), and with `--enable-row-security` it exits 0 and writes **empty** tables. Backups (ADR 0011, DevOps stage 7) must run as a role with `BYPASSRLS` (or the RDS master user), never with `--enable-row-security`, and the restore drill must check row counts.
+  - **Dated note 2026-11-19 (ADR 0037):** on RDS neither exists: the master user has no `BYPASSRLS` and can't give it. Backups run as the read-only role `app_backup` **with** `--enable-row-security`, and every tenant table has a second policy, `backup_read` (`FOR SELECT TO app_backup USING (true)`), from `tenantPolicies()`. The guard requires it on every tenant table, and `dump.sh` refuses to dump a table missing it, so the empty-table trap above can't happen silently. The restore drill checks row counts as planned.
 - No materialized views or foreign tables for tenant data: RLS never applies to them (the guard refuses them).
 - After a transaction-local setting ends, PostgreSQL reads it back as `''` on that connection; the function's `nullif` handles it, and a test reuses one pooled connection to prove it.
 - Querying tenant tables by hand (psql) shows nothing until `select set_config('app.business_id', '<id>', false)` is run (`docs/devops/local-database.md`).

@@ -1,15 +1,14 @@
+import { ACTIVE_PING_MS } from '@business-software/shared';
 import { useEffect, useRef } from 'react';
 
 /** What counts as someone at the counter. Mouse movement alone doesn't: a bumped mouse isn't use. */
 const ACTIVITY = ['keydown', 'pointerdown', 'wheel', 'touchstart'] as const;
 
-/** How often, at most, the server hears that someone is still at the counter. */
-export const ACTIVE_PING_MS = 30_000;
-
 /**
- * Calls `onIdle` once after `minutes` with no key, click, scroll or touch (Module 00 #21, #29),
- * and `onActive` at most every 30 seconds while there is some, so the server's idle clock
- * follows the person and not only the requests (typing a long bill sends none).
+ * Calls `onIdle` once after `minutes` with no key, click, scroll or touch (Module 00 #21, #29).
+ * Calls `onActive` on the first one after a quiet spell, then at most every ACTIVE_PING_MS,
+ * so the server's idle clock follows the person and not only the requests (typing a long bill
+ * sends none). The server waits IDLE_GRACE_MS longer, so the screen always locks first.
  */
 export function useIdle({
   minutes,
@@ -30,7 +29,8 @@ export function useIdle({
   useEffect(() => {
     if (!enabled) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    let lastPing = Date.now();
+    // Nothing heard yet: the first key press is told at once.
+    let lastPing = Number.NEGATIVE_INFINITY;
     const startTimer = () => {
       clearTimeout(timer);
       timer = setTimeout(() => {

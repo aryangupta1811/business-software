@@ -1,6 +1,7 @@
 import { fireEvent, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { ACTIVE_PING_MS, useIdle } from './use-idle';
+import { ACTIVE_PING_MS, IDLE_GRACE_MS } from '@business-software/shared';
+import { useIdle } from './use-idle';
 
 const MINUTE = 60_000;
 
@@ -45,14 +46,33 @@ test('starts counting again on each key or click, but not on mouse movement', ()
   expect(onIdle).toHaveBeenCalledOnce();
 });
 
-test('tells the server at most every 30 seconds that someone is there', () => {
+test('tells the server at once on the first key press, then at most every 30 seconds', () => {
   const { onActive } = watch(5);
-  fireEvent.keyDown(window, { key: 'a' });
+  // A page that just loaded isn't activity; the first key press after it is.
   expect(onActive).not.toHaveBeenCalled();
-  vi.advanceTimersByTime(ACTIVE_PING_MS);
-  fireEvent.keyDown(window, { key: 'b' });
-  fireEvent.keyDown(window, { key: 'c' });
+  fireEvent.keyDown(window, { key: 'a' });
   expect(onActive).toHaveBeenCalledOnce();
+  vi.advanceTimersByTime(ACTIVE_PING_MS - 1);
+  fireEvent.keyDown(window, { key: 'b' });
+  expect(onActive).toHaveBeenCalledOnce();
+  vi.advanceTimersByTime(1);
+  fireEvent.keyDown(window, { key: 'c' });
+  expect(onActive).toHaveBeenCalledTimes(2);
+});
+
+// The 5-minute case: the server hears of the last key press at most ACTIVE_PING_MS late and
+// waits IDLE_GRACE_MS longer than the screen (packages/shared), so the screen locks first.
+test('locks 5 minutes after the last key press, however long after the last ping', () => {
+  const { onIdle, onActive } = watch(5);
+  fireEvent.keyDown(window, { key: 'a' });
+  vi.advanceTimersByTime(ACTIVE_PING_MS - 1);
+  fireEvent.keyDown(window, { key: 'b' });
+  expect(onActive).toHaveBeenCalledOnce();
+  vi.advanceTimersByTime(5 * MINUTE - 1);
+  expect(onIdle).not.toHaveBeenCalled();
+  vi.advanceTimersByTime(1);
+  expect(onIdle).toHaveBeenCalledOnce();
+  expect(ACTIVE_PING_MS + 5 * MINUTE).toBeLessThan(5 * MINUTE + IDLE_GRACE_MS);
 });
 
 test('does nothing while switched off (a locked screen)', () => {

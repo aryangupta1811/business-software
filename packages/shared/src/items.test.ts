@@ -300,6 +300,9 @@ describe('small schemas', () => {
       code: '8901725181222',
       packId: null,
     });
+    // No code: the server makes the next in-store one.
+    expect(barcodeSchema.parse({ code: null, packId: null })).toEqual({ code: null, packId: null });
+    expect(errorsOf(barcodeSchema, { code: '', packId: null })).toEqual({ code: 'required' });
   });
 
   it('category', () => {

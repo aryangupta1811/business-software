@@ -222,9 +222,12 @@ export const itemUpdateSchema = z
   .superRefine(itemRules);
 export type ItemUpdateInput = z.infer<typeof itemUpdateSchema>;
 
-/** `POST /api/items/:id/barcodes`: a code for the item's stock unit or one of its packs. */
+/**
+ * `POST /api/items/:id/barcodes`: a code for the item's stock unit or one of its packs. A null
+ * code asks the server to make the next in-store code (#8), so two counters can't get the same.
+ */
 export const barcodeSchema = z.strictObject({
-  code: barcode(),
+  code: barcode().nullable(),
   packId: id().nullable(),
 });
 export type BarcodeInput = z.infer<typeof barcodeSchema>;

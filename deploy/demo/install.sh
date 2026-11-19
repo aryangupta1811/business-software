@@ -32,6 +32,13 @@ mv "$dir/certs/rds-ca.pem.new" "$dir/certs/rds-ca.pem"
 
 "$dir/bootstrap-db.sh"
 
+# The release this one replaces, kept for a person rolling back by hand (the deploy workflow
+# reads it before deploying, with scripts/deploy/current-release.sh). Not on a rerun of the
+# same commit, which would overwrite it with itself.
+if [[ -f $dir/release.env ]] && ! grep -qx "IMAGE_TAG=$sha" "$dir/release.env"; then
+  echo "replacing: $(cat "$dir/release.env")"
+  cp "$dir/release.env" "$dir/previous-release.env"
+fi
 printf 'IMAGE_TAG=%s\n' "$sha" >"$dir/release.env"
 systemctl daemon-reload
 systemctl enable business-software.service

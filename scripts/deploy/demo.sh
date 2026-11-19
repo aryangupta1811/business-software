@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Deploys a commit of main to the demo server, from the laptop (Git Bash):
+# Deploys a commit of main to the demo server, from the laptop (Git Bash) or the deploy
+# workflow (stage 6, .github/workflows/deploy.yml):
 #   scripts/deploy/demo.sh [commit]        default: origin/main
-# Needs `aws login --profile business-software`, the server and RDS running, and the
-# images for that commit on GHCR (the images workflow builds them on every push to main).
+# Needs AWS credentials (scripts/deploy/lib.sh), the server and RDS running, and the images
+# for that commit on GHCR (the images workflow smoke-tests and pushes them for every commit on
+# main).
 #
 # How: Systems Manager Run Command tells the server to download this repo at exactly that
 # commit from GitHub, then run deploy/demo/install.sh from it. No SSH, no open port, and the

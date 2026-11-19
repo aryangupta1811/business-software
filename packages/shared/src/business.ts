@@ -53,5 +53,8 @@ export const PERMISSIONS = [
   'items.view',
   'items.manage',
   'items.view_cost',
+  // P1.8: see stock and its history; opening stock and adjustments (`01` #11).
+  'stock.view',
+  'stock.adjust',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];

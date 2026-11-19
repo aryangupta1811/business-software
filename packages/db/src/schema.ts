@@ -4,15 +4,19 @@ import {
   BUILT_IN_UNITS,
   BUSINESS_TYPES,
   FEATURES,
+  ADJUSTMENT_REASONS,
   GST_RATES,
   GST_STATUSES,
   ITEM_KINDS,
+  NEGATIVE_STOCK_SETTINGS,
+  STOCK_MOVEMENT_KINDS,
 } from '@business-software/shared';
 import { sql, type SQL } from 'drizzle-orm';
 import {
   bigint,
   boolean,
   check,
+  date,
   foreignKey,
   index,
   integer,
@@ -94,6 +98,8 @@ export const businesses = pgTable(
     features: text('features').array().notNull(),
     ownerLockMinutes: smallint('owner_lock_minutes').notNull().default(5),
     staffIdleMinutes: smallint('staff_idle_minutes').notNull().default(30),
+    /** Module 01 #12: selling past zero stock warns or is blocked (P1.14 reads it). */
+    negativeStock: text('negative_stock').notNull().default('warn'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -109,6 +115,10 @@ export const businesses = pgTable(
     check('businesses_features_check', sql`${t.features} <@ array[${literals(FEATURES)}]::text[]`),
     check('businesses_owner_lock_minutes_check', sql`${t.ownerLockMinutes} between 1 and 30`),
     check('businesses_staff_idle_minutes_check', sql`${t.staffIdleMinutes} between 5 and 120`),
+    check(
+      'businesses_negative_stock_check',
+      sql`${t.negativeStock} in (${literals(NEGATIVE_STOCK_SETTINGS)})`,
+    ),
   ],
 );
 
@@ -596,5 +606,102 @@ export const itemBranchLevels = pgTable(
     }),
     unique('item_branch_levels_item_branch_unique').on(t.businessId, t.itemId, t.branchId),
     check('item_branch_levels_level_check', sql`${t.lowStockLevel} >= 0`),
+  ],
+);
+
+// ---- Stock (P1.8, design `docs/plans/2026-11-20-p1.8-stock-ledger-design.md`; ADR 0007 rule 4) ----
+// Both tables are written only by moveStock (src/stock.ts), in the action's own transaction.
+
+// The running total per item per branch: the row two counters lock (ADR 0007 rules 4 and 6).
+export const itemStock = pgTable(
+  'item_stock',
+  {
+    id: id(),
+    businessId: ownBusinessId(),
+    branchId: uuid('branch_id').notNull(),
+    itemId: uuid('item_id').notNull(),
+    /** Thousandths of the item's stock unit; below zero when sold past it (Module 01 #12). */
+    quantity: bigint('quantity', { mode: 'number' }).notNull().default(0),
+    /** Paise per stock unit (Module 01 #4); null until stock arrives at a known cost. */
+    averageCost: money('average_cost'),
+    /** The movement that last changed this row; null means nothing has moved yet (answer 4A). */
+    lastMovementId: uuid('last_movement_id'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    unique('item_stock_business_id_id_unique').on(t.businessId, t.id),
+    unique('item_stock_item_branch_unique').on(t.businessId, t.branchId, t.itemId),
+    foreignKey({
+      name: 'item_stock_branch_fk',
+      columns: [t.businessId, t.branchId],
+      foreignColumns: [branches.businessId, branches.id],
+    }),
+    foreignKey({
+      name: 'item_stock_item_fk',
+      columns: [t.businessId, t.itemId],
+      foreignColumns: [items.businessId, items.id],
+    }),
+    check('item_stock_average_cost_check', sql`${t.averageCost} >= 0`),
+  ],
+);
+
+// The ledger: append-only (the migration revokes UPDATE; DELETE was never granted). A mistake
+// is fixed by a new movement. Later tasks add a key per source document (bill, purchase…).
+export const stockMovements = pgTable(
+  'stock_movements',
+  {
+    id: id(),
+    businessId: ownBusinessId(),
+    branchId: uuid('branch_id').notNull(),
+    itemId: uuid('item_id').notNull(),
+    kind: text('kind').notNull(),
+    /** Signed thousandths of the item's stock unit. */
+    quantity: bigint('quantity', { mode: 'number' }).notNull(),
+    /** Paise per stock unit at that moment; null when the item's cost is unknown. */
+    unitCost: money('unit_cost'),
+    /** Paise, signed: quantity × unit cost. */
+    value: money('value'),
+    balanceAfter: bigint('balance_after', { mode: 'number' }).notNull(),
+    /** The IST day the action belongs to (06 #7); created_at stays the database's own time. */
+    businessDate: date('business_date', { mode: 'string' }).notNull(),
+    reason: text('reason'),
+    note: text('note'),
+    actorId: uuid('actor_id').notNull(),
+    /** Idempotency (ADR 0007 rule 7): a retried request finds its first movement. */
+    requestKey: uuid('request_key'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    unique('stock_movements_business_id_id_unique').on(t.businessId, t.id),
+    unique('stock_movements_request_key_unique').on(t.businessId, t.requestKey),
+    foreignKey({
+      name: 'stock_movements_branch_fk',
+      columns: [t.businessId, t.branchId],
+      foreignColumns: [branches.businessId, branches.id],
+    }),
+    foreignKey({
+      name: 'stock_movements_item_fk',
+      columns: [t.businessId, t.itemId],
+      foreignColumns: [items.businessId, items.id],
+    }),
+    foreignKey({
+      name: 'stock_movements_actor_fk',
+      columns: [t.businessId, t.actorId],
+      foreignColumns: [users.businessId, users.id],
+    }),
+    // The history of one item at one branch, newest first, and the audit's sum.
+    index('stock_movements_item_idx').on(t.businessId, t.branchId, t.itemId, t.id),
+    check('stock_movements_kind_check', sql`${t.kind} in (${literals(STOCK_MOVEMENT_KINDS)})`),
+    check('stock_movements_quantity_check', sql`${t.quantity} <> 0`),
+    check('stock_movements_unit_cost_check', sql`${t.unitCost} >= 0`),
+    // Only adjustments carry a reason, and every adjustment has one (Module 01 #11).
+    check(
+      'stock_movements_reason_check',
+      sql`(${t.kind} = 'adjustment') = (${t.reason} is not null) and ${t.reason} in (${literals(ADJUSTMENT_REASONS)})`,
+    ),
+    check('stock_movements_note_check', sql`char_length(${t.note}) between 1 and 200`),
   ],
 );

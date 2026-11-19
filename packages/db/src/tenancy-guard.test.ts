@@ -29,7 +29,7 @@ interface Violation {
 }
 
 /** Tables the app may only insert into and read (ADRs 0007, 0028). */
-const APPEND_ONLY = ['entry_log'];
+const APPEND_ONLY = ['entry_log', 'stock_movements'];
 
 /**
  * Unique keys on tenant tables without business_id, each on purpose (P1.7 rule

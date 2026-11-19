@@ -5,8 +5,10 @@
 #   scripts/deploy/backup.sh list          the backups in S3, newest last
 #   scripts/deploy/backup.sh drill [key]   restore one (default: the newest) into a throwaway
 #                                          PostgreSQL on the server and check every row count
-#   scripts/deploy/backup.sh before-deploy as now, but skipped while the server has no backup
-#                                          service yet (the deploy workflow, stage 6)
+#   scripts/deploy/backup.sh before-deploy [--first-backup-release]
+#                                          as now, for the deploy workflow (stage 6); fails
+#                                          if the server has no backup service, unless the
+#                                          option says this deploy is the one installing it
 # Needs `aws login --profile business-software`; now and drill need the server and RDS
 # running. Prints backup keys, never the bucket name (it holds the account ID).
 set -euo pipefail
@@ -46,10 +48,24 @@ case ${1:-} in
     run_on_server "backup now" 900 'set -eu' "${backup_lines[@]}"
     ;;
   before-deploy)
-    # A server that has never run a release with stage 7 has no backup service yet: the
-    # deploy itself installs it. Any other failure stops the deploy.
+    # No deploy without a fresh backup (CLAUDE.md rule 7). The one exception is chosen by a
+    # person: the first deploy of a release with stage 7, on a server that has never had the
+    # backup service (that deploy installs it). Then a missing service skips the backup;
+    # without the option it stops the deploy, whatever removed the service.
+    case ${2:-} in
+      --first-backup-release)
+        missing="echo 'backup: skipped, no backup service on the server yet (this deploy installs it)'; exit 0"
+        ;;
+      '')
+        missing="echo 'backup: no backup service on the server, so no fresh backup: not deploying. For the first deploy with backups, run the deploy by hand with first_backup_release ticked' >&2; exit 1"
+        ;;
+      *)
+        echo "usage: backup.sh before-deploy [--first-backup-release]" >&2
+        exit 2
+        ;;
+    esac
     run_on_server "backup before deploy" 900 'set -eu' \
-      "if ! systemctl cat $service >/dev/null 2>&1; then echo 'backup: skipped, no backup service on the server yet (installed by this deploy)'; exit 0; fi" \
+      "if ! systemctl cat $service >/dev/null 2>&1; then $missing; fi" \
       "${backup_lines[@]}"
     ;;
   list)
@@ -68,7 +84,7 @@ case ${1:-} in
       "bash /opt/business-software/restore-drill.sh '$dump_url' '$counts_url'"
     ;;
   *)
-    sed -n '2,11p' "$0" >&2
+    sed -n '2,13p' "$0" >&2
     exit 2
     ;;
 esac

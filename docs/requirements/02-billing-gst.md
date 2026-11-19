@@ -54,6 +54,15 @@
 ## Not in v1
 
 19. **E-invoicing and e-way bills** are not built in v1 (e-invoicing is compulsory only above ₹5 crore turnover; e-way bills are for moving goods over ₹50,000). Bills store every field the government portals need (GSTIN, HSN, values), so they can be added later without changing data.
+20. **Compensation cess** (tobacco, aerated drinks, cars) is not in v1 (sitting 2, G2).
+
+## Settled after finalizing (sitting 2, 2026-11-19)
+
+21. **Checking GST rates:** an item's GST rate must be one of the current GST rates, and its HSN code must have a valid format. The app doesn't check that the HSN code carries that rate (that needs the full, changing HSN-to-rate table); the owner stays responsible for it. (G1)
+22. **Exempt and 0% items** both show under rate 0 in the tax summary; split only if a CA asks. (G3)
+23. **Round-off is always on** (#6); there is no setting to turn it off. (G4)
+24. **HSN on every line** of a regular business's bill, stricter than the law for small shops' B2C bills; it comes from the item, so the cashier never types it. (G5)
+25. **GSTIN before the first tax invoice:** a registered business (regular or composition) must have a GSTIN on its head office before saving its first tax invoice or bill of supply; checked when a bill is saved (P1.14), not at signup. See `00` #36. (G6)
 
 ## Open questions
 
@@ -64,3 +73,4 @@ None.
 - 2026-10-29 — Draft created from the planning chat on claude.ai.
 - 2026-11-17 — Finalized with the owner in fast-track sitting 1. The owner confirmed every draft idea, chose Claude's recommendation on every question, and confirmed Claude's additions: #2 GSTIN check and optional B2C details, #3 place of supply, #5 per-item and per-bill discounts with GST after discount, #6 round-off line, #14 never edited.
 - 2026-11-18 — #5: a bill discount in rupees means the customer pays exactly ₹X less (owner, 2026-11-18, while reviewing the P1.12 GST engine). Added to #5's text.
+- 2026-11-19 — Fast-track sitting 2, GST questions G1–G6: the owner took every recommendation, G1 in the version revised by the P1.7 design (rate and HSN format checked, not the HSN-to-rate match). Added #20–25. No earlier point changed.

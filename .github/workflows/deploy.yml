@@ -1,0 +1,161 @@
+# Deploys a commit of main to the demo server (stage 6, ADR 0012; design:
+# docs/plans/2026-11-19-stage-6-cd.md). Runs after the images workflow has smoke-tested and
+# pushed that commit's ARM64 images, and waits for the owner's approval in the GitHub
+# environment "demo". No AWS keys are stored anywhere: the job swaps GitHub's OIDC token for
+# one-hour credentials of a role that may only run commands on the demo server.
+#
+# Flow: deploy hold → credentials → server running? → note the running release → backup →
+# deploy → live check. If the deploy or the live check fails, it redeploys the release that
+# was running before, checks again, and the job stays red.
+#
+# Run by hand (Actions → deploy → Run workflow) to deploy any commit already on main, which is
+# also the manual rollback. The same approval applies.
+name: deploy
+
+on:
+  workflow_run:
+    workflows: [images]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: Commit on main to deploy (full or short hash; empty for the newest)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+# One deploy at a time, never cancelled half-way. A newer deploy waiting in the queue replaces
+# an older one that hasn't started: only the newest commit is worth deploying.
+concurrency:
+  group: deploy-demo
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # From the images workflow: only when it succeeded, for a commit on main.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # The approval click: the environment requires the owner as reviewer and accepts main only.
+    environment:
+      name: demo
+      url: https://business-software.duckdns.org
+    permissions:
+      contents: read
+      # To ask GitHub for the OIDC token AWS trusts (infra/terraform/demo/deploy.tf).
+      id-token: write
+      # To check the images exist on GHCR before telling the server to pull them.
+      packages: read
+    env:
+      DEMO_INSTANCE_ID: ${{ vars.DEMO_INSTANCE_ID }}
+    steps:
+      # Fails closed: deploys only while DEPLOY_HOLD is exactly "off". Unset (the environment
+      # isn't set up yet) or any other text (the reason for the hold) stops here, before AWS.
+      - name: Deploy hold
+        env:
+          DEPLOY_HOLD: ${{ vars.DEPLOY_HOLD }}
+        run: |
+          if [[ $DEPLOY_HOLD != off ]]; then
+            echo "::error::Deploy hold: ${DEPLOY_HOLD:-DEPLOY_HOLD is not set}"
+            exit 1
+          fi
+          [[ $DEMO_INSTANCE_ID =~ ^i-[0-9a-f]+$ ]] ||
+            { echo "::error::Variable DEMO_INSTANCE_ID is not set"; exit 1; }
+
+      # Every branch, so demo.sh can check the commit is on main (origin/main).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Which commit
+        id: commit
+        env:
+          FROM_IMAGES: ${{ github.event.workflow_run.head_sha }}
+          FROM_INPUT: ${{ inputs.commit }}
+        run: |
+          sha=$(git rev-parse --verify "${FROM_IMAGES:-${FROM_INPUT:-origin/main}}^{commit}")
+          git merge-base --is-ancestor "$sha" origin/main ||
+            { echo "::error::$sha is not on main"; exit 1; }
+          echo "sha=$sha" >>"$GITHUB_OUTPUT"
+          echo "Deploying $sha: $(git log -1 --format=%s "$sha")"
+
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: deploy-${{ github.run_id }}
+          role-duration-seconds: 3600
+          aws-region: ap-south-1
+
+      # The server and RDS are stopped outside sessions (ADR 0033). The deploy role may not
+      # start them: a person does, RDS first, then approves again.
+      - name: Is the server running
+        run: |
+          state=$(aws ec2 describe-instances --instance-ids "$DEMO_INSTANCE_ID" \
+            --query 'Reservations[0].Instances[0].State.Name' --output text)
+          [[ $state == running ]] ||
+            { echo "::error::The server is $state: start RDS, then the server, then run this again"; exit 1; }
+
+      # What runs now is what a failed deploy goes back to. Empty on a server's first release.
+      - name: Note the running release
+        id: previous
+        run: |
+          previous=$(scripts/deploy/current-release.sh)
+          echo "sha=$previous" >>"$GITHUB_OUTPUT"
+          echo "Running now: ${previous:-nothing}"
+
+      # Before anything changes (ADR 0037). If it fails, nothing is deployed.
+      - name: Back up the database
+        run: scripts/deploy/backup.sh before-deploy
+
+      - name: Deploy
+        id: deploy
+        env:
+          SHA: ${{ steps.commit.outputs.sha }}
+        run: scripts/deploy/demo.sh "$SHA"
+
+      # Three tries, 15 s apart: Caddy and the API can need a moment after the restart, and a
+      # needless rollback costs more than the wait.
+      - name: Check the live site
+        id: live
+        run: |
+          for try in 1 2 3; do
+            scripts/deploy/check-live.sh && exit 0
+            echo "live check failed (try $try of 3)"
+            sleep 15
+          done
+          exit 1
+
+      # Rollback: the previous release's images on the new schema, which works because every
+      # migration is expand-then-contract (a step that drops what the old release uses waits
+      # for a later release). The job stays red so the failure is seen.
+      - name: Roll back to the release that was running
+        if: >-
+          failure() && steps.previous.outputs.sha != '' &&
+          (steps.deploy.conclusion == 'failure' || steps.live.conclusion == 'failure')
+        env:
+          PREVIOUS: ${{ steps.previous.outputs.sha }}
+        run: |
+          echo "::error::Deploy failed: rolling back to $PREVIOUS"
+          scripts/deploy/demo.sh "$PREVIOUS"
+          for _ in 1 2 3; do
+            if scripts/deploy/check-live.sh; then
+              echo "::error::Rolled back to $PREVIOUS, which is live; the failed commit is not"
+              exit 1
+            fi
+            sleep 15
+          done
+          echo "::error::Rolled back to $PREVIOUS, but the live check still fails: look now"
+          exit 1

@@ -2,8 +2,9 @@
 # Deploys one commit to the demo server. Run as root through Systems Manager by
 # scripts/deploy/demo.sh, from a copy of this folder taken from GitHub at that same commit:
 #   bash install.sh <40-character commit hash>
-# Installs the server files, makes sure the database exists, records which images to run,
-# and restarts the stack. Running it again with the same commit changes nothing.
+# Installs the server files and the nightly backup's timer, makes sure the database and its
+# roles exist, records which images to run, and restarts the stack. Running it again with the
+# same commit changes nothing.
 set -euo pipefail
 
 sha=${1:-}
@@ -14,9 +15,12 @@ readonly src dir=/opt/business-software
 
 install -d -m 755 "$dir" "$dir/certs"
 install -m 644 "$src/compose.yaml" "$dir/compose.yaml"
-install -m 755 "$src/start.sh" "$src/bootstrap-db.sh" "$dir/"
-install -m 644 "$src/../../packages/db/bootstrap/create-roles.sql" "$dir/create-roles.sql"
-install -m 644 "$src/business-software.service" /etc/systemd/system/business-software.service
+install -m 755 "$src/start.sh" "$src/bootstrap-db.sh" "$src/backup.sh" "$src/dump.sh" \
+  "$src/restore-drill.sh" "$src/restore-check.sh" "$dir/"
+install -m 644 "$src/../../packages/db/bootstrap/create-roles.sql" \
+  "$src/../../packages/db/bootstrap/create-backup-role.sql" "$dir/"
+install -m 644 "$src/business-software.service" "$src/business-software-backup.service" \
+  "$src/business-software-backup.timer" /etc/systemd/system/
 
 # Amazon's certificate authorities for RDS in Mumbai (public, from AWS's trust store). The
 # app and psql check RDS's certificate against these (sslmode=verify-full).
@@ -31,6 +35,9 @@ mv "$dir/certs/rds-ca.pem.new" "$dir/certs/rds-ca.pem"
 printf 'IMAGE_TAG=%s\n' "$sha" >"$dir/release.env"
 systemctl daemon-reload
 systemctl enable business-software.service
+# The nightly backup (ADR 0037). Enabling the timer runs nothing now; the first backup comes at
+# 22:45 IST or the next boot, or by hand with scripts/deploy/backup.sh now.
+systemctl enable --now business-software-backup.timer
 systemctl reset-failed business-software.service || true
 # restart = stop the old containers, then start.sh with the new images: a few seconds of
 # downtime (stage 6 can make this smoother). --no-block, then wait for the outcome: a first

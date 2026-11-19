@@ -27,6 +27,7 @@ function parse(keys: string): KeyCombo {
   }
   if (/^[A-Z]$/i.test(name)) combo.key = `Key${name.toUpperCase()}`;
   else if (/^[0-9]$/.test(name)) combo.key = `Digit${name}`;
+  else if (name === '/') combo.key = 'Slash';
   else if (!isFunctionOrEscape(name) && name !== '?') {
     throw new Error(`Unknown key "${name}" in "${keys}"`);
   }
@@ -43,7 +44,7 @@ export function sameCombo(a: KeyCombo, b: KeyCombo): boolean {
 
 const RESERVED = BROWSER_KEYS.map(parse);
 
-/** Parses `F2`, `Escape`, `?`, `Alt+H`, `Ctrl+Shift+K`, refusing the browser's own keys. */
+/** Parses `F2`, `Escape`, `?`, `/`, `Alt+H`, `Ctrl+Shift+K`, refusing the browser's own keys. */
 export function parseKeys(keys: string): KeyCombo {
   const combo = parse(keys);
   if (RESERVED.some((reserved) => sameCombo(reserved, combo))) {
@@ -58,7 +59,8 @@ export function parseKeys(keys: string): KeyCombo {
  * Ctrl+Alt (AltGr on some layouts) never counts as Alt.
  */
 export function matches(combo: KeyCombo, event: KeyboardEvent): boolean {
-  const physical = /^(Key|Digit)/.test(combo.key);
+  // `/` (search) is the slash key by position too: Inscript types "य" there.
+  const physical = /^(Key|Digit|Slash)/.test(combo.key);
   // "?" is also Shift+/ by position: on the Hindi Inscript layout that key types "य़".
   const question = combo.key === '?' && event.code === 'Slash' && event.shiftKey;
   if (!question && (physical ? event.code : event.key) !== combo.key) return false;

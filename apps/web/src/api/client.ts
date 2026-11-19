@@ -11,6 +11,8 @@ export class ApiError extends Error {
     readonly fields: FieldErrors = {},
     /** With `too_many_attempts`: when trying again is allowed (Module 00 #41). */
     readonly retryAt?: string,
+    /** The rest of the answer, such as the item that already has a barcode. */
+    readonly detail: Readonly<Record<string, unknown>> = {},
   ) {
     super(`API answered ${String(status)} ${code}`);
   }
@@ -64,7 +66,7 @@ export async function apiRequest<T>(method: string, path: string, body?: unknown
     if (response.status === 401 && AUTH_CODES.has(code)) {
       for (const listener of authListeners) listener(code);
     }
-    throw new ApiError(response.status, code, answer?.fields, answer?.retryAt);
+    throw new ApiError(response.status, code, answer?.fields, answer?.retryAt, answer ?? {});
   }
   return answer as T;
 }

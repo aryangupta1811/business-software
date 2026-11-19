@@ -8,7 +8,8 @@
   "nav": {
     "label": "Mukhya",
     "home": "Home",
-    "settings": "Settings"
+    "settings": "Settings",
+    "items": "Saamaan"
   },
   "theme": {
     "toDark": "Dark mode chalu karein",
@@ -22,7 +23,10 @@
       "navigation": "Navigation"
     },
     "openHelp": "Keyboard shortcuts dikhayein",
-    "goHome": "Home par jaayein"
+    "goHome": "Home par jaayein",
+    "goItems": "Saamaan par jaayein",
+    "search": "Saamaan khojein",
+    "newItem": "Naya saamaan jodein"
   },
   "connection": {
     "checking": "Connection check ho raha hai…",
@@ -111,52 +115,11 @@
       "password": "Password",
       "passwordHint": "Kam se kam 10 akshar. Ek chhota vaakya yaad rakhna aasaan hai."
     },
+    "showPassword": "Password dikhayein",
+    "hidePassword": "Password chhupayein",
     "submit": "Account banayein",
     "submitting": "Account ban raha hai…",
     "failed": "Account nahi ban saka. Connection check karein aur phir koshish karein."
-  },
-  "password": {
-    "show": "Password dikhayein",
-    "hide": "Password chhupayein"
-  },
-  "login": {
-    "title": "Login",
-    "counterOf": "Yeh counter {{business}} ka hai.",
-    "who": "Kaun login kar raha hai",
-    "as": {
-      "staff": "Staff",
-      "owner": "Maalik"
-    },
-    "email": "Email",
-    "username": "Username",
-    "password": "Password",
-    "submit": "Login karein",
-    "submitting": "Login ho raha hai…",
-    "wrongOwner": "Email aur password match nahi karte. Dono check karein aur phir koshish karein.",
-    "wrongStaff": "Username aur password match nahi karte. Dono check karein aur phir koshish karein.",
-    "tooMany": "Bahut zyada koshishein. {{time}} par phir koshish karein.",
-    "noDevice": "Staff usi counter par login kar sakta hai jahan maalik ne login kiya ho. Maalik se ek baar yahan login karne ko kahein.",
-    "busy": "Server busy hai. Kuch second baad phir koshish karein.",
-    "failed": "Login nahi ho saka. Connection check karein aur phir koshish karein.",
-    "newBusiness": "Naye hain?",
-    "signUp": "Account banayein"
-  },
-  "lock": {
-    "title": "Counter lock hai",
-    "who": "Login: {{user}}, {{business}}",
-    "unlock": "Unlock karein",
-    "unlocking": "Unlock ho raha hai…",
-    "wrongPassword": "Galat password. Phir koshish karein.",
-    "failed": "Unlock nahi ho saka. Connection check karein aur phir koshish karein.",
-    "switchUser": "Doosra user"
-  },
-  "session": {
-    "roles": {
-      "owner": "Maalik",
-      "staff": "Staff"
-    },
-    "lockNow": "Abhi lock karein",
-    "logout": "Logout"
   },
   "businessTypes": {
     "kirana": {
@@ -216,9 +179,9 @@
       },
       "gstin": {
         "invalid": "GSTIN check karein: 15 akshar, state code se shuru",
-        "not_registered": "Jo business GST mein registered nahin hai, uska GSTIN nahin hota",
         "state_mismatch": "GSTIN ke pehle do ank state se milne chahiye",
-        "pan_mismatch": "GSTIN mein PAN hona chahiye"
+        "pan_mismatch": "GSTIN mein PAN hona chahiye",
+        "not_registered": "Jo business GST mein registered nahin hai, uska GSTIN nahin hota"
       },
       "pan": {
         "invalid": "ABCDE1234F jaisa PAN likhein"
@@ -239,10 +202,59 @@
         "too_small": "5 se 120 minute likhein",
         "too_big": "5 se 120 minute likhein"
       },
+      "sellingPrice": {
+        "invalid": "52.50 jaisi raqam likhein"
+      },
+      "mrp": {
+        "invalid": "55.00 jaisi raqam likhein",
+        "too_small": "MRP ₹0 se zyada hoti hai"
+      },
+      "wholesalePrice": {
+        "invalid": "49.00 jaisi raqam likhein"
+      },
+      "purchasePrice": {
+        "invalid": "45.00 jaisi raqam likhein"
+      },
+      "hsn": {
+        "invalid": "Saamaan: 4, 6 ya 8 ank. Seva: 99 se shuru 6 ank"
+      },
+      "code": {
+        "invalid": "Akshar, ank aur chinh, bina space, 20 tak"
+      },
+      "barcode": {
+        "invalid": "4 se 48 akshar, ank ya chinh, bina space"
+      },
+      "size": {
+        "invalid": "12 ya 0.5 jaisi sankhya likhein",
+        "too_small": "Pack mein 0 se zyada hota hai"
+      },
+      "level": {
+        "invalid": "5 ya 2.5 jaisi sankhya likhein"
+      },
       "username": {
         "invalid": "3 se 32 akshar, ank, dot, dash ya underscore likhein"
       }
-    }
+    },
+    "too_small": "Yeh bahut kam hai",
+    "too_big": "Yeh bahut zyada hai",
+    "too_many": "Bahut zyada",
+    "duplicate": "Yeh list mein pehle se hai",
+    "name_taken": "Yeh naam pehle se use mein hai",
+    "code_taken": "Yeh code kisi aur saamaan ka hai",
+    "barcode_taken": "Yeh barcode kisi aur saamaan par hai",
+    "above_mrp": "MRP se zyada nahi ho sakta",
+    "mrp_needs_inclusive_price": "MRP ho to daam mein GST shaamil hona chahiye",
+    "gst_required": "GST mein registered dukaan ke liye zaroori",
+    "not_for_service": "Seva mein yeh nahi hota",
+    "same_as_stock_unit": "Yeh stock ki unit hi hai: doosri chunein",
+    "unit_mismatch": "Stock ki unit mein nahi naapa ja sakta",
+    "size_mismatch": "Unit ke tay naap se match nahi karta",
+    "duplicate_pack": "Do pack ek hi unit mein hain",
+    "built_in": "Yeh unit pehle se bani hai",
+    "archived": "Yeh archived hai",
+    "server": "Save nahi ho saka. Phir koshish karein",
+    "network": "Server se jud nahi pa rahe",
+    "forbidden": "Aapko iski anumati nahi hai"
   },
   "recoveryKey": {
     "title": "Apni recovery key sambhaal kar rakhein",
@@ -357,5 +369,226 @@
     "multiple_units": "Kai units (piece, dibba, kilo)",
     "wholesale_price": "Thok daam",
     "large_credit": "Thekedaaron ko bada udhaar"
+  },
+  "dialog": {
+    "cancel": "Radd karein"
+  },
+  "units": {
+    "kg": "kilo",
+    "g": "gram",
+    "litre": "litre",
+    "ml": "ml",
+    "piece": "piece",
+    "box": "dibba",
+    "dozen": "darjan",
+    "pack": "packet",
+    "bag": "bori",
+    "metre": "meter",
+    "foot": "foot",
+    "pair": "jodi"
+  },
+  "items": {
+    "tabs": {
+      "label": "Saamaan ke hisse",
+      "items": "Saamaan",
+      "catalogue": "Categories aur units"
+    },
+    "loading": "Load ho raha hai…",
+    "loadFailed": "Saamaan load nahi ho saka.",
+    "retry": "Phir se koshish karein",
+    "loggedOut": {
+      "title": "Saamaan dekhne ke liye login karein",
+      "body": "Saamaan kisi dukaan ka hota hai. Dekhne aur badalne ke liye login karein."
+    },
+    "notFound": {
+      "title": "Aisa koi saamaan nahi",
+      "body": "Shayad pata galat likha gaya. Saamaan ki list se kholein."
+    },
+    "search": "Saamaan khojein",
+    "searchPlaceholder": "Naam, code ya barcode",
+    "category": "Category",
+    "allCategories": "Sabhi categories",
+    "showArchived": "Sirf archived",
+    "add": "Saamaan jodein",
+    "columns": {
+      "name": "Naam",
+      "code": "Code",
+      "category": "Category",
+      "unit": "Unit",
+      "price": "Daam",
+      "mrp": "MRP",
+      "cost": "Kharid",
+      "gst": "GST"
+    },
+    "archived": "Archived",
+    "service": "Seva",
+    "empty": "Abhi koi saamaan nahi. Pehla jodein, ya uska barcode scan karein.",
+    "noMatches": "Koi saamaan match nahi karta.",
+    "more": "Aur dikhayein",
+    "newTitle": "Naya saamaan",
+    "editTitle": "Saamaan",
+    "isArchived": "Yeh saamaan archived hai: bill mein nahi dikhta aur badla nahi ja sakta. Phir se use karne ke liye wapas laayein.",
+    "saving": "Save ho raha hai…",
+    "save": "Save karein",
+    "create": "Saamaan jodein",
+    "saved": "Save ho gaya",
+    "archive": "Archive karein",
+    "restore": "Wapas laayein",
+    "noCategory": "Koi category nahi",
+    "noGstRate": "Tay nahi",
+    "errors": {
+      "barcodeTakenBy": "Barcode {{code}} pehle se “{{name}}” par hai.",
+      "stale": "Aapke badalte samay kisi aur ne yeh saamaan save kar diya. Unke badlaav dekhne ke liye page phir se kholein, phir apne badlaav dobara karein.",
+      "archived": "Is beech yeh saamaan archive ho gaya. Badalne ke liye wapas laayein.",
+      "failed": "Save nahi ho saka. Connection check karein aur phir koshish karein.",
+      "name_taken": "Yeh naam kisi aur saamaan ka hai.",
+      "code_taken": "Yeh code kisi aur saamaan ka hai.",
+      "unsaved": "Pehle apne badlaav save karein ya hatayein."
+    },
+    "cards": {
+      "basics": "Mool jaankari",
+      "basicsLead": "Bill aur khoj mein saamaan ka naam.",
+      "price": "Daam aur tax",
+      "priceLead": "Daam stock ki ek unit ka hai. GST bill jaise hi gina jaata hai.",
+      "stock": "Pack, barcode aur kam stock",
+      "stockLead": "Aur kin units mein bikta ya kharida jaata hai, aur kab kam stock ki chetavni dein.",
+      "stockOnly": "Barcode aur kam stock",
+      "stockOnlyLead": "Is par chhape code, aur kab kam stock ki chetavni dein."
+    },
+    "fields": {
+      "kind": "Prakaar",
+      "name": "Naam",
+      "hindiName": "Hindi mein naam",
+      "code": "Chhota code",
+      "codeHint": "Zaroori nahi. Counter par naam ki jagah yeh likhein.",
+      "category": "Category",
+      "categoryHint": "Categories “Categories aur units” tab mein jodein.",
+      "brand": "Brand",
+      "stockUnit": "Stock ki unit",
+      "sellingPrice": "Bikri daam (₹)",
+      "mrp": "MRP (₹)",
+      "wholesalePrice": "Thok daam (₹)",
+      "purchasePrice": "Kharid daam (₹)",
+      "purchasePriceHint": "Yeh sirf wahi dekhte hain jinhe laagat dekhne ki anumati hai.",
+      "gstRate": "GST dar",
+      "gstOptional": "GST mein register hone par zaroori.",
+      "hsn": "HSN code",
+      "sac": "SAC code",
+      "priceIncludesTax": "Daam mein GST shaamil hai"
+    },
+    "kinds": {
+      "goods": "Saamaan",
+      "service": "Seva"
+    },
+    "preview": {
+      "taxable": "GST se pehle",
+      "tax": "GST",
+      "total": "Grahak dega",
+      "margin": "Munafa",
+      "aboveMrp": "Bikri daam MRP se zyada hai. MRP se zyada mein bechna kanoon ke khilaaf hai."
+    },
+    "packs": {
+      "title": "Pack",
+      "unit": "Unit",
+      "chooseUnit": "Chunein…",
+      "size": "Kitne {{unit}}",
+      "price": "Pack ka daam (₹)",
+      "priceHint": "Khaali: size × daam",
+      "remove": "Pack {{number}} hatayein",
+      "sold": "Pack mein bikta hai",
+      "bought": "Pack mein kharida jaata hai",
+      "add": "Pack jodein"
+    },
+    "barcodes": {
+      "title": "Barcode",
+      "lead": "Counter par inmein se koi bhi scan karne par yeh saamaan milta hai. Jodna ya hatana turant save hota hai.",
+      "newHint": "Is par chhape code scan karein ya likhein. Dukaan ke apne code save karne ke baad ban sakte hain.",
+      "code": "Barcode {{number}}",
+      "remove": "Barcode {{code}} hatayein",
+      "add": "Barcode jodein",
+      "none": "Abhi koi barcode nahi.",
+      "inStore": "Dukaan ka",
+      "removeSaved": "Hatayein",
+      "newCode": "Naya barcode",
+      "makeInStore": "Dukaan ka code banayein",
+      "stockUnit": "Ek {{unit}}"
+    },
+    "levels": {
+      "title": "Kam stock ki chetavni",
+      "for": "Branch: {{branch}}",
+      "hint": "Stock itne {{unit}} par aane par chetavni dein. Khaali: kabhi nahi."
+    },
+    "confirm": {
+      "archiveTitle": "“{{name}}” archive karein?",
+      "archiveBody": "Yeh bill aur khoj se hat jaayega. Iska itihaas rahega, aur aap kabhi bhi wapas la sakte hain.",
+      "restoreTitle": "“{{name}}” wapas laayein?",
+      "restoreBody": "Yeh bill aur khoj mein wapas aa jaayega."
+    },
+    "catalogue": {
+      "categories": "Categories",
+      "categoriesLead": "Saamaan ko apne tareeke se baantein: pehle se koi nahi bani.",
+      "noCategories": "Abhi koi category nahi.",
+      "categoryName": "Category ka naam",
+      "rename": "Naam badlein",
+      "newCategory": "Nayi category",
+      "add": "Jodein",
+      "units": "Aapki apni units",
+      "unitsLead": "Un pack ke liye jo pehle se bani units mein nahi, jaise 24 ki crate.",
+      "noUnits": "Abhi aapki koi unit nahi.",
+      "unitSize": "1 {{name}} = {{size}} {{base}}",
+      "unitName": "Unit ka naam",
+      "baseUnit": "Kisse bani",
+      "defaultSize": "Ek mein kitne",
+      "defaultSizeHint": "Har saamaan ise apne liye badal sakta hai.",
+      "addUnit": "Unit jodein"
+    },
+    "scan": {
+      "unknown": "Barcode {{code}} kisi saamaan par nahi hai.",
+      "loggedOut": "Barcode {{code}} dekhne ke liye phir se login karein.",
+      "failed": "Barcode {{code}} dekha nahi ja saka. Connection check karein aur phir scan karein."
+    }
+  },
+  "password": {
+    "show": "Password dikhayein",
+    "hide": "Password chhupayein"
+  },
+  "login": {
+    "title": "Login",
+    "counterOf": "Yeh counter {{business}} ka hai.",
+    "who": "Kaun login kar raha hai",
+    "as": {
+      "staff": "Staff",
+      "owner": "Maalik"
+    },
+    "email": "Email",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Login karein",
+    "submitting": "Login ho raha hai…",
+    "wrongOwner": "Email aur password match nahi karte. Dono check karein aur phir koshish karein.",
+    "wrongStaff": "Username aur password match nahi karte. Dono check karein aur phir koshish karein.",
+    "tooMany": "Bahut zyada koshishein. {{time}} par phir koshish karein.",
+    "noDevice": "Staff usi counter par login kar sakta hai jahan maalik ne login kiya ho. Maalik se ek baar yahan login karne ko kahein.",
+    "busy": "Server busy hai. Kuch second baad phir koshish karein.",
+    "failed": "Login nahi ho saka. Connection check karein aur phir koshish karein.",
+    "newBusiness": "Naye hain?",
+    "signUp": "Account banayein"
+  },
+  "lock": {
+    "title": "Counter lock hai",
+    "who": "Login: {{user}}, {{business}}",
+    "unlock": "Unlock karein",
+    "unlocking": "Unlock ho raha hai…",
+    "wrongPassword": "Galat password. Phir koshish karein.",
+    "failed": "Unlock nahi ho saka. Connection check karein aur phir koshish karein.",
+    "switchUser": "Doosra user"
+  },
+  "session": {
+    "roles": {
+      "owner": "Maalik",
+      "staff": "Staff"
+    },
+    "lockNow": "Abhi lock karein",
+    "logout": "Logout"
   }
 }

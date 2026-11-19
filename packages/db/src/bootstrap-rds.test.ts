@@ -125,4 +125,36 @@ describe('the bootstrap files run by a non-superuser admin, as on RDS', () => {
     const url = `postgresql://app_owner:owner-test@${container.getHost()}:${String(container.getPort())}/business_software`;
     await expect(runMigrations(url)).resolves.toBeUndefined();
   });
+
+  // bootstrap-db.sh runs the file on every deploy, so a role left half made (a run that
+  // stopped after CREATE ROLE) or a rotated password in SSM is put right at the next deploy
+  // (PR #32 review).
+  it('repairs the backup role and applies a new password on the next run', async () => {
+    await superuser.query('alter role app_backup reset default_transaction_read_only');
+    await superuser.query('alter role app_backup password null');
+    await superuser.query('revoke connect on database business_software from app_backup');
+
+    const rerun = await container.exec(
+      ['psql', '-U', 'rds_admin', '-d', 'postgres', '-X', '-v', 'ON_ERROR_STOP=1'].concat([
+        '-f',
+        '/tmp/create-backup-role.sql',
+      ]),
+      { env: { ...passwords, APP_BACKUP_PASSWORD: 'backup-rotated' } },
+    );
+    expect(rerun.exitCode, rerun.output).toBe(0);
+    expect(rerun.output).not.toMatch(/WARNING/);
+
+    const backup = new Pool({
+      connectionString: `postgresql://app_backup:backup-rotated@${container.getHost()}:${String(container.getPort())}/business_software`,
+    });
+    try {
+      const { rows } = await backup.query<{ read_only: string }>(
+        'select current_setting($1) as read_only',
+        ['default_transaction_read_only'],
+      );
+      expect(rows).toEqual([{ read_only: 'on' }]);
+    } finally {
+      await backup.end();
+    }
+  });
 });

@@ -7,8 +7,9 @@
 -- role, every row (packages/db/src/schema.ts, checked by src/tenancy-guard.test.ts). Its table
 -- grants (SELECT only) come from migration 0006.
 --
--- Safe to run more than once: it does nothing when the role exists. Run after
--- create-roles.sql, by the same administrator:
+-- Safe to run more than once: it creates the role only when missing, and sets everything else
+-- on every run, so a run that stopped half-way, or a new password in SSM, is put right by the
+-- next one. Run after create-roles.sql, by the same administrator:
 --   - Docker and the tests run it as 20-create-backup-role.sql, after 10-create-roles.sql.
 --   - On RDS, deploy/demo/bootstrap-db.sh runs it on every deploy, so a database made before
 --     this file existed gets the role before migration 0006 needs it.
@@ -24,15 +25,16 @@ SELECT NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_backup') AS creat
   -- NOBYPASSRLS on purpose: the backup_read policies decide what it sees, so a table that
   -- forgot its policy fails the guard test instead of being silently readable.
   CREATE ROLE app_backup LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
-  \if :{?backup_password}
-    -- Its own statement, like create-roles.sql: a failing CREATE ROLE is logged, this isn't.
-    ALTER ROLE app_backup PASSWORD :'backup_password';
-  \endif
-  -- Read-only even if a grant slips through: every transaction starts READ ONLY.
-  ALTER ROLE app_backup SET default_transaction_read_only = on;
-  -- The database belongs to app_owner; a non-superuser admin (RDS) may only grant on it as
-  -- app_owner, and PostgreSQL would just WARN otherwise.
-  SET ROLE app_owner;
-  GRANT CONNECT ON DATABASE business_software TO app_backup;
-  RESET ROLE;
 \endif
+
+\if :{?backup_password}
+  -- Its own statement, like create-roles.sql: a failing CREATE ROLE is logged, this isn't.
+  ALTER ROLE app_backup PASSWORD :'backup_password';
+\endif
+-- Read-only even if a grant slips through: every transaction starts READ ONLY.
+ALTER ROLE app_backup SET default_transaction_read_only = on;
+-- The database belongs to app_owner; a non-superuser admin (RDS) may only grant on it as
+-- app_owner, and PostgreSQL would just WARN otherwise.
+SET ROLE app_owner;
+GRANT CONNECT ON DATABASE business_software TO app_backup;
+RESET ROLE;

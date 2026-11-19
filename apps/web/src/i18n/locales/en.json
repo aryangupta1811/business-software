@@ -111,11 +111,52 @@
       "password": "Password",
       "passwordHint": "At least 10 characters. A short sentence is easy to remember."
     },
-    "showPassword": "Show password",
-    "hidePassword": "Hide password",
     "submit": "Create account",
     "submitting": "Creating account…",
     "failed": "Couldn't create the account. Check the connection and try again."
+  },
+  "password": {
+    "show": "Show password",
+    "hide": "Hide password"
+  },
+  "login": {
+    "title": "Log in",
+    "counterOf": "This counter belongs to {{business}}.",
+    "who": "Who is logging in",
+    "as": {
+      "staff": "Staff",
+      "owner": "Owner"
+    },
+    "email": "Email",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Log in",
+    "submitting": "Logging in…",
+    "wrongOwner": "That email and password don't match. Check both and try again.",
+    "wrongStaff": "That username and password don't match. Check both and try again.",
+    "tooMany": "Too many tries. Try again at {{time}}.",
+    "noDevice": "Staff can log in only on a counter where the owner has logged in. Ask the owner to log in here once.",
+    "busy": "The server is busy. Try again in a few seconds.",
+    "failed": "Couldn't log in. Check the connection and try again.",
+    "newBusiness": "New here?",
+    "signUp": "Create an account"
+  },
+  "lock": {
+    "title": "Counter locked",
+    "who": "Logged in: {{user}}, {{business}}",
+    "unlock": "Unlock",
+    "unlocking": "Unlocking…",
+    "wrongPassword": "Wrong password. Try again.",
+    "failed": "Couldn't unlock. Check the connection and try again.",
+    "switchUser": "Switch user"
+  },
+  "session": {
+    "roles": {
+      "owner": "Owner",
+      "staff": "Staff"
+    },
+    "lockNow": "Lock now",
+    "logout": "Log out"
   },
   "businessTypes": {
     "kirana": {
@@ -197,6 +238,9 @@
         "invalid": "Enter 5 to 120 minutes",
         "too_small": "Enter 5 to 120 minutes",
         "too_big": "Enter 5 to 120 minutes"
+      },
+      "username": {
+        "invalid": "Use 3 to 32 letters, digits, dots, dashes or underscores"
       }
     }
   },

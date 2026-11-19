@@ -111,11 +111,52 @@
       "password": "Password",
       "passwordHint": "Kam se kam 10 akshar. Ek chhota vaakya yaad rakhna aasaan hai."
     },
-    "showPassword": "Password dikhayein",
-    "hidePassword": "Password chhupayein",
     "submit": "Account banayein",
     "submitting": "Account ban raha hai…",
     "failed": "Account nahi ban saka. Connection check karein aur phir koshish karein."
+  },
+  "password": {
+    "show": "Password dikhayein",
+    "hide": "Password chhupayein"
+  },
+  "login": {
+    "title": "Login",
+    "counterOf": "Yeh counter {{business}} ka hai.",
+    "who": "Kaun login kar raha hai",
+    "as": {
+      "staff": "Staff",
+      "owner": "Maalik"
+    },
+    "email": "Email",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Login karein",
+    "submitting": "Login ho raha hai…",
+    "wrongOwner": "Email aur password match nahi karte. Dono check karein aur phir koshish karein.",
+    "wrongStaff": "Username aur password match nahi karte. Dono check karein aur phir koshish karein.",
+    "tooMany": "Bahut zyada koshishein. {{time}} par phir koshish karein.",
+    "noDevice": "Staff usi counter par login kar sakta hai jahan maalik ne login kiya ho. Maalik se ek baar yahan login karne ko kahein.",
+    "busy": "Server busy hai. Kuch second baad phir koshish karein.",
+    "failed": "Login nahi ho saka. Connection check karein aur phir koshish karein.",
+    "newBusiness": "Naye hain?",
+    "signUp": "Account banayein"
+  },
+  "lock": {
+    "title": "Counter lock hai",
+    "who": "Login: {{user}}, {{business}}",
+    "unlock": "Unlock karein",
+    "unlocking": "Unlock ho raha hai…",
+    "wrongPassword": "Galat password. Phir koshish karein.",
+    "failed": "Unlock nahi ho saka. Connection check karein aur phir koshish karein.",
+    "switchUser": "Doosra user"
+  },
+  "session": {
+    "roles": {
+      "owner": "Maalik",
+      "staff": "Staff"
+    },
+    "lockNow": "Abhi lock karein",
+    "logout": "Logout"
   },
   "businessTypes": {
     "kirana": {
@@ -197,6 +238,9 @@
         "invalid": "5 se 120 minute likhein",
         "too_small": "5 se 120 minute likhein",
         "too_big": "5 se 120 minute likhein"
+      },
+      "username": {
+        "invalid": "3 se 32 akshar, ank, dot, dash ya underscore likhein"
       }
     }
   },

@@ -8,7 +8,8 @@
   "nav": {
     "label": "Main",
     "home": "Home",
-    "settings": "Settings"
+    "settings": "Settings",
+    "items": "Items"
   },
   "theme": {
     "toDark": "Switch to dark mode",
@@ -22,7 +23,10 @@
       "navigation": "Navigation"
     },
     "openHelp": "Show keyboard shortcuts",
-    "goHome": "Go to Home"
+    "goHome": "Go to Home",
+    "goItems": "Go to Items",
+    "search": "Search items",
+    "newItem": "Add an item"
   },
   "connection": {
     "checking": "Checking connection…",
@@ -196,8 +200,57 @@
         "invalid": "Enter 5 to 120 minutes",
         "too_small": "Enter 5 to 120 minutes",
         "too_big": "Enter 5 to 120 minutes"
+      },
+      "sellingPrice": {
+        "invalid": "Enter an amount like 52.50"
+      },
+      "mrp": {
+        "invalid": "Enter an amount like 55.00",
+        "too_small": "An MRP is more than ₹0"
+      },
+      "wholesalePrice": {
+        "invalid": "Enter an amount like 49.00"
+      },
+      "purchasePrice": {
+        "invalid": "Enter an amount like 45.00"
+      },
+      "hsn": {
+        "invalid": "Goods: 4, 6 or 8 digits. Services: 6 digits starting 99"
+      },
+      "code": {
+        "invalid": "Letters, digits and symbols, no spaces, up to 20"
+      },
+      "barcode": {
+        "invalid": "4 to 48 letters, digits or symbols, no spaces"
+      },
+      "size": {
+        "invalid": "Enter a number like 12 or 0.5",
+        "too_small": "A pack holds more than 0"
+      },
+      "level": {
+        "invalid": "Enter a number like 5 or 2.5"
       }
-    }
+    },
+    "too_small": "This is too small",
+    "too_big": "This is too big",
+    "too_many": "Too many",
+    "duplicate": "This is already in the list",
+    "name_taken": "This name is already used",
+    "code_taken": "Another item already has this code",
+    "barcode_taken": "Another item already has this barcode",
+    "above_mrp": "Must not be above the MRP",
+    "mrp_needs_inclusive_price": "With an MRP, the price must include GST",
+    "gst_required": "A GST-registered business needs this",
+    "not_for_service": "A service has none",
+    "same_as_stock_unit": "Already the stock unit: choose another",
+    "unit_mismatch": "Can't be measured in the stock unit",
+    "size_mismatch": "Doesn't match the unit's fixed size",
+    "duplicate_pack": "Two packs use the same unit",
+    "built_in": "This unit is built in already",
+    "archived": "This is archived",
+    "server": "Couldn't save. Try again",
+    "network": "Can't reach the server",
+    "forbidden": "You aren't allowed to do this"
   },
   "recoveryKey": {
     "title": "Save your recovery key",
@@ -312,5 +365,176 @@
     "multiple_units": "Several units (piece, box, kg)",
     "wholesale_price": "Wholesale price",
     "large_credit": "Large credit to contractors"
+  },
+  "dialog": {
+    "cancel": "Cancel"
+  },
+  "units": {
+    "kg": "kg",
+    "g": "g",
+    "litre": "litre",
+    "ml": "ml",
+    "piece": "piece",
+    "box": "box",
+    "dozen": "dozen",
+    "pack": "pack",
+    "bag": "bag",
+    "metre": "metre",
+    "foot": "foot",
+    "pair": "pair"
+  },
+  "items": {
+    "tabs": {
+      "label": "Items sections",
+      "items": "Items",
+      "catalogue": "Categories & units"
+    },
+    "loading": "Loading…",
+    "loadFailed": "Couldn't load the items.",
+    "retry": "Try again",
+    "loggedOut": {
+      "title": "Log in to see items",
+      "body": "Items belong to a business. Log in to see and change them."
+    },
+    "notFound": {
+      "title": "No such item",
+      "body": "It may have been typed wrong. Open it from the items list."
+    },
+    "search": "Search items",
+    "searchPlaceholder": "Name, code or barcode",
+    "category": "Category",
+    "allCategories": "All categories",
+    "showArchived": "Show archived",
+    "add": "Add item",
+    "scanUnknown": "No item has the barcode {{code}}.",
+    "columns": {
+      "name": "Name",
+      "code": "Code",
+      "category": "Category",
+      "unit": "Unit",
+      "price": "Price",
+      "mrp": "MRP",
+      "cost": "Cost",
+      "gst": "GST"
+    },
+    "archived": "Archived",
+    "service": "Service",
+    "empty": "No items yet. Add your first one, or scan its barcode.",
+    "noMatches": "No items match.",
+    "more": "Show more",
+    "newTitle": "New item",
+    "editTitle": "Item",
+    "isArchived": "This item is archived: it is hidden from billing and can't be changed. Restore it to use it again.",
+    "saving": "Saving…",
+    "save": "Save",
+    "create": "Add item",
+    "saved": "Saved",
+    "archive": "Archive",
+    "restore": "Restore",
+    "noCategory": "No category",
+    "noGstRate": "Not set",
+    "errors": {
+      "barcodeTakenBy": "The barcode {{code}} is already on “{{name}}”.",
+      "stale": "Someone else saved this item while you were editing. Reload the page to see their changes, then make yours again.",
+      "archived": "This item was archived meanwhile. Restore it to change it.",
+      "failed": "Couldn't save. Check the connection and try again.",
+      "name_taken": "Another item already has this name.",
+      "code_taken": "Another item already has this code."
+    },
+    "cards": {
+      "basics": "Basics",
+      "basicsLead": "What the item is called on bills and in search.",
+      "price": "Price and tax",
+      "priceLead": "Prices are per stock unit. GST is worked out the way the bill will.",
+      "stock": "Packs, barcodes and low stock",
+      "stockLead": "Other units it is sold or bought in, and when to warn that stock is low."
+    },
+    "fields": {
+      "kind": "Type",
+      "name": "Name",
+      "hindiName": "Name in Hindi",
+      "code": "Short code",
+      "codeHint": "Optional. Type it at the counter instead of the name.",
+      "category": "Category",
+      "categoryHint": "Add categories in the “Categories & units” tab.",
+      "brand": "Brand",
+      "stockUnit": "Stock unit",
+      "sellingPrice": "Selling price (₹)",
+      "mrp": "MRP (₹)",
+      "wholesalePrice": "Wholesale price (₹)",
+      "purchasePrice": "Purchase price (₹)",
+      "purchasePriceHint": "Only people allowed to see costs see this.",
+      "gstRate": "GST rate",
+      "gstOptional": "Needed once you register for GST.",
+      "hsn": "HSN code",
+      "sac": "SAC code",
+      "priceIncludesTax": "Price includes GST"
+    },
+    "kinds": {
+      "goods": "Goods",
+      "service": "Service"
+    },
+    "preview": {
+      "taxable": "Before GST",
+      "tax": "GST",
+      "total": "Customer pays",
+      "margin": "Margin",
+      "aboveMrp": "The selling price is above the MRP. Selling above MRP is against the law."
+    },
+    "packs": {
+      "title": "Packs",
+      "unit": "Unit",
+      "chooseUnit": "Choose…",
+      "size": "How many {{unit}}",
+      "price": "Pack price (₹)",
+      "priceHint": "Blank: size × price",
+      "remove": "Remove pack {{number}}",
+      "sold": "Sold as a pack",
+      "bought": "Bought as a pack",
+      "add": "Add a pack"
+    },
+    "barcodes": {
+      "title": "Barcodes",
+      "lead": "Scanning any of these at the counter finds this item. Adding or removing one saves at once.",
+      "newHint": "Scan or type the codes printed on it. In-store codes can be made after saving.",
+      "code": "Barcode {{number}}",
+      "remove": "Remove barcode {{code}}",
+      "add": "Add barcode",
+      "none": "No barcodes yet.",
+      "inStore": "In-store",
+      "removeSaved": "Remove",
+      "newCode": "New barcode",
+      "makeInStore": "Make an in-store code",
+      "stockUnit": "One {{unit}}"
+    },
+    "levels": {
+      "title": "Low-stock warning",
+      "for": "{{branch}}",
+      "hint": "Warn when stock falls to this many {{unit}}. Blank: never."
+    },
+    "confirm": {
+      "archiveTitle": "Archive “{{name}}”?",
+      "archiveBody": "It disappears from billing and search. Its history stays, and you can restore it any time.",
+      "restoreTitle": "Restore “{{name}}”?",
+      "restoreBody": "It comes back to billing and search."
+    },
+    "catalogue": {
+      "categories": "Categories",
+      "categoriesLead": "Group items your way: none are made for you.",
+      "noCategories": "No categories yet.",
+      "categoryName": "Category name",
+      "rename": "Rename",
+      "newCategory": "New category",
+      "add": "Add",
+      "units": "Your own units",
+      "unitsLead": "For packs the built-in units don't cover, like a crate of 24.",
+      "noUnits": "No units of your own yet.",
+      "unitSize": "1 {{name}} = {{size}} {{base}}",
+      "unitName": "Unit name",
+      "baseUnit": "Made of",
+      "defaultSize": "How many in one",
+      "defaultSizeHint": "An item can change it for itself.",
+      "addUnit": "Add unit"
+    }
   }
 }

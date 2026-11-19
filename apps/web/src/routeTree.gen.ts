@@ -15,6 +15,9 @@ import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppDesignRouteImport } from './routes/_app/design'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as PublicSignupRouteImport } from './routes/_public/signup'
+import { Route as AppItemsIndexRouteImport } from './routes/_app/items.index'
+import { Route as AppItemsIdRouteImport } from './routes/_app/items.$id'
+import { Route as AppItemsNewRouteImport } from './routes/_app/items.new'
 import { Route as PublicSignupRecoveryKeyRouteImport } from './routes/_public/signup_.recovery-key'
 
 const AppRoute = AppRouteImport.update({
@@ -45,6 +48,21 @@ const PublicSignupRoute = PublicSignupRouteImport.update({
   path: '/signup',
   getParentRoute: () => PublicRoute,
 } as any)
+const AppItemsIndexRoute = AppItemsIndexRouteImport.update({
+  id: '/items/',
+  path: '/items/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppItemsIdRoute = AppItemsIdRouteImport.update({
+  id: '/items/$id',
+  path: '/items/$id',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppItemsNewRoute = AppItemsNewRouteImport.update({
+  id: '/items/new',
+  path: '/items/new',
+  getParentRoute: () => AppRoute,
+} as any)
 const PublicSignupRecoveryKeyRoute = PublicSignupRecoveryKeyRouteImport.update({
   id: '/signup_/recovery-key',
   path: '/signup/recovery-key',
@@ -56,14 +74,20 @@ export interface FileRoutesByFullPath {
   '/design': typeof AppDesignRoute
   '/settings': typeof AppSettingsRoute
   '/signup': typeof PublicSignupRoute
+  '/items/$id': typeof AppItemsIdRoute
+  '/items/new': typeof AppItemsNewRoute
   '/signup/recovery-key': typeof PublicSignupRecoveryKeyRoute
+  '/items/': typeof AppItemsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/design': typeof AppDesignRoute
   '/settings': typeof AppSettingsRoute
   '/signup': typeof PublicSignupRoute
+  '/items/$id': typeof AppItemsIdRoute
+  '/items/new': typeof AppItemsNewRoute
   '/signup/recovery-key': typeof PublicSignupRecoveryKeyRoute
+  '/items': typeof AppItemsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -73,13 +97,32 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/_public/signup': typeof PublicSignupRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/items/$id': typeof AppItemsIdRoute
+  '/_app/items/new': typeof AppItemsNewRoute
   '/_public/signup_/recovery-key': typeof PublicSignupRecoveryKeyRoute
+  '/_app/items/': typeof AppItemsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/design' | '/settings' | '/signup' | '/signup/recovery-key'
+  fullPaths:
+    | '/'
+    | '/design'
+    | '/settings'
+    | '/signup'
+    | '/items/$id'
+    | '/items/new'
+    | '/signup/recovery-key'
+    | '/items/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/design' | '/settings' | '/signup' | '/signup/recovery-key'
+  to:
+    | '/'
+    | '/design'
+    | '/settings'
+    | '/signup'
+    | '/items/$id'
+    | '/items/new'
+    | '/signup/recovery-key'
+    | '/items'
   id:
     | '__root__'
     | '/_app'
@@ -88,7 +131,10 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/_public/signup'
     | '/_app/'
+    | '/_app/items/$id'
+    | '/_app/items/new'
     | '/_public/signup_/recovery-key'
+    | '/_app/items/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -140,6 +186,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PublicSignupRouteImport
       parentRoute: typeof PublicRoute
     }
+    '/_app/items/': {
+      id: '/_app/items/'
+      path: '/items'
+      fullPath: '/items/'
+      preLoaderRoute: typeof AppItemsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/items/$id': {
+      id: '/_app/items/$id'
+      path: '/items/$id'
+      fullPath: '/items/$id'
+      preLoaderRoute: typeof AppItemsIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/items/new': {
+      id: '/_app/items/new'
+      path: '/items/new'
+      fullPath: '/items/new'
+      preLoaderRoute: typeof AppItemsNewRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_public/signup_/recovery-key': {
       id: '/_public/signup_/recovery-key'
       path: '/signup/recovery-key'
@@ -154,12 +221,18 @@ interface AppRouteChildren {
   AppDesignRoute: typeof AppDesignRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppItemsIdRoute: typeof AppItemsIdRoute
+  AppItemsNewRoute: typeof AppItemsNewRoute
+  AppItemsIndexRoute: typeof AppItemsIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppDesignRoute: AppDesignRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppIndexRoute: AppIndexRoute,
+  AppItemsIdRoute: AppItemsIdRoute,
+  AppItemsNewRoute: AppItemsNewRoute,
+  AppItemsIndexRoute: AppItemsIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

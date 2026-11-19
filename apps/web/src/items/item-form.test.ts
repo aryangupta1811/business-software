@@ -191,7 +191,15 @@ describe('the form’s checks, the same as the API’s', () => {
   });
 
   test('a pack’s unit problems land on its unit picker, its size on its size', async () => {
-    const pack = (unit: string, size: string) => ({ ...filled().packs[0]!, id: null, unit, size });
+    const pack = (unit: string, size: string) => ({
+      id: null,
+      unit,
+      size,
+      sellingPrice: '',
+      mrp: '',
+      soldAsPack: true,
+      boughtAsPack: true,
+    });
     expect(
       await errorsOf(
         filled({ packs: [pack('b:kg', '1'), pack('b:g', '5'), pack('b:piece', '1')] }),
@@ -205,12 +213,12 @@ describe('the form’s checks, the same as the API’s', () => {
     });
   });
 
-  test('a blank selling price, GST rate and HSN are required for a regular business (G5)', async () => {
+  test('a blank selling price is required, and a GST rate and HSN for a regular business (G5)', async () => {
     const blank = { ...filled(), sellingPrice: '', gstRate: '', hsn: '' };
     expect(await errorsOf(blank, context, 3)).toMatchObject({
       sellingPrice: 'required',
-      gstRate: 'required',
-      hsn: 'required',
+      gstRate: 'gst_required',
+      hsn: 'gst_required',
     });
     const unregistered = await errorsOf(blank, { ...context, needsGst: false }, 3);
     expect(unregistered).not.toHaveProperty('gstRate');

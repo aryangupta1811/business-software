@@ -10,7 +10,7 @@ function feed(buffer: ScanBuffer, keys: string[], gap: number, start = 1000): st
   return result;
 }
 
-const keysOf = (code: string) => [...code, 'Enter'];
+const keysOf = (code: string) => [...Array.from(code), 'Enter'];
 
 test('a fast burst ended by Enter is a scan', () => {
   expect(feed(new ScanBuffer(), keysOf('8901234567890'), 5)).toBe('8901234567890');
@@ -31,12 +31,16 @@ test('a pause starts a new burst, so slow keys before a scan are dropped', () =>
 });
 
 test('Shift (for capitals) keeps the burst going', () => {
-  expect(feed(new ScanBuffer(), ['Shift', 'A', 'Shift', 'B', ...'1234', 'Enter'], 5)).toBe(
-    'AB1234',
-  );
+  expect(
+    feed(new ScanBuffer(), ['Shift', 'A', 'Shift', 'B', ...Array.from('1234'), 'Enter'], 5),
+  ).toBe('AB1234');
 });
 
 test('a key that prints nothing (an arrow) or a non-ASCII letter breaks the burst', () => {
-  expect(feed(new ScanBuffer(), [...'1234', 'ArrowLeft', ...'56', 'Enter'], 5)).toBeNull();
-  expect(feed(new ScanBuffer(), [...'12', 'क', ...'34', 'Enter'], 5)).toBeNull();
+  expect(
+    feed(new ScanBuffer(), [...Array.from('1234'), 'ArrowLeft', ...Array.from('56'), 'Enter'], 5),
+  ).toBeNull();
+  expect(
+    feed(new ScanBuffer(), [...Array.from('12'), 'क', ...Array.from('34'), 'Enter'], 5),
+  ).toBeNull();
 });

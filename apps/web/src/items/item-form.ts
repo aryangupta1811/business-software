@@ -200,7 +200,7 @@ export function itemBody(
 }
 
 /** Where a body's error belongs on the form: a pack's unit id and unit code are one picker. */
-function formPath(path: readonly PropertyKey[]): string {
+export function formPath(path: readonly PropertyKey[]): string {
   const parts = path.map(String);
   if (parts[0] === 'packs' && ['unitCode', 'unitId', 'id'].includes(parts[2] ?? '')) {
     parts[2] = 'unit';
@@ -226,7 +226,7 @@ function place(errors: Record<string, unknown>, path: string, code: string): voi
 export function fieldErrors(codes: Record<string, string>): FieldErrors<ItemForm> {
   const errors: Record<string, unknown> = {};
   for (const [path, code] of Object.entries(codes)) place(errors, path, code);
-  return errors as FieldErrors<ItemForm>;
+  return errors;
 }
 
 /**
@@ -243,8 +243,8 @@ export function itemResolver(
     const result = schema.safeParse(body);
     const codes: Record<string, string> = {};
     if (form.sellingPrice.trim() === '') codes.sellingPrice = 'required';
-    if (context.needsGst && form.gstRate === '') codes.gstRate = 'required';
-    if (context.needsGst && form.hsn.trim() === '') codes.hsn = 'required';
+    if (context.needsGst && form.gstRate === '') codes.gstRate = 'gst_required';
+    if (context.needsGst && form.hsn.trim() === '') codes.hsn = 'gst_required';
     for (const issue of result.error?.issues ?? []) {
       const path = formPath(issue.path);
       codes[path] ??= issue.message;

@@ -27,6 +27,13 @@ on:
         description: Commit on main to deploy (full or short hash; empty for the newest)
         required: false
         type: string
+      first_backup_release:
+        description: >-
+          First release with nightly backups (stage 7) on a server that has none yet: skip the
+          pre-deploy backup if the backup service is missing. Leave off otherwise.
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -48,9 +55,11 @@ jobs:
       cancel-in-progress: false
     # Above the worst case, so a timeout can never cut a rollback short (a job timeout cancels
     # the job, and a cancelled job skips the rollback step): each slow step has its own limit,
-    # and a step that hits it fails, which the rollback does see. Worst case: release 3 +
-    # backup 20 + deploy 20 + live check 6 + rollback 25 = 74 minutes, plus a few for setup.
-    timeout-minutes: 85
+    # and a step that hits it fails, which the rollback does see. Worst case: release 5 +
+    # backup 22 + deploy 22 + live check 6 + rollback 45 = 100 minutes, plus a few for setup.
+    # The first credentials last an hour, enough for everything before the rollback (55
+    # minutes at most); the rollback gets fresh ones.
+    timeout-minutes: 110
     # The approval click: the environment requires the owner as reviewer and accepts main only.
     environment:
       name: demo
@@ -122,7 +131,7 @@ jobs:
       # What runs now is what a failed deploy goes back to. Empty on a server's first release.
       - name: Note the running release
         id: previous
-        timeout-minutes: 3
+        timeout-minutes: 5
         run: |
           previous=$(scripts/deploy/current-release.sh)
           echo "sha=$previous" >>"$GITHUB_OUTPUT"
@@ -139,15 +148,20 @@ jobs:
           source scripts/deploy/lib.sh
           not_older_than_running "$SHA" "$RUNNING"
 
-      # Before anything changes (ADR 0037). If it fails, nothing is deployed. The server stops
-      # a backup at 15 minutes; the step limit adds room for the polling.
+      # Before anything changes (ADR 0037). If it fails, nothing is deployed. A server without
+      # the backup service stops the deploy, except on the run a person marks as the first
+      # release with backups (that release installs the service).
       - name: Back up the database
-        timeout-minutes: 20
-        run: scripts/deploy/backup.sh before-deploy
+        timeout-minutes: 22
+        env:
+          FIRST_BACKUP_RELEASE: ${{ inputs.first_backup_release && 'yes' || '' }}
+        run: scripts/deploy/backup.sh before-deploy ${FIRST_BACKUP_RELEASE:+--first-backup-release}
 
+      # demo.sh waits until the server's command has finished (scripts/deploy/lib.sh), so this
+      # limit is only a backstop. Once the command is sent, it sets the output command_id.
       - name: Deploy
         id: deploy
-        timeout-minutes: 20
+        timeout-minutes: 22
         env:
           SHA: ${{ steps.commit.outputs.sha }}
         run: scripts/deploy/demo.sh "$SHA"
@@ -158,25 +172,64 @@ jobs:
         timeout-minutes: 6
         run: scripts/deploy/check-live.sh --tries 3
 
-      # Rollback: the previous release's images on the new schema, which works because every
-      # migration is expand-then-contract (a step that drops what the old release uses waits
-      # for a later release). The job stays red so the failure is seen.
-      # Only to a different commit: going "back" to the commit that just failed (a rerun of
-      # the running release) would redeploy it and could report it live.
+      # After a failure: roll back only if something reached the server (a failure before the
+      # deploy command was sent, such as missing images, changed nothing), and only to a
+      # different release (going "back" to the commit that just failed would redeploy it and
+      # could report it live).
+      - name: Decide on a rollback
+        id: rollback
+        if: failure()
+        env:
+          SENT: ${{ steps.deploy.outputs.command_id }}
+          PREVIOUS: ${{ steps.previous.outputs.sha }}
+          SHA: ${{ steps.commit.outputs.sha }}
+        run: |
+          if [[ -z $SENT ]]; then
+            echo "Nothing was sent to the server: no rollback needed."
+          elif [[ -z $PREVIOUS ]]; then
+            echo "::error::The server's first release failed: there is no release to go back to. Look now."
+          elif [[ $PREVIOUS == "$SHA" ]]; then
+            echo "::error::The failed commit is the release that was running: not rolling back to itself. Look now."
+          else
+            echo "needed=true" >>"$GITHUB_OUTPUT"
+          fi
+
+      # The first credentials can run out (one hour) by the time a slow deploy has failed.
+      - name: Fresh AWS credentials for the rollback
+        if: failure() && steps.rollback.outputs.needed == 'true'
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: rollback-${{ github.run_id }}
+          role-duration-seconds: 3600
+          aws-region: ap-south-1
+
+      # The previous release's images on the new schema, which works because every migration
+      # is expand-then-contract (a step that drops what the old release uses waits for a later
+      # release). First it waits for the failed deploy's command to finish on the server, so
+      # two installs never run at once. The job stays red so the failure is seen.
       - name: Roll back to the release that was running
-        if: >-
-          failure() && steps.previous.outputs.sha != '' &&
-          steps.previous.outputs.sha != steps.commit.outputs.sha &&
-          (steps.deploy.conclusion == 'failure' || steps.live.conclusion == 'failure')
-        timeout-minutes: 25
+        if: failure() && steps.rollback.outputs.needed == 'true'
+        timeout-minutes: 45
         env:
           PREVIOUS: ${{ steps.previous.outputs.sha }}
+          DEPLOY_COMMAND: ${{ steps.deploy.outputs.command_id }}
         run: |
+          source scripts/deploy/lib.sh
           echo "::error::Deploy failed: rolling back to $PREVIOUS"
-          scripts/deploy/demo.sh "$PREVIOUS"
+          finished=0
+          wait_for_command "$DEPLOY_COMMAND" "$DEMO_INSTANCE_ID" 1080 || finished=$?
+          if ((finished == 2)); then
+            echo "::error::The failed deploy may still be running on the server: not rolling back. Look now."
+            exit 1
+          fi
+          if ! scripts/deploy/demo.sh "$PREVIOUS"; then
+            echo "::error::The rollback to $PREVIOUS failed too: the site may be down. Look now."
+            exit 1
+          fi
           if scripts/deploy/check-live.sh --tries 3; then
             echo "::error::Rolled back to $PREVIOUS, which is live; the failed commit is not"
           else
-            echo "::error::Rolled back to $PREVIOUS, but the live check still fails: look now"
+            echo "::error::Rolled back to $PREVIOUS, but the live check still fails. Look now."
           fi
           exit 1

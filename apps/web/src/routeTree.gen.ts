@@ -14,6 +14,7 @@ import { Route as PublicRouteImport } from './routes/_public'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppDesignRouteImport } from './routes/_app/design'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as PublicLoginRouteImport } from './routes/_public/login'
 import { Route as PublicSignupRouteImport } from './routes/_public/signup'
 import { Route as AppItemsIndexRouteImport } from './routes/_app/items.index'
 import { Route as AppItemsIdRouteImport } from './routes/_app/items.$id'
@@ -42,6 +43,11 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
   getParentRoute: () => AppRoute,
+} as any)
+const PublicLoginRoute = PublicLoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => PublicRoute,
 } as any)
 const PublicSignupRoute = PublicSignupRouteImport.update({
   id: '/signup',
@@ -73,6 +79,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/design': typeof AppDesignRoute
   '/settings': typeof AppSettingsRoute
+  '/login': typeof PublicLoginRoute
   '/signup': typeof PublicSignupRoute
   '/items/$id': typeof AppItemsIdRoute
   '/items/new': typeof AppItemsNewRoute
@@ -83,6 +90,7 @@ export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/design': typeof AppDesignRoute
   '/settings': typeof AppSettingsRoute
+  '/login': typeof PublicLoginRoute
   '/signup': typeof PublicSignupRoute
   '/items/$id': typeof AppItemsIdRoute
   '/items/new': typeof AppItemsNewRoute
@@ -95,6 +103,7 @@ export interface FileRoutesById {
   '/_public': typeof PublicRouteWithChildren
   '/_app/design': typeof AppDesignRoute
   '/_app/settings': typeof AppSettingsRoute
+  '/_public/login': typeof PublicLoginRoute
   '/_public/signup': typeof PublicSignupRoute
   '/_app/': typeof AppIndexRoute
   '/_app/items/$id': typeof AppItemsIdRoute
@@ -108,6 +117,7 @@ export interface FileRouteTypes {
     | '/'
     | '/design'
     | '/settings'
+    | '/login'
     | '/signup'
     | '/items/$id'
     | '/items/new'
@@ -118,6 +128,7 @@ export interface FileRouteTypes {
     | '/'
     | '/design'
     | '/settings'
+    | '/login'
     | '/signup'
     | '/items/$id'
     | '/items/new'
@@ -129,6 +140,7 @@ export interface FileRouteTypes {
     | '/_public'
     | '/_app/design'
     | '/_app/settings'
+    | '/_public/login'
     | '/_public/signup'
     | '/_app/'
     | '/_app/items/$id'
@@ -178,6 +190,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings'
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/_public/login': {
+      id: '/_public/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof PublicLoginRouteImport
+      parentRoute: typeof PublicRoute
     }
     '/_public/signup': {
       id: '/_public/signup'
@@ -238,11 +257,13 @@ const AppRouteChildren: AppRouteChildren = {
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 interface PublicRouteChildren {
+  PublicLoginRoute: typeof PublicLoginRoute
   PublicSignupRoute: typeof PublicSignupRoute
   PublicSignupRecoveryKeyRoute: typeof PublicSignupRecoveryKeyRoute
 }
 
 const PublicRouteChildren: PublicRouteChildren = {
+  PublicLoginRoute: PublicLoginRoute,
   PublicSignupRoute: PublicSignupRoute,
   PublicSignupRecoveryKeyRoute: PublicSignupRecoveryKeyRoute,
 }

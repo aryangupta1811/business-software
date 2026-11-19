@@ -146,6 +146,13 @@ export const users = pgTable(
     email: text('email'),
     /** A PHC string (ADR 0035); null for staff without a login (Module 00 #19). */
     passwordHash: text('password_hash'),
+    /** Staff only, lower case, unique within the business (Module 00 #28, #43). */
+    username: text('username'),
+    /** Module 00 #32; until then only the recovery key resets the password. */
+    emailConfirmedAt: timestamp('email_confirmed_at', { withTimezone: true }),
+    passwordChangedAt: timestamp('password_changed_at', { withTimezone: true }),
+    /** Module 00 #34: a login that left is never deleted; it can't log in and its sessions end. */
+    deactivatedAt: timestamp('deactivated_at', { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [
@@ -168,6 +175,9 @@ export const users = pgTable(
       sql`${t.email} = lower(btrim(${t.email})) and ${t.email} ~ '^[!-~]+$'`,
     ),
     check('users_owner_email_check', sql`${t.role} <> 'owner' or ${t.email} is not null`),
+    unique('users_business_id_username_unique').on(t.businessId, t.username),
+    check('users_username_check', sql`${t.username} ~ '^[a-z0-9._-]{3,32}$'`),
+    check('users_owner_username_check', sql`${t.role} <> 'owner' or ${t.username} is null`),
   ],
 );
 
@@ -227,6 +237,102 @@ export const entryLog = pgTable(
       columns: [t.businessId, t.actorId],
       foreignColumns: [users.businessId, users.id],
     }),
+  ],
+);
+
+// Every token is stored as its SHA-256 in lower-case hex (P1.4 design, section 4).
+const tokenHashCheck = (column: AnyPgColumn) => sql`${column} ~ '^[0-9a-f]{64}$'`;
+
+// A counter computer that knows its business (Module 00 #28, #44). The browser holds
+// `<businessId>.<token>` in a cookie; only the hash is stored. Forgotten, never deleted.
+export const devices = pgTable(
+  'devices',
+  {
+    id: id(),
+    businessId: businessId(),
+    branchId: uuid('branch_id').notNull(),
+    tokenHash: text('token_hash').notNull(),
+    name: text('name'),
+    registeredBy: uuid('registered_by').notNull(),
+    createdAt: createdAt(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (t) => [
+    tenantPolicy(t.businessId),
+    unique('devices_business_id_id_unique').on(t.businessId, t.id),
+    unique('devices_business_id_token_hash_unique').on(t.businessId, t.tokenHash),
+    foreignKey({
+      name: 'devices_branch_fk',
+      columns: [t.businessId, t.branchId],
+      foreignColumns: [branches.businessId, branches.id],
+    }),
+    foreignKey({
+      name: 'devices_registered_by_fk',
+      columns: [t.businessId, t.registeredBy],
+      foreignColumns: [users.businessId, users.id],
+    }),
+    check('devices_token_hash_check', tokenHashCheck(t.tokenHash)),
+  ],
+);
+
+/** Why a session ended (P1.4 design, section 3). */
+export const SESSION_END_REASONS = [
+  'logout',
+  'idle',
+  'replaced',
+  'password_changed',
+  'deactivated',
+  'reset',
+] as const;
+export type SessionEndReason = (typeof SESSION_END_REASONS)[number];
+
+// A login on one browser (ADR 0009). Rows end with `ended_at` and are kept: they show who was
+// logged in when (ADR 0007). The cookie holds `<businessId>.<token>`; only hashes are stored.
+export const sessions = pgTable(
+  'sessions',
+  {
+    id: id(),
+    businessId: businessId(),
+    userId: uuid('user_id').notNull(),
+    branchId: uuid('branch_id').notNull(),
+    deviceId: uuid('device_id'),
+    tokenHash: text('token_hash').notNull(),
+    csrfHash: text('csrf_hash').notNull(),
+    userAgent: text('user_agent'),
+    createdAt: createdAt(),
+    lastActiveAt: timestamp('last_active_at', { withTimezone: true }).notNull().defaultNow(),
+    /** The owner's auto-lock (Module 00 #21); null while unlocked. */
+    lockedAt: timestamp('locked_at', { withTimezone: true }),
+    endedAt: timestamp('ended_at', { withTimezone: true }),
+    endReason: text('end_reason'),
+  },
+  (t) => [
+    tenantPolicy(t.businessId),
+    unique('sessions_business_id_token_hash_unique').on(t.businessId, t.tokenHash),
+    foreignKey({
+      name: 'sessions_user_fk',
+      columns: [t.businessId, t.userId],
+      foreignColumns: [users.businessId, users.id],
+    }),
+    foreignKey({
+      name: 'sessions_branch_fk',
+      columns: [t.businessId, t.branchId],
+      foreignColumns: [branches.businessId, branches.id],
+    }),
+    foreignKey({
+      name: 'sessions_device_fk',
+      columns: [t.businessId, t.deviceId],
+      foreignColumns: [devices.businessId, devices.id],
+    }),
+    index('sessions_open_by_user')
+      .on(t.businessId, t.userId)
+      .where(sql`${t.endedAt} is null`),
+    check('sessions_token_hash_check', tokenHashCheck(t.tokenHash)),
+    check('sessions_csrf_hash_check', tokenHashCheck(t.csrfHash)),
+    check('sessions_end_reason_check', sql`${t.endReason} in (${literals(SESSION_END_REASONS)})`),
+    check('sessions_ended_check', sql`(${t.endedAt} is null) = (${t.endReason} is null)`),
+    check('sessions_user_agent_check', sql`length(${t.userAgent}) <= 200`),
   ],
 );
 

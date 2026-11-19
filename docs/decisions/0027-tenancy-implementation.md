@@ -92,6 +92,7 @@ The database is the guarantee (ADR 0006), and the guard test guarantees that the
   - `append_only` now covers an append-only table's partitions, and `append_only_missing` fails on a listed name that doesn't exist. Writing it found that `pg_partition_tree` returns nothing for a table that isn't partitioned; the probes caught the rule silently skipping `entry_log`.
   - `schema_usage`: `app_runtime` has no `USAGE` on a `NOT_TENANT_SCHEMAS` schema. A non-tenant schema the app must use (P1.4's rate limits) needs its own list.
 - **Added 2026-11-19 (P1.7): item tables default `business_id` to `app_current_business_id()`,** like `entry_log`, so services never pass a business ID and can't pass a wrong one; the policy still checks it.
+- **Settled 2026-11-19 (P1.4, ADR 0039): the login lookup.** As predicted above: `app_find_owner_login(email)`, a `SECURITY DEFINER` function over `auth.owner_logins`, a schema `app_runtime` has no USAGE on. The guard now also requires every allowed definer function to pin its `search_path`. `auth` is on `NOT_TENANT_SCHEMAS`, so P1.7's `schema_usage` rule checks the app can't use it; the rate limits live in memory (ADR 0038), so no schema the app must use was needed after all. Since PR #33's review, `alsoInBusiness` lets one transaction step into a second business and back, each step under RLS (ADR 0039).
 
 ## Interview note
 

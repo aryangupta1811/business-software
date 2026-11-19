@@ -16,14 +16,18 @@ import {
 } from '@business-software/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../app.js';
+import { hashToken } from '../auth/tokens.js';
 import type { Caller, SessionResolver } from '../http/session.js';
 
-// Tests say who is calling in a header; P1.4's resolver reads a session cookie instead.
+// Tests say who is calling in a header; the real resolver reads the session cookie
+// (auth/session.test.ts). Every write carries the CSRF token the fake session was given.
+const CSRF = 'csrf-token-for-tests';
 const headerSessions: SessionResolver = {
   resolve(request: IncomingMessage) {
     const header = request.headers['x-test-caller'];
     return Promise.resolve(typeof header === 'string' ? (JSON.parse(header) as Caller) : null);
   },
+  recordActivity: () => Promise.resolve(),
 };
 
 const atta = {
@@ -81,6 +85,7 @@ describe('items', () => {
       method,
       headers: {
         'content-type': 'application/json',
+        'x-csrf-token': CSRF,
         ...(caller && { 'x-test-caller': JSON.stringify(caller) }),
       },
       ...(body !== undefined && { body: JSON.stringify(body) }),
@@ -99,11 +104,21 @@ describe('items', () => {
       password: 'correct horse battery',
     });
     const { businessId } = created.body as { businessId: string };
-    const { rows } = await admin.pool.query<{ id: string }>(
-      "select id from users where business_id = $1 and role = 'owner'",
+    const { rows } = await admin.pool.query<{ id: string; branch_id: string }>(
+      `select u.id, b.id as branch_id from users u join branches b using (business_id)
+        where u.business_id = $1 and u.role = 'owner'`,
       [businessId],
     );
-    return { businessId, userId: rows[0]?.id ?? '', permissions: PERMISSIONS };
+    return {
+      businessId,
+      userId: rows[0]?.id ?? '',
+      sessionId: '0190f0f0-0000-7000-8000-0000000000c1',
+      branchId: rows[0]?.branch_id ?? '',
+      role: 'owner',
+      permissions: PERMISSIONS,
+      locked: false,
+      csrfHash: hashToken(CSRF),
+    };
   }
 
   /** The same person with only some permissions, as P1.5's staff logins will be. */

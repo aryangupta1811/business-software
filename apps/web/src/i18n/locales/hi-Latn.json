@@ -180,7 +180,8 @@
       "gstin": {
         "invalid": "GSTIN check karein: 15 akshar, state code se shuru",
         "state_mismatch": "GSTIN ke pehle do ank state se milne chahiye",
-        "pan_mismatch": "GSTIN mein PAN hona chahiye"
+        "pan_mismatch": "GSTIN mein PAN hona chahiye",
+        "not_registered": "Jo business GST mein registered nahin hai, uska GSTIN nahin hota"
       },
       "pan": {
         "invalid": "ABCDE1234F jaisa PAN likhein"
@@ -229,6 +230,9 @@
       },
       "level": {
         "invalid": "5 ya 2.5 jaisi sankhya likhein"
+      },
+      "username": {
+        "invalid": "3 se 32 akshar, ank, dot, dash ya underscore likhein"
       }
     },
     "too_small": "Yeh bahut kam hai",
@@ -541,5 +545,48 @@
       "loggedOut": "Barcode {{code}} dekhne ke liye phir se login karein.",
       "failed": "Barcode {{code}} dekha nahi ja saka. Connection check karein aur phir scan karein."
     }
+  },
+  "password": {
+    "show": "Password dikhayein",
+    "hide": "Password chhupayein"
+  },
+  "login": {
+    "title": "Login",
+    "counterOf": "Yeh counter {{business}} ka hai.",
+    "who": "Kaun login kar raha hai",
+    "as": {
+      "staff": "Staff",
+      "owner": "Maalik"
+    },
+    "email": "Email",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Login karein",
+    "submitting": "Login ho raha hai…",
+    "wrongOwner": "Email aur password match nahi karte. Dono check karein aur phir koshish karein.",
+    "wrongStaff": "Username aur password match nahi karte. Dono check karein aur phir koshish karein.",
+    "tooMany": "Bahut zyada koshishein. {{time}} par phir koshish karein.",
+    "noDevice": "Staff usi counter par login kar sakta hai jahan maalik ne login kiya ho. Maalik se ek baar yahan login karne ko kahein.",
+    "busy": "Server busy hai. Kuch second baad phir koshish karein.",
+    "failed": "Login nahi ho saka. Connection check karein aur phir koshish karein.",
+    "newBusiness": "Naye hain?",
+    "signUp": "Account banayein"
+  },
+  "lock": {
+    "title": "Counter lock hai",
+    "who": "Login: {{user}}, {{business}}",
+    "unlock": "Unlock karein",
+    "unlocking": "Unlock ho raha hai…",
+    "wrongPassword": "Galat password. Phir koshish karein.",
+    "failed": "Unlock nahi ho saka. Connection check karein aur phir koshish karein.",
+    "switchUser": "Doosra user"
+  },
+  "session": {
+    "roles": {
+      "owner": "Maalik",
+      "staff": "Staff"
+    },
+    "lockNow": "Abhi lock karein",
+    "logout": "Logout"
   }
 }

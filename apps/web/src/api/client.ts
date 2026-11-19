@@ -9,6 +9,8 @@ export class ApiError extends Error {
     readonly status: number,
     readonly code: string,
     readonly fields: FieldErrors = {},
+    /** With `too_many_attempts`: when trying again is allowed (Module 00 #41). */
+    readonly retryAt?: string,
     /** The rest of the answer, such as the item that already has a barcode. */
     readonly detail: Readonly<Record<string, unknown>> = {},
   ) {
@@ -18,13 +20,34 @@ export class ApiError extends Error {
 
 const REQUEST_TIMEOUT_MS = 15_000;
 
+// The session's CSRF token (ADR 0009), from `GET /api/session` or a login. Kept in memory only:
+// a reload asks for it again.
+let csrfToken: string | null = null;
+
+export function setCsrfToken(token: string | null): void {
+  csrfToken = token;
+}
+
+// Told when an answer says the session is locked or gone, so the screen can follow (#21, #29).
+const authListeners = new Set<(code: string) => void>();
+
+export function onAuthError(listener: (code: string) => void): () => void {
+  authListeners.add(listener);
+  return () => authListeners.delete(listener);
+}
+
+const AUTH_CODES = new Set(['locked', 'not_logged_in', 'session_ended']);
+
 /** Sends JSON to the API and reads JSON back. Every failure becomes an `ApiError`. */
 export async function apiRequest<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (body !== undefined) headers['content-type'] = 'application/json';
+  if (method !== 'GET' && csrfToken !== null) headers['x-csrf-token'] = csrfToken;
   let response: Response;
   try {
     response = await fetch(path, {
       method,
-      headers: body === undefined ? {} : { 'content-type': 'application/json' },
+      headers,
       cache: 'no-store',
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       ...(body !== undefined && { body: JSON.stringify(body) }),
@@ -32,13 +55,18 @@ export async function apiRequest<T>(method: string, path: string, body?: unknown
   } catch {
     throw new ApiError(0, 'network');
   }
+  // A 204 has no body: null.
   const answer = (await response.json().catch(() => null)) as {
     code?: unknown;
     fields?: FieldErrors;
+    retryAt?: string;
   } | null;
   if (!response.ok) {
     const code = typeof answer?.code === 'string' ? answer.code : 'server';
-    throw new ApiError(response.status, code, answer?.fields, answer ?? {});
+    if (response.status === 401 && AUTH_CODES.has(code)) {
+      for (const listener of authListeners) listener(code);
+    }
+    throw new ApiError(response.status, code, answer?.fields, answer?.retryAt, answer ?? {});
   }
   return answer as T;
 }

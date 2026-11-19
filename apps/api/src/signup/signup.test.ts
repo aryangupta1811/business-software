@@ -46,13 +46,22 @@ async function startApp(databaseUrl: string, logger: LoggerService | false = fal
   return { app, url: `http://127.0.0.1:${String(port)}/api/signup` };
 }
 
-async function post(url: string, body: unknown): Promise<{ status: number; body: unknown }> {
+async function post(
+  url: string,
+  body: unknown,
+  ip = '203.0.113.1',
+): Promise<{ status: number; body: unknown; cookies: string[] }> {
   const response = await fetch(url, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    // The one trusted proxy (Caddy) names the client; tests stand in for it.
+    headers: { 'content-type': 'application/json', 'x-forwarded-for': ip },
     body: JSON.stringify(body),
   });
-  return { status: response.status, body: await response.json() };
+  return {
+    status: response.status,
+    body: await response.json(),
+    cookies: response.headers.getSetCookie(),
+  };
 }
 
 describe('signup', () => {
@@ -134,9 +143,10 @@ describe('signup', () => {
     ]);
 
     const { rows: log } = await admin.pool.query<{ after: Record<string, unknown> }>(
-      'select action, actor_id, entity_type, entity_id, after from entry_log where business_id = $1',
+      'select action, actor_id, entity_type, entity_id, after from entry_log where business_id = $1 order by id',
       [businessId],
     );
+    // Module 00 #37: signup also registers this computer and logs the owner in.
     expect(log).toEqual([
       {
         action: 'business.created',
@@ -145,7 +155,20 @@ describe('signup', () => {
         entity_id: businessId,
         after: expect.any(Object) as unknown,
       },
+      expect.objectContaining({ action: 'device.registered', actor_id: owner[0]?.id }),
+      expect.objectContaining({ action: 'user.logged_in', actor_id: owner[0]?.id }),
     ]);
+    expect(response.cookies).toEqual([
+      expect.stringMatching(/^__Host-session=[^;]+; Path=\/; HttpOnly; SameSite=Lax; Secure$/),
+      expect.stringMatching(
+        /^__Host-device=[^;]+; Path=\/; HttpOnly; SameSite=Lax; Secure; Max-Age=34560000$/,
+      ),
+    ]);
+    const { rows: logins } = await admin.pool.query(
+      'select business_id, user_id from auth.owner_logins where email = $1',
+      ['owner@example.com'],
+    );
+    expect(logins).toEqual([{ business_id: businessId, user_id: owner[0]?.id }]);
     const logged = JSON.stringify(log[0]?.after);
     expect(logged).not.toContain(signup.password);
     expect(logged).not.toContain(recoveryKey);
@@ -158,7 +181,7 @@ describe('signup', () => {
       businessName: 'Copy Shop',
       email: '  OWNER@example.COM ',
     });
-    expect(response).toEqual({ status: 409, body: { code: 'email_taken' } });
+    expect(response).toMatchObject({ status: 409, body: { code: 'email_taken' }, cookies: [] });
     expect(await count('businesses')).toBe(businesses);
     expect(await count('branches', 'name = $1', ['Copy Shop'])).toBe(0);
     expect(await count('entry_log', "action = 'business.created'")).toBe(businesses);
@@ -171,9 +194,25 @@ describe('signup', () => {
     expect(await count('users', 'email = $1', ['race@example.com'])).toBe(1);
   });
 
+  // P1.4 design, section 7: 5 signups per computer per hour.
+  it('answers 429 after five signups from one computer', async () => {
+    const ip = '203.0.113.99';
+    for (let i = 0; i < 5; i += 1) {
+      const response = await post(url, { ...signup, email: `limit${String(i)}@example.com` }, ip);
+      expect(response.status).toBe(201);
+    }
+    const refused = await post(url, { ...signup, email: 'limit5@example.com' }, ip);
+    expect(refused).toMatchObject({
+      status: 429,
+      body: { code: 'too_many_attempts', retryAt: expect.any(String) as unknown },
+    });
+    expect(await count('users', 'email = $1', ['limit5@example.com'])).toBe(0);
+    expect((await post(url, { ...signup, email: 'other-ip@example.com' })).status).toBe(201);
+  });
+
   it('answers 400 with codes before touching the database', async () => {
     const response = await post(url, { ...signup, password: 'short', phone: '123' });
-    expect(response).toEqual({
+    expect(response).toMatchObject({
       status: 400,
       body: { code: 'invalid_body', fields: { phone: 'invalid', password: 'too_short' } },
     });
@@ -185,7 +224,7 @@ describe('signup', () => {
     const broken = await startApp(UNREACHABLE_URL, logs);
     try {
       const response = await post(broken.url, { ...signup, email: 'lost@example.com' });
-      expect(response).toEqual({
+      expect(response).toMatchObject({
         status: 500,
         body: { statusCode: 500, message: 'Internal Server Error' },
       });

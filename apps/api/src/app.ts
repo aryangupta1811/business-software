@@ -2,11 +2,18 @@ import 'reflect-metadata';
 import { ConsoleLogger, Module, type DynamicModule, type INestApplication } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import type { Database } from '@business-software/db';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import { SYSTEM_CLOCK, type Clock } from './auth/clock.js';
+import { HASH_GATE, HashGate } from './auth/hash-gate.js';
+import { CookieSessionResolver, SessionController } from './auth/session.controller.js';
+import { LoginLimits, SESSION_SERVICE, SessionService } from './auth/session.service.js';
 import type { ApiConfig } from './config.js';
-import { DatabaseModule } from './database.module.js';
+import { DATABASE, DatabaseModule } from './database.module.js';
 import { UnhandledErrorFilter } from './error-filter.js';
 import { HealthController } from './health.controller.js';
-import { HttpRulesModule } from './http/http-rules.module.js';
+import { httpRules } from './http/http-rules.js';
+import { SESSION_RESOLVER, type SessionResolver } from './http/session.js';
 import { CatalogueService } from './items/catalogue.service.js';
 import {
   CategoriesController,
@@ -14,7 +21,6 @@ import {
   UnitsController,
 } from './items/items.controller.js';
 import { ItemsService } from './items/items.service.js';
-import type { SessionResolver } from './http/session.js';
 import { SettingsController } from './settings/settings.controller.js';
 import { SettingsService } from './settings/settings.service.js';
 import { SignupController } from './signup/signup.controller.js';
@@ -23,6 +29,7 @@ import { SignupService } from './signup/signup.service.js';
 /** Every controller the API serves; the route census test reads this list. */
 export const API_CONTROLLERS = [
   HealthController,
+  SessionController,
   SettingsController,
   SignupController,
   ItemsController,
@@ -31,8 +38,12 @@ export const API_CONTROLLERS = [
 ];
 
 export interface AppOptions {
-  /** Who is calling; tests pass a fake. Defaults to nobody until P1.4. */
+  /** Who is calling; tests may pass a fake. Defaults to the session cookie (ADR 0009). */
   sessions?: SessionResolver;
+  /** Tests move time to check the lock and idle rules. */
+  clock?: Clock;
+  /** Tests fill the Argon2 queue to check the busy answer. */
+  hashGate?: HashGate;
 }
 
 @Module({})
@@ -40,12 +51,35 @@ class ApiModule {
   static register(config: ApiConfig, options: AppOptions): DynamicModule {
     return {
       module: ApiModule,
-      imports: [
-        DatabaseModule.register(config.databaseUrl),
-        HttpRulesModule.register(options.sessions),
-      ],
+      imports: [DatabaseModule.register(config.databaseUrl)],
       controllers: API_CONTROLLERS,
-      providers: [SettingsService, SignupService, ItemsService, CatalogueService],
+      providers: [
+        SettingsService,
+        SignupService,
+        ItemsService,
+        CatalogueService,
+        // One Argon2 queue for signup and logins (ADR 0038).
+        { provide: HASH_GATE, useValue: options.hashGate ?? new HashGate() },
+        {
+          provide: SESSION_SERVICE,
+          inject: [DATABASE, HASH_GATE],
+          useFactory: (database: Database, gate: HashGate) => {
+            const clock = options.clock ?? SYSTEM_CLOCK;
+            const settings = { cookieSecure: config.cookieSecure ?? true };
+            return new SessionService(database, settings, clock, new LoginLimits(clock), gate);
+          },
+        },
+        // Every route: public or a permission, CSRF, lock (ADRs 0009, 0036).
+        ...httpRules(
+          options.sessions === undefined
+            ? {
+                provide: SESSION_RESOLVER,
+                inject: [SESSION_SERVICE],
+                useFactory: (sessions: SessionService) => new CookieSessionResolver(sessions),
+              }
+            : { provide: SESSION_RESOLVER, useValue: options.sessions },
+        ),
+      ],
     };
   }
 }
@@ -63,6 +97,14 @@ export async function createApp(
   );
   // Express adds "X-Powered-By: Express" to every answer; it only helps attackers.
   app.disable('x-powered-by');
+  // Exactly one proxy, Caddy, stands in front (ADR 0011), so the client's IP is the last entry
+  // of X-Forwarded-For; anything a client writes before it is ignored (rate limits, scan c).
+  app.set('trust proxy', 1);
+  // A shared counter's browser must not keep owner-only answers (scan d).
+  app.use((_request: IncomingMessage, response: ServerResponse, next: () => void) => {
+    response.setHeader('Cache-Control', 'no-store');
+    next();
+  });
   // Caddy sends everything under /api to this service (ADR 0011).
   app.setGlobalPrefix('api');
   app.useGlobalFilters(new UnhandledErrorFilter(app.getHttpAdapter()));

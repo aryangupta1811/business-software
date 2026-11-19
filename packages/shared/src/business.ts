@@ -46,6 +46,7 @@ export type GstStatus = (typeof GST_STATUSES)[number];
  * owner give staff logins a subset.
  */
 export const PERMISSIONS = [
+  'session.own', // anyone logged in: their own session (lock, log out)
   'settings.view',
   'settings.manage',
   // P1.7: list and look items up; change them; see and change the purchase price (`01` #1).

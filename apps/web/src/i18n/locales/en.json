@@ -180,7 +180,8 @@
       "gstin": {
         "invalid": "Check the GSTIN: 15 characters, starting with the state code",
         "state_mismatch": "The GSTIN's first two digits must match the state",
-        "pan_mismatch": "The GSTIN must contain the PAN"
+        "pan_mismatch": "The GSTIN must contain the PAN",
+        "not_registered": "A business that isn't registered for GST has no GSTIN"
       },
       "pan": {
         "invalid": "Enter a PAN like ABCDE1234F"
@@ -229,6 +230,9 @@
       },
       "level": {
         "invalid": "Enter a number like 5 or 2.5"
+      },
+      "username": {
+        "invalid": "Use 3 to 32 letters, digits, dots, dashes or underscores"
       }
     },
     "too_small": "This is too small",
@@ -541,5 +545,48 @@
       "loggedOut": "Log in again to look up the barcode {{code}}.",
       "failed": "Couldn't look up the barcode {{code}}. Check the connection and scan again."
     }
+  },
+  "password": {
+    "show": "Show password",
+    "hide": "Hide password"
+  },
+  "login": {
+    "title": "Log in",
+    "counterOf": "This counter belongs to {{business}}.",
+    "who": "Who is logging in",
+    "as": {
+      "staff": "Staff",
+      "owner": "Owner"
+    },
+    "email": "Email",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Log in",
+    "submitting": "Logging in…",
+    "wrongOwner": "That email and password don't match. Check both and try again.",
+    "wrongStaff": "That username and password don't match. Check both and try again.",
+    "tooMany": "Too many tries. Try again at {{time}}.",
+    "noDevice": "Staff can log in only on a counter where the owner has logged in. Ask the owner to log in here once.",
+    "busy": "The server is busy. Try again in a few seconds.",
+    "failed": "Couldn't log in. Check the connection and try again.",
+    "newBusiness": "New here?",
+    "signUp": "Create an account"
+  },
+  "lock": {
+    "title": "Counter locked",
+    "who": "Logged in: {{user}}, {{business}}",
+    "unlock": "Unlock",
+    "unlocking": "Unlocking…",
+    "wrongPassword": "Wrong password. Try again.",
+    "failed": "Couldn't unlock. Check the connection and try again.",
+    "switchUser": "Switch user"
+  },
+  "session": {
+    "roles": {
+      "owner": "Owner",
+      "staff": "Staff"
+    },
+    "lockNow": "Lock now",
+    "logout": "Log out"
   }
 }

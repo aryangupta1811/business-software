@@ -1,3 +1,4 @@
+import type { ActiveSession } from '@business-software/shared';
 import { Link, useMatches, useNavigate } from '@tanstack/react-router';
 import { House, Keyboard, Package, Settings } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -6,6 +7,7 @@ import { keyLabels } from '../shortcuts/keys';
 import { useOpenShortcutHelp, useShortcut } from '../shortcuts/use-shortcut';
 import { ConnectionBadge } from './connection-badge';
 import { LanguageSwitcher } from './language-switcher';
+import { SessionPanel } from './session-panel';
 import { ThemeToggle } from './theme-toggle';
 import { Button } from './ui/button';
 import { Kbd, KbdGroup } from './ui/kbd';
@@ -15,8 +17,17 @@ const ITEMS_KEYS = 'Alt+I';
 const NAV_LINK =
   'flex min-h-10 items-center gap-2.5 rounded-lg px-2 text-muted hover:bg-surface-muted data-[status=active]:bg-surface-muted data-[status=active]:font-semibold data-[status=active]:text-foreground';
 
-/** Sidebar on the left, top bar with the page title and settings, then the page. */
-export function AppShell({ children }: { children: ReactNode }) {
+/**
+ * Sidebar on the left, top bar with the page title and settings, then the page. With a
+ * session, the sidebar ends with who is logged in and the lock and logout buttons.
+ */
+export function AppShell({
+  session = null,
+  children,
+}: {
+  session?: ActiveSession | null;
+  children: ReactNode;
+}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const titleKey = useMatches().at(-1)?.staticData.titleKey;
@@ -76,17 +87,20 @@ export function AppShell({ children }: { children: ReactNode }) {
             {t('nav.settings')}
           </Link>
         </nav>
-        {/* The ? key alone is invisible to mouse users, so the list has a button too. */}
-        <Button
-          variant="ghost"
-          aria-keyshortcuts="?"
-          onClick={openShortcutHelp}
-          className="mt-auto justify-start gap-2.5 px-2 font-normal text-muted"
-        >
-          <Keyboard aria-hidden="true" />
-          <span className="flex-1 text-left">{t('shortcuts.title')}</span>
-          <Kbd aria-hidden="true">?</Kbd>
-        </Button>
+        <div className="mt-auto flex flex-col gap-3">
+          {/* The ? key alone is invisible to mouse users, so the list has a button too. */}
+          <Button
+            variant="ghost"
+            aria-keyshortcuts="?"
+            onClick={openShortcutHelp}
+            className="justify-start gap-2.5 px-2 font-normal text-muted"
+          >
+            <Keyboard aria-hidden="true" />
+            <span className="flex-1 text-left">{t('shortcuts.title')}</span>
+            <Kbd aria-hidden="true">?</Kbd>
+          </Button>
+          {session !== null && <SessionPanel session={session} />}
+        </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-10 flex min-h-14 items-center justify-between gap-6 border-b border-border bg-background px-8 py-2">

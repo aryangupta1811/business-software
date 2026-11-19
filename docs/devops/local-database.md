@@ -64,7 +64,7 @@ The app always uses `true` (one transaction only), through `withBusiness`. The `
 `FORCE` filters `app_owner` too, which has two traps (ADR 0027):
 
 - **A data migration as `app_owner` changes 0 rows, with no error.** Wrap the statement in `ALTER TABLE … NO FORCE ROW LEVEL SECURITY` / `FORCE ROW LEVEL SECURITY` inside the migration, and test the row count.
-- **`pg_dump -U app_owner` fails** on tenant tables, and `--enable-row-security` makes it succeed with **empty** tables. Dump as `postgres` locally (and a `BYPASSRLS` role on RDS); never use `--enable-row-security`.
+- **`pg_dump -U app_owner` fails** on tenant tables, and `--enable-row-security` makes it succeed with **empty** tables. Dump as `postgres` locally. On RDS no role has `BYPASSRLS`, so the nightly backup dumps as the read-only role `app_backup` **with** `--enable-row-security`, which works only because every tenant table has a `backup_read` policy for it (ADR 0037, `docs/devops/backup-restore.md`).
 
 ### The entry log
 
@@ -79,8 +79,15 @@ Order by `id`: entries written in one transaction share `created_at` (it's the t
 
 ## Things to know
 
+- **A volume made before 2026-11-19 has no `app_backup` role,** so migration 0007 fails with `role "app_backup" does not exist`. Create it once, then migrate:
+  ```bash
+  docker compose exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1 < packages/db/bootstrap/create-backup-role.sql
+  pnpm db:migrate
+  ```
+  Locally it gets no password, so it can't log in over TCP; local backups use `postgres`.
 - **The bootstrap runs only on an empty volume.** Changing a password in `.env` later does nothing by itself. Change it in the database too: `ALTER ROLE app_runtime PASSWORD '...'` as `postgres`.
 - **`docker compose down` is safe.** It removes the container, not the volume.
 - **`docker compose down -v` deletes the database** (the `pgdata` volume). Ask the owner first (`CLAUDE.md` rule 7). It's only ever needed to rerun the bootstrap from scratch.
 - **Port 5432 already in use** (e.g. a PostgreSQL installed on Windows): stop that service, or change the left side of `127.0.0.1:5432:5432` in `compose.yaml` and the port in `MIGRATION_DATABASE_URL`.
+- **An owner who signed up before migration `0006` (P1.4) can't log in.** Login by email reads `auth.owner_logins`, which signup fills from P1.4 on, and the migration can't backfill it (it runs as `app_owner`, which `FORCE` RLS shows no `users` rows; ADR 0039). Sign up again with another email. Those old businesses stay in the database; wiping the volume to start clean needs the owner's OK (above).
 - **`pnpm test` needs Docker too.** The integration tests start their own throwaway PostgreSQL, separate from this one.

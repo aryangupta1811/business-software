@@ -72,3 +72,14 @@ export async function verifyPassword(password: string, stored: string): Promise<
   });
   return timingSafeEqual(actual, expected);
 }
+
+/** True when a stored hash wasn't made with today's parameters, so login should rehash it. */
+export function needsRehash(stored: string): boolean {
+  const match = PHC.exec(stored);
+  return (
+    match === null ||
+    Number(match[1]) !== MEMORY_KIB ||
+    Number(match[2]) !== PASSES ||
+    Number(match[3]) !== PARALLELISM
+  );
+}

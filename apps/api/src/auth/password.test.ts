@@ -1,7 +1,7 @@
 import { argon2 } from 'node:crypto';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
-import { hashPassword, verifyPassword } from './password.js';
+import { hashPassword, needsRehash, verifyPassword } from './password.js';
 
 const PHC = /^\$argon2id\$v=19\$m=19456,t=2,p=1\$[A-Za-z0-9+/]{22}\$[A-Za-z0-9+/]{43}$/;
 
@@ -72,5 +72,12 @@ describe('passwords', () => {
     '$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHRzYWx0$aA',
   ])('refuses a malformed stored hash %j without throwing', async (stored) => {
     expect(await verifyPassword('correct horse', stored)).toBe(false);
+  });
+
+  // ADR 0035: raise the cost later and rehash each user at their next login.
+  it('asks for a rehash only when the stored parameters differ from today', async () => {
+    expect(needsRehash(await hashPassword('correct horse'))).toBe(false);
+    expect(needsRehash('$argon2id$v=19$m=8192,t=3,p=1$c2FsdHNhbHRzYWx0$aGFzaA')).toBe(true);
+    expect(needsRehash('not a hash')).toBe(true);
   });
 });

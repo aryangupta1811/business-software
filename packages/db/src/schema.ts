@@ -1,10 +1,21 @@
 // Drizzle table definitions (ADRs 0006, 0027). Every business-owned table uses the helpers
 // below; src/tenancy-guard.test.ts fails if a table misses one.
-import { BUSINESS_TYPES, FEATURES, GST_STATUSES } from '@business-software/shared';
+import {
+  BUILT_IN_UNITS,
+  BUSINESS_TYPES,
+  FEATURES,
+  GST_RATES,
+  GST_STATUSES,
+  ITEM_KINDS,
+} from '@business-software/shared';
 import { sql, type SQL } from 'drizzle-orm';
 import {
+  bigint,
+  boolean,
   check,
   foreignKey,
+  index,
+  integer,
   jsonb,
   pgPolicy,
   pgTable,
@@ -39,19 +50,34 @@ const literals = (values: readonly string[]): SQL =>
   sql.raw(values.map((value) => `'${value}'`).join(', '));
 
 /**
- * Rows are visible and writable only inside `withBusiness` for their own business. The same
- * check in USING and WITH CHECK stops inserting, or moving a row into, another business.
+ * The two policies every tenant table has; spread them into the table's extra config.
+ *
+ * - `tenant_isolation`: rows are visible and writable only inside `withBusiness` for their
+ *   own business. The same check in USING and WITH CHECK stops inserting, or moving a row
+ *   into, another business.
+ * - `backup_read` (ADR 0037): the backup role reads every row and writes none. Only
+ *   app_backup is in it, and no app role belongs to app_backup (tenancy guard). Without it
+ *   the nightly pg_dump, which runs with RLS on, would write this table empty.
+ *
  * The migration adds FORCE ROW LEVEL SECURITY by hand: drizzle-kit can't generate it.
  */
-export function tenantPolicy(column: AnyPgColumn) {
+export function tenantPolicies(column: AnyPgColumn) {
   const check = sql`${column} = (select app_current_business_id())`;
-  return pgPolicy('tenant_isolation', {
-    as: 'permissive',
-    for: 'all',
-    to: 'public',
-    using: check,
-    withCheck: check,
-  });
+  return [
+    pgPolicy('tenant_isolation', {
+      as: 'permissive',
+      for: 'all',
+      to: 'public',
+      using: check,
+      withCheck: check,
+    }),
+    pgPolicy('backup_read', {
+      as: 'permissive',
+      for: 'select',
+      to: 'app_backup',
+      using: sql`true`,
+    }),
+  ];
 }
 
 // Module 00 #6–8, #21, #29. Format checks repeat the shared schemas' rules, so the database
@@ -72,7 +98,7 @@ export const businesses = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [
-    tenantPolicy(t.id),
+    ...tenantPolicies(t.id),
     check(
       'businesses_business_type_check',
       sql`${t.businessType} in (${literals(BUSINESS_TYPES)})`,
@@ -106,7 +132,7 @@ export const branches = pgTable(
   // Branch-level tables reference (business_id, branch_id), so a row can't point at
   // another business's branch.
   (t) => [
-    tenantPolicy(t.businessId),
+    ...tenantPolicies(t.businessId),
     unique('branches_business_id_id_unique').on(t.businessId, t.id),
     // Not 97 (Other Territory): a place of supply outside any state, never a shop's address.
     check(
@@ -135,10 +161,17 @@ export const users = pgTable(
     email: text('email'),
     /** A PHC string (ADR 0035); null for staff without a login (Module 00 #19). */
     passwordHash: text('password_hash'),
+    /** Staff only, lower case, unique within the business (Module 00 #28, #43). */
+    username: text('username'),
+    /** Module 00 #32; until then only the recovery key resets the password. */
+    emailConfirmedAt: timestamp('email_confirmed_at', { withTimezone: true }),
+    passwordChangedAt: timestamp('password_changed_at', { withTimezone: true }),
+    /** Module 00 #34: a login that left is never deleted; it can't log in and its sessions end. */
+    deactivatedAt: timestamp('deactivated_at', { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [
-    tenantPolicy(t.businessId),
+    ...tenantPolicies(t.businessId),
     unique('users_business_id_id_unique').on(t.businessId, t.id),
     // #27: one email, one owner account across the whole app. Unique indexes see every row,
     // whatever RLS hides, so a second signup fails here (23505) with no cross-business read.
@@ -157,6 +190,9 @@ export const users = pgTable(
       sql`${t.email} = lower(btrim(${t.email})) and ${t.email} ~ '^[!-~]+$'`,
     ),
     check('users_owner_email_check', sql`${t.role} <> 'owner' or ${t.email} is not null`),
+    unique('users_business_id_username_unique').on(t.businessId, t.username),
+    check('users_username_check', sql`${t.username} ~ '^[a-z0-9._-]{3,32}$'`),
+    check('users_owner_username_check', sql`${t.role} <> 'owner' or ${t.username} is null`),
   ],
 );
 
@@ -173,7 +209,7 @@ export const recoveryKeys = pgTable(
     usedAt: timestamp('used_at', { withTimezone: true }),
   },
   (t) => [
-    tenantPolicy(t.businessId),
+    ...tenantPolicies(t.businessId),
     foreignKey({
       name: 'recovery_keys_user_fk',
       columns: [t.businessId, t.userId],
@@ -204,7 +240,7 @@ export const entryLog = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    tenantPolicy(t.businessId),
+    ...tenantPolicies(t.businessId),
     foreignKey({
       name: 'entry_log_branch_fk',
       columns: [t.businessId, t.branchId],
@@ -216,5 +252,349 @@ export const entryLog = pgTable(
       columns: [t.businessId, t.actorId],
       foreignColumns: [users.businessId, users.id],
     }),
+  ],
+);
+
+// Every token is stored as its SHA-256 in lower-case hex (P1.4 design, section 4).
+const tokenHashCheck = (column: AnyPgColumn) => sql`${column} ~ '^[0-9a-f]{64}$'`;
+
+// A counter computer that knows its business (Module 00 #28, #44). The browser holds
+// `<businessId>.<token>` in a cookie; only the hash is stored. Forgotten, never deleted.
+export const devices = pgTable(
+  'devices',
+  {
+    id: id(),
+    businessId: businessId(),
+    branchId: uuid('branch_id').notNull(),
+    tokenHash: text('token_hash').notNull(),
+    name: text('name'),
+    registeredBy: uuid('registered_by').notNull(),
+    createdAt: createdAt(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    unique('devices_business_id_id_unique').on(t.businessId, t.id),
+    unique('devices_business_id_token_hash_unique').on(t.businessId, t.tokenHash),
+    foreignKey({
+      name: 'devices_branch_fk',
+      columns: [t.businessId, t.branchId],
+      foreignColumns: [branches.businessId, branches.id],
+    }),
+    foreignKey({
+      name: 'devices_registered_by_fk',
+      columns: [t.businessId, t.registeredBy],
+      foreignColumns: [users.businessId, users.id],
+    }),
+    check('devices_token_hash_check', tokenHashCheck(t.tokenHash)),
+  ],
+);
+
+/** Why a session ended (P1.4 design, section 3). */
+export const SESSION_END_REASONS = [
+  'logout',
+  'idle',
+  'replaced',
+  'password_changed',
+  'deactivated',
+  'reset',
+] as const;
+export type SessionEndReason = (typeof SESSION_END_REASONS)[number];
+
+// A login on one browser (ADR 0009). Rows end with `ended_at` and are kept: they show who was
+// logged in when (ADR 0007). The cookie holds `<businessId>.<token>`; only hashes are stored.
+export const sessions = pgTable(
+  'sessions',
+  {
+    id: id(),
+    businessId: businessId(),
+    userId: uuid('user_id').notNull(),
+    branchId: uuid('branch_id').notNull(),
+    deviceId: uuid('device_id'),
+    tokenHash: text('token_hash').notNull(),
+    csrfHash: text('csrf_hash').notNull(),
+    userAgent: text('user_agent'),
+    createdAt: createdAt(),
+    lastActiveAt: timestamp('last_active_at', { withTimezone: true }).notNull().defaultNow(),
+    /** The owner's auto-lock (Module 00 #21); null while unlocked. */
+    lockedAt: timestamp('locked_at', { withTimezone: true }),
+    endedAt: timestamp('ended_at', { withTimezone: true }),
+    endReason: text('end_reason'),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    unique('sessions_business_id_token_hash_unique').on(t.businessId, t.tokenHash),
+    foreignKey({
+      name: 'sessions_user_fk',
+      columns: [t.businessId, t.userId],
+      foreignColumns: [users.businessId, users.id],
+    }),
+    foreignKey({
+      name: 'sessions_branch_fk',
+      columns: [t.businessId, t.branchId],
+      foreignColumns: [branches.businessId, branches.id],
+    }),
+    foreignKey({
+      name: 'sessions_device_fk',
+      columns: [t.businessId, t.deviceId],
+      foreignColumns: [devices.businessId, devices.id],
+    }),
+    index('sessions_open_by_user')
+      .on(t.businessId, t.userId)
+      .where(sql`${t.endedAt} is null`),
+    check('sessions_token_hash_check', tokenHashCheck(t.tokenHash)),
+    check('sessions_csrf_hash_check', tokenHashCheck(t.csrfHash)),
+    check('sessions_end_reason_check', sql`${t.endReason} in (${literals(SESSION_END_REASONS)})`),
+    check('sessions_ended_check', sql`(${t.endedAt} is null) = (${t.endReason} is null)`),
+    check('sessions_user_agent_check', sql`length(${t.userAgent}) <= 200`),
+  ],
+);
+
+// ---- Items (P1.7, Module 01; design docs/plans/2026-11-19-p1.7-items-design.md) ----
+// Names sort with the `item_name` ICU collation (migration 0005): Latin before Devanagari,
+// numbers by value. Queries name it (`collate item_name`); the columns keep the default.
+// Nothing here is ever deleted: rows are archived (`archived_at`) or removed (`removed_at`).
+
+const money = (name: string) => bigint(name, { mode: 'number' });
+/** Defaults to the transaction's business, like entry_log: code never passes another one. */
+const ownBusinessId = () => businessId().default(sql`app_current_business_id()`);
+const archivedAt = () => timestamp('archived_at', { withTimezone: true });
+
+/** Unique among live rows, case ignored, within one business. */
+function liveName(
+  name: string,
+  t: { businessId: AnyPgColumn; name: AnyPgColumn; archivedAt: AnyPgColumn },
+) {
+  return uniqueIndex(name)
+    .on(t.businessId, sql`lower(${t.name})`)
+    .where(sql`${t.archivedAt} is null`);
+}
+
+// Module 00 #4: none pre-loaded; owners add their own.
+export const categories = pgTable(
+  'categories',
+  {
+    id: id(),
+    businessId: ownBusinessId(),
+    name: text('name').notNull(),
+    archivedAt: archivedAt(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    unique('categories_business_id_id_unique').on(t.businessId, t.id),
+    liveName('categories_live_name_unique', t),
+    check('categories_name_check', sql`char_length(${t.name}) between 1 and 60`),
+  ],
+);
+
+// Module 01 #16: the owner's own units, each a size of a built-in unit (1 crate = 24 piece).
+export const units = pgTable(
+  'units',
+  {
+    id: id(),
+    businessId: ownBusinessId(),
+    name: text('name').notNull(),
+    hindiName: text('hindi_name'),
+    baseUnit: text('base_unit').notNull(),
+    /** Thousandths of the base unit; an item can change it for itself (owner's answer 3). */
+    defaultSize: bigint('default_size', { mode: 'number' }).notNull(),
+    archivedAt: archivedAt(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    unique('units_business_id_id_unique').on(t.businessId, t.id),
+    liveName('units_live_name_unique', t),
+    check('units_name_check', sql`char_length(${t.name}) between 1 and 30`),
+    check('units_not_built_in_check', sql`lower(${t.name}) not in (${literals(BUILT_IN_UNITS)})`),
+    check('units_base_unit_check', sql`${t.baseUnit} in (${literals(BUILT_IN_UNITS)})`),
+    check('units_default_size_check', sql`${t.defaultSize} > 0`),
+  ],
+);
+
+// Module 01 #1–3: one catalogue and one price list per business (owner's answer 4); stock and
+// low-stock levels per branch. Prices are paise per stock unit (ADR 0008).
+export const items = pgTable(
+  'items',
+  {
+    id: id(),
+    businessId: ownBusinessId(),
+    kind: text('kind').notNull(),
+    name: text('name').notNull(),
+    hindiName: text('hindi_name'),
+    code: text('code'),
+    categoryId: uuid('category_id'),
+    brand: text('brand'),
+    stockUnit: text('stock_unit').notNull(),
+    sellingPrice: money('selling_price').notNull(),
+    wholesalePrice: money('wholesale_price'),
+    purchasePrice: money('purchase_price'),
+    mrp: money('mrp'),
+    priceIncludesTax: boolean('price_includes_tax').notNull().default(true),
+    /** Basis points, one of GST_RATES; null until the owner sets it. */
+    gstRate: integer('gst_rate'),
+    hsn: text('hsn'),
+    archivedAt: archivedAt(),
+    /** +1 on every save: a save made from an older copy answers 409 (design §6). */
+    version: integer('version').notNull().default(1),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    unique('items_business_id_id_unique').on(t.businessId, t.id),
+    foreignKey({
+      name: 'items_category_fk',
+      columns: [t.businessId, t.categoryId],
+      foreignColumns: [categories.businessId, categories.id],
+    }),
+    liveName('items_live_name_unique', t),
+    uniqueIndex('items_live_code_unique')
+      .on(t.businessId, sql`lower(${t.code})`)
+      .where(sql`${t.archivedAt} is null`),
+    // P1.13 copies the catalogue into the browser and asks what changed since.
+    index('items_updated_at_idx').on(t.businessId, t.updatedAt),
+    check('items_kind_check', sql`${t.kind} in (${literals(ITEM_KINDS)})`),
+    check('items_name_check', sql`char_length(${t.name}) between 1 and 100`),
+    check('items_code_check', sql`${t.code} ~ '^[!-~]{1,20}$'`),
+    check('items_stock_unit_check', sql`${t.stockUnit} in (${literals(BUILT_IN_UNITS)})`),
+    check(
+      'items_prices_check',
+      sql`${t.sellingPrice} >= 0 and ${t.wholesalePrice} >= 0 and ${t.purchasePrice} >= 0 and ${t.mrp} > 0`,
+    ),
+    // Module 01 #3: never above MRP. MRP includes every tax, so the price must too (answer 2).
+    check(
+      'items_mrp_check',
+      sql`${t.mrp} is null or (${t.priceIncludesTax} and ${t.sellingPrice} <= ${t.mrp} and coalesce(${t.wholesalePrice}, 0) <= ${t.mrp})`,
+    ),
+    check('items_service_check', sql`${t.kind} = 'goods' or ${t.mrp} is null`),
+    check('items_gst_rate_check', sql`${t.gstRate} in (${sql.raw(GST_RATES.join(', '))})`),
+    // Goods: HSN 4, 6 or 8 digits. Services: SAC, 6 digits from 99.
+    check(
+      'items_hsn_check',
+      sql`case ${t.kind} when 'goods' then ${t.hsn} ~ '^([0-9]{4}|[0-9]{6}|[0-9]{8})$' else ${t.hsn} ~ '^99[0-9]{4}$' end`,
+    ),
+    check('items_version_check', sql`${t.version} >= 1`),
+  ],
+);
+
+// Module 01 #2: other units an item is bought or sold in, each with its size in stock units.
+export const itemUnits = pgTable(
+  'item_units',
+  {
+    id: id(),
+    businessId: ownBusinessId(),
+    itemId: uuid('item_id').notNull(),
+    /** A built-in unit, or else one of the owner's units (`unit_id`); exactly one is set. */
+    unitCode: text('unit_code'),
+    unitId: uuid('unit_id'),
+    /** Thousandths of the item's stock unit in one pack. */
+    size: bigint('size', { mode: 'number' }).notNull(),
+    /** Null: size × the item's price. */
+    sellingPrice: money('selling_price'),
+    mrp: money('mrp'),
+    soldAsPack: boolean('sold_as_pack').notNull(),
+    boughtAsPack: boolean('bought_as_pack').notNull(),
+    archivedAt: archivedAt(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    unique('item_units_business_id_id_unique').on(t.businessId, t.id),
+    // Barcodes check that their pack belongs to their item.
+    unique('item_units_business_id_item_id_id_unique').on(t.businessId, t.itemId, t.id),
+    foreignKey({
+      name: 'item_units_item_fk',
+      columns: [t.businessId, t.itemId],
+      foreignColumns: [items.businessId, items.id],
+    }),
+    foreignKey({
+      name: 'item_units_unit_fk',
+      columns: [t.businessId, t.unitId],
+      foreignColumns: [units.businessId, units.id],
+    }),
+    uniqueIndex('item_units_live_unit_unique')
+      .on(t.businessId, t.itemId, sql`coalesce(${t.unitCode}, ${t.unitId}::text)`)
+      .where(sql`${t.archivedAt} is null`),
+    check('item_units_one_unit_check', sql`num_nonnulls(${t.unitCode}, ${t.unitId}) = 1`),
+    check('item_units_unit_code_check', sql`${t.unitCode} in (${literals(BUILT_IN_UNITS)})`),
+    check(
+      'item_units_numbers_check',
+      sql`${t.size} > 0 and ${t.sellingPrice} >= 0 and ${t.mrp} > 0`,
+    ),
+    check(
+      'item_units_mrp_check',
+      sql`${t.mrp} is null or ${t.sellingPrice} is null or ${t.sellingPrice} <= ${t.mrp}`,
+    ),
+  ],
+);
+
+// Module 01 #8. A code belongs to one live item or pack per business; removing it from an item
+// (`removed_at`) frees it. An archived item keeps its codes, so a scan can offer a restore.
+export const itemBarcodes = pgTable(
+  'item_barcodes',
+  {
+    id: id(),
+    businessId: ownBusinessId(),
+    itemId: uuid('item_id').notNull(),
+    /** The pack the code is printed on; null for the stock unit. */
+    itemUnitId: uuid('item_unit_id'),
+    code: text('code').notNull(),
+    /** Made by the app (EAN-13 from 2), for loose and unbranded items. */
+    inStore: boolean('in_store').notNull().default(false),
+    removedAt: timestamp('removed_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    foreignKey({
+      name: 'item_barcodes_item_fk',
+      columns: [t.businessId, t.itemId],
+      foreignColumns: [items.businessId, items.id],
+    }),
+    // The pack must be one of this item's (MATCH SIMPLE: skipped when item_unit_id is null).
+    foreignKey({
+      name: 'item_barcodes_pack_fk',
+      columns: [t.businessId, t.itemId, t.itemUnitId],
+      foreignColumns: [itemUnits.businessId, itemUnits.itemId, itemUnits.id],
+    }),
+    uniqueIndex('item_barcodes_live_code_unique')
+      .on(t.businessId, t.code)
+      .where(sql`${t.removedAt} is null`),
+    check('item_barcodes_code_check', sql`${t.code} ~ '^[!-~]{4,48}$'`),
+  ],
+);
+
+// Module 01 #1: an item's low-stock level at one branch, in thousandths of its stock unit.
+export const itemBranchLevels = pgTable(
+  'item_branch_levels',
+  {
+    id: id(),
+    businessId: ownBusinessId(),
+    itemId: uuid('item_id').notNull(),
+    branchId: uuid('branch_id').notNull(),
+    lowStockLevel: bigint('low_stock_level', { mode: 'number' }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    foreignKey({
+      name: 'item_branch_levels_item_fk',
+      columns: [t.businessId, t.itemId],
+      foreignColumns: [items.businessId, items.id],
+    }),
+    foreignKey({
+      name: 'item_branch_levels_branch_fk',
+      columns: [t.businessId, t.branchId],
+      foreignColumns: [branches.businessId, branches.id],
+    }),
+    unique('item_branch_levels_item_branch_unique').on(t.businessId, t.itemId, t.branchId),
+    check('item_branch_levels_level_check', sql`${t.lowStockLevel} >= 0`),
   ],
 );

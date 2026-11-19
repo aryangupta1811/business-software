@@ -66,7 +66,7 @@ variable "db_password_version" {
 }
 
 variable "app_password_version" {
-  description = "Bump by one to make new passwords for app_owner and app_runtime in SSM (then ALTER ROLE on RDS, see terraform.md)."
+  description = "Bump by one to make new passwords for app_owner, app_runtime and app_backup in SSM (then ALTER ROLE on RDS, see terraform.md)."
   type        = number
   default     = 1
 }
@@ -87,4 +87,10 @@ variable "github_repository" {
   description = "owner/name of the GitHub repository whose demo environment may deploy (stage 6)."
   type        = string
   default     = "aryangupta1811/business-software"
+}
+
+variable "backup_retention_days" {
+  description = "Days a nightly database backup is kept in S3 before it expires (ADR 0037); 30 more as an older version."
+  type        = number
+  default     = 90
 }

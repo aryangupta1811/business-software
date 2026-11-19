@@ -132,9 +132,19 @@ describe('settingsBusinessSchema', () => {
     [{ fssai: '1234567890123' }, { fssai: 'invalid' }],
     [{ address: 'x'.repeat(301) }, { address: 'too_long' }],
     [{ branchName: '' }, { branchName: 'required' }],
+    // Module 00 #36 (G6): a business that isn't registered has no GSTIN.
+    [{ gstStatus: 'unregistered' }, { gstin: 'not_registered' }],
   ])('refuses %j', (change, expected) => {
     expect(errorsOf(settingsBusinessSchema, { ...business, ...change })).toEqual(expected);
   });
+
+  // #36: registered without a GSTIN is allowed here; the first tax invoice checks it (P1.14).
+  it.each(['unregistered', 'regular', 'composition'])(
+    'accepts a %s business with no GSTIN',
+    (gstStatus) => {
+      expect(errorsOf(settingsBusinessSchema, { ...business, gstStatus, gstin: '' })).toEqual({});
+    },
+  );
 
   it('accepts a business with no GSTIN or PAN', () => {
     expect(() =>

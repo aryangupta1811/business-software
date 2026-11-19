@@ -1,6 +1,6 @@
 // The only way rows get into the entry log (ADRs 0007, 0028). It takes a transaction, never the
 // database, so a log row commits or rolls back with the action it describes.
-import { entryLog } from './schema.js';
+import { sql } from 'drizzle-orm';
 import type { Transaction } from './tenancy.js';
 
 /** Every action the log knows. Each module adds its own names. */
@@ -8,6 +8,27 @@ export const ENTRY_ACTIONS = {
   'business.created': { reasonRequired: false }, // Module 00 #7, at signup
   'business.updated': { reasonRequired: false }, // Module 00 #10, settings
   'stock.adjusted': { reasonRequired: true }, // Module 01 #11
+  // Logins (sitting 2, 06 L2; Module 00 #20). Failed logins stay with the rate limit.
+  'user.logged_in': { reasonRequired: false },
+  'user.logged_out': { reasonRequired: false }, // after.cause: logout, idle, replaced
+  'session.locked': { reasonRequired: false }, // Module 00 #21, #38
+  'session.unlocked': { reasonRequired: false },
+  'device.registered': { reasonRequired: false }, // Module 00 #28, #37
+  // P1.7 (Module 01 #1-3, #8, #16): items, their barcodes, categories and own units.
+  'item.created': { reasonRequired: false },
+  'item.updated': { reasonRequired: false },
+  'item.archived': { reasonRequired: false },
+  'item.restored': { reasonRequired: false },
+  'item.barcode_added': { reasonRequired: false },
+  'item.barcode_removed': { reasonRequired: false },
+  'category.created': { reasonRequired: false },
+  'category.updated': { reasonRequired: false },
+  'category.archived': { reasonRequired: false },
+  'category.restored': { reasonRequired: false },
+  'unit.created': { reasonRequired: false },
+  'unit.updated': { reasonRequired: false },
+  'unit.archived': { reasonRequired: false },
+  'unit.restored': { reasonRequired: false },
 } as const satisfies Record<string, { reasonRequired: boolean }>;
 
 export type EntryAction = keyof typeof ENTRY_ACTIONS;
@@ -41,15 +62,14 @@ export async function recordEntry(tx: Transaction, entry: EntryInput): Promise<v
     throw new Error(`Entry action "${entry.action}" needs a reason`);
   }
   // Fails here, before the insert, on anything JSON can't hold (a BigInt, a cycle).
-  JSON.stringify([entry.before, entry.after]);
-  await tx.insert(entryLog).values({
-    actorId: entry.actorId,
-    action: entry.action,
-    entityType: entry.entityType,
-    entityId: entry.entityId,
-    branchId: entry.branchId,
-    reason,
-    before: entry.before,
-    after: entry.after,
-  });
+  const before = entry.before === undefined ? null : JSON.stringify(entry.before);
+  const after = entry.after === undefined ? null : JSON.stringify(entry.after);
+  // D4 (ADR 0028 note): app_runtime may not name id, business_id or created_at, so their
+  // defaults always apply. Drizzle's insert names every column (sending `default` for the ones
+  // left out), which PostgreSQL refuses here, so the column list is written out.
+  await tx.execute(sql`
+    insert into entry_log
+      (branch_id, actor_id, action, entity_type, entity_id, reason, before, after)
+    values (${entry.branchId ?? null}, ${entry.actorId}, ${entry.action}, ${entry.entityType},
+            ${entry.entityId}, ${reason}, ${before}::jsonb, ${after}::jsonb)`);
 }

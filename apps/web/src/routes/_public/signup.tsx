@@ -10,8 +10,6 @@ import {
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import {
   Boxes,
-  Eye,
-  EyeOff,
   Hammer,
   NotebookPen,
   Pill,
@@ -20,11 +18,13 @@ import {
   ShoppingBasket,
   Smartphone,
 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import type { z } from 'zod';
 import { ApiError, apiRequest } from '../../api/client';
+import { PasswordInput } from '../../components/password-input';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { ChoiceCards } from '../../components/ui/choice-cards';
@@ -51,7 +51,7 @@ function Signup() {
   const { t, i18n } = useTranslation();
   const errorText = useFieldError();
   const navigate = useNavigate();
-  const [showPassword, setShowPassword] = useState(false);
+  const queryClient = useQueryClient();
   const [failed, setFailed] = useState(false);
   const {
     register,
@@ -78,6 +78,8 @@ function Signup() {
     try {
       const result = await apiRequest<SignupResult>('POST', '/api/signup', input);
       holdRecoveryKey({ businessName: input.businessName, recoveryKey: result.recoveryKey });
+      // The answer logged the owner in (#37): drop what this tab knew before, the session included.
+      queryClient.clear();
       await navigate({ to: '/signup/recovery-key' });
     } catch (error) {
       if (error instanceof ApiError && error.code === 'email_taken') {
@@ -217,26 +219,7 @@ function Signup() {
               error={errorText('password', errors.password?.message)}
             >
               {(props) => (
-                <div className="relative">
-                  <Input
-                    {...props}
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete="new-password"
-                    className="pr-12"
-                    {...register('password')}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-0 right-0"
-                    aria-label={t(showPassword ? 'signup.hidePassword' : 'signup.showPassword')}
-                    onClick={() => {
-                      setShowPassword((shown) => !shown);
-                    }}
-                  >
-                    {showPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
-                  </Button>
-                </div>
+                <PasswordInput {...props} autoComplete="new-password" {...register('password')} />
               )}
             </Field>
 

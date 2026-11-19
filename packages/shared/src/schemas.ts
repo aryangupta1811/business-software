@@ -86,6 +86,11 @@ export const settingsBusinessSchema = z
   })
   // Zod runs this even when a field's own check failed, so only checked values are compared.
   .superRefine((value, context) => {
+    // Module 00 #36 (G6): a GSTIN on a business that isn't registered is refused.
+    if (value.gstStatus === 'unregistered' && value.gstin !== null) {
+      context.addIssue({ code: 'custom', path: ['gstin'], message: 'not_registered' });
+      return;
+    }
     if (value.gstin === null || !isValidGstin(value.gstin) || !isBranchStateCode(value.stateCode)) {
       return;
     }

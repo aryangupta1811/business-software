@@ -39,8 +39,10 @@ import {
   type ItemPage,
   type ItemQuery,
   type ItemRow,
+  type ItemsContext,
   type ItemUpdateInput,
   type ItemView,
+  type Feature,
   type NewItemInput,
   type PackInput,
 } from '@business-software/shared';
@@ -117,6 +119,26 @@ export class ItemsService {
   }
 
   // ---- Reading ----
+
+  /** What the page needs before it shows a form: the caller's item permissions, G5, features, branches. */
+  context(caller: Caller): Promise<ItemsContext> {
+    return this.inBusiness(caller, async (tx) => {
+      const [business] = await tx
+        .select({ gstStatus: businesses.gstStatus, features: businesses.features })
+        .from(businesses);
+      const branchRows = await tx
+        .select({ id: branches.id, name: branches.name })
+        .from(branches)
+        .orderBy(sql`${branches.name} collate item_name`, asc(branches.id));
+      return {
+        canViewCost: seesCost(caller),
+        canManage: caller.permissions.includes('items.manage'),
+        needsGst: business?.gstStatus === 'regular',
+        features: (business?.features ?? []) as Feature[],
+        branches: branchRows,
+      };
+    });
+  }
 
   list(caller: Caller, query: ItemQuery): Promise<ItemPage> {
     return this.inBusiness(caller, async (tx) => {

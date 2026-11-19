@@ -20,10 +20,10 @@ Update this as the project grows.
 
 - **The problem:** a small Indian shop runs on a billing app, a paper udhaar register and a staff notebook. I'm building one web app that does all of it, for many shops at once, each seeing only its own data, in English, Hindi and Hinglish.
 - **What makes it hard:** correctness, not the feature list. A bill must save the invoice, the stock change and the udhaar entry together or not at all. Two counters can sell the last unit at the same moment. GST maths must be exact to the paisa. And the owner can't lose a single record.
-- **My architecture:** a TypeScript monorepo with a React single-page app, a NestJS modular monolith (so a bill is one database transaction, not a saga across services) and PostgreSQL. The safety rules live in the database, not only in my code: money is stored as whole paise, the app's database user has no DELETE permission, and Row-Level Security keeps businesses apart. Every choice has a written decision record with the alternatives I rejected; there are 33 so far.
+- **My architecture:** a TypeScript monorepo with a React single-page app, a NestJS modular monolith (so a bill is one database transaction, not a saga across services) and PostgreSQL. The safety rules live in the database, not only in my code: money is stored as whole paise, the app's database user has no DELETE permission, and Row-Level Security keeps businesses apart. Every choice has a written decision record with the alternatives I rejected; there are 39 so far.
 - **One hard bug:** my background worker kept dying after exactly 10 seconds. That was the database driver's idle timeout. Waiting for the shutdown signal doesn't keep Node's event loop alive, so when the pool's last idle connection closed, the process simply ended. I reproduced it in a test, held the process open until SIGTERM, and confirmed it in Docker with zero restarts.
-- **How it's shipped:** the same Docker Compose stack runs on my laptop and in CI. Every pull request must pass five required checks: lint, types and 1,082 tests against a real PostgreSQL; a secret scan of the whole history; a migration-order check; the PR title; and a smoke test that starts the real images. The cloud is Terraform on AWS in Mumbai: one ARM64 EC2 server plus RDS PostgreSQL with point-in-time restore, no SSH (Systems Manager only), priced at about 4 cents per running hour and run only for sessions and demos, because my budget is ₹0. CI also checks the Terraform on every PR. Every commit on `main` gets ARM64 images on GHCR, tagged by its hash, and the demo at https://business-software.duckdns.org deploys one commit at a time over Systems Manager.
-- **Where it stands:** the foundations are done (Phase 0). In Phase 1 the database already keeps businesses apart (forced Row-Level Security, with a test that scans every table), and an append-only audit log records every change in the same transaction. The GST engine computes every number on a bill, and a shop can sign up (Argon2id passwords, a recovery key kept only in memory); logins, items and billing come next.
+- **How it's shipped:** the same Docker Compose stack runs on my laptop and in CI. Every pull request must pass five required checks: lint, types and 1,399 tests against a real PostgreSQL; a secret scan of the whole history; a migration-order check; the PR title; and a smoke test that starts the real images. The cloud is Terraform on AWS in Mumbai: one ARM64 EC2 server plus RDS PostgreSQL with point-in-time restore, no SSH (Systems Manager only), priced at about 4 cents per running hour and run only for sessions and demos, because my budget is ₹0. CI also checks the Terraform on every PR. Every commit on `main` gets ARM64 images on GHCR, tagged by its hash, and the demo at https://business-software.duckdns.org deploys one commit at a time over Systems Manager.
+- **Where it stands:** the foundations are done (Phase 0). In Phase 1 the database already keeps businesses apart (forced Row-Level Security, with a test that scans every table), and an append-only audit log records every change in the same transaction. The GST engine computes every number on a bill; a shop can sign up, owners and staff log in (hashed sessions, a lock screen, CSRF, rate limits), and the owner manages items with barcodes. The database is backed up nightly to S3 by a read-only role, into a bucket that refuses overwrites, with a restore drill. Billing comes next.
 - **What I'd do differently:** pin down the real constraints first. I designed hosting for a budget I didn't have and had to redesign it. And test what you ship: the production CSS minifier broke a page my unit tests said was fine.
 
 ---
@@ -43,9 +43,9 @@ Update this as the project grows.
 | Largest exact amount in JavaScript | ≈ ₹90 lakh crore in paise (2^53) | ADR 0008 |
 | Business types in v1 | 5 | Module 00 |
 | Modules | 10 (00–09) | `docs/requirements/` |
-| ADRs | 36 (16 at kickoff) | `docs/decisions/` |
+| ADRs | 39 (16 at kickoff) | `docs/decisions/` |
 | Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
-| Automated tests | 1,082 (2026-11-19): 731 shared (money, GST engine, states, field and body schemas), 104 db (roles, RDS bootstrap, tenancy, entry log, guard, business setup), 91 api (signup, settings, Argon2id, route census, health, shutdown), 156 web (signup, recovery key, settings, three languages, contrast, components) | `pnpm test` |
+| Automated tests | 1,399 (2026-11-20): 831 shared, 165 db (roles, tenancy, entry log, guard, backups and restore, items, sessions), 183 api (signup, login, sessions, settings, items, routes), 220 web (signup, login, lock screen, items page, settings, three languages, contrast) | `pnpm test` |
 | Interface languages | 3: English, Hindi, Hinglish (`en`, `hi`, `hi-Latn`) | Module 00 #25, ADR 0023 |
 | Web app download | ~160 KB gzipped JavaScript; fonts 307 KB (woff2, six files, cached for a year); web image 95 MB (Caddy) | P0.7, `vite build` |
 | Readability floor | text ≥ 4.5:1 contrast (main text ≥ 7:1), input edges and focus ring ≥ 3:1, both modes; body text 15 px, nothing under 13 px | ADR 0025 |
@@ -65,6 +65,9 @@ Update this as the project grows.
 | Demo server memory | 773 MB used of 1.8 GB with the whole stack running (containers ~100 MB) | Stage 5 part 3 |
 | Password hashing | Argon2id, 19 MiB, 2 passes, 1 lane (OWASP), ~30 ms and ~19 MiB per hash | ADR 0035 |
 | Recovery key | 160 random bits, 32 Crockford base32 characters, stored as SHA-256 | Module 00 #31 |
+| Backups | nightly at 22:45 IST (or at the next boot), kept 90 days + 30 days as old versions; can't be overwritten; under $0.10 a month | Stage 7, ADR 0037 |
+| Wrong-password limit | 10 per login per 15 minutes, 30 per computer; at most 2 Argon2 hashes at once | P1.4, ADR 0038 |
+| Review findings before merge, Day 3 | 39 across 4 PRs (10 + 9 + 10 + 10), all fixed test-first; CI was green on every one | Fast track Day 3 |
 
 ---
 
@@ -201,6 +204,11 @@ Short answers; the Log entry has the full story.
 - **Q: How do you make sure written requirements match what the client decided?**
   A: Every requirement file gets a review before merge from someone without the conversation's context, checking each point against the client's actual answers. Additions are labelled as additions and confirmed. On my project that review caught a rule nobody had chosen and a note contradicting a newer decision.Every PR still had tests first, an independent review and five green CI checks. → `docs/plans/2026-11-17-fast-track.md`
 
+- **Q: How do you back up a database whose rows are hidden by row-level security?**
+  A: A read-only `app_backup` role with its own policy on every tenant table; CI fails if a table lacks it, and the dump script refuses to run if the live database does. The RDS master can't bypass RLS, so it can't do it. → ADR 0037
+- **Q: How did you run several tasks at once on your own?**
+  A: One git worktree, branch and PR per task, each worked by a background agent; one merge queue where the second PR to merge updates from `main`, renumbers its migration and re-runs CI; a code review on every PR before merge. → `docs/plans/2026-11-17-fast-track.md`
+
 ---
 
 ## Glossary
@@ -325,6 +333,10 @@ Terms I learned on this project, in one line each.
 | Export condition (`source`) | A key in a package's `exports` that lets a tool pick another entry point, here the TypeScript source instead of the build |
 | PHC string | The standard text form of a password hash: algorithm, version, parameters, salt and hash in one string |
 | cloud-init | The first-boot setup script Ubuntu cloud images run from the instance's user data |
+| Conditional write (S3) | An upload with `If-None-Match: *` succeeds only if the key doesn't exist; a bucket policy can require it, so files can't be overwritten |
+| Optimistic locking | Each row carries a version; a save sends the version it read and is refused (`409`) if someone saved in between |
+| Git worktree | A second checkout of the same repository in another folder, on its own branch, sharing one `.git` |
+| InsufficientInstanceCapacity | AWS has no spare servers of that type in that zone right now; a stopped instance doesn't reserve its capacity |
 
 ---
 
@@ -1682,7 +1694,40 @@ Entry format:
 - **Why / what I learned:** A backup that skips what it can't read looks fine until the restore, when every owner is locked out. Failing loudly turned that into a red test on the day the schema arrived.
 - **Say it in an interview:** "My backup refuses to run if there's anything it can't read. When a later feature added a new schema, CI went red on the backup test the same day, not on the day I needed a restore."
 
+### 2026-11-19 — Telling a barcode scanner from a person typing `#frontend` `#gotcha`
+- **What happened:** A USB scanner is a keyboard: it "types" the code and presses Enter. The Items page opens a scanned item when no field is focused, so it has to tell a scan from someone pressing keys. A scanner sends each key a few milliseconds apart; people take 100 ms or more. The page keeps a buffer that empties after any gap over 50 ms and counts only four or more printable characters ended by Enter. The first version reset the buffer on Shift, which scanners press for every capital letter, so codes with letters would never scan; a test caught it before the page used it.
+- **Say it in an interview:** "A scanner is a fast keyboard, so I detect scans by timing: a burst of keys a few milliseconds apart ending in Enter. The logic is a small class with tests that feed it timestamps, so it's tested without a real device."
+
+### 2026-11-19 — Optimistic locking undone by the browser's own cache `#frontend` `#bug` `#review`
+- **What happened:** The item form sends back the `version` it was loaded at, so the server can answer `409 stale` if someone else saved first. A review found the form read the version from the query cache instead of from when its values were loaded. TanStack Query refetches when the window regains focus, and adding a barcode also writes a fresh copy into the cache. Either can bring someone else's newer version, and the next save would carry it and silently overwrite their change. The form now keeps the loaded version in a ref and updates it only when the form itself is reset from a save.
+- **Why / what I learned:** The version must travel with the values it describes. A cache that updates itself in the background is exactly what makes a separate "latest version" wrong.
+- **Say it in an interview:** "Optimistic locking only works if the version you send is the one your edits started from. My form kept it next to the values, not in the live cache, after a review showed a focus refetch could defeat the check."
+
+### 2026-11-19 — A scanner's keys and keyboard shortcuts share one keyboard `#frontend` `#gotcha` `#review`
+- **What happened:** `/` focuses the item search. A code containing `/` scanned with nothing focused triggered it mid-scan, so the rest of the code went into the search box. The scanner's listener now runs in the capture phase, before the shortcut registry, and stops any key that continues a burst already under way. The first test passed for the wrong reason: it fired every key at the page body and without the physical key code, so the shortcut never matched; the helper now sends keys to whatever has focus, with their codes, as a keyboard does.
+- **Say it in an interview:** "Scanners type through the keyboard, so shortcut keys can appear inside a barcode. I give the scanner first look at each key, and a key that continues a fast burst belongs to the scan."
+
+### 2026-11-19 — What a real-app check finds that tests don't `#frontend` `#testing`
+- **What happened:** After the tests and CI were green, I signed up a test business on my own database, logged in and used the Items page in Chrome: shortcuts, a simulated scan, prices and margin, errors in three languages, barcodes, archive and restore, light and dark, 1024 px. Everything worked, and the rows and entry log matched. It still found three wording problems no test could: a "Show archived" box that actually shows only archived items, a card promising packs that a kirana's settings hide, and one language missing the "Branch:" prefix the others had. Each got a test with the fix.
+- **Why / what I learned:** Tests check what I thought to ask; using the page as a shopkeeper checks what I didn't. A label that describes the code instead of the behaviour passes every test.
+- **Say it in an interview:** "Green CI isn't done. I use every feature once in a real browser against a real database before calling it finished, and anything I find becomes a test."
+
 ### 2026-11-19 — Continuous deployment: test the exact image, and make the hold fail closed `#devops` `#cicd` `#security`
 - **What happened:** Stage 6 built the deploy pipeline. The images workflow now builds both ARM64 images into the runner's Docker, runs the same smoke test CI runs, and only then pushes them, so the image on the Graviton server is the one that was tested (CI's smoke job tests x86 builds). A new deploy workflow waits for the owner's approval in a protected GitHub environment, gets one-hour AWS credentials through OIDC for a role that may only run commands on that one server, notes the running release, takes a backup, deploys over Systems Manager, checks the live site, and redeploys the previous release if the deploy or the check fails. The same scripts run on my laptop and on the Linux runner; I tested them on both against a fake AWS CLI before any AWS change.
 - **Why / what I learned:** My design said "the deploy runs while `DEPLOY_HOLD` is empty". Writing it, I saw that a merge before anyone set up the environment would find the variable empty and deploy. The hold now fails closed: only the exact text `off` lets a deploy through, and unset means held. Safety switches should default to the safe side.
 - **Say it in an interview:** "Every merge builds and smoke-tests the ARM64 images and pushes exactly those. Deploying needs my approval, uses short-lived OIDC credentials scoped to one server, takes a backup first, and rolls back automatically. The deploy hold fails closed, so a missing setting can never mean 'go'."
+
+### 2026-11-20 — Running three tasks in parallel, and what it cost `#process` `#mistake`
+- **What happened:** Day 3 ran three lanes as background agents, each in its own git worktree and branch, with one merge queue. Four PRs merged (P1.7 twice, P1.4, stage 7), plus the sitting-2 docs. The 5-hour usage limit stopped all three lanes three times; each resumed where it stopped, but once an RDS start was left in flight and the lane had to stop it after resuming. A `code-review` on every PR found 39 real problems that green CI had missed.
+- **Why / what I learned:** parallel work multiplies cost as well as speed, so size it to the real budget (two or three lanes), and check cloud state after any interruption. Review is the step that finds the bugs tests didn't think of; it isn't optional when four branches land in a day.
+- **Say it in an interview:** "I ran three features in parallel with worktrees and a strict merge queue: each PR reviewed, then merged one at a time, with the next one updating from main and renumbering its migration."
+
+### 2026-11-20 — A permission check stopped an approved `terraform apply` `#devops` `#process` `#gotcha`
+- **What happened:** The owner approved the stage 7 apply, but the background lane's `terraform apply` was blocked by Claude Code's permission check (an agent can't inherit a chat approval). The main session showed the saved plan (10 to add, 0 change, 0 destroy), applied that exact plan file, and later re-planned before applying the S3 policy change (1 to change). The AWS sign-in had also expired after 12 hours; the owner ran `aws login` again.
+- **Why / what I learned:** apply a saved plan file, never a fresh `apply` that re-plans: what the owner approved is exactly what runs. Plan in the worker, apply from the place the approval was given.
+- **Say it in an interview:** "Plans are reviewed as files and the same file is applied, so nothing changes between approval and apply."
+
+### 2026-11-20 — Checking the GST rate list after GST 2.0 `#domain` `#research`
+- **What happened:** P1.7 accepts the rates 0, 0.25, 3, 5, 18 and 40%. Since 22 September 2025 (Notification 9/2025, after the 56th GST Council), the main slabs are 5% and 18%, with 40% for luxury and demerit goods, 3% for precious metals and 0.25% for rough diamonds; 12% and 28% are gone for goods. Secondary sources disagree on a 1.5% rate (polished diamonds) versus 1.5% as the CGST half of 3%.
+- **Why / what I learned:** tax rates change by notification, so the app checks a rate is on today's list but not that an HSN code carries it (G1). The 1.5% question stays open until checked against CBIC's own notification, before the billing screen.
+- **Say it in an interview:** "The GST rate list is data that changes by government notification, so it's one constant with its source, checked against the notification, not spread through the code."

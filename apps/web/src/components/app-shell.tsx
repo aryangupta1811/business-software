@@ -1,6 +1,6 @@
 import type { ActiveSession } from '@business-software/shared';
 import { Link, useMatches, useNavigate } from '@tanstack/react-router';
-import { House, Keyboard, Settings } from 'lucide-react';
+import { House, Keyboard, Package, Settings } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keyLabels } from '../shortcuts/keys';
@@ -13,6 +13,7 @@ import { Button } from './ui/button';
 import { Kbd, KbdGroup } from './ui/kbd';
 
 const HOME_KEYS = 'Alt+H';
+const ITEMS_KEYS = 'Alt+I';
 const NAV_LINK =
   'flex min-h-10 items-center gap-2.5 rounded-lg px-2 text-muted hover:bg-surface-muted data-[status=active]:bg-surface-muted data-[status=active]:font-semibold data-[status=active]:text-foreground';
 
@@ -41,6 +42,15 @@ export function AppShell({
     },
   });
 
+  useShortcut({
+    keys: ITEMS_KEYS,
+    description: 'shortcuts.goItems',
+    group: 'navigation',
+    action: () => {
+      void navigate({ to: '/items' });
+    },
+  });
+
   return (
     <div className="flex min-h-screen">
       <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col overflow-y-auto border-r border-border bg-sidebar px-3 py-4">
@@ -59,6 +69,15 @@ export function AppShell({
             <span className="flex-1">{t('nav.home')}</span>
             <KbdGroup aria-hidden="true">
               {keyLabels(HOME_KEYS).map((label) => (
+                <Kbd key={label}>{label}</Kbd>
+              ))}
+            </KbdGroup>
+          </Link>
+          <Link to="/items" aria-keyshortcuts={ITEMS_KEYS} className={NAV_LINK}>
+            <Package aria-hidden="true" className="size-4" />
+            <span className="flex-1">{t('nav.items')}</span>
+            <KbdGroup aria-hidden="true">
+              {keyLabels(ITEMS_KEYS).map((label) => (
                 <Kbd key={label}>{label}</Kbd>
               ))}
             </KbdGroup>

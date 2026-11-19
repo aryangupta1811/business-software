@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { keyLabels, parseKeys } from './keys';
+import { keyLabels, matches, parseKeys } from './keys';
 
 test('parses function keys, Escape and ?', () => {
   expect(parseKeys('F2')).toEqual({ ctrl: false, alt: false, shift: false, key: 'F2' });
@@ -31,4 +31,14 @@ test('unknown keys are refused', () => {
 test('labels for the key chips', () => {
   expect(keyLabels('Alt+H')).toEqual(['Alt', 'H']);
   expect(keyLabels('?')).toEqual(['?']);
+});
+
+test('/ is the slash key by position, without Shift, so ? and / never collide', () => {
+  const slash = parseKeys('/');
+  const press = (init: KeyboardEventInit) => new KeyboardEvent('keydown', init);
+  expect(matches(slash, press({ key: '/', code: 'Slash' }))).toBe(true);
+  // The Hindi Inscript layout types "य" on that key.
+  expect(matches(slash, press({ key: 'य', code: 'Slash' }))).toBe(true);
+  expect(matches(slash, press({ key: '?', code: 'Slash', shiftKey: true }))).toBe(false);
+  expect(matches(parseKeys('?'), press({ key: '/', code: 'Slash' }))).toBe(false);
 });

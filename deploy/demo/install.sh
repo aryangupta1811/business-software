@@ -32,11 +32,13 @@ mv "$dir/certs/rds-ca.pem.new" "$dir/certs/rds-ca.pem"
 
 "$dir/bootstrap-db.sh"
 
-# The release that runs from now on. The deploy workflow reads the one it replaces first
-# (scripts/deploy/current-release.sh) and rolls back to it if this one fails. No "previous
-# release" is kept here: after a rollback it would name the failed release. The deploy
-# workflow's green runs, each named after its commit, are the record of what went live.
-[[ ! -f $dir/release.env ]] || echo "replacing: $(cat "$dir/release.env")"
+# The release that runs from now on (start.sh and compose read it). The deploy workflow reads
+# the one it replaces first (scripts/deploy/current-release.sh) and rolls back to it if this
+# one fails. No "previous release" is kept here: after a rollback it would name the failed
+# release. The deploy workflow's green runs, each named after its commit, are the record of
+# what went live.
+replaced=$(cat "$dir/release.env" 2>/dev/null || true)
+[[ -z $replaced ]] || echo "replacing: $replaced"
 printf 'IMAGE_TAG=%s\n' "$sha" >"$dir/release.env"
 systemctl daemon-reload
 systemctl enable business-software.service
@@ -60,4 +62,11 @@ for _ in $(seq 1 60); do # up to 10 minutes
 done
 echo "deploy of $sha did not come up; last log lines:" >&2
 journalctl -u business-software.service -n 40 --no-pager >&2
+# A release that never came up must not stay in release.env: the next deploy would take it as
+# the running release, roll back to it, and order commits against it. With the old one back,
+# systemd's next try (or the next boot) also starts the old release again.
+if [[ -n $replaced ]]; then
+  printf '%s\n' "$replaced" >"$dir/release.env"
+  echo "release.env is back to: $replaced" >&2
+fi
 exit 1

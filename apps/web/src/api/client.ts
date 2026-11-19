@@ -9,6 +9,8 @@ export class ApiError extends Error {
     readonly status: number,
     readonly code: string,
     readonly fields: FieldErrors = {},
+    /** The rest of the answer, such as the item that already has a barcode. */
+    readonly detail: Readonly<Record<string, unknown>> = {},
   ) {
     super(`API answered ${String(status)} ${code}`);
   }
@@ -36,7 +38,7 @@ export async function apiRequest<T>(method: string, path: string, body?: unknown
   } | null;
   if (!response.ok) {
     const code = typeof answer?.code === 'string' ? answer.code : 'server';
-    throw new ApiError(response.status, code, answer?.fields);
+    throw new ApiError(response.status, code, answer?.fields, answer ?? {});
   }
   return answer as T;
 }

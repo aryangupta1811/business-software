@@ -9,7 +9,9 @@ import type { INestApplication } from '@nestjs/common';
 import { createDatabase, type Database } from '@business-software/db';
 import { startTestDatabase, type TestDatabase } from '@business-software/db/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { ACTIVE_PING_MS, IDLE_GRACE_MS } from '@business-software/shared';
 import { createApp } from '../app.js';
+import { BusyError, HashGate } from './hash-gate.js';
 import { hashPassword } from './password.js';
 
 const PASSWORD = 'correct horse battery';
@@ -286,12 +288,12 @@ describe('logins and sessions', () => {
       expect((await actions(businessId)).slice(-2)).toEqual(['session.locked', 'session.unlocked']);
     });
 
-    it('locks after the owner lock time, counting from the last activity', async () => {
+    it('locks after the owner lock time and the grace, counting from the last activity', async () => {
       const { owner, businessId } = await signUp('idle-owner@example.com');
-      clock.advance(5 * MINUTE);
-      // Exactly the lock time is still allowed, and this request counts as activity.
+      // Signup was the last activity. The lock time plus the grace is still allowed.
+      clock.advance(5 * MINUTE + IDLE_GRACE_MS);
       expect((await owner.call('GET', '/settings')).status).toBe(200);
-      clock.advance(5 * MINUTE + 1);
+      clock.advance(1);
       expect(await owner.call('GET', '/settings')).toMatchObject({
         status: 401,
         body: { code: 'locked' },
@@ -300,13 +302,29 @@ describe('logins and sessions', () => {
       expect(await actions(businessId)).toContain('session.locked');
     });
 
-    // A poll mustn't keep the session awake (P1.4 design, section 5).
-    it("doesn't count reading the session as activity", async () => {
-      const { owner } = await signUp('passive@example.com');
-      clock.advance(4 * MINUTE);
+    // A tab that refetches on focus mustn't keep the owner's screen open (#21).
+    it("doesn't count reads, or a write refused for its CSRF token, as activity", async () => {
+      const { owner } = await signUp('reads@example.com');
+      clock.advance(3 * MINUTE);
       await owner.session();
-      clock.advance(2 * MINUTE);
+      expect((await owner.call('GET', '/settings')).status).toBe(200);
+      const forged = await owner.call('POST', '/session/active', undefined, {
+        'x-csrf-token': 'not-the-token',
+      });
+      expect(forged).toMatchObject({ status: 403, body: { code: 'csrf' } });
+      clock.advance(2 * MINUTE + IDLE_GRACE_MS + 1);
       expect(await owner.call('GET', '/settings')).toMatchObject({ body: { code: 'locked' } });
+    });
+
+    // The browser pings on the first key press, then at most every ACTIVE_PING_MS, and covers
+    // the screen after the idle time without one. The server must not act before it does.
+    it('never locks before the browser would', async () => {
+      const { owner } = await signUp('in-step@example.com');
+      clock.advance(MINUTE);
+      expect((await owner.call('POST', '/session/active')).status).toBe(204);
+      // Keys pressed until just before the next ping was due, then nothing for 5 minutes.
+      clock.advance(ACTIVE_PING_MS - 1 + 5 * MINUTE);
+      expect((await owner.call('GET', '/settings')).status).toBe(200);
     });
 
     // Typing a long bill sends no requests: the web app tells the server someone is there.
@@ -366,7 +384,7 @@ describe('logins and sessions', () => {
       const { owner, businessId } = await signUp('staff-idle@example.com');
       await addStaff(businessId, 'suresh');
       await owner.call('POST', '/login/staff', { username: 'suresh', password: PASSWORD });
-      clock.advance(30 * MINUTE + 1);
+      clock.advance(30 * MINUTE + IDLE_GRACE_MS + 1);
       expect(await owner.call('POST', '/session/lock')).toMatchObject({
         status: 401,
         body: { code: 'session_ended' },
@@ -397,6 +415,36 @@ describe('logins and sessions', () => {
         'replaced',
         null,
       ]);
+    });
+  });
+
+  describe('one session per browser (#18)', () => {
+    it("ends another business's session when its browser logs in as an owner", async () => {
+      const { owner, businessId } = await signUp('shop-a@example.com');
+      const { businessId: other } = await signUp('shop-b@example.com');
+      const login = await owner.call('POST', '/login', {
+        email: 'shop-b@example.com',
+        password: PASSWORD,
+      });
+      expect(login).toMatchObject({ status: 200, body: { business: { id: other } } });
+      expect((await sessionsOf(businessId)).map((row) => row.end_reason)).toEqual(['replaced']);
+      expect((await actions(businessId)).at(-1)).toBe('user.logged_out');
+    });
+
+    it('ends the session a signup replaces (#37)', async () => {
+      const { owner, businessId } = await signUp('first-shop@example.com');
+      const second = await owner.call('POST', '/signup', {
+        businessName: 'Second shop',
+        businessType: 'kirana',
+        phone: '9111111111',
+        stateCode: '27',
+        gstStatus: 'regular',
+        email: 'second-shop@example.com',
+        password: PASSWORD,
+      });
+      expect(second.status).toBe(201);
+      expect((await sessionsOf(businessId)).map((row) => row.end_reason)).toEqual(['replaced']);
+      expect((await actions(businessId)).at(-1)).toBe('user.logged_out');
     });
   });
 
@@ -486,6 +534,35 @@ describe('logins and sessions', () => {
       expect(refused.status).toBe(429);
     });
 
+    // Each try is counted before its password is checked, so a burst can't slip past (#41).
+    it('lets 10 of 22 simultaneous guesses at one login be checked', async () => {
+      await signUp('burst@example.com');
+      const answers = await Promise.all(
+        Array.from({ length: 22 }, (_, i) =>
+          browser().call('POST', '/login', {
+            email: 'burst@example.com',
+            password: `wrong ${String(i)}`,
+          }),
+        ),
+      );
+      const statuses = answers.map((answer) => answer.status);
+      expect(statuses.filter((status) => status === 401)).toHaveLength(10);
+      expect(statuses.filter((status) => status === 429)).toHaveLength(12);
+    });
+
+    it('lets 10 of 12 simultaneous unlock guesses be checked', async () => {
+      const { owner } = await signUp('unlock-burst@example.com');
+      await owner.call('POST', '/session/lock');
+      const answers = await Promise.all(
+        Array.from({ length: 12 }, () =>
+          owner.call('POST', '/session/unlock', { password: 'wrong' }),
+        ),
+      );
+      const statuses = answers.map((answer) => answer.status);
+      expect(statuses.filter((status) => status === 401)).toHaveLength(10);
+      expect(statuses.filter((status) => status === 429)).toHaveLength(2);
+    });
+
     it('limits wrong unlock passwords per session', async () => {
       const { owner } = await signUp('unlock-limit@example.com');
       await owner.call('POST', '/session/lock');
@@ -496,6 +573,46 @@ describe('logins and sessions', () => {
         status: 429,
       });
     });
+  });
+
+  // The password queue is full once, then frees up: the next logins must work (ADR 0038).
+  it('answers busy when the password queue is full, and recovers', async () => {
+    const { businessId } = await signUp('queue@example.com');
+    class FullOnce extends HashGate {
+      full = true;
+      override run<T>(work: () => Promise<T>): Promise<T> {
+        if (!this.full) return super.run(work);
+        this.full = false;
+        return Promise.reject(new BusyError());
+      }
+    }
+    const busyApp = await createApp(
+      { databaseUrl: server.runtimeUrl, host: '127.0.0.1', port: 0, jsonLogs: false },
+      { clock, hashGate: new FullOnce() },
+    );
+    busyApp.useLogger(false);
+    await busyApp.listen(0, '127.0.0.1');
+    try {
+      const { port } = (busyApp.getHttpServer() as Server).address() as AddressInfo;
+      const counter = new Browser(`http://127.0.0.1:${String(port)}/api`, '198.51.100.250');
+      const login = (email: string) =>
+        counter.call('POST', '/login', { email, password: PASSWORD });
+      expect(await login('queue@example.com')).toMatchObject({
+        status: 503,
+        body: { code: 'busy' },
+      });
+      // An unknown email is checked against a stand-in hash; a busy moment mustn't break it.
+      expect(await login('nobody-here@example.com')).toMatchObject({
+        status: 401,
+        body: { code: 'wrong_login' },
+      });
+      expect(await login('queue@example.com')).toMatchObject({
+        status: 200,
+        body: { business: { id: businessId } },
+      });
+    } finally {
+      await busyApp.close();
+    }
   });
 
   // Scan d: a shared counter's browser keeps no API answer.

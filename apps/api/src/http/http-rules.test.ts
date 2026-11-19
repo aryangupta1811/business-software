@@ -10,9 +10,14 @@ import { z } from 'zod';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { hashToken } from '../auth/tokens.js';
 import { UnhandledErrorFilter } from '../error-filter.js';
-import { HttpRulesModule } from './http-rules.module.js';
+import { httpRules } from './http-rules.js';
 import { AllowLocked, CurrentCaller, Permission, Public } from './permission.decorator.js';
-import type { Caller, SessionResolver } from './session.js';
+import {
+  NoSessionResolver,
+  SESSION_RESOLVER,
+  type Caller,
+  type SessionResolver,
+} from './session.js';
 import { ZodBodyPipe } from './zod-body.pipe.js';
 
 const echoSchema = z.strictObject({ name: text(5) });
@@ -63,8 +68,26 @@ const owner: Caller = {
   csrfHash: hashToken(CSRF),
 };
 
-async function start(resolver?: SessionResolver): Promise<{ app: INestApplication; url: string }> {
-  @Module({ imports: [HttpRulesModule.register(resolver)], controllers: [TestController] })
+/** Always answers `caller`, and notes each write it is told about. */
+function fakeSessions(caller: Caller) {
+  const active: string[] = [];
+  const resolver: SessionResolver = {
+    resolve: () => Promise.resolve(caller),
+    recordActivity: (who) => {
+      active.push(who.sessionId);
+      return Promise.resolve();
+    },
+  };
+  return { resolver, active };
+}
+
+async function start(
+  resolver: SessionResolver = new NoSessionResolver(),
+): Promise<{ app: INestApplication; url: string }> {
+  @Module({
+    providers: httpRules({ provide: SESSION_RESOLVER, useValue: resolver }),
+    controllers: [TestController],
+  })
   class TestModule {}
   const app = await NestFactory.create(TestModule, { logger: false });
   app.useGlobalFilters(new UnhandledErrorFilter(app.getHttpAdapter()));
@@ -137,9 +160,10 @@ describe('request rules', () => {
   describe('with a session', () => {
     let app: INestApplication;
     let url: string;
+    const sessions = fakeSessions(owner);
 
     beforeAll(async () => {
-      ({ app, url } = await start({ resolve: () => Promise.resolve(owner) }));
+      ({ app, url } = await start(sessions.resolver));
     });
 
     afterAll(async () => {
@@ -167,6 +191,16 @@ describe('request rules', () => {
         body: { written: true },
       });
     });
+
+    // #21, #29: a read, or a write refused for its token, isn't someone at the counter.
+    it('counts only a write that passed every check as activity', async () => {
+      sessions.active.length = 0;
+      await send(`${url}/who`);
+      await send(`${url}/write`, {}, { 'x-csrf-token': 'guess' });
+      expect(sessions.active).toEqual([]);
+      await send(`${url}/write`, {}, { 'x-csrf-token': CSRF });
+      expect(sessions.active).toEqual([owner.sessionId]);
+    });
   });
 
   // Another site's page making the browser post here, public routes included (login CSRF).
@@ -175,7 +209,7 @@ describe('request rules', () => {
     let url: string;
 
     beforeAll(async () => {
-      ({ app, url } = await start({ resolve: () => Promise.resolve(owner) }));
+      ({ app, url } = await start(fakeSessions(owner).resolver));
     });
 
     afterAll(async () => {
@@ -218,7 +252,7 @@ describe('request rules', () => {
     let url: string;
 
     beforeAll(async () => {
-      ({ app, url } = await start({ resolve: () => Promise.resolve({ ...owner, locked: true }) }));
+      ({ app, url } = await start(fakeSessions({ ...owner, locked: true }).resolver));
     });
 
     afterAll(async () => {
@@ -242,9 +276,7 @@ describe('request rules', () => {
     let url: string;
 
     beforeAll(async () => {
-      ({ app, url } = await start({
-        resolve: () => Promise.resolve({ ...owner, permissions: [] }),
-      }));
+      ({ app, url } = await start(fakeSessions({ ...owner, permissions: [] }).resolver));
     });
 
     afterAll(async () => {

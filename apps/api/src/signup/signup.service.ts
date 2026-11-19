@@ -10,6 +10,7 @@ import {
   type Database,
 } from '@business-software/db';
 import { FEATURE_PRESETS, type SignupInput, type SignupResult } from '@business-software/shared';
+import { HASH_GATE, type HashGate } from '../auth/hash-gate.js';
 import { hashPassword } from '../auth/password.js';
 import {
   SESSION_SERVICE,
@@ -38,20 +39,23 @@ export class SignupService {
   constructor(
     @Inject(DATABASE) private readonly database: Database,
     @Inject(SESSION_SERVICE) private readonly sessions: SessionService,
+    @Inject(HASH_GATE) private readonly gate: HashGate,
   ) {}
 
   /**
    * One transaction: the business, its first branch, the owner, an unused recovery key and
    * the `business.created` log entry, or none of them (ADR 0007). The unique index on owner
    * emails refuses a duplicate even across businesses, so no cross-business read is needed.
-   * The owner is logged in and this computer becomes the business's counter (Module 00 #37).
+   * The owner is logged in, this computer becomes the business's counter, and the browser's
+   * old session, if any, ends as replaced (Module 00 #18, #37).
    */
   async signUp(
     input: SignupInput,
     context: RequestContext,
   ): Promise<SignupResult & { setCookies: string[] }> {
-    // Hashed first, so the slow hash never holds a database connection.
-    const passwordHash = await hashPassword(input.password);
+    // Hashed first, so the slow hash never holds a database connection, and in the one
+    // Argon2 queue, so a burst of signups can't run the server out of memory (ADR 0038).
+    const passwordHash = await this.gate.run(() => hashPassword(input.password));
     const recoveryKey = makeRecoveryKey();
     const features = [...FEATURE_PRESETS[input.businessType]];
     try {

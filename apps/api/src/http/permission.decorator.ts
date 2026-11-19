@@ -7,7 +7,6 @@ import type { Caller } from './session.js';
 export const PUBLIC_KEY = 'route:public';
 export const PERMISSION_KEY = 'route:permission';
 export const ALLOW_LOCKED_KEY = 'route:allow-locked';
-export const PASSIVE_KEY = 'route:passive';
 
 /** Anyone may call this route, logged in or not (signup, health). */
 export const Public = () => SetMetadata(PUBLIC_KEY, true);
@@ -17,9 +16,6 @@ export const Permission = (permission: PermissionName) => SetMetadata(PERMISSION
 
 /** Works on a locked owner session too (unlock, log out). Every other route answers 401 locked. */
 export const AllowLocked = () => SetMetadata(ALLOW_LOCKED_KEY, true);
-
-/** A polling route: calling it doesn't keep a session awake (P1.4 design, section 5). */
-export const Passive = () => SetMetadata(PASSIVE_KEY, true);
 
 /** The request as the permission guard leaves it. */
 export interface RequestWithCaller extends IncomingMessage {

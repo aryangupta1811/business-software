@@ -1,6 +1,7 @@
 // Logins and sessions (ADR 0009; P1.4 design, sections 3–7; Module 00 #21, #27–#29, #34,
 // #37–#41). Every lookup after login-by-email runs under RLS for the business in the cookie.
 import {
+  alsoInBusiness,
   and,
   asc,
   branches,
@@ -17,7 +18,12 @@ import {
   type SessionEndReason,
   type Transaction,
 } from '@business-software/db';
-import { PERMISSIONS, type ActiveSession, type SessionView } from '@business-software/shared';
+import {
+  IDLE_GRACE_MS,
+  PERMISSIONS,
+  type ActiveSession,
+  type SessionView,
+} from '@business-software/shared';
 import type { IncomingMessage } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import type { Caller } from '../http/session.js';
@@ -29,7 +35,7 @@ import {
   serializeCookie,
   type CookieNames,
 } from './cookies.js';
-import { HashGate } from './hash-gate.js';
+import type { HashGate } from './hash-gate.js';
 import { hashPassword, needsRehash, verifyPassword } from './password.js';
 import { RateLimiter, type Verdict } from './rate-limit.js';
 import {
@@ -45,8 +51,6 @@ import {
 export const SESSION_SERVICE = 'SESSION_SERVICE';
 
 const MINUTE = 60_000;
-/** `last_active_at` is written at most this often, not on every request. */
-const ACTIVITY_WRITE_MS = 15_000;
 
 /** A wrong email, username or password: one answer for all (P1.4 design, section 5). */
 export class WrongLoginError extends Error {
@@ -105,12 +109,19 @@ export interface LoginResult {
   view: ActiveSession;
 }
 
+/** A device row and the cookie that names it. */
+interface FoundDevice {
+  id: string;
+  branchId: string;
+  cookie: CookieToken;
+}
+
 interface StartOptions {
   businessId: string;
   userId: string;
   role: 'owner' | 'staff';
   /** The computer's device row, or none: an owner login registers the computer (#37). */
-  device: { id: string; branchId: string; cookie: CookieToken } | null;
+  device: FoundDevice | null;
 }
 
 function throwUnless(verdict: Verdict): void {
@@ -123,15 +134,16 @@ export interface AuthSettings {
 
 export class SessionService {
   private readonly names: CookieNames;
-  private readonly gate = new HashGate();
   // Checked against when the login doesn't exist, so the answer takes as long (section 5).
-  private dummyHash: Promise<string> | undefined;
+  private standIn: Promise<string> | undefined;
 
   constructor(
     private readonly database: Database,
     private readonly settings: AuthSettings,
     private readonly clock: Clock,
     readonly limits: LoginLimits,
+    /** The one Argon2 queue, shared with signup (ADR 0038). */
+    private readonly gate: HashGate,
   ) {
     this.names = cookieNames(settings.cookieSecure);
   }
@@ -150,8 +162,10 @@ export class SessionService {
   /** Module 00 #27: email and password. */
   async loginOwner(email: string, password: string, context: RequestContext): Promise<LoginResult> {
     throwUnless(this.limits.ip.hit(context.ip));
+    // Counted before the password is checked, so simultaneous guesses can't pass the limit;
+    // a right password takes the count back.
     const loginKey = `owner:${email}`;
-    throwUnless(this.limits.failures.check(loginKey));
+    throwUnless(this.limits.failures.hit(loginKey));
     const { rows } = await this.database.db.execute<{ business_id: string; user_id: string }>(
       sql`select business_id, user_id from app_find_owner_login(${email})`,
     );
@@ -167,35 +181,31 @@ export class SessionService {
             return row;
           });
     const ok = await this.checkPassword(password, user?.passwordHash ?? null);
-    if (!ok || found === undefined || user?.deactivatedAt !== null) {
-      this.limits.failures.hit(loginKey);
-      throw new WrongLoginError();
-    }
+    if (!ok || found === undefined || user?.deactivatedAt !== null) throw new WrongLoginError();
     this.limits.failures.reset(loginKey);
-    await this.rehashIfOld(found.business_id, found.user_id, password, user.passwordHash);
-    await this.endCookieSession(context, 'replaced');
-    const device = await this.findDevice(context);
-    return this.start(
-      {
-        businessId: found.business_id,
-        userId: found.user_id,
-        role: 'owner',
-        device: device?.cookie.businessId === found.business_id ? device : null,
-      },
-      context,
-    );
+    const rehash = await this.rehashIfOld(password, user.passwordHash);
+    const businessId = found.business_id;
+    // One transaction: the new session and the end of the old, or neither (#18).
+    return withBusiness(this.database.db, businessId, async (tx) => {
+      await rehash?.(tx, found.user_id);
+      const device = await this.findDeviceIn(tx, businessId, context);
+      return this.startIn(
+        tx,
+        { businessId, userId: found.user_id, role: 'owner', device },
+        context,
+      );
+    });
   }
 
   /** Module 00 #28: username and password, on a computer that knows its business. */
   async loginStaff(username: string, password: string, context: RequestContext) {
     throwUnless(this.limits.ip.hit(context.ip));
-    const device = await this.findDevice(context);
-    if (device === null) throw new NoDeviceError();
-    const { businessId } = device.cookie;
-    const loginKey = `staff:${businessId}:${username}`;
-    throwUnless(this.limits.failures.check(loginKey));
-    const user = await withBusiness(this.database.db, businessId, async (tx) => {
-      const [row] = await tx
+    const businessId = readCookieToken(context.cookies.get(this.names.device))?.businessId;
+    if (businessId === undefined) throw new NoDeviceError();
+    const found = await withBusiness(this.database.db, businessId, async (tx) => {
+      const device = await this.findDeviceIn(tx, businessId, context);
+      if (device === null) return null;
+      const [user] = await tx
         .select({
           id: users.id,
           passwordHash: users.passwordHash,
@@ -203,22 +213,25 @@ export class SessionService {
         })
         .from(users)
         .where(and(eq(users.username, username), eq(users.role, 'staff')));
-      return row;
+      return { device, user };
     });
+    if (found === null) throw new NoDeviceError();
+    const { device, user } = found;
+    const loginKey = `staff:${businessId}:${username}`;
+    throwUnless(this.limits.failures.hit(loginKey));
     const ok = await this.checkPassword(password, user?.passwordHash ?? null);
-    if (!ok || user?.deactivatedAt !== null) {
-      this.limits.failures.hit(loginKey);
-      throw new WrongLoginError();
-    }
+    if (!ok || user?.deactivatedAt !== null) throw new WrongLoginError();
     this.limits.failures.reset(loginKey);
-    await this.rehashIfOld(businessId, user.id, password, user.passwordHash);
-    await this.endCookieSession(context, 'replaced');
-    return this.start({ businessId, userId: user.id, role: 'staff', device }, context);
+    const rehash = await this.rehashIfOld(password, user.passwordHash);
+    return withBusiness(this.database.db, businessId, async (tx) => {
+      await rehash?.(tx, user.id);
+      return this.startIn(tx, { businessId, userId: user.id, role: 'staff', device }, context);
+    });
   }
 
   /**
-   * Signup's last step, inside its transaction (Module 00 #37): the owner is logged in and the
-   * computer becomes the business's counter.
+   * Signup's last step, inside its transaction (Module 00 #37): the owner is logged in, the
+   * computer becomes the business's counter, and the browser's old session ends (#18).
    */
   async startInTransaction(
     tx: Transaction,
@@ -235,31 +248,53 @@ export class SessionService {
   }
 
   /** Who is calling, applying the lock and idle rules (Module 00 #21, #29, #34). */
-  async resolve(request: IncomingMessage, passive: boolean): Promise<Caller | null> {
+  async resolve(request: IncomingMessage): Promise<Caller | null> {
     const cookie = readCookieToken(this.contextOf(request).cookies.get(this.names.session));
     if (cookie === null) return null;
     const outcome = await withBusiness(this.database.db, cookie.businessId, (tx) =>
-      this.applyRules(tx, cookie, passive),
+      this.applyRules(tx, cookie),
     );
     if (outcome === 'ended') throw new SessionEndedError();
     return outcome;
   }
 
-  /** `GET /api/session` (passive): the session, or which business this computer remembers. */
+  /**
+   * Someone is at the counter: a write that passed the CSRF check, or the web app's "still
+   * here" (P1.4 design, section 5). Reads don't count, so a tab that refetches by itself can't
+   * keep the owner's screen open (#21).
+   */
+  async recordActivity(caller: Caller): Promise<void> {
+    if (caller.locked) return;
+    await withBusiness(this.database.db, caller.businessId, (tx) =>
+      tx
+        .update(sessions)
+        .set({ lastActiveAt: this.clock.now() })
+        .where(
+          and(
+            eq(sessions.id, caller.sessionId),
+            isNull(sessions.endedAt),
+            isNull(sessions.lockedAt),
+          ),
+        ),
+    );
+  }
+
+  /** `GET /api/session`: the session, or which business this computer remembers. */
   async view(request: IncomingMessage): Promise<SessionView> {
     const context = this.contextOf(request);
     const cookie = readCookieToken(context.cookies.get(this.names.session));
     if (cookie !== null) {
       const view = await withBusiness(this.database.db, cookie.businessId, async (tx) => {
-        const caller = await this.applyRules(tx, cookie, true);
+        const caller = await this.applyRules(tx, cookie);
         if (caller === null || caller === 'ended') return null;
         return this.viewOf(tx, caller, csrfTokenFor(cookie.token));
       });
       if (view !== null) return view;
     }
-    const device = await this.findDevice(context);
-    if (device === null) return { state: 'none', device: null };
-    const name = await withBusiness(this.database.db, device.cookie.businessId, async (tx) => {
+    const businessId = readCookieToken(context.cookies.get(this.names.device))?.businessId;
+    if (businessId === undefined) return { state: 'none', device: null };
+    const name = await withBusiness(this.database.db, businessId, async (tx) => {
+      if ((await this.findDeviceIn(tx, businessId, context)) === null) return undefined;
       const [row] = await tx.select({ name: businesses.name }).from(businesses);
       return row?.name;
     });
@@ -275,7 +310,8 @@ export class SessionService {
 
   /** #21: unlocking needs the password; false when it's wrong. */
   async unlock(caller: Caller, password: string): Promise<boolean> {
-    throwUnless(this.limits.unlock.check(caller.sessionId));
+    // Counted before the check, like a login (#41); the right password takes it back.
+    throwUnless(this.limits.unlock.hit(caller.sessionId));
     const hash = await withBusiness(this.database.db, caller.businessId, async (tx) => {
       const [row] = await tx
         .select({ passwordHash: users.passwordHash })
@@ -283,10 +319,7 @@ export class SessionService {
         .where(eq(users.id, caller.userId));
       return row?.passwordHash ?? null;
     });
-    if (!(await this.checkPassword(password, hash))) {
-      this.limits.unlock.hit(caller.sessionId);
-      return false;
-    }
+    if (!(await this.checkPassword(password, hash))) return false;
     this.limits.unlock.reset(caller.sessionId);
     const now = this.clock.now();
     await withBusiness(this.database.db, caller.businessId, async (tx) => {
@@ -327,65 +360,80 @@ export class SessionService {
   // ---------------------------------------------------------------------------------------
 
   private async checkPassword(password: string, stored: string | null): Promise<boolean> {
-    this.dummyHash ??= this.gate.run(() => hashPassword(randomUUID()));
-    const hash = stored ?? (await this.dummyHash);
+    const hash = stored ?? (await this.standInHash());
     const ok = await this.gate.run(() => verifyPassword(password, hash));
     return ok && stored !== null;
   }
 
-  /** ADR 0035: a hash made with older parameters is replaced at the next login. */
+  /**
+   * Made once and outside the queue, only when a login doesn't exist. A failure isn't kept, so
+   * one bad moment can't break every later unknown-email login.
+   */
+  private standInHash(): Promise<string> {
+    this.standIn ??= hashPassword(randomUUID()).catch((error: unknown) => {
+      this.standIn = undefined;
+      throw error;
+    });
+    return this.standIn;
+  }
+
+  /**
+   * ADR 0035: a hash made with older parameters is replaced at the next login. The slow hash
+   * runs here, outside any transaction; the returned step writes it inside the login's.
+   */
   private async rehashIfOld(
-    businessId: string,
-    userId: string,
     password: string,
     stored: string | null,
-  ): Promise<void> {
-    if (stored === null || !needsRehash(stored)) return;
+  ): Promise<((tx: Transaction, userId: string) => Promise<void>) | undefined> {
+    if (stored === null || !needsRehash(stored)) return undefined;
     const passwordHash = await this.gate.run(() => hashPassword(password));
-    await withBusiness(this.database.db, businessId, (tx) =>
-      tx.update(users).set({ passwordHash }).where(eq(users.id, userId)),
-    );
+    return async (tx, userId) => {
+      await tx.update(users).set({ passwordHash }).where(eq(users.id, userId));
+    };
   }
 
-  /** The live device row behind this computer's device cookie, or null. */
-  private async findDevice(context: RequestContext) {
+  /** The live device row behind this computer's device cookie, if it belongs to `businessId`. */
+  private async findDeviceIn(
+    tx: Transaction,
+    businessId: string,
+    context: RequestContext,
+  ): Promise<FoundDevice | null> {
     const cookie = readCookieToken(context.cookies.get(this.names.device));
-    if (cookie === null) return null;
-    const row = await withBusiness(this.database.db, cookie.businessId, async (tx) => {
-      const [found] = await tx
-        .select({ id: devices.id, branchId: devices.branchId })
-        .from(devices)
-        .where(and(eq(devices.tokenHash, hashToken(cookie.token)), isNull(devices.revokedAt)));
-      return found;
-    });
-    return row === undefined ? null : { ...row, cookie };
+    if (cookie?.businessId !== businessId) return null;
+    const [found] = await tx
+      .select({ id: devices.id, branchId: devices.branchId })
+      .from(devices)
+      .where(and(eq(devices.tokenHash, hashToken(cookie.token)), isNull(devices.revokedAt)));
+    return found === undefined ? null : { ...found, cookie };
   }
 
-  /** One session per browser (#18): a new login ends the one the cookie held. */
-  private async endCookieSession(context: RequestContext, reason: SessionEndReason) {
+  /**
+   * One session per browser (#18): a new login ends the one the cookie held, in the same
+   * transaction, even when that session belongs to another business.
+   */
+  private async endCookieSessionIn(tx: Transaction, businessId: string, context: RequestContext) {
     const cookie = readCookieToken(context.cookies.get(this.names.session));
     if (cookie === null) return;
-    await withBusiness(this.database.db, cookie.businessId, async (tx) => {
-      const [row] = await tx
+    const endIt = async (inner: Transaction) => {
+      const [row] = await inner
         .select({ id: sessions.id, userId: sessions.userId, branchId: sessions.branchId })
         .from(sessions)
         .where(and(eq(sessions.tokenHash, hashToken(cookie.token)), isNull(sessions.endedAt)));
-      if (row !== undefined) await this.end(tx, row.id, row.userId, row.branchId, reason);
-    });
+      if (row !== undefined) await this.end(inner, row.id, row.userId, row.branchId, 'replaced');
+    };
+    await (cookie.businessId === businessId
+      ? endIt(tx)
+      : alsoInBusiness(tx, cookie.businessId, endIt));
   }
 
-  private start(options: StartOptions, context: RequestContext): Promise<LoginResult> {
-    return withBusiness(this.database.db, options.businessId, (tx) =>
-      this.startIn(tx, options, context),
-    );
-  }
-
+  /** Starts a session inside the caller's transaction, ending the browser's old one. */
   private async startIn(
     tx: Transaction,
     options: StartOptions,
     context: RequestContext,
   ): Promise<LoginResult> {
     const { businessId, userId } = options;
+    await this.endCookieSessionIn(tx, businessId, context);
     const now = this.clock.now();
     let device = options.device;
     if (device === null) {
@@ -470,11 +518,7 @@ export class SessionService {
   }
 
   /** The lock and idle rules, applied to the session a cookie names. */
-  private async applyRules(
-    tx: Transaction,
-    cookie: CookieToken,
-    passive: boolean,
-  ): Promise<Caller | 'ended' | null> {
+  private async applyRules(tx: Transaction, cookie: CookieToken): Promise<Caller | 'ended' | null> {
     const [row] = await tx
       .select({
         id: sessions.id,
@@ -503,8 +547,8 @@ export class SessionService {
       await this.end(tx, row.id, row.userId, row.branchId, 'deactivated');
       return 'ended';
     }
-    const now = this.clock.now();
-    const idleMs = now.getTime() - row.lastActiveAt.getTime();
+    // The grace covers key presses since the web app's last "still here" (IDLE_GRACE_MS).
+    const idleMs = this.clock.now().getTime() - row.lastActiveAt.getTime() - IDLE_GRACE_MS;
     if (role === 'staff' && idleMs > row.staffIdleMinutes * MINUTE) {
       await this.end(tx, row.id, row.userId, row.branchId, 'idle');
       return 'ended';
@@ -521,9 +565,6 @@ export class SessionService {
     if (role === 'owner' && !caller.locked && idleMs > row.ownerLockMinutes * MINUTE) {
       await this.lockIn(tx, caller, { idleSince: row.lastActiveAt.toISOString() });
       return { ...caller, locked: true };
-    }
-    if (!caller.locked && !passive && idleMs > ACTIVITY_WRITE_MS) {
-      await tx.update(sessions).set({ lastActiveAt: now }).where(eq(sessions.id, row.id));
     }
     return caller;
   }

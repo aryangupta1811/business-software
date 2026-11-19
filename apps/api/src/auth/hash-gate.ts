@@ -1,6 +1,9 @@
 // Caps how many Argon2id hashes run at once (ADR 0035: about 19 MiB each on a 2 GB server).
 // Extra calls wait in line; beyond the line's length the caller gets BusyError (503).
 
+/** Injection token for the one HashGate the API shares. */
+export const HASH_GATE = 'HASH_GATE';
+
 export class BusyError extends Error {
   constructor() {
     super('Too many password checks waiting');

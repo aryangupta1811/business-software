@@ -11,7 +11,6 @@ import type { Permission } from '@business-software/shared';
 import { tokenMatches } from '../auth/tokens.js';
 import {
   ALLOW_LOCKED_KEY,
-  PASSIVE_KEY,
   PERMISSION_KEY,
   PUBLIC_KEY,
   type RequestWithCaller,
@@ -63,7 +62,7 @@ export class PermissionGuard implements CanActivate {
         `Route ${context.getClass().name}.${context.getHandler().name} names no permission`,
       );
     }
-    const caller = await this.sessions.resolve(request, { passive: flag(PASSIVE_KEY) });
+    const caller = await this.sessions.resolve(request);
     if (caller === null) throw new UnauthorizedException({ code: 'not_logged_in' });
     if (caller.locked && !flag(ALLOW_LOCKED_KEY)) {
       throw new UnauthorizedException({ code: 'locked' });
@@ -77,6 +76,8 @@ export class PermissionGuard implements CanActivate {
     if (!caller.permissions.includes(permission)) {
       throw new ForbiddenException({ code: 'forbidden' });
     }
+    // Only a write that got this far shows someone is at the counter (#21, #29).
+    if (unsafe) await this.sessions.recordActivity(caller);
     request.caller = caller;
     return true;
   }

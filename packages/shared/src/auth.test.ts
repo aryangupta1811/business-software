@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { ownerLoginSchema, staffLoginSchema, unlockSchema } from './auth.js';
+import {
+  ACTIVE_PING_MS,
+  IDLE_GRACE_MS,
+  ownerLoginSchema,
+  staffLoginSchema,
+  unlockSchema,
+} from './auth.js';
 
 describe('login schemas', () => {
   it('normalises the email but keeps the password exactly as typed', () => {
@@ -26,4 +32,8 @@ describe('login schemas', () => {
   ])('refuses a bad body (%#)', (schema, body) => {
     expect(schema.safeParse(body).success).toBe(false);
   });
+});
+
+it('the server waits longer than the gap between two "still here" pings', () => {
+  expect(IDLE_GRACE_MS).toBeGreaterThan(ACTIVE_PING_MS);
 });

@@ -1,17 +1,18 @@
 import 'reflect-metadata';
 import { ConsoleLogger, Module, type DynamicModule, type INestApplication } from '@nestjs/common';
-import { APP_GUARD, NestFactory } from '@nestjs/core';
+import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Database } from '@business-software/db';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { SYSTEM_CLOCK, type Clock } from './auth/clock.js';
+import { HASH_GATE, HashGate } from './auth/hash-gate.js';
 import { CookieSessionResolver, SessionController } from './auth/session.controller.js';
 import { LoginLimits, SESSION_SERVICE, SessionService } from './auth/session.service.js';
 import type { ApiConfig } from './config.js';
 import { DATABASE, DatabaseModule } from './database.module.js';
 import { UnhandledErrorFilter } from './error-filter.js';
 import { HealthController } from './health.controller.js';
-import { PermissionGuard } from './http/permission.guard.js';
+import { httpRules } from './http/http-rules.js';
 import { SESSION_RESOLVER, type SessionResolver } from './http/session.js';
 import { CatalogueService } from './items/catalogue.service.js';
 import {
@@ -41,6 +42,8 @@ export interface AppOptions {
   sessions?: SessionResolver;
   /** Tests move time to check the lock and idle rules. */
   clock?: Clock;
+  /** Tests fill the Argon2 queue to check the busy answer. */
+  hashGate?: HashGate;
 }
 
 @Module({})
@@ -55,24 +58,27 @@ class ApiModule {
         SignupService,
         ItemsService,
         CatalogueService,
+        // One Argon2 queue for signup and logins (ADR 0038).
+        { provide: HASH_GATE, useValue: options.hashGate ?? new HashGate() },
         {
           provide: SESSION_SERVICE,
-          inject: [DATABASE],
-          useFactory: (database: Database) => {
+          inject: [DATABASE, HASH_GATE],
+          useFactory: (database: Database, gate: HashGate) => {
             const clock = options.clock ?? SYSTEM_CLOCK;
             const settings = { cookieSecure: config.cookieSecure ?? true };
-            return new SessionService(database, settings, clock, new LoginLimits(clock));
+            return new SessionService(database, settings, clock, new LoginLimits(clock), gate);
           },
         },
-        options.sessions === undefined
-          ? {
-              provide: SESSION_RESOLVER,
-              inject: [SESSION_SERVICE],
-              useFactory: (sessions: SessionService) => new CookieSessionResolver(sessions),
-            }
-          : { provide: SESSION_RESOLVER, useValue: options.sessions },
         // Every route: public or a permission, CSRF, lock (ADRs 0009, 0036).
-        { provide: APP_GUARD, useClass: PermissionGuard },
+        ...httpRules(
+          options.sessions === undefined
+            ? {
+                provide: SESSION_RESOLVER,
+                inject: [SESSION_SERVICE],
+                useFactory: (sessions: SessionService) => new CookieSessionResolver(sessions),
+              }
+            : { provide: SESSION_RESOLVER, useValue: options.sessions },
+        ),
       ],
     };
   }

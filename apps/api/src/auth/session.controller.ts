@@ -24,7 +24,7 @@ import {
 } from '@business-software/shared';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { AllowLocked, CurrentCaller, Permission, Public } from '../http/permission.decorator.js';
-import type { Caller, ResolveOptions, SessionResolver } from '../http/session.js';
+import type { Caller, SessionResolver } from '../http/session.js';
 import { ZodBodyPipe } from '../http/zod-body.pipe.js';
 import { BusyError } from './hash-gate.js';
 import {
@@ -65,8 +65,12 @@ async function answer<T>(work: () => Promise<T>): Promise<T> {
 export class CookieSessionResolver implements SessionResolver {
   constructor(private readonly sessions: SessionService) {}
 
-  resolve(request: IncomingMessage, options: ResolveOptions): Promise<Caller | null> {
-    return answer(() => this.sessions.resolve(request, options.passive));
+  resolve(request: IncomingMessage): Promise<Caller | null> {
+    return answer(() => this.sessions.resolve(request));
+  }
+
+  recordActivity(caller: Caller): Promise<void> {
+    return this.sessions.recordActivity(caller);
   }
 }
 
@@ -110,7 +114,7 @@ export class SessionController {
 
   /**
    * Who is logged in here, with the CSRF token; or, with no session, which business this
-   * computer remembers. Public and passive: reading it doesn't keep a session awake.
+   * computer remembers. Public; like every read, it doesn't count as activity.
    */
   @Public()
   @Get('session')
@@ -128,9 +132,9 @@ export class SessionController {
   }
 
   /**
-   * "Someone is still at the counter": the web app sends this at most every 30 seconds while
-   * keys are pressed, since typing a long bill makes no other request. The guard records the
-   * activity; there is nothing else to do.
+   * "Someone is still at the counter": the web app sends this on the first key press after a
+   * quiet spell and then at most every 30 seconds, since typing a long bill makes no other
+   * request. The guard records the activity, as for any write; there is nothing else to do.
    */
   @Permission('session.own')
   @Post('session/active')

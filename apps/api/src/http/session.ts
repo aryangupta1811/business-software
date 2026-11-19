@@ -18,17 +18,17 @@ export interface Caller {
   csrfHash: string;
 }
 
-export interface ResolveOptions {
-  /** A polling route: it must not count as activity (P1.4 design, section 5). */
-  passive: boolean;
-}
-
 export interface SessionResolver {
   /**
    * The caller, or null when the request carries no live session. May throw an
    * HttpException, e.g. `401 session_ended` for a session that just ended for inactivity.
    */
-  resolve(request: IncomingMessage, options: ResolveOptions): Promise<Caller | null>;
+  resolve(request: IncomingMessage): Promise<Caller | null>;
+  /**
+   * Called after a write passed the CSRF and permission checks: someone is at the counter.
+   * Reads never count (P1.4 design, section 5).
+   */
+  recordActivity(caller: Caller): Promise<void>;
 }
 
 export const SESSION_RESOLVER = 'SESSION_RESOLVER';
@@ -37,5 +37,9 @@ export const SESSION_RESOLVER = 'SESSION_RESOLVER';
 export class NoSessionResolver implements SessionResolver {
   resolve(): Promise<Caller | null> {
     return Promise.resolve(null);
+  }
+
+  recordActivity(): Promise<void> {
+    return Promise.resolve();
   }
 }

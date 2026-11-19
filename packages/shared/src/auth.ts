@@ -33,6 +33,19 @@ export type StaffLoginInput = z.infer<typeof staffLoginSchema>;
 export const unlockSchema = z.strictObject({ password: typedPassword() });
 export type UnlockInput = z.infer<typeof unlockSchema>;
 
+/**
+ * Typing a bill makes no request, so the web app tells the server "still here" on the first
+ * key press after a quiet spell and then at most this often (P1.4 design, section 5).
+ */
+export const ACTIVE_PING_MS = 30_000;
+
+/**
+ * The server locks the owner (or ends a staff login) only after the idle time plus this much,
+ * so the last key presses between two pings can't make it act before the screen does.
+ * Must cover `ACTIVE_PING_MS`; the margin is for the network and the two clocks.
+ */
+export const IDLE_GRACE_MS = 60_000;
+
 /** A logged-in session, as `GET /api/session` and the login routes answer it. */
 export interface ActiveSession {
   state: 'active' | 'locked';

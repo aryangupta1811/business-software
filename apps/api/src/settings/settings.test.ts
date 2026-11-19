@@ -19,6 +19,7 @@ const headerSessions: SessionResolver = {
     const header = request.headers['x-test-caller'];
     return Promise.resolve(typeof header === 'string' ? (JSON.parse(header) as Caller) : null);
   },
+  recordActivity: () => Promise.resolve(),
 };
 
 const signupBody = (name: string, email: string) => ({

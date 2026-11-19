@@ -31,6 +31,8 @@ Option B. These rules apply to all modules:
 8. **Snapshots:** a bill stores the business details, prices and tax it was printed with.
 9. **Migrations are never destructive** without the owner's OK and a fresh backup (`CLAUDE.md` rule 7).
 
+- **Dated note 2026-11-20 (P1.8, design `docs/plans/2026-11-20-p1.8-stock-ledger-design.md`):** rule 4 is built as `stock_movements` (append-only: the migration revokes `UPDATE`, and the guard's `APPEND_ONLY` list includes it) plus `item_stock`, one row per item per branch with the quantity and the average cost (Module 01 #4, kept per branch). `moveStock(tx, …)` in `packages/db/src/stock.ts` is the only code that writes either. Rule 6: it locks the items `FOR SHARE` and then their stock rows `FOR UPDATE`, both sorted by item ID, so two calls with the same items in any order can't deadlock (tested). Rule 7: a `request_key` on the movement, unique per business; a retry answers the first movement, the same key for a different change answers `422 key_reused`. `findStockMismatches` checks every total against the sum of its movements and its last balance. Lock waits are limited by ADR 0041.
+
 ## Why
 
 Code will have bugs, so the database is the last line of defense. These rules are also the strongest interview material in the project.

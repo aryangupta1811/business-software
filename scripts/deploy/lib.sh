@@ -25,6 +25,10 @@ run_on_server() {
   instance=$(server_instance)
 
   params=$(mktemp)
+  # The lines can hold pre-signed links (backup.sh drill): delete them even when send-command
+  # fails and set -e stops the script. ${params:-}: it is local, unset by the time a later
+  # exit runs this, and set -u would stop on it.
+  trap 'rm -f "${params:-}"' EXIT
   # JSON from Python, so quotes and backslashes in the lines can't break it.
   python -X utf8 -I -c 'import json, sys
 print(json.dumps({"commands": sys.argv[2:], "executionTimeout": [sys.argv[1]]}))' \

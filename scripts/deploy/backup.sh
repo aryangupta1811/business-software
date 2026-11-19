@@ -33,8 +33,11 @@ list_backups() {
 
 case ${1:-} in
   now)
+    # reset-failed first: after 20 failed tries at boot (RDS still starting) systemd refuses
+    # to start the unit again for 30 minutes, even by hand.
     run_on_server "backup now" 900 \
       'set -eu' \
+      "systemctl reset-failed $service" \
       "systemctl start $service || { journalctl -u $service -n 30 --no-pager -o cat; exit 1; }" \
       "journalctl -u $service -n 2 --no-pager -o cat"
     ;;

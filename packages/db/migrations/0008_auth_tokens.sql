@@ -24,4 +24,5 @@ ALTER TABLE "auth_tokens" ADD CONSTRAINT "auth_tokens_business_id_businesses_id_
 ALTER TABLE "auth_tokens" ADD CONSTRAINT "auth_tokens_user_fk" FOREIGN KEY ("business_id","user_id") REFERENCES "public"."users"("business_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "auth_tokens_one_open_per_user" ON "auth_tokens" USING btree ("business_id","user_id","kind") WHERE "auth_tokens"."used_at" is null;--> statement-breakpoint
 ALTER TABLE "sessions" ADD CONSTRAINT "sessions_end_reason_check" CHECK ("sessions"."end_reason" in ('logout', 'idle', 'replaced', 'password_changed', 'deactivated', 'reset', 'device_forgotten'));--> statement-breakpoint
-CREATE POLICY "tenant_isolation" ON "auth_tokens" AS PERMISSIVE FOR ALL TO public USING ("auth_tokens"."business_id" = (select app_current_business_id())) WITH CHECK ("auth_tokens"."business_id" = (select app_current_business_id()));
+CREATE POLICY "tenant_isolation" ON "auth_tokens" AS PERMISSIVE FOR ALL TO public USING ("auth_tokens"."business_id" = (select app_current_business_id())) WITH CHECK ("auth_tokens"."business_id" = (select app_current_business_id()));--> statement-breakpoint
+CREATE POLICY "backup_read" ON "auth_tokens" AS PERMISSIVE FOR SELECT TO "app_backup" USING (true);

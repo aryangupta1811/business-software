@@ -23,6 +23,7 @@ import {
   type CategoryInput,
   type CategoryView,
   type ItemPage,
+  type ItemsContext,
   type ItemQuery,
   type ItemUpdateInput,
   type ItemView,
@@ -49,6 +50,13 @@ export class ItemsController {
     @Query(new ZodBodyPipe(itemQuerySchema)) query: ItemQuery,
   ): Promise<ItemPage> {
     return this.items.list(caller, query);
+  }
+
+  // Before `:id`, so "context" isn't read as an item's id.
+  @Permission('items.view')
+  @Get('context')
+  context(@CurrentCaller() caller: Caller): Promise<ItemsContext> {
+    return this.items.context(caller);
   }
 
   @Permission('items.view')

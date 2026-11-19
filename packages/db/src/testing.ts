@@ -2,13 +2,16 @@
 // a throwaway PostgreSQL with the app roles and migrations, like a fresh production server.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { PostgreSqlContainer } from '@testcontainers/postgresql';
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { sql } from 'drizzle-orm';
 import { runMigrations } from './migrate.js';
 import { branches, businesses, users } from './schema.js';
 import type { Transaction } from './tenancy.js';
 
 const bootstrapFile = fileURLToPath(new URL('../bootstrap/create-roles.sql', import.meta.url));
+const backupRoleFile = fileURLToPath(
+  new URL('../bootstrap/create-backup-role.sql', import.meta.url),
+);
 
 export interface TestDatabase {
   /** The container's superuser on the app's database, for things the app roles may not do. */
@@ -17,6 +20,10 @@ export interface TestDatabase {
   adminDatabase: string;
   ownerUrl: string;
   runtimeUrl: string;
+  /** The backup role (ADR 0037): reads every row, writes nothing. */
+  backupUrl: string;
+  /** For running tools inside it (psql, pg_dump), as the backup test does. */
+  container: StartedPostgreSqlContainer;
   stop(): Promise<void>;
 }
 
@@ -30,9 +37,14 @@ export function composePostgresImage(): string {
 
 export async function startTestDatabase(): Promise<TestDatabase> {
   const container = await new PostgreSqlContainer(composePostgresImage())
-    .withEnvironment({ APP_OWNER_PASSWORD: 'owner-test', APP_RUNTIME_PASSWORD: 'runtime-test' })
+    .withEnvironment({
+      APP_OWNER_PASSWORD: 'owner-test',
+      APP_RUNTIME_PASSWORD: 'runtime-test',
+      APP_BACKUP_PASSWORD: 'backup-test',
+    })
     .withCopyFilesToContainer([
       { source: bootstrapFile, target: '/docker-entrypoint-initdb.d/10-create-roles.sql' },
+      { source: backupRoleFile, target: '/docker-entrypoint-initdb.d/20-create-backup-role.sql' },
     ])
     .start();
   const server = `${container.getHost()}:${String(container.getPort())}/business_software`;
@@ -46,6 +58,8 @@ export async function startTestDatabase(): Promise<TestDatabase> {
     adminDatabase: container.getDatabase(),
     ownerUrl,
     runtimeUrl: `postgresql://app_runtime:runtime-test@${server}`,
+    backupUrl: `postgresql://app_backup:backup-test@${server}`,
+    container,
     stop: async () => {
       await container.stop();
     },

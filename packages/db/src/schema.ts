@@ -50,19 +50,34 @@ const literals = (values: readonly string[]): SQL =>
   sql.raw(values.map((value) => `'${value}'`).join(', '));
 
 /**
- * Rows are visible and writable only inside `withBusiness` for their own business. The same
- * check in USING and WITH CHECK stops inserting, or moving a row into, another business.
+ * The two policies every tenant table has; spread them into the table's extra config.
+ *
+ * - `tenant_isolation`: rows are visible and writable only inside `withBusiness` for their
+ *   own business. The same check in USING and WITH CHECK stops inserting, or moving a row
+ *   into, another business.
+ * - `backup_read` (ADR 0037): the backup role reads every row and writes none. Only
+ *   app_backup is in it, and no app role belongs to app_backup (tenancy guard). Without it
+ *   the nightly pg_dump, which runs with RLS on, would write this table empty.
+ *
  * The migration adds FORCE ROW LEVEL SECURITY by hand: drizzle-kit can't generate it.
  */
-export function tenantPolicy(column: AnyPgColumn) {
+export function tenantPolicies(column: AnyPgColumn) {
   const check = sql`${column} = (select app_current_business_id())`;
-  return pgPolicy('tenant_isolation', {
-    as: 'permissive',
-    for: 'all',
-    to: 'public',
-    using: check,
-    withCheck: check,
-  });
+  return [
+    pgPolicy('tenant_isolation', {
+      as: 'permissive',
+      for: 'all',
+      to: 'public',
+      using: check,
+      withCheck: check,
+    }),
+    pgPolicy('backup_read', {
+      as: 'permissive',
+      for: 'select',
+      to: 'app_backup',
+      using: sql`true`,
+    }),
+  ];
 }
 
 // Module 00 #6–8, #21, #29. Format checks repeat the shared schemas' rules, so the database
@@ -83,7 +98,7 @@ export const businesses = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [
-    tenantPolicy(t.id),
+    ...tenantPolicies(t.id),
     check(
       'businesses_business_type_check',
       sql`${t.businessType} in (${literals(BUSINESS_TYPES)})`,
@@ -117,7 +132,7 @@ export const branches = pgTable(
   // Branch-level tables reference (business_id, branch_id), so a row can't point at
   // another business's branch.
   (t) => [
-    tenantPolicy(t.businessId),
+    ...tenantPolicies(t.businessId),
     unique('branches_business_id_id_unique').on(t.businessId, t.id),
     // Not 97 (Other Territory): a place of supply outside any state, never a shop's address.
     check(
@@ -156,7 +171,7 @@ export const users = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    tenantPolicy(t.businessId),
+    ...tenantPolicies(t.businessId),
     unique('users_business_id_id_unique').on(t.businessId, t.id),
     // #27: one email, one owner account across the whole app. Unique indexes see every row,
     // whatever RLS hides, so a second signup fails here (23505) with no cross-business read.
@@ -194,7 +209,7 @@ export const recoveryKeys = pgTable(
     usedAt: timestamp('used_at', { withTimezone: true }),
   },
   (t) => [
-    tenantPolicy(t.businessId),
+    ...tenantPolicies(t.businessId),
     foreignKey({
       name: 'recovery_keys_user_fk',
       columns: [t.businessId, t.userId],
@@ -225,7 +240,7 @@ export const entryLog = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    tenantPolicy(t.businessId),
+    ...tenantPolicies(t.businessId),
     foreignKey({
       name: 'entry_log_branch_fk',
       columns: [t.businessId, t.branchId],
@@ -259,7 +274,7 @@ export const devices = pgTable(
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
   },
   (t) => [
-    tenantPolicy(t.businessId),
+    ...tenantPolicies(t.businessId),
     unique('devices_business_id_id_unique').on(t.businessId, t.id),
     unique('devices_business_id_token_hash_unique').on(t.businessId, t.tokenHash),
     foreignKey({
@@ -309,7 +324,7 @@ export const sessions = pgTable(
     endReason: text('end_reason'),
   },
   (t) => [
-    tenantPolicy(t.businessId),
+    ...tenantPolicies(t.businessId),
     unique('sessions_business_id_token_hash_unique').on(t.businessId, t.tokenHash),
     foreignKey({
       name: 'sessions_user_fk',
@@ -356,7 +371,7 @@ export const authTokens = pgTable(
     usedAt: timestamp('used_at', { withTimezone: true }),
   },
   (t) => [
-    tenantPolicy(t.businessId),
+    ...tenantPolicies(t.businessId),
     foreignKey({
       name: 'auth_tokens_user_fk',
       columns: [t.businessId, t.userId],
@@ -404,7 +419,7 @@ export const categories = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [
-    tenantPolicy(t.businessId),
+    ...tenantPolicies(t.businessId),
     unique('categories_business_id_id_unique').on(t.businessId, t.id),
     liveName('categories_live_name_unique', t),
     check('categories_name_check', sql`char_length(${t.name}) between 1 and 60`),
@@ -427,7 +442,7 @@ export const units = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [
-    tenantPolicy(t.businessId),
+    ...tenantPolicies(t.businessId),
     unique('units_business_id_id_unique').on(t.businessId, t.id),
     liveName('units_live_name_unique', t),
     check('units_name_check', sql`char_length(${t.name}) between 1 and 30`),
@@ -466,7 +481,7 @@ export const items = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [
-    tenantPolicy(t.businessId),
+    ...tenantPolicies(t.businessId),
     unique('items_business_id_id_unique').on(t.businessId, t.id),
     foreignKey({
       name: 'items_category_fk',
@@ -525,7 +540,7 @@ export const itemUnits = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [
-    tenantPolicy(t.businessId),
+    ...tenantPolicies(t.businessId),
     unique('item_units_business_id_id_unique').on(t.businessId, t.id),
     // Barcodes check that their pack belongs to their item.
     unique('item_units_business_id_item_id_id_unique').on(t.businessId, t.itemId, t.id),
@@ -572,7 +587,7 @@ export const itemBarcodes = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    tenantPolicy(t.businessId),
+    ...tenantPolicies(t.businessId),
     foreignKey({
       name: 'item_barcodes_item_fk',
       columns: [t.businessId, t.itemId],
@@ -604,7 +619,7 @@ export const itemBranchLevels = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [
-    tenantPolicy(t.businessId),
+    ...tenantPolicies(t.businessId),
     foreignKey({
       name: 'item_branch_levels_item_fk',
       columns: [t.businessId, t.itemId],

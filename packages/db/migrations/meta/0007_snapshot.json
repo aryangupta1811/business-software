@@ -1,154 +1,9 @@
 {
-  "id": "a90984b6-8259-40e6-80da-9f2937454010",
+  "id": "fe34c82c-891b-487c-8a4d-1f8a60704a60",
   "prevId": "08590896-0453-4179-ab27-4b190231ba80",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.auth_tokens": {
-      "name": "auth_tokens",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "uuidv7()"
-        },
-        "business_id": {
-          "name": "business_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "token_hash": {
-          "name": "token_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "used_at": {
-          "name": "used_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "auth_tokens_one_open_per_user": {
-          "name": "auth_tokens_one_open_per_user",
-          "columns": [
-            {
-              "expression": "business_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "kind",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"auth_tokens\".\"used_at\" is null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "auth_tokens_business_id_businesses_id_fk": {
-          "name": "auth_tokens_business_id_businesses_id_fk",
-          "tableFrom": "auth_tokens",
-          "tableTo": "businesses",
-          "columnsFrom": [
-            "business_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "auth_tokens_user_fk": {
-          "name": "auth_tokens_user_fk",
-          "tableFrom": "auth_tokens",
-          "tableTo": "users",
-          "columnsFrom": [
-            "business_id",
-            "user_id"
-          ],
-          "columnsTo": [
-            "business_id",
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {
-        "tenant_isolation": {
-          "name": "tenant_isolation",
-          "as": "PERMISSIVE",
-          "for": "ALL",
-          "to": [
-            "public"
-          ],
-          "using": "\"auth_tokens\".\"business_id\" = (select app_current_business_id())",
-          "withCheck": "\"auth_tokens\".\"business_id\" = (select app_current_business_id())"
-        }
-      },
-      "checkConstraints": {
-        "auth_tokens_kind_check": {
-          "name": "auth_tokens_kind_check",
-          "value": "\"auth_tokens\".\"kind\" in ('confirm_email', 'reset_password')"
-        },
-        "auth_tokens_token_hash_check": {
-          "name": "auth_tokens_token_hash_check",
-          "value": "\"auth_tokens\".\"token_hash\" ~ '^[0-9a-f]{64}$'"
-        },
-        "auth_tokens_expiry_check": {
-          "name": "auth_tokens_expiry_check",
-          "value": "\"auth_tokens\".\"expires_at\" > \"auth_tokens\".\"created_at\""
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.branches": {
       "name": "branches",
       "schema": "",
@@ -260,6 +115,15 @@
           ],
           "using": "\"branches\".\"business_id\" = (select app_current_business_id())",
           "withCheck": "\"branches\".\"business_id\" = (select app_current_business_id())"
+        },
+        "backup_read": {
+          "name": "backup_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_backup"
+          ],
+          "using": "true"
         }
       },
       "checkConstraints": {
@@ -372,6 +236,15 @@
           ],
           "using": "\"businesses\".\"id\" = (select app_current_business_id())",
           "withCheck": "\"businesses\".\"id\" = (select app_current_business_id())"
+        },
+        "backup_read": {
+          "name": "backup_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_backup"
+          ],
+          "using": "true"
         }
       },
       "checkConstraints": {
@@ -511,6 +384,15 @@
           ],
           "using": "\"categories\".\"business_id\" = (select app_current_business_id())",
           "withCheck": "\"categories\".\"business_id\" = (select app_current_business_id())"
+        },
+        "backup_read": {
+          "name": "backup_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_backup"
+          ],
+          "using": "true"
         }
       },
       "checkConstraints": {
@@ -658,6 +540,15 @@
           ],
           "using": "\"devices\".\"business_id\" = (select app_current_business_id())",
           "withCheck": "\"devices\".\"business_id\" = (select app_current_business_id())"
+        },
+        "backup_read": {
+          "name": "backup_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_backup"
+          ],
+          "using": "true"
         }
       },
       "checkConstraints": {
@@ -800,6 +691,15 @@
           ],
           "using": "\"entry_log\".\"business_id\" = (select app_current_business_id())",
           "withCheck": "\"entry_log\".\"business_id\" = (select app_current_business_id())"
+        },
+        "backup_read": {
+          "name": "backup_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_backup"
+          ],
+          "using": "true"
         }
       },
       "checkConstraints": {},
@@ -945,6 +845,15 @@
           ],
           "using": "\"item_barcodes\".\"business_id\" = (select app_current_business_id())",
           "withCheck": "\"item_barcodes\".\"business_id\" = (select app_current_business_id())"
+        },
+        "backup_read": {
+          "name": "backup_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_backup"
+          ],
+          "using": "true"
         }
       },
       "checkConstraints": {
@@ -1074,6 +983,15 @@
           ],
           "using": "\"item_branch_levels\".\"business_id\" = (select app_current_business_id())",
           "withCheck": "\"item_branch_levels\".\"business_id\" = (select app_current_business_id())"
+        },
+        "backup_read": {
+          "name": "backup_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_backup"
+          ],
+          "using": "true"
         }
       },
       "checkConstraints": {
@@ -1276,6 +1194,15 @@
           ],
           "using": "\"item_units\".\"business_id\" = (select app_current_business_id())",
           "withCheck": "\"item_units\".\"business_id\" = (select app_current_business_id())"
+        },
+        "backup_read": {
+          "name": "backup_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_backup"
+          ],
+          "using": "true"
         }
       },
       "checkConstraints": {
@@ -1547,6 +1474,15 @@
           ],
           "using": "\"items\".\"business_id\" = (select app_current_business_id())",
           "withCheck": "\"items\".\"business_id\" = (select app_current_business_id())"
+        },
+        "backup_read": {
+          "name": "backup_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_backup"
+          ],
+          "using": "true"
         }
       },
       "checkConstraints": {
@@ -1702,6 +1638,15 @@
           ],
           "using": "\"recovery_keys\".\"business_id\" = (select app_current_business_id())",
           "withCheck": "\"recovery_keys\".\"business_id\" = (select app_current_business_id())"
+        },
+        "backup_read": {
+          "name": "backup_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_backup"
+          ],
+          "using": "true"
         }
       },
       "checkConstraints": {
@@ -1903,6 +1848,15 @@
           ],
           "using": "\"sessions\".\"business_id\" = (select app_current_business_id())",
           "withCheck": "\"sessions\".\"business_id\" = (select app_current_business_id())"
+        },
+        "backup_read": {
+          "name": "backup_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_backup"
+          ],
+          "using": "true"
         }
       },
       "checkConstraints": {
@@ -1916,7 +1870,7 @@
         },
         "sessions_end_reason_check": {
           "name": "sessions_end_reason_check",
-          "value": "\"sessions\".\"end_reason\" in ('logout', 'idle', 'replaced', 'password_changed', 'deactivated', 'reset', 'device_forgotten')"
+          "value": "\"sessions\".\"end_reason\" in ('logout', 'idle', 'replaced', 'password_changed', 'deactivated', 'reset')"
         },
         "sessions_ended_check": {
           "name": "sessions_ended_check",
@@ -2052,6 +2006,15 @@
           ],
           "using": "\"units\".\"business_id\" = (select app_current_business_id())",
           "withCheck": "\"units\".\"business_id\" = (select app_current_business_id())"
+        },
+        "backup_read": {
+          "name": "backup_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_backup"
+          ],
+          "using": "true"
         }
       },
       "checkConstraints": {
@@ -2225,6 +2188,15 @@
           ],
           "using": "\"users\".\"business_id\" = (select app_current_business_id())",
           "withCheck": "\"users\".\"business_id\" = (select app_current_business_id())"
+        },
+        "backup_read": {
+          "name": "backup_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_backup"
+          ],
+          "using": "true"
         }
       },
       "checkConstraints": {

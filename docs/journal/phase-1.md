@@ -30,6 +30,12 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
   - A stop and start brought the site back on a new IP in 73 s. ADR 0034.
 - **2026-11-18 (P1.12 GST engine, PR #25):** one pure function computes every number on a bill (inclusive and exclusive prices, CGST+SGST or IGST, composition, item and bill discounts, round-off) in whole paise, plus Indian state codes. Owner's answer: a ₹X bill discount means the customer pays exactly ₹X less.
 - **2026-11-19 (P1.3 Signup & business setup, PR #27):** signup creates the business, its head-office branch, the owner (Argon2id, ADR 0035) and a recovery key shown once, in one transaction with an entry-log row. The settings page and API save business, feature and lock-time settings, logging only what changed. Every route must declare a permission or `@Public()`, and a census test proves it (ADR 0036). Two reviews and a real-app check found 13 problems, all fixed test-first. 1,082 tests.
+- **2026-11-19 (fast track Day 3: sitting 2, P1.7, P1.4 PR 1, stage 7; PRs #30–#34):** three lanes ran at once as background agents, each in its own git worktree, merged one at a time.
+  - **Sitting 2:** Modules 05–07 decided in about an hour; D4 means only the database sets an entry log row's ID and time.
+  - **P1.7 Items:** six tenant tables (items, packs, barcodes, categories, own units, per-branch low-stock levels), an `item_name` ICU collation, an API with versioned saves (`409 stale`), barcode lookup and in-store EAN-13 codes, and the Items page with scanner input. The guard gained rules for unique keys, unvalidated foreign keys and schema access.
+  - **P1.4 Login, PR 1:** owner by email, staff by username on a remembered counter computer; sessions stored as hashes; the one cross-business lookup in a schema the app can't touch (ADRs 0038–0039); lock screen, CSRF, rate limits counted before hashing.
+  - **Stage 7 backups:** the RDS master can't bypass RLS, so a read-only `app_backup` role reads every tenant table through its own policy; nightly dumps go to an S3 bucket that refuses overwrites; a restore drill compares row counts (ADR 0037).
+  - Every PR got a code review (high): 39 findings across four PRs, all fixed test-first. 1,399 tests.
 
 ## Stack choices vs alternatives
 
@@ -55,6 +61,11 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
 | Deploying | Run Command by commit hash: the repo's files and the images at one hash | SSH and `git pull`; a deploy agent | 0034 |
 | Password hashing | Argon2id from Node's built-in `crypto` | bcrypt; an argon2 npm package with native code | 0035 |
 | Login email alphabet | Printable ASCII, in the schema and a database CHECK | Unicode normalisation (NFKC) plus look-alike detection | P1.3 review |
+| Backups under forced RLS | A read-only `app_backup` role with its own `backup_read` policy on every tenant table, checked by the guard and by the dump script | `pg_dump` as the RDS master (can't bypass RLS); lifting `FORCE` during the dump | 0037 |
+| Backups can't be destroyed | S3 bucket policy denies uploads without `If-None-Match: *`; the server may only add files | Plain `PutObject` (a taken-over server could overwrite history); S3 Object Lock | 0037 |
+| Login by email before the business is known | One `auth.owner_logins` table the app can't read, reached by two pinned `SECURITY DEFINER` functions | A `BYPASSRLS` role; a global users table | 0039 |
+| Sessions | Random token in a `__Host-` cookie carrying the business ID, stored as SHA-256 | JWTs (can't be revoked); plain tokens in the database | 0038 |
+| History can't be backdated | Column-level INSERT grants: the database sets `entry_log.id` and `created_at` | A trigger that overwrites them silently; a seed-only role | D4, 0028 note |
 
 ## Mistakes and what I learned
 
@@ -76,6 +87,10 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
 - **Two of my "failing" tests had never failed.** Leftover data or a no-op input made them pass without the fix. Lesson: run each new test against the old code first.
 - **My editing tool decoded the escapes I wrote**, so tests held invisible characters a reviewer couldn't see. A scan for format characters found them. Lesson: check the bytes of what you test, not how it looks.
 - **My first deploy-script fix didn't work**: `python -I` ignores `PYTHONUTF8`. The review reproduced it. Lesson: test a fix in the same conditions as the bug (piped, not on a terminal).
+- **Every one of the four Day 3 PRs had real bugs CI didn't catch.** Green checks and a lane's own tests passed, yet a review found 39 problems, among them a backup restore that would have failed on RDS, a login limit beaten by parallel guesses, and a form that could overwrite another counter's change. Lesson: a fresh-context review before every merge is part of "done", not an extra.
+- **A merge between lanes broke the backup.** Login added the `auth` schema; the backup role couldn't read it, so every nightly dump would have failed. The restore test caught it only because it runs the real `pg_dump`. Lesson: a cross-cutting rule (every table is backed up) needs a test that sees new tables automatically.
+- **I planned for four lanes and hit the usage limit three times.** Each stop cost a resume, and once an RDS start was left in flight. Lesson: size parallel work to the real budget, and check cloud state after any interruption.
+- **A plan step trusted a sentence in my own ADR.** ADR 0027 said backups could run "as the RDS master"; AWS's docs say the master can't bypass RLS. Lesson: re-check a stored claim against the source when a design leans on it.
 
 ## Interview questions I can now answer
 
@@ -119,3 +134,12 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
   A: A partial unique index on owner emails, which sees every tenant's rows despite RLS, plus a CHECK that emails are lower-case printable ASCII, so zero-width spaces and look-alike letters can't make a second spelling. (Module 00 #27)
 - Q: Why Argon2id from Node itself?
   A: Node 24 ships it in `crypto`, so there's no native npm package to build for ARM64. OWASP's parameters (19 MiB, 2 passes) cost about 30 ms per hash, and the PHC string stores them with the hash so they can change later. (ADR 0035)
+
+- Q: How do you back up a database where row-level security hides rows even from the owner?
+  A: A dedicated read-only role with its own policy on every tenant table. A CI guard fails if any table lacks it or the role gains a write right, and the dump script refuses to run if the live database is missing one, because a backup with empty tables looks fine until you need it. (ADR 0037)
+- Q: How do you stop a compromised server from destroying its own backups?
+  A: It can only add files: the bucket policy denies any upload without `If-None-Match: *`, so an existing backup can't be overwritten, and the server has no read, list or delete rights. (ADR 0037)
+- Q: How do you limit password guesses when hashing is slow?
+  A: Count the attempt before the slow Argon2 check, not after, or many guesses sent at once all pass the check before any is counted. A right password takes the count back. (ADR 0038)
+- Q: How do two counters editing the same item not overwrite each other?
+  A: Each item has a version; a save sends the version it loaded, and the server answers `409 stale` if it changed. The form must keep the version it loaded, not the latest one from the cache. (P1.7)

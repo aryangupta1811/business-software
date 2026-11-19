@@ -11,7 +11,7 @@ The repo is public, so anything in git, in a published image, in the browser's J
 | AWS (stage 5 onwards) | SSM Parameter Store, encrypted (`SecureString`), read on the server at deploy time (ADR 0011) |
 | GitHub Actions | CI uses no secrets at all (ADR 0024): the smoke test copies `.env.example`, whose fake passwords protect a database thrown away after the job. Nothing for AWS either: OIDC gives short-lived credentials (ADR 0012, stage 6). Any other secret goes in GitHub Actions secrets, only if there's no other way. |
 
-Each process gets only what it needs: `migrate` gets `MIGRATION_DATABASE_URL` (owner role), while `api` and `worker` get `DATABASE_URL` (runtime role) (ADR 0021).
+Each process gets only what it needs: `migrate` gets `MIGRATION_DATABASE_URL` (owner role), while `api` and `worker` get `DATABASE_URL` (runtime role) (ADR 0021). The nightly backup on the server reads only `app-backup-password`, for the read-only role `app_backup` (ADR 0037); it passes it to the `postgres:18` container as a bare `-e PGPASSWORD`, so it is never on a command line. The restore drill gets two pre-signed S3 links that work for 15 minutes; they stay in Systems Manager's command history after they expire.
 
 ## The five ways a secret leaks, and the rule for each
 

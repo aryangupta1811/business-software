@@ -1,7 +1,7 @@
 # Module 01 — Items & inventory
 
 **Status:** DECIDED (29 Oct 2026)
-**Decided:** every item tracks units, prices, GST and stock per branch, and stock only changes through recorded actions.
+**Decided:** every item tracks units, prices, GST and stock; stock (and the low-stock level) is kept per branch, while the catalogue and its prices are one list for the whole business. Stock only changes through recorded actions.
 
 ## Item basics
 
@@ -45,3 +45,4 @@ None.
 - 2026-10-29 — Created from the planning chat on claude.ai.
 - 2026-10-29 — Kickoff session: added the open question on inter-state branch transfers. No decided point changed.
 - 2026-11-17 — Fast-track sitting 1: the owner answered all four open questions with Claude's recommendations (#15–18). #15 changes how #4 applies to medical shops: batch actually sold, not oldest stock first.
+- 2026-11-19 — Fast-track sitting 2 (P1.7 design Q4): the owner confirmed one catalogue and one price list per business, with stock and the low-stock level per branch. The summary line was reworded to say so; it could be read as prices per branch. No numbered point changed.

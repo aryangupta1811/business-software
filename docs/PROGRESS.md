@@ -65,9 +65,9 @@ The live server keeps running the skeleton until stage 7 is done (Day 3), so P1.
 | 02 Billing & GST | DECIDED (2026-11-17, sitting 1) |
 | 03 Udhaar | DECIDED (2026-11-17, sitting 1) |
 | 04 Suppliers & purchases | DRAFT |
-| 05 Staff, attendance & salary | DRAFT |
-| 06 Entry logs | DRAFT |
-| 07 Alerts | DRAFT |
+| 05 Staff, attendance & salary | DECIDED (2026-11-19, sitting 2) |
+| 06 Entry logs | DECIDED (2026-11-19, sitting 2) |
+| 07 Alerts | DECIDED (2026-11-19, sitting 2) |
 | 08 Dashboard | DRAFT |
 | 09 AI assistant | DRAFT |
 

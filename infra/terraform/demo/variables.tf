@@ -82,3 +82,9 @@ variable "nightly_stop_timezone" {
   type        = string
   default     = "Asia/Kolkata"
 }
+
+variable "github_repository" {
+  description = "owner/name of the GitHub repository whose demo environment may deploy (stage 6)."
+  type        = string
+  default     = "aryangupta1811/business-software"
+}

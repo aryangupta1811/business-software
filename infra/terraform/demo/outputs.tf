@@ -29,3 +29,9 @@ output "duckdns_token_parameter" {
   description = "SSM parameter the owner overwrites with the DuckDNS token."
   value       = aws_ssm_parameter.duckdns_token.name
 }
+
+output "deploy_role_arn" {
+  description = "Goes into the GitHub environment secret AWS_DEPLOY_ROLE_ARN (holds the account ID, so not printed)."
+  value       = aws_iam_role.deploy.arn
+  sensitive   = true
+}

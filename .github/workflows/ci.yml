@@ -44,6 +44,9 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      # The deploy scripts' own logic (stage 6), with a fake site and a throwaway repository.
+      - name: Test the deploy scripts
+        run: scripts/deploy/test.sh
       - name: Lint the workflows
         run: >-
           docker run --rm -v "$PWD:/repo:ro" -w /repo

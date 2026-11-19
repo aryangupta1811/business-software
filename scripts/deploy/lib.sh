@@ -42,6 +42,36 @@ server_instance() {
   fi
 }
 
+# main_commit <commit>: prints its full hash if it is on main (origin/main), else fails. Only
+# merged commits are deployed: they passed review and CI. One check for demo.sh and the
+# deploy workflow.
+main_commit() {
+  local sha
+  sha=$(git rev-parse --verify --quiet "$1^{commit}") ||
+    { echo "$1: not a commit in this repository" >&2; return 1; }
+  git merge-base --is-ancestor "$sha" origin/main ||
+    { echo "$sha is not on origin/main: only merged commits are deployed" >&2; return 1; }
+  echo "$sha"
+}
+
+# not_older_than_running <commit> <running commit, or empty>: fails if the commit is older
+# than the one the server runs (an ancestor of it). Images runs can finish out of order, and an
+# automatic deploy must never take the server back; going back is a deliberate act, by hand.
+# The same commit again is fine (a rerun). A running commit unknown here only warns.
+not_older_than_running() {
+  local sha=$1 running=$2
+  [[ -n $running && $running != "$sha" ]] || return 0
+  if ! git cat-file -e "$running^{commit}" 2>/dev/null; then
+    echo "warning: the running release ${running:0:12} is not in this repository; deploying anyway"
+    return 0
+  fi
+  if git merge-base --is-ancestor "$sha" "$running"; then
+    echo "${sha:0:12} is older than the running release ${running:0:12}: not deploying." \
+      "To go back on purpose, run the deploy workflow by hand with that commit." >&2
+    return 1
+  fi
+}
+
 # run_on_server <comment> <timeout in seconds> <shell line>...
 # Runs the lines with plain sh on the server through Systems Manager Run Command (no SSH, no
 # open port), waits up to the timeout, prints the output and returns 0 only on Success.

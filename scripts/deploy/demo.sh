@@ -15,9 +15,7 @@ source "$(dirname "$0")/lib.sh"
 
 readonly repo=aryangupta1811/business-software
 
-sha=$(git rev-parse --verify "${1:-origin/main}^{commit}")
-git merge-base --is-ancestor "$sha" origin/main ||
-  { echo "$sha is not on origin/main: only merged commits are deployed" >&2; exit 1; }
+sha=$(main_commit "${1:-origin/main}")
 
 # Needs Docker Desktop running; works without a login once the packages are public.
 for image in business-software-app business-software-web; do

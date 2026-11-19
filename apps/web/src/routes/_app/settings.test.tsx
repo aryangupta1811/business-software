@@ -31,6 +31,7 @@ const VIEW: SettingsView = {
   // A kirana preset on a medical store: the owner changed the type and kept the switches.
   features: ['loose_weight', 'expiry_dates', 'udhaar_prominent'],
   security: { ownerLockMinutes: 5, staffIdleMinutes: 30 },
+  stock: { negativeStock: 'warn' },
 };
 
 /**

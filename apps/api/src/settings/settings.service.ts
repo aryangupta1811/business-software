@@ -17,7 +17,9 @@ import type {
   SettingsBusinessInput,
   SettingsFeaturesInput,
   SettingsSecurityInput,
+  SettingsStockInput,
   SettingsView,
+  NegativeStockSetting,
   BranchStateCode,
 } from '@business-software/shared';
 import { DATABASE } from '../database.module.js';
@@ -119,6 +121,20 @@ export class SettingsService {
     );
   }
 
+  /** Module 01 #12 (owner answer 1A): one switch for the whole business. */
+  saveStock(caller: Caller, input: SettingsStockInput): Promise<SettingsView> {
+    return this.save(
+      caller,
+      (current) => current.view.stock,
+      input,
+      (tx) =>
+        tx
+          .update(businesses)
+          .set({ negativeStock: input.negativeStock, updatedAt: new Date() })
+          .where(eq(businesses.id, caller.businessId)),
+    );
+  }
+
   /** Locks, compares, writes and logs `business.updated` with only the changed fields. */
   private save(
     caller: Caller,
@@ -178,6 +194,7 @@ export class SettingsService {
           ownerLockMinutes: business.ownerLockMinutes,
           staffIdleMinutes: business.staffIdleMinutes,
         },
+        stock: { negativeStock: business.negativeStock as NegativeStockSetting },
       },
     };
   }

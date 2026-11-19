@@ -4,7 +4,7 @@ import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Database } from '@business-software/db';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { SYSTEM_CLOCK, type Clock } from './auth/clock.js';
+import { CLOCK, SYSTEM_CLOCK, type Clock } from './auth/clock.js';
 import { HASH_GATE, HashGate } from './auth/hash-gate.js';
 import { CookieSessionResolver, SessionController } from './auth/session.controller.js';
 import { LoginLimits, SESSION_SERVICE, SessionService } from './auth/session.service.js';
@@ -25,6 +25,8 @@ import { SettingsController } from './settings/settings.controller.js';
 import { SettingsService } from './settings/settings.service.js';
 import { SignupController } from './signup/signup.controller.js';
 import { SignupService } from './signup/signup.service.js';
+import { StockController } from './stock/stock.controller.js';
+import { StockService } from './stock/stock.service.js';
 
 /** Every controller the API serves; the route census test reads this list. */
 export const API_CONTROLLERS = [
@@ -35,6 +37,7 @@ export const API_CONTROLLERS = [
   ItemsController,
   CategoriesController,
   UnitsController,
+  StockController,
 ];
 
 export interface AppOptions {
@@ -58,6 +61,8 @@ class ApiModule {
         SignupService,
         ItemsService,
         CatalogueService,
+        StockService,
+        { provide: CLOCK, useValue: options.clock ?? SYSTEM_CLOCK },
         // One Argon2 queue for signup and logins (ADR 0038).
         { provide: HASH_GATE, useValue: options.hashGate ?? new HashGate() },
         {

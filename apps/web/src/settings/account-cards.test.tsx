@@ -125,6 +125,22 @@ test('lists the computers, renames one and forgets another with the owner passwo
   ).toEqual({ ownerPassword: 'correct horse battery' });
 });
 
+test('Rename and Forget put the cursor in their box, and Cancel puts it back on the button', async () => {
+  openSettings({});
+  const region = within(await card('Computers'));
+  const user = userEvent.setup();
+
+  await user.click(await region.findByRole('button', { name: 'Rename Back counter' }));
+  expect(region.getByLabelText('Name')).toHaveFocus();
+  await user.click(region.getByRole('button', { name: 'Cancel' }));
+  expect(region.getByRole('button', { name: 'Rename Back counter' })).toHaveFocus();
+
+  await user.click(region.getByRole('button', { name: 'Forget Back counter' }));
+  expect(region.getByLabelText("Owner's password")).toHaveFocus();
+  await user.click(region.getByRole('button', { name: 'Cancel' }));
+  expect(region.getByRole('button', { name: 'Forget Back counter' })).toHaveFocus();
+});
+
 test('forgetting this computer goes to the login page', async () => {
   const { history } = openSettings({
     'POST /api/devices/00000000-0000-4000-8000-0000000000d1/forget': { status: 204 },

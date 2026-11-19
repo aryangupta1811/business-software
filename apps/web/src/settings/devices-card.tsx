@@ -9,7 +9,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { Monitor } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { DEVICES_KEY, forgetDevice, listDevices, renameDevice } from '../api/account';
@@ -60,6 +60,20 @@ type Mode = 'view' | 'rename' | 'forget';
 function DeviceRow({ device }: { device: DeviceView }) {
   const { t, i18n } = useTranslation();
   const [mode, setMode] = useState<Mode>('view');
+  // The button that opened a form disappears while it is open, so focus would fall to the
+  // page: each form takes focus when it opens, and closing it puts focus back on its button.
+  const renameButton = useRef<HTMLButtonElement>(null);
+  const forgetButton = useRef<HTMLButtonElement>(null);
+  const reopen = useRef<Mode>('view');
+  useEffect(() => {
+    if (mode !== 'view') {
+      reopen.current = mode;
+      return;
+    }
+    if (reopen.current === 'rename') renameButton.current?.focus();
+    if (reopen.current === 'forget') forgetButton.current?.focus();
+    reopen.current = 'view';
+  }, [mode]);
   const lastUsed = new Intl.DateTimeFormat(i18n.language, {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -85,6 +99,7 @@ function DeviceRow({ device }: { device: DeviceView }) {
         {mode === 'view' && (
           <div className="flex gap-2">
             <Button
+              ref={renameButton}
               size="sm"
               variant="ghost"
               aria-label={t('account.devices.renameNamed', { name })}
@@ -95,6 +110,7 @@ function DeviceRow({ device }: { device: DeviceView }) {
               {t('account.devices.rename')}
             </Button>
             <Button
+              ref={forgetButton}
               size="sm"
               variant="ghost"
               aria-label={t('account.devices.forgetNamed', { name })}
@@ -122,11 +138,15 @@ function RenameForm({ device, onDone }: { device: DeviceView; onDone: () => void
     register,
     handleSubmit,
     setError,
+    setFocus,
     formState: { errors, isSubmitting },
   } = useForm<DeviceNameInput>({
     resolver: zodResolver(deviceNameSchema),
     defaultValues: { name: device.name ?? '' },
   });
+  useEffect(() => {
+    setFocus('name');
+  }, [setFocus]);
 
   const onSubmit = async ({ name }: DeviceNameInput) => {
     setFailed(false);
@@ -188,11 +208,15 @@ function ForgetForm({ device, onCancel }: { device: DeviceView; onCancel: () => 
     register,
     handleSubmit,
     setError,
+    setFocus,
     formState: { errors, isSubmitting },
   } = useForm<OwnerPasswordInput>({
     resolver: zodResolver(ownerPasswordSchema),
     defaultValues: { ownerPassword: '' },
   });
+  useEffect(() => {
+    setFocus('ownerPassword');
+  }, [setFocus]);
 
   const onSubmit = async ({ ownerPassword }: OwnerPasswordInput) => {
     setFailure(null);

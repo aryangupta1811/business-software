@@ -4,6 +4,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 import { fakeApi, renderAt } from '../../test/fake-api';
+import { madeUpRecoveryKey } from '../../test/made-up-recovery-key';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -13,7 +14,7 @@ const NO_SESSION = { state: 'none', device: null } as const;
 // Made-up values in the shapes the API uses.
 const BUSINESS = '00000000-0000-4000-8000-000000000002';
 const TOKEN = 'A'.repeat(43);
-const NEW_KEY = 'ABCD-EFGH-JKMN-PQRS-TVWX-YZ01-2345-6789';
+const NEW_KEY = madeUpRecoveryKey();
 
 async function fill(fields: Record<string, string>) {
   const user = userEvent.setup();

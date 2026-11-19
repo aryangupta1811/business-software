@@ -4,6 +4,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 import { fakeApi, OWNER_SESSION, renderAt, type FakeAnswer } from '../test/fake-api';
+import { madeUpRecoveryKey } from '../test/made-up-recovery-key';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -78,7 +79,7 @@ test('changes the password with the current one, and says a wrong one under its 
 });
 
 test('makes a new recovery key with the owner password and shows it once', async () => {
-  const recoveryKey = 'ABCD-EFGH-JKMN-PQRS-TVWX-YZ01-2345-6789';
+  const recoveryKey = madeUpRecoveryKey();
   const { api } = openSettings({ 'POST /api/recovery-key': { body: { recoveryKey } } });
   const region = within(await card('Recovery key'));
   const user = userEvent.setup();

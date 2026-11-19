@@ -12,6 +12,7 @@ import { createApp } from '../app.js';
 import { hashPassword } from '../auth/password.js';
 import { FakeMailer } from '../mail/mailer.js';
 import { Browser, FakeClock } from '../testing/browser.js';
+import { madeUpRecoveryKey } from '../testing/made-up-recovery-key.js';
 
 const PASSWORD = 'correct horse battery';
 const NEW_PASSWORD = 'a much newer password';
@@ -343,7 +344,7 @@ describe('account recovery and remembered computers', () => {
     it('gives one answer for a wrong key and an unknown email, 5 tries per email an hour', async () => {
       const email = 'recover-limit@example.com';
       await signUp(email);
-      const wrongKey = 'ABCD-EFGH-JKMN-PQRS-TVWX-YZ01-2345-6789';
+      const wrongKey = madeUpRecoveryKey();
       expect(
         await browser().call('POST', '/recovery/reset', {
           email: 'nobody@example.com',

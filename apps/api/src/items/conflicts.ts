@@ -1,4 +1,6 @@
 import { ConflictException } from '@nestjs/common';
+import { withBusiness, type Database, type Transaction } from '@business-software/db';
+import type { Caller } from '../http/session.js';
 
 /** Unique indexes whose refusal is the visitor's to fix, and the code the screen translates. */
 const CONFLICTS: Record<string, string> = {
@@ -27,6 +29,15 @@ export async function answerConflicts<T>(work: Promise<T>): Promise<T> {
     }
     throw error;
   }
+}
+
+/** `work` in one transaction as the caller's business, with unique-index refusals as 409s. */
+export function inBusiness<T>(
+  database: Database,
+  caller: Caller,
+  work: (tx: Transaction) => Promise<T>,
+): Promise<T> {
+  return answerConflicts(withBusiness(database.db, caller.businessId, work));
 }
 
 /** The keys whose values differ, as `before` and `after` objects (compared as JSON). */

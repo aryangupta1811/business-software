@@ -2,7 +2,7 @@
 // forms and the API parse the same schemas (ADR 0036). Money is whole paise, rates basis points
 // and quantities thousandths of the item's stock unit (ADR 0008).
 import { z } from 'zod';
-import { optionalText, text } from './fields.js';
+import { optionalText, text, uuid } from './fields.js';
 import type { Paise } from './money.js';
 import { BUILT_IN_UNITS, isBuiltInUnit, packSizeFor, type BuiltInUnit } from './units.js';
 
@@ -33,7 +33,6 @@ const thousandths = (min: number) =>
     .int({ error: 'invalid' })
     .min(min, { error: 'too_small' })
     .max(MAX_THOUSANDTHS, { error: 'too_big' });
-const id = () => z.uuid({ error: 'invalid' });
 // Nothing picked says `choose`; a value that isn't one of the options says `invalid`.
 const choose = (issue: { input?: unknown }) =>
   issue.input === undefined || issue.input === null || issue.input === '' ? 'choose' : 'invalid';
@@ -61,9 +60,9 @@ export const barcode = () =>
 /** A pack of an item (box = 12 piece, bag = 50 kg): a built-in unit or the owner's own. */
 const packSchema = z.strictObject({
   /** The pack's id when it already exists; null for a new one. */
-  id: id().nullable(),
+  id: uuid().nullable(),
   unitCode: builtInUnit().nullable(),
-  unitId: id().nullable(),
+  unitId: uuid().nullable(),
   /** Thousandths of the item's stock unit in one pack. */
   size: thousandths(1),
   /** Null: size × the item's price. */
@@ -75,7 +74,7 @@ const packSchema = z.strictObject({
 export type PackInput = z.infer<typeof packSchema>;
 
 const levelSchema = z.strictObject({
-  branchId: id(),
+  branchId: uuid(),
   lowStockLevel: thousandths(0),
 });
 
@@ -84,7 +83,7 @@ const itemShape = {
   name: text(100),
   hindiName: optionalText(100),
   code: optionalPattern(20, SHORT_CODE),
-  categoryId: id().nullable(),
+  categoryId: uuid().nullable(),
   brand: optionalText(60),
   stockUnit: builtInUnit(),
   sellingPrice: paise(),
@@ -228,7 +227,7 @@ export type ItemUpdateInput = z.infer<typeof itemUpdateSchema>;
  */
 export const barcodeSchema = z.strictObject({
   code: barcode().nullable(),
-  packId: id().nullable(),
+  packId: uuid().nullable(),
 });
 export type BarcodeInput = z.infer<typeof barcodeSchema>;
 
@@ -248,7 +247,7 @@ export type UnitInput = z.infer<typeof unitSchema>;
 /** The item list's filters (`GET /api/items`). */
 export const itemQuerySchema = z.strictObject({
   q: optionalText(100).optional(),
-  category: id().optional(),
+  category: uuid().optional(),
   archived: z.enum(['true', 'false'], { error: 'invalid' }).optional(),
   after: z.string().max(400, { error: 'too_long' }).optional(),
 });

@@ -23,13 +23,14 @@ import {
   recordEntry,
   sql,
   units,
-  withBusiness,
   type Database,
   type Transaction,
 } from '@business-software/db';
 import {
   inStoreBarcode,
   inStoreSerial,
+  text,
+  uuid,
   type BarcodeInput,
   type BarcodeMatch,
   type BuiltInUnit,
@@ -43,9 +44,10 @@ import {
   type NewItemInput,
   type PackInput,
 } from '@business-software/shared';
+import { z } from 'zod';
 import { DATABASE } from '../database.module.js';
 import type { Caller } from '../http/session.js';
-import { answerConflicts, changes } from './conflicts.js';
+import { changes, inBusiness } from './conflicts.js';
 
 const PAGE_SIZE = 50;
 
@@ -81,23 +83,23 @@ interface Cursor {
 const encodeCursor = (cursor: Cursor) =>
   Buffer.from(JSON.stringify([cursor.rank, cursor.name, cursor.id])).toString('base64url');
 
+// What a cursor this API made holds: a rank (0-2), a stored item name, an item id. Anything
+// else would reach PostgreSQL as a bad cast (a 500), so it's refused here.
+const CURSOR = z.tuple([z.union([z.literal(0), z.literal(1), z.literal(2)]), text(100), uuid()]);
+
 function decodeCursor(after: string): Cursor {
+  let value: unknown = null;
   try {
-    const value: unknown = JSON.parse(Buffer.from(after, 'base64url').toString('utf8'));
-    if (
-      Array.isArray(value) &&
-      value.length === 3 &&
-      Number.isInteger(value[0]) &&
-      typeof value[1] === 'string' &&
-      typeof value[2] === 'string' &&
-      /^[0-9a-f-]{36}$/.test(value[2])
-    ) {
-      return { rank: value[0] as number, name: value[1], id: value[2] };
-    }
+    value = JSON.parse(Buffer.from(after, 'base64url').toString('utf8'));
   } catch {
-    // Not base64url JSON: answered below.
+    // Not base64url JSON: refused below.
   }
-  throw new BadRequestException({ code: 'invalid_body', fields: { after: 'invalid' } });
+  const parsed = CURSOR.safeParse(value);
+  if (!parsed.success) {
+    throw new BadRequestException({ code: 'invalid_body', fields: { after: 'invalid' } });
+  }
+  const [rank, name, id] = parsed.data;
+  return { rank, name, id };
 }
 
 const invalid = (fields: FieldErrors) => new BadRequestException({ code: 'invalid_body', fields });
@@ -111,7 +113,7 @@ export class ItemsService {
   constructor(@Inject(DATABASE) private readonly database: Database) {}
 
   private inBusiness<T>(caller: Caller, work: (tx: Transaction) => Promise<T>): Promise<T> {
-    return answerConflicts(withBusiness(this.database.db, caller.businessId, work));
+    return inBusiness(this.database, caller, work);
   }
 
   // ---- Reading ----
@@ -201,10 +203,11 @@ export class ItemsService {
       if (row === undefined) throw new Error('No item row returned');
       await this.writePacks(tx, row.id, input.packs, []);
       await this.writeLevels(tx, row.id, input.levels, []);
-      for (const code of input.barcodes) {
+      if (input.barcodes.length > 0) {
+        // Typed or scanned codes: never in-store, even one that looks like ours.
         await tx
           .insert(itemBarcodes)
-          .values({ itemId: row.id, code, inStore: inStoreSerial(code) !== null });
+          .values(input.barcodes.map((code) => ({ itemId: row.id, code, inStore: false })));
       }
       const view = await this.mustLoad(tx, row.id);
       await recordEntry(tx, {
@@ -236,16 +239,23 @@ export class ItemsService {
         .update(items)
         .set({ ...columns(input), purchasePrice })
         .where(eq(items.id, id));
-      await this.writePacks(tx, id, input.packs, before.packs);
+      const removedCodes = await this.writePacks(tx, id, input.packs, before.packs);
       await this.writeLevels(tx, id, input.levels, before.levels);
 
       const after = await this.mustLoad(tx, id);
       const changed = changes(logged(before), logged(after));
       if (changed === null) return forCaller(before, caller);
-      await tx
+      const [bumped] = await tx
         .update(items)
         .set({ version: sql`${items.version} + 1`, updatedAt: new Date() })
-        .where(eq(items.id, id));
+        .where(eq(items.id, id))
+        .returning({ version: items.version });
+      if (bumped === undefined) throw new Error('No item row updated');
+      // The codes that went with a dropped pack are part of what this save changed.
+      if (removedCodes.length > 0) {
+        changed.before.barcodes = removedCodes;
+        changed.after.barcodes = [];
+      }
       await recordEntry(tx, {
         actorId: caller.userId,
         action: 'item.updated',
@@ -253,7 +263,7 @@ export class ItemsService {
         entityId: id,
         ...changed,
       });
-      return forCaller(await this.mustLoad(tx, id), caller);
+      return forCaller({ ...after, version: bumped.version }, caller);
     });
   }
 
@@ -287,7 +297,7 @@ export class ItemsService {
       if (input.code !== null) await this.checkBarcodesFree(tx, [code]);
       await tx
         .insert(itemBarcodes)
-        .values({ itemId, itemUnitId: input.packId, code, inStore: inStoreSerial(code) !== null });
+        .values({ itemId, itemUnitId: input.packId, code, inStore: input.code === null });
       // The browser's copy of the catalogue (P1.13) asks for what changed since.
       await tx.update(items).set({ updatedAt: new Date() }).where(eq(items.id, itemId));
       await recordEntry(tx, {
@@ -303,6 +313,7 @@ export class ItemsService {
 
   removeBarcode(caller: Caller, itemId: string, barcodeId: string): Promise<ItemView> {
     return this.inBusiness(caller, async (tx) => {
+      await this.lock(tx, itemId);
       const [removed] = await tx
         .update(itemBarcodes)
         .set({ removedAt: new Date() })
@@ -383,8 +394,8 @@ export class ItemsService {
     const errors: FieldErrors = {};
     const [business] = await tx.select({ gstStatus: businesses.gstStatus }).from(businesses);
     if (business?.gstStatus === 'regular') {
-      if (input.gstRate === null) errors.gstRate = 'required';
-      if (input.hsn === null) errors.hsn = 'required';
+      if (input.gstRate === null) errors.gstRate = 'gst_required';
+      if (input.hsn === null) errors.hsn = 'gst_required';
     }
 
     // An archived category or unit may stay where it already is, but not be newly chosen.
@@ -466,52 +477,79 @@ export class ItemsService {
       .select({ code: sql<string | null>`max(${itemBarcodes.code})` })
       .from(itemBarcodes)
       .where(eq(itemBarcodes.inStore, true));
-    const last = highest?.code === null || highest === undefined ? 0 : inStoreSerial(highest.code);
-    return inStoreBarcode((last ?? 0) + 1);
+    let serial = (highest?.code ? inStoreSerial(highest.code) : null) ?? 0;
+    // A typed or scanned code can look like ours (weighing scales print 2-prefixed EAN-13s
+    // too). Skip any code in use, live or removed, so an old label never means two items.
+    for (;;) {
+      serial += 1;
+      const code = inStoreBarcode(serial);
+      const [taken] = await tx
+        .select({ id: itemBarcodes.id })
+        .from(itemBarcodes)
+        .where(eq(itemBarcodes.code, code))
+        .limit(1);
+      if (taken === undefined) return code;
+    }
   }
 
   /**
    * Packs not sent any more are archived, with their barcodes removed; sent ones are updated;
-   * new ones (no id) are added. In that order, so a unit can move from an old pack to a new one.
+   * new ones (no id) are added. Returns the codes removed with dropped packs.
+   *
+   * The live-unit unique index checks each write, not the final set, so a valid set could
+   * collide half-way (two packs swapping units, or a new box listed before the old box turns
+   * into a dozen). So packs whose unit changes are first parked (archived) together, then each
+   * sent pack is written live again, then the new ones are added.
    */
   private async writePacks(
     tx: Transaction,
     itemId: string,
     packs: readonly PackInput[],
     existing: ItemView['packs'],
-  ): Promise<void> {
+  ): Promise<string[]> {
+    const now = new Date();
     const sent = new Set(packs.flatMap((pack) => (pack.id === null ? [] : [pack.id])));
     const dropped = existing.filter((pack) => !sent.has(pack.id)).map((pack) => pack.id);
-    if (dropped.length > 0) {
-      const now = new Date();
+    const unitOf = new Map(existing.map((pack) => [pack.id, pack.unitCode ?? pack.unitId]));
+    const moving = packs.flatMap((pack) =>
+      pack.id !== null && unitOf.get(pack.id) !== (pack.unitCode ?? pack.unitId) ? [pack.id] : [],
+    );
+    if (dropped.length + moving.length > 0) {
       await tx
         .update(itemUnits)
         .set({ archivedAt: now, updatedAt: now })
-        .where(inArray(itemUnits.id, dropped));
-      await tx
-        .update(itemBarcodes)
-        .set({ removedAt: now })
-        .where(and(inArray(itemBarcodes.itemUnitId, dropped), isNull(itemBarcodes.removedAt)));
+        .where(inArray(itemUnits.id, [...dropped, ...moving]));
     }
+    const removed =
+      dropped.length === 0
+        ? []
+        : await tx
+            .update(itemBarcodes)
+            .set({ removedAt: now })
+            .where(and(inArray(itemBarcodes.itemUnitId, dropped), isNull(itemBarcodes.removedAt)))
+            .returning({ code: itemBarcodes.code });
+
+    const values = (pack: PackInput) => ({
+      unitCode: pack.unitCode,
+      unitId: pack.unitId,
+      size: pack.size,
+      sellingPrice: pack.sellingPrice,
+      mrp: pack.mrp,
+      soldAsPack: pack.soldAsPack,
+      boughtAsPack: pack.boughtAsPack,
+    });
     for (const pack of packs) {
-      const values = {
-        unitCode: pack.unitCode,
-        unitId: pack.unitId,
-        size: pack.size,
-        sellingPrice: pack.sellingPrice,
-        mrp: pack.mrp,
-        soldAsPack: pack.soldAsPack,
-        boughtAsPack: pack.boughtAsPack,
-      };
-      if (pack.id === null) {
-        await tx.insert(itemUnits).values({ ...values, itemId });
-      } else {
-        await tx
-          .update(itemUnits)
-          .set({ ...values, updatedAt: new Date() })
-          .where(eq(itemUnits.id, pack.id));
-      }
+      if (pack.id === null) continue;
+      await tx
+        .update(itemUnits)
+        .set({ ...values(pack), archivedAt: null, updatedAt: now })
+        .where(eq(itemUnits.id, pack.id));
     }
+    const added = packs.filter((pack) => pack.id === null);
+    if (added.length > 0) {
+      await tx.insert(itemUnits).values(added.map((pack) => ({ ...values(pack), itemId })));
+    }
+    return removed.map((row) => row.code).sort();
   }
 
   /** One level per branch sent; a branch not sent any more goes back to 0 (no alert). */
@@ -528,16 +566,16 @@ export class ItemsService {
         .filter((level) => !sent.has(level.branchId) && level.lowStockLevel !== 0)
         .map((level) => ({ branchId: level.branchId, lowStockLevel: 0 })),
     ];
-    for (const level of all) {
-      await tx
-        .insert(itemBranchLevels)
-        .values({ itemId, branchId: level.branchId, lowStockLevel: level.lowStockLevel })
-        .onConflictDoUpdate({
-          target: [itemBranchLevels.businessId, itemBranchLevels.itemId, itemBranchLevels.branchId],
-          set: { lowStockLevel: level.lowStockLevel, updatedAt: new Date() },
-          setWhere: sql`${itemBranchLevels.lowStockLevel} <> ${level.lowStockLevel}`,
-        });
-    }
+    if (all.length === 0) return;
+    await tx
+      .insert(itemBranchLevels)
+      .values(all.map((level) => ({ itemId, ...level })))
+      .onConflictDoUpdate({
+        target: [itemBranchLevels.businessId, itemBranchLevels.itemId, itemBranchLevels.branchId],
+        set: { lowStockLevel: sql`excluded.low_stock_level`, updatedAt: new Date() },
+        // An unchanged level keeps its row as it was.
+        setWhere: sql`${itemBranchLevels.lowStockLevel} <> excluded.low_stock_level`,
+      });
   }
 
   private async mustLoad(tx: Transaction, id: string): Promise<ItemView> {

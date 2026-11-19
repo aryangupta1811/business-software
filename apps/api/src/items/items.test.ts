@@ -6,6 +6,7 @@ import type { INestApplication } from '@nestjs/common';
 import { createDatabase, type Database } from '@business-software/db';
 import { startTestDatabase, type TestDatabase } from '@business-software/db/testing';
 import {
+  inStoreBarcode,
   inStoreSerial,
   PERMISSIONS,
   type ItemPage,
@@ -205,7 +206,10 @@ describe('items', () => {
         await call('POST', '/items', a, { ...atta, name: 'No GST', gstRate: null, hsn: null }),
       ).toEqual({
         status: 400,
-        body: { code: 'invalid_body', fields: { gstRate: 'required', hsn: 'required' } },
+        body: {
+          code: 'invalid_body',
+          fields: { gstRate: 'gst_required', hsn: 'gst_required' },
+        },
       });
       await create(b, { gstRate: null, hsn: null });
     });
@@ -312,8 +316,54 @@ describe('items', () => {
         packs: [],
       });
       expect(saved.body).toMatchObject({ packs: [], barcodes: [] });
+      // The log says which codes went with the pack.
+      expect((await entries(item.id)).at(-1)).toMatchObject({
+        action: 'item.updated',
+        before: { barcodes: ['BAG-0001'] },
+        after: { barcodes: [] },
+      });
       // The code is free again.
       await create(a, { barcodes: ['BAG-0001'] });
+    });
+
+    // The live-unit unique index sees each write, not the final set, so the order matters.
+    it('saves any valid set of packs, whatever order the units move in', async () => {
+      const box = { ...bag, unitCode: 'box', size: 10_000, sellingPrice: null };
+      const pack = { ...box, unitCode: 'pack', size: 6_000 };
+      const item = await create(a, { stockUnit: 'piece', mrp: null, packs: [box, pack] });
+      const [first, second] = item.packs;
+      // Swap the two packs' units.
+      const swapped = await call<ItemView>(
+        'PUT',
+        `/items/${item.id}`,
+        a,
+        asUpdate(item, {
+          packs: [
+            { ...box, id: first?.id, unitCode: second?.unitCode },
+            { ...pack, id: second?.id, unitCode: first?.unitCode },
+          ],
+        }),
+      );
+      expect(swapped.status).toBe(200);
+      expect(swapped.body.packs.map((row) => [row.id, row.unitCode])).toEqual([
+        [first?.id, second?.unitCode],
+        [second?.id, first?.unitCode],
+      ]);
+      // A new pack takes a unit that an existing pack is leaving, listed first.
+      const moved = await call<ItemView>(
+        'PUT',
+        `/items/${item.id}`,
+        a,
+        asUpdate(swapped.body, {
+          packs: [
+            { ...box, unitCode: 'box', size: 20_000 },
+            { ...box, id: first?.id, unitCode: 'dozen', size: 12_000 },
+            { ...pack, id: second?.id, unitCode: 'pack' },
+          ],
+        }),
+      );
+      expect(moved.status).toBe(200);
+      expect(moved.body.packs.map((row) => row.unitCode).sort()).toEqual(['box', 'dozen', 'pack']);
     });
 
     it('sets a level back to 0 when a branch is left out', async () => {
@@ -425,6 +475,37 @@ describe('items', () => {
       expect(new Set(codes).size).toBe(2);
       for (const code of codes) expect(inStoreSerial(code)).not.toBeNull();
       expect(results[0]?.body.barcodes[0]?.inStore).toBe(true);
+    });
+
+    it("counts only codes the app made as in-store, and never makes one that's taken", async () => {
+      const item = await create(a);
+      const made = await call<ItemView>('POST', `/items/${item.id}/barcodes`, a, {
+        code: null,
+        packId: null,
+      });
+      const serial = inStoreSerial(made.body.barcodes[0]?.code ?? '') ?? 0;
+      // Typed (or scanned) codes that look like ours: the next serial, and the highest there is.
+      const typed = await create(a, {
+        barcodes: [inStoreBarcode(serial + 1), inStoreBarcode(99_999_999_999)],
+      });
+      expect(typed.barcodes.map((code) => code.inStore)).toEqual([false, false]);
+      const next = await call<ItemView>('POST', `/items/${item.id}/barcodes`, a, {
+        code: null,
+        packId: null,
+      });
+      expect(next.status).toBe(201);
+      expect(next.body.barcodes.map((code) => inStoreSerial(code.code))).toEqual([
+        serial,
+        serial + 2,
+      ]);
+    });
+
+    it("won't remove a code from an archived item", async () => {
+      const item = await create(a, { barcodes: ['ARCH-0001'] });
+      await call('POST', `/items/${item.id}/archive`, a);
+      expect(
+        await call('POST', `/items/${item.id}/barcodes/${item.barcodes[0]?.id ?? ''}/remove`, a),
+      ).toEqual({ status: 409, body: { code: 'archived' } });
     });
 
     it('removes a code and logs it', async () => {
@@ -550,11 +631,22 @@ describe('items', () => {
       ]);
     });
 
-    it('refuses a cursor it did not make', async () => {
-      expect(await call('GET', '/items?after=nonsense', shop)).toEqual({
-        status: 400,
-        body: { code: 'invalid_body', fields: { after: 'invalid' } },
-      });
+    it('refuses a cursor it did not make, never a 500', async () => {
+      const cursor = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
+      const id = crypto.randomUUID();
+      for (const after of [
+        'nonsense',
+        cursor([0, 'Atta', '-'.repeat(36)]),
+        cursor([2 ** 31, 'Atta', id]),
+        cursor([7, 'Atta', id]),
+        cursor([0, 'At\u0000ta', id]),
+        cursor([0, 'Atta', id, 'extra']),
+      ]) {
+        expect(await call('GET', `/items?after=${after}`, shop)).toEqual({
+          status: 400,
+          body: { code: 'invalid_body', fields: { after: 'invalid' } },
+        });
+      }
     });
   });
 
@@ -604,6 +696,27 @@ describe('items', () => {
         ],
       });
       expect(item.packs[0]).toMatchObject({ unitId: crate.body.id, unitName: 'Crate' });
+
+      // Renaming or archiving the unit changes how the item reads, so P1.13's "changed
+      // since" sync must see the item as changed.
+      const updatedAt = async () =>
+        (
+          await admin.pool.query<{ updated_at: Date }>(
+            'select updated_at from items where id = $1',
+            [item.id],
+          )
+        ).rows[0]?.updated_at.getTime() ?? 0;
+      const before = await updatedAt();
+      await call('PUT', `/units/${crate.body.id}`, a, {
+        name: 'Big crate',
+        hindiName: null,
+        baseUnit: 'piece',
+        defaultSize: 24_000,
+      });
+      const renamed = await updatedAt();
+      expect(renamed).toBeGreaterThan(before);
+      await call('POST', `/units/${crate.body.id}/archive`, a);
+      expect(await updatedAt()).toBeGreaterThan(renamed);
     });
   });
 });

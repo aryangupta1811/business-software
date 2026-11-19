@@ -12,11 +12,13 @@ export {
 export {
   email,
   fieldErrors,
+  isUuid,
   isValidGstin,
   normalizePhone,
   optionalText,
   phone,
   text,
+  uuid,
   type FieldErrors,
 } from './fields.js';
 export {

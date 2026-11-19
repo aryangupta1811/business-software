@@ -11,6 +11,7 @@ import {
   Query,
 } from '@nestjs/common';
 import {
+  barcode,
   barcodeSchema,
   categorySchema,
   itemQuerySchema,
@@ -36,9 +37,6 @@ import { ZodBodyPipe } from '../http/zod-body.pipe.js';
 import { CatalogueService } from './catalogue.service.js';
 import { ItemsService } from './items.service.js';
 
-/** A scanned code in the path: anything a scanner can't print is no barcode we know. */
-const SCANNED = /^[!-~]{4,48}$/;
-
 /** Items (P1.7, design §6). Reading needs `items.view`; any change needs `items.manage`. */
 @Controller('items')
 export class ItemsController {
@@ -56,8 +54,10 @@ export class ItemsController {
   @Permission('items.view')
   @Get('barcode/:code')
   byBarcode(@CurrentCaller() caller: Caller, @Param('code') code: string): Promise<BarcodeMatch> {
-    if (!SCANNED.test(code)) throw new NotFoundException({ code: 'unknown_barcode' });
-    return this.items.byBarcode(caller, code);
+    // Anything that can't be a barcode is no barcode we know (the same check as saving one).
+    const scanned = barcode().safeParse(code);
+    if (!scanned.success) throw new NotFoundException({ code: 'unknown_barcode' });
+    return this.items.byBarcode(caller, scanned.data);
   }
 
   @Permission('items.view')

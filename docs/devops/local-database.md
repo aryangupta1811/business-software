@@ -83,4 +83,5 @@ Order by `id`: entries written in one transaction share `created_at` (it's the t
 - **`docker compose down` is safe.** It removes the container, not the volume.
 - **`docker compose down -v` deletes the database** (the `pgdata` volume). Ask the owner first (`CLAUDE.md` rule 7). It's only ever needed to rerun the bootstrap from scratch.
 - **Port 5432 already in use** (e.g. a PostgreSQL installed on Windows): stop that service, or change the left side of `127.0.0.1:5432:5432` in `compose.yaml` and the port in `MIGRATION_DATABASE_URL`.
+- **An owner who signed up before migration `0005` (P1.4) can't log in.** Login by email reads `auth.owner_logins`, which signup fills from P1.4 on, and the migration can't backfill it (it runs as `app_owner`, which `FORCE` RLS shows no `users` rows; ADR 0039). Sign up again with another email. Those old businesses stay in the database; wiping the volume to start clean needs the owner's OK (above).
 - **`pnpm test` needs Docker too.** The integration tests start their own throwaway PostgreSQL, separate from this one.

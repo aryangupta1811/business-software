@@ -12,7 +12,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { Plus, Trash2 } from 'lucide-react';
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import {
   useFieldArray,
   useForm,
@@ -80,8 +80,13 @@ export function ItemEditor({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const loadedVersion = useRef(item?.version);
   const form = useForm<ItemForm, unknown, Record<string, unknown>>({
-    resolver: itemResolver(context, item?.version),
+    // The version the form's values were loaded at, not the cache's latest: a refetch on
+    // focus, or the answer to adding a barcode, can bring someone else's newer copy, and
+    // saving with its version would silently overwrite their change.
+    resolver: (values, resolverContext, options) =>
+      itemResolver(context, loadedVersion.current)(values, resolverContext, options),
     defaultValues: item ? itemFormFrom(item, context) : emptyItemForm(context, barcode),
   });
   const [banner, setBanner] = useState<Banner | null>(null);
@@ -102,6 +107,7 @@ export function ItemEditor({
         : await apiRequest<ItemView>('POST', '/api/items', body);
       showSaved(view);
       if (item) {
+        loadedVersion.current = view.version;
         form.reset(itemFormFrom(view, context));
         setSaved(true);
       } else {
@@ -168,8 +174,10 @@ export function ItemEditor({
         {item && context.canManage && (
           <ArchiveControl
             item={item}
+            dirty={form.formState.isDirty}
             onDone={(view) => {
               showSaved(view);
+              loadedVersion.current = view.version;
               form.reset(itemFormFrom(view, context));
             }}
           />
@@ -181,10 +189,13 @@ export function ItemEditor({
 
 function BannerText({ banner }: { banner: Banner }) {
   const { t } = useTranslation();
+  // A race settled by the unique index answers without the other item's name.
   const text =
-    banner.kind === 'barcode'
-      ? t('items.errors.barcodeTakenBy', { code: banner.code, name: banner.itemName })
-      : t(`items.errors.${banner.kind}`);
+    banner.kind !== 'barcode'
+      ? t(`items.errors.${banner.kind}`)
+      : banner.itemName === ''
+        ? t('errors.barcode_taken')
+        : t('items.errors.barcodeTakenBy', { code: banner.code, name: banner.itemName });
   return (
     <p role="alert" className="rounded-lg bg-danger-soft px-4 py-3 text-danger">
       {text}
@@ -324,7 +335,12 @@ function PriceCard({
     priceIncludesTax: values.priceIncludesTax ?? true,
   });
   const profit = context.canViewCost
-    ? margin({ sellingPrice: values.sellingPrice ?? '', purchasePrice: values.purchasePrice ?? '' })
+    ? margin({
+        sellingPrice: values.sellingPrice ?? '',
+        purchasePrice: values.purchasePrice ?? '',
+        gstRate: values.gstRate ?? '',
+        priceIncludesTax: values.priceIncludesTax ?? true,
+      })
     : null;
   const selling = parseRupees(values.sellingPrice ?? '');
   const mrp = parseRupees(values.mrp ?? '');
@@ -679,9 +695,10 @@ function Barcodes({
       if (failure instanceof ApiError) {
         setError({
           code: Object.values(failure.fields)[0] ?? failure.code,
-          ...(failure.code === 'barcode_taken' && {
-            detail: asText(failure.detail.itemName),
-          }),
+          ...(failure.code === 'barcode_taken' &&
+            asText(failure.detail.itemName) !== '' && {
+              detail: asText(failure.detail.itemName),
+            }),
         });
       } else {
         setError({ code: 'server' });
@@ -712,6 +729,7 @@ function Barcodes({
               {row.inStore && <Badge tone="info">{t('items.barcodes.inStore')}</Badge>}
               {!readOnly && (
                 <Button
+                  aria-label={`${t('items.barcodes.removeSaved')} ${row.code}`}
                   variant="ghost"
                   size="sm"
                   className="ml-auto"
@@ -720,7 +738,6 @@ function Barcodes({
                   }
                 >
                   {t('items.barcodes.removeSaved')}
-                  <span className="sr-only"> {row.code}</span>
                 </Button>
               )}
             </li>
@@ -782,7 +799,16 @@ function Barcodes({
   );
 }
 
-function ArchiveControl({ item, onDone }: { item: ItemView; onDone: (view: ItemView) => void }) {
+/** Archive or restore; refused while the form has unsaved changes, which it would discard. */
+function ArchiveControl({
+  item,
+  dirty,
+  onDone,
+}: {
+  item: ItemView;
+  dirty: boolean;
+  onDone: (view: ItemView) => void;
+}) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
@@ -793,7 +819,8 @@ function ArchiveControl({ item, onDone }: { item: ItemView; onDone: (view: ItemV
         variant={item.archived ? 'secondary' : 'ghost'}
         className="ml-auto"
         onClick={() => {
-          setOpen(true);
+          setFailed(dirty ? 'unsaved' : null);
+          if (!dirty) setOpen(true);
         }}
       >
         {t(`items.${action}`)}
@@ -801,7 +828,7 @@ function ArchiveControl({ item, onDone }: { item: ItemView; onDone: (view: ItemV
       {failed && (
         <p role="alert" className="text-label text-danger">
           {t(
-            `items.errors.${failed === 'name_taken' || failed === 'code_taken' ? failed : 'failed'}`,
+            `items.errors.${failed === 'name_taken' || failed === 'code_taken' || failed === 'unsaved' ? failed : 'failed'}`,
           )}
         </p>
       )}

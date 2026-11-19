@@ -194,7 +194,8 @@ export function itemBody(
         }))
       : [],
     ...(version === undefined
-      ? { barcodes: form.barcodes.map(({ code }) => code.trim()).filter((code) => code !== '') }
+      ? // Blank rows too: each error's index must stay the row it belongs to (blank says required).
+        { barcodes: form.barcodes.map(({ code }) => code.trim()) }
       : { version }),
   };
 }
@@ -287,13 +288,19 @@ export function priceWithTax(
   };
 }
 
-/** Selling price less purchase price, and that as a share of the selling price (basis points). */
+/**
+ * The price before GST less the purchase price, and that as a share of the price before GST
+ * (basis points). GST collected goes to the government, so it isn't margin. With no rate
+ * chosen yet, the price as typed.
+ */
 export function margin(
-  form: Pick<ItemForm, 'sellingPrice' | 'purchasePrice'>,
+  form: Pick<ItemForm, 'sellingPrice' | 'purchasePrice' | 'gstRate' | 'priceIncludesTax'>,
 ): { amount: Paise; basisPoints: number } | null {
   const selling = parseRupees(form.sellingPrice);
   const cost = parseRupees(form.purchasePrice);
-  if (selling === null || cost === null || selling === 0) return null;
-  const amount = selling - cost;
-  return { amount, basisPoints: Math.round((amount * 10_000) / selling) };
+  if (selling === null || cost === null) return null;
+  const beforeTax = form.priceIncludesTax ? (priceWithTax(form)?.taxable ?? selling) : selling;
+  if (beforeTax === 0) return null;
+  const amount = beforeTax - cost;
+  return { amount, basisPoints: Math.round((amount * 10_000) / beforeTax) };
 }

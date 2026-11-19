@@ -79,7 +79,11 @@ function ItemList() {
   const [q, setQ] = useState('');
   const [category, setCategory] = useState('');
   const [archived, setArchived] = useState(false);
-  const [scanError, setScanError] = useState<string | null>(null);
+  // What a scan's lookup ended in, when it didn't open an item.
+  const [scanError, setScanError] = useState<{
+    code: string;
+    reason: 'unknown' | 'loggedOut' | 'failed';
+  } | null>(null);
 
   // Ask the server once typing pauses, not on every key.
   useEffect(() => {
@@ -129,11 +133,17 @@ function ItemList() {
     apiRequest<BarcodeMatch>('GET', `/api/items/barcode/${encodeURIComponent(code)}`).then(
       (match) => void navigate({ to: '/items/$id', params: { id: match.item.id } }),
       (error: unknown) => {
-        if (error instanceof ApiError && error.code === 'unknown_barcode' && context?.canManage) {
+        const status = error instanceof ApiError ? error.status : 0;
+        const unknown = error instanceof ApiError && error.code === 'unknown_barcode';
+        if (unknown && context?.canManage) {
           void navigate({ to: '/items/new', search: { barcode: code } });
-        } else {
-          setScanError(code);
+          return;
         }
+        // Only a 404 for the code means "no such item"; a dropped connection or a 500 doesn't.
+        setScanError({
+          code,
+          reason: unknown ? 'unknown' : status === 401 ? 'loggedOut' : 'failed',
+        });
       },
     );
   });
@@ -212,7 +222,7 @@ function ItemList() {
 
       {scanError !== null && (
         <p role="alert" className="rounded-lg bg-danger-soft px-4 py-3 text-danger">
-          {t('items.scanUnknown', { code: scanError })}
+          {t(`items.scan.${scanError.reason}`, { code: scanError.code })}
         </p>
       )}
 

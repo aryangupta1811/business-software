@@ -155,9 +155,8 @@ describe('the body sent to the API', () => {
     expect(body).toMatchObject({ mrp: null, packs: [], levels: [] });
   });
 
-  test('a new item sends its barcodes, blanks dropped, and no version', () => {
-    const form = { ...emptyItemForm(context, '8901234567890'), name: 'Pen' };
-    form.barcodes.push({ code: ' ' });
+  test('a new item sends its barcodes trimmed, and no version', () => {
+    const form = { ...emptyItemForm(context, ' 8901234567890 '), name: 'Pen' };
     const body = itemBody(form, context);
     expect(body.barcodes).toEqual(['8901234567890']);
     expect(body).not.toHaveProperty('version');
@@ -187,6 +186,18 @@ describe('the form’s checks, the same as the API’s', () => {
       sellingPrice: 'above_mrp',
       priceIncludesTax: 'mrp_needs_inclusive_price',
       hsn: 'invalid',
+    });
+  });
+
+  // Every row is sent, blank ones too, so an error's index is the row it belongs to.
+  test('a barcode’s error lands on its own row, after a blank one', async () => {
+    const form = { ...emptyItemForm(context), name: 'Pen', sellingPrice: '10' };
+    form.gstRate = '1800';
+    form.hsn = '9608';
+    form.barcodes = [{ code: '' }, { code: 'has space' }];
+    expect(await errorsOf(form)).toEqual({
+      'barcodes.0.code': 'required',
+      'barcodes.1.code': 'invalid',
     });
   });
 
@@ -242,11 +253,25 @@ describe('what the form shows as you type', () => {
     expect(priceWithTax({ sellingPrice: '10', gstRate: '', priceIncludesTax: true })).toBeNull();
   });
 
-  test('the margin on the selling price', () => {
-    expect(margin({ sellingPrice: '52', purchasePrice: '45' })).toEqual({
-      amount: 700,
-      basisPoints: 1346,
+  // GST collected isn't profit: the margin is on the price before GST.
+  test('the margin on the price before GST', () => {
+    const price = { gstRate: '1800', priceIncludesTax: true };
+    expect(margin({ ...price, sellingPrice: '118', purchasePrice: '90' })).toEqual({
+      amount: 1_000,
+      basisPoints: 1_000,
     });
-    expect(margin({ sellingPrice: '52', purchasePrice: '' })).toBeNull();
+    expect(
+      margin({
+        sellingPrice: '100',
+        purchasePrice: '90',
+        gstRate: '1800',
+        priceIncludesTax: false,
+      }),
+    ).toEqual({ amount: 1_000, basisPoints: 1_000 });
+    // No rate chosen yet: the price as typed.
+    expect(
+      margin({ sellingPrice: '52', purchasePrice: '45', gstRate: '', priceIncludesTax: true }),
+    ).toEqual({ amount: 700, basisPoints: 1346 });
+    expect(margin({ ...price, sellingPrice: '52', purchasePrice: '' })).toBeNull();
   });
 });

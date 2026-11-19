@@ -406,7 +406,6 @@
     "allCategories": "All categories",
     "showArchived": "Show archived",
     "add": "Add item",
-    "scanUnknown": "No item has the barcode {{code}}.",
     "columns": {
       "name": "Name",
       "code": "Code",
@@ -439,7 +438,8 @@
       "archived": "This item was archived meanwhile. Restore it to change it.",
       "failed": "Couldn't save. Check the connection and try again.",
       "name_taken": "Another item already has this name.",
-      "code_taken": "Another item already has this code."
+      "code_taken": "Another item already has this code.",
+      "unsaved": "Save or undo your changes first."
     },
     "cards": {
       "basics": "Basics",
@@ -535,6 +535,11 @@
       "defaultSize": "How many in one",
       "defaultSizeHint": "An item can change it for itself.",
       "addUnit": "Add unit"
+    },
+    "scan": {
+      "unknown": "No item has the barcode {{code}}.",
+      "loggedOut": "Log in again to look up the barcode {{code}}.",
+      "failed": "Couldn't look up the barcode {{code}}. Check the connection and scan again."
     }
   }
 }

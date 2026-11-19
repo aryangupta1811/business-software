@@ -406,7 +406,6 @@
     "allCategories": "Sabhi categories",
     "showArchived": "Archived dikhayein",
     "add": "Saamaan jodein",
-    "scanUnknown": "Barcode {{code}} kisi saamaan par nahi hai.",
     "columns": {
       "name": "Naam",
       "code": "Code",
@@ -439,7 +438,8 @@
       "archived": "Is beech yeh saamaan archive ho gaya. Badalne ke liye wapas laayein.",
       "failed": "Save nahi ho saka. Connection check karein aur phir koshish karein.",
       "name_taken": "Yeh naam kisi aur saamaan ka hai.",
-      "code_taken": "Yeh code kisi aur saamaan ka hai."
+      "code_taken": "Yeh code kisi aur saamaan ka hai.",
+      "unsaved": "Pehle apne badlaav save karein ya hatayein."
     },
     "cards": {
       "basics": "Mool jaankari",
@@ -535,6 +535,11 @@
       "defaultSize": "Ek mein kitne",
       "defaultSizeHint": "Har saamaan ise apne liye badal sakta hai.",
       "addUnit": "Unit jodein"
+    },
+    "scan": {
+      "unknown": "Barcode {{code}} kisi saamaan par nahi hai.",
+      "loggedOut": "Barcode {{code}} dekhne ke liye phir se login karein.",
+      "failed": "Barcode {{code}} dekha nahi ja saka. Connection check karein aur phir scan karein."
     }
   }
 }

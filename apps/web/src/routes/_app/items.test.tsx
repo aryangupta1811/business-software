@@ -101,9 +101,19 @@ function renderAt(path: string) {
   return history;
 }
 
-/** A scanner's burst: every key at once, then Enter, with no field focused. */
+/** The physical key a US keyboard (and so a scanner) uses for a character. */
+const codeOf = (key: string) =>
+  /^\d$/.test(key)
+    ? `Digit${key}`
+    : /^[a-z]$/i.test(key)
+      ? `Key${key.toUpperCase()}`
+      : ({ '/': 'Slash', '-': 'Minus', Enter: 'Enter' }[key] ?? key);
+
+/** A scanner's burst: every key at once, then Enter, each to whatever has focus (as a keyboard). */
 function scan(code: string) {
-  for (const key of [...Array.from(code), 'Enter']) fireEvent.keyDown(document.body, { key });
+  for (const key of [...Array.from(code), 'Enter']) {
+    fireEvent.keyDown(document.activeElement ?? document.body, { key, code: codeOf(key) });
+  }
 }
 
 const sentTo = (fetchMock: ReturnType<typeof stubApi>, method: string, path: string) =>
@@ -169,7 +179,7 @@ test('shows the price with GST and the margin as you type, and warns above the M
   await userEvent.type(price.getByLabelText('Purchase price (₹)'), '90');
   expect(price.getByText('Before GST').nextSibling).toHaveTextContent('₹100.00');
   expect(price.getByText('Customer pays').nextSibling).toHaveTextContent('₹118.00');
-  expect(price.getByText('Margin').nextSibling).toHaveTextContent('₹28.00 (23.73%)');
+  expect(price.getByText('Margin').nextSibling).toHaveTextContent('₹10.00 (10%)');
   await userEvent.type(price.getByLabelText('MRP (₹)'), '100');
   expect(price.getByRole('status')).toHaveTextContent('above the MRP');
 });
@@ -242,4 +252,132 @@ test('asks to log in when the API says no one is', async () => {
   stubApi({ 'GET /api/items/context': () => ({ status: 401, body: { code: 'not_logged_in' } }) });
   renderAt('/items');
   expect(await screen.findByRole('heading', { name: 'Log in to see items' })).toBeInTheDocument();
+});
+
+test('a scan whose code holds / is still one scan, not the search shortcut', async () => {
+  stubApi({
+    ...base(),
+    'GET /api/items/barcode/AB%2F12345': () => ({ status: 404, body: { code: 'unknown_barcode' } }),
+  });
+  renderAt('/items');
+  await screen.findByRole('table', { name: 'Items' });
+  scan('AB/12345');
+  expect(await screen.findByLabelText('Barcode 1')).toHaveValue('AB/12345');
+});
+
+test('a scan after ticking a filter still counts', async () => {
+  stubApi({
+    ...base(),
+    'GET /api/items/barcode/8901234567890': () => ({ body: { item: ATTA, packId: null } }),
+  });
+  const history = renderAt('/items');
+  const archived = await screen.findByRole('checkbox', { name: 'Show archived' });
+  await userEvent.click(archived);
+  expect(archived).toHaveFocus();
+  scan('8901234567890');
+  await waitFor(() => {
+    expect(history.location.pathname).toBe(`/items/${ITEM}`);
+  });
+});
+
+test('says a lookup failed, not that the code is unknown, when the server errs', async () => {
+  stubApi({
+    ...base(),
+    'GET /api/items/barcode/8901234567890': () => ({ status: 500, body: { code: 'server' } }),
+  });
+  renderAt('/items');
+  await screen.findByRole('table', { name: 'Items' });
+  scan('8901234567890');
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent("Couldn't look up the barcode 8901234567890");
+  expect(alert).not.toHaveTextContent('No item has');
+});
+
+test('saves with the version the form was loaded at, even after a newer copy arrives', async () => {
+  const fetchMock = stubApi({
+    ...base(),
+    // Someone else saved meanwhile: the answer to adding a code carries their version.
+    [`POST /api/items/${ITEM}/barcodes`]: () => ({
+      status: 201,
+      body: {
+        ...ATTA,
+        version: 9,
+        barcodes: [{ id: BRANCH, code: 'NEW-0001', packId: null, inStore: false }],
+      },
+    }),
+    [`PUT /api/items/${ITEM}`]: () => ({ status: 409, body: { code: 'stale' } }),
+  });
+  renderAt(`/items/${ITEM}`);
+  await userEvent.type(await screen.findByLabelText('New barcode'), 'NEW-0001');
+  await userEvent.click(screen.getByRole('button', { name: 'Add barcode' }));
+  await screen.findByText('NEW-0001');
+  await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => {
+    expect(sentTo(fetchMock, 'PUT', `/api/items/${ITEM}`)).toHaveLength(1);
+  });
+  expect(sentTo(fetchMock, 'PUT', `/api/items/${ITEM}`)[0]).toMatchObject({ version: 3 });
+});
+
+test('won’t archive over unsaved changes', async () => {
+  const fetchMock = stubApi(base());
+  renderAt(`/items/${ITEM}`);
+  await userEvent.type(await screen.findByLabelText('Brand'), ' Gold');
+  await userEvent.click(screen.getByRole('button', { name: 'Archive' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Save or undo your changes first');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(fetchMock.mock.calls.some(([url]) => url.endsWith('/archive'))).toBe(false);
+  expect(screen.getByLabelText('Brand')).toHaveValue('Aashirvaad Gold');
+});
+
+test('says a barcode is taken even when the answer doesn’t name the other item', async () => {
+  stubApi({
+    ...base(),
+    'POST /api/items': () => ({ status: 409, body: { code: 'barcode_taken' } }),
+  });
+  renderAt('/items/new?barcode=8901234567890');
+  await userEvent.type(await screen.findByLabelText('Name'), 'Pen');
+  const price = within(screen.getByRole('region', { name: 'Price and tax' }));
+  await userEvent.type(price.getByLabelText('Selling price (₹)'), '10');
+  await userEvent.selectOptions(price.getByLabelText('GST rate'), '18%');
+  await userEvent.type(price.getByLabelText('HSN code'), '9608');
+  await userEvent.click(screen.getByRole('button', { name: 'Add item' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Another item already has this barcode',
+  );
+});
+
+test('shows a catalogue error under the field or row it is about', async () => {
+  stubApi({
+    ...base(),
+    'GET /api/categories': () => ({
+      body: [{ id: BRANCH, name: 'Atta', archived: true }],
+    }),
+    [`POST /api/categories/${BRANCH}/restore`]: () => ({
+      status: 409,
+      body: { code: 'name_taken' },
+    }),
+    'POST /api/units': () => ({
+      status: 400,
+      body: { code: 'invalid_body', fields: { defaultSize: 'too_big' } },
+    }),
+  });
+  renderAt('/items?tab=catalogue');
+  const categories = within(await screen.findByRole('region', { name: 'Categories' }));
+  await userEvent.click(categories.getByRole('button', { name: 'Restore Atta' }));
+  const row = categories.getByText('Atta').closest('li');
+  expect(
+    await within(row as HTMLElement).findByText('This name is already used'),
+  ).toBeInTheDocument();
+  expect(categories.getByLabelText('New category')).not.toHaveAccessibleDescription();
+
+  const units = within(screen.getByRole('region', { name: 'Your own units' }));
+  await userEvent.type(units.getByLabelText('Unit name'), 'Crate');
+  await userEvent.type(units.getByLabelText('How many in one'), '24');
+  await userEvent.click(units.getByRole('button', { name: 'Add unit' }));
+  await waitFor(() => {
+    expect(units.getByLabelText('How many in one')).toHaveAccessibleDescription(
+      expect.stringContaining('This is too big') as string,
+    );
+  });
+  expect(units.getByLabelText('Unit name')).not.toHaveAccessibleDescription();
 });

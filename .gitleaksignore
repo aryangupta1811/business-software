@@ -1,0 +1,8 @@
+# gitleaks findings checked by hand and accepted (docs/devops/git-workflow.md, Secrets).
+# Each line is a finding's Fingerprint from the CI log: commit:file:rule:line.
+
+# 2026-11-20, P1.4 PR 2 (branch feat/p1.4-email-reset): a fake recovery key in tests,
+# the alphabet in order ('ABCD-EFGH-JKMN-PQRS-TVWX-YZ01-2345-6789'). Not a secret.
+717ae5a4742dd44d873225413dbac41914779d81:apps/web/src/routes/_public/recovery.test.tsx:generic-api-key:16
+717ae5a4742dd44d873225413dbac41914779d81:apps/web/src/settings/account-cards.test.tsx:generic-api-key:81
+851fca74e845a1f3483e79aa8cabf68a793514a7:apps/api/src/account/account.test.ts:generic-api-key:346

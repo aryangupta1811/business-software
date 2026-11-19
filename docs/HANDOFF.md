@@ -30,3 +30,4 @@ Overwritten at the end of every session. Older handoffs are in git history: `git
 - **Unverified:** the 1.5% GST rate (polished diamonds) vs CBIC's notification, before P1.13; the `item_name` collation on RDS.
 - Local leftovers: worktrees `../Business-software-lane1` (stage 7, merged) and `../Business-software-lane2-items` (P1.7, merged) can go; Docker volume of lane 2's `p17-items` database; branch `backup/p1.3-before-rewrite` (unpushed, differs from #27; owner to look).
 - EC2 and RDS are **stopped**.
+- **gitleaks and P1.4 PR 2's tests:** the fake recovery key `ABCD-EFGH-…-6789` trips `generic-api-key`, and CI's `secrets` job scans every pushed branch, so it failed PR #36. Its three fingerprints are in `.gitleaksignore`. Any new commit on that branch with the same value gets a new fingerprint: build the test key at runtime (e.g. from a helper) instead, so it doesn't look like a literal key.

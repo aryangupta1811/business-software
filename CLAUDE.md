@@ -71,5 +71,5 @@ Run from the repo root. Node 24+, pnpm 12.
 - Type-check: `pnpm typecheck`
 - Format: `pnpm format` (Prettier; `pnpm format:check` only reports)
 - Everything, before a commit: `pnpm check`
-- AWS sign-in (ADRs 0031, 0033): `aws login --profile business-software`, as the IAM user `admin`, never root. Always name the profile; Region `ap-south-1`. The AWS MCP server (`aws-mcp`) is read-only. Claude runs Terraform (`terraform plan`, cost stated, `apply` after my OK)
+- AWS sign-in (ADRs 0031, 0033): `aws login --profile business-software`, as the admin IAM user, never root. Always name the profile; Region `ap-south-1`. The AWS MCP server (`aws-mcp`) is read-only. Claude runs Terraform (`terraform plan`, cost stated, `apply` after my OK)
 - CI: five required checks on every PR (GitHub Actions, ADR 0024); how to read and reproduce a red one: `docs/devops/git-workflow.md`, CI

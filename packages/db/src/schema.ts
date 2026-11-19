@@ -336,6 +336,41 @@ export const sessions = pgTable(
   ],
 );
 
+/** What an emailed link does (Module 00 #30, #32). */
+export const AUTH_TOKEN_KINDS = ['confirm_email', 'reset_password'] as const;
+export type AuthTokenKind = (typeof AUTH_TOKEN_KINDS)[number];
+
+// A one-time link sent by email (P1.4 design, section 6). Only the hash is stored. Using a
+// token, or making a newer one, sets `used_at`; rows are kept, so the trail shows every link.
+export const authTokens = pgTable(
+  'auth_tokens',
+  {
+    id: id(),
+    businessId: businessId(),
+    userId: uuid('user_id').notNull(),
+    kind: text('kind').notNull(),
+    tokenHash: text('token_hash').notNull(),
+    createdAt: createdAt(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+  },
+  (t) => [
+    tenantPolicy(t.businessId),
+    foreignKey({
+      name: 'auth_tokens_user_fk',
+      columns: [t.businessId, t.userId],
+      foreignColumns: [users.businessId, users.id],
+    }),
+    // One open link per user and kind: a new link replaces the old one in the same transaction.
+    uniqueIndex('auth_tokens_one_open_per_user')
+      .on(t.businessId, t.userId, t.kind)
+      .where(sql`${t.usedAt} is null`),
+    check('auth_tokens_kind_check', sql`${t.kind} in (${literals(AUTH_TOKEN_KINDS)})`),
+    check('auth_tokens_token_hash_check', tokenHashCheck(t.tokenHash)),
+    check('auth_tokens_expiry_check', sql`${t.expiresAt} > ${t.createdAt}`),
+  ],
+);
+
 // ---- Items (P1.7, Module 01; design docs/plans/2026-11-19-p1.7-items-design.md) ----
 // Names sort with the `item_name` ICU collation (migration 0005): Latin before Devanagari,
 // numbers by value. Queries name it (`collate item_name`); the columns keep the default.

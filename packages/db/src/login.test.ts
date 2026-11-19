@@ -1,11 +1,11 @@
 // Integration test on a throwaway PostgreSQL (ADR 0013) for P1.4's database rules: D4 (only the
 // database sets an entry's id, business and time), the one cross-business read for login by
-// email, and the login columns and tables.
+// email, and the login columns and tables. P1.4 PR 2 adds the email links' tokens.
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createDatabase, type Database } from './client.js';
 import { recordEntry } from './entry-log.js';
-import { entryLog, sessions, users } from './schema.js';
+import { authTokens, entryLog, sessions, users } from './schema.js';
 import { withBusiness, withNewBusiness, type Transaction } from './tenancy.js';
 import { insertTestBusiness, startTestDatabase, type TestDatabase } from './testing.js';
 
@@ -196,6 +196,56 @@ describe('login database rules', () => {
       await expect(
         openSession(a, { userId: b.ownerId, tokenHash: 'c'.repeat(64) }),
       ).rejects.toMatchObject(failsWith('23503'));
+    });
+  });
+
+  // Email-confirmation and password-reset links (Module 00 #30, #32; design section 6).
+  describe('auth tokens', () => {
+    const addToken = (shop: Shop, overrides: Partial<typeof authTokens.$inferInsert> = {}) =>
+      withBusiness(runtime.db, shop.businessId, (tx) =>
+        tx.insert(authTokens).values({
+          businessId: shop.businessId,
+          userId: shop.ownerId,
+          kind: 'reset_password',
+          tokenHash: HASH,
+          expiresAt: new Date(Date.now() + 30 * 60_000),
+          ...overrides,
+        }),
+      );
+
+    it('keeps one open token per user and kind, and any number of used ones', async () => {
+      await addToken(a, { tokenHash: 'd'.repeat(64) });
+      await addToken(a, { kind: 'confirm_email', tokenHash: 'e'.repeat(64) });
+      await expect(addToken(a, { tokenHash: 'f'.repeat(64) })).rejects.toMatchObject(
+        failsWith('23505'),
+      );
+      await withBusiness(runtime.db, a.businessId, (tx) =>
+        tx
+          .update(authTokens)
+          .set({ usedAt: new Date() })
+          .where(sql`${authTokens.kind} = 'reset_password'`),
+      );
+      await addToken(a, { tokenHash: 'f'.repeat(64) });
+    });
+
+    it.each([
+      ['a kind it does not know', { kind: 'login' }],
+      ['a token that is not a hash', { tokenHash: 'plain-token' }],
+      ['an expiry before it was made', { expiresAt: new Date(Date.now() - 60_000) }],
+    ])('refuses %s', async (_name, overrides) => {
+      await expect(
+        addToken(b, overrides as Partial<typeof authTokens.$inferInsert>),
+      ).rejects.toMatchObject(failsWith('23514'));
+    });
+
+    it("refuses a token for another business's user, and hides other businesses' tokens", async () => {
+      await expect(
+        addToken(a, { userId: b.ownerId, tokenHash: '1'.repeat(64) }),
+      ).rejects.toMatchObject(failsWith('23503'));
+      const seen = await withBusiness(runtime.db, b.businessId, (tx) =>
+        tx.select().from(authTokens),
+      );
+      expect(seen).toEqual([]);
     });
   });
 });

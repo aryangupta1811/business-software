@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
-# Creates the app roles and database on RDS, once (ADR 0019). Run as root by install.sh on
-# every deploy; it does nothing when the business_software database already exists.
-# Uses the same packages/db/bootstrap/create-roles.sql as local Docker and the tests, run by
-# psql from the postgres:18 image as RDS's master user, over TLS that checks RDS's certificate.
+# Creates the app roles and database on RDS (ADR 0019), and the backup role (ADR 0037). Run as
+# root by install.sh on every deploy, before the migrations:
+# - create-roles.sql once: skipped when the business_software database already exists;
+# - create-backup-role.sql every time: it does nothing once app_backup exists, and gives a
+#   database made before it existed the role that migration 0007 needs.
+# Uses the same packages/db/bootstrap files as local Docker and the tests, run by psql from
+# the postgres:18 image as RDS's master user, over TLS that checks RDS's certificate.
 set -euo pipefail
 
 readonly region=ap-south-1
@@ -23,8 +26,10 @@ export PGPASSWORD
 
 psql() {
   docker run --rm -i -e PGPASSWORD -e APP_OWNER_PASSWORD -e APP_RUNTIME_PASSWORD \
+    -e APP_BACKUP_PASSWORD \
     -v "$dir/certs/rds-ca.pem:/certs/rds-ca.pem:ro" \
     -v "$dir/create-roles.sql:/sql/create-roles.sql:ro" \
+    -v "$dir/create-backup-role.sql:/sql/create-backup-role.sql:ro" \
     postgres:18 psql \
     "host=$host port=5432 dbname=postgres user=postgres_admin sslmode=verify-full sslrootcert=/certs/rds-ca.pem" \
     -v ON_ERROR_STOP=1 -X -q "$@"
@@ -32,14 +37,18 @@ psql() {
 
 exists=$(psql -At -c "select count(*) from pg_database where datname = 'business_software'")
 if [[ $exists == 1 ]]; then
-  echo "database: business_software already exists, nothing to do"
-  exit 0
+  echo "database: business_software already exists"
+else
+  # If an earlier run stopped halfway (roles made, database not), this fails at CREATE ROLE:
+  # finish by hand through Session Manager (docs/devops/terraform.md).
+  APP_OWNER_PASSWORD=$(param db/app-owner-password)
+  APP_RUNTIME_PASSWORD=$(param db/app-runtime-password)
+  export APP_OWNER_PASSWORD APP_RUNTIME_PASSWORD
+  psql -f /sql/create-roles.sql
+  echo "database: app roles and business_software created"
 fi
 
-# If an earlier run stopped halfway (roles made, database not), this fails at CREATE ROLE:
-# finish by hand through Session Manager (docs/devops/terraform.md).
-APP_OWNER_PASSWORD=$(param db/app-owner-password)
-APP_RUNTIME_PASSWORD=$(param db/app-runtime-password)
-export APP_OWNER_PASSWORD APP_RUNTIME_PASSWORD
-psql -f /sql/create-roles.sql
-echo "database: app roles and business_software created"
+APP_BACKUP_PASSWORD=$(param db/app-backup-password)
+export APP_BACKUP_PASSWORD
+psql -f /sql/create-backup-role.sql
+echo "database: backup role app_backup in place"

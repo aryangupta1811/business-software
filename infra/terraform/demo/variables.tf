@@ -66,7 +66,7 @@ variable "db_password_version" {
 }
 
 variable "app_password_version" {
-  description = "Bump by one to make new passwords for app_owner and app_runtime in SSM (then ALTER ROLE on RDS, see terraform.md)."
+  description = "Bump by one to make new passwords for app_owner, app_runtime and app_backup in SSM (then ALTER ROLE on RDS, see terraform.md)."
   type        = number
   default     = 1
 }
@@ -81,4 +81,10 @@ variable "nightly_stop_timezone" {
   description = "Time zone for nightly_stop_cron."
   type        = string
   default     = "Asia/Kolkata"
+}
+
+variable "backup_retention_days" {
+  description = "Days a nightly database backup is kept in S3 before it expires (ADR 0037); 30 more as an older version."
+  type        = number
+  default     = 90
 }

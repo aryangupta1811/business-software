@@ -1,0 +1,19 @@
+# The nightly database backup (ADR 0037), started by business-software-backup.timer or by
+# hand: systemctl start business-software-backup.service (scripts/deploy/backup.sh now).
+# Installed by install.sh into /etc/systemd/system.
+[Unit]
+Description=Business Software database backup to S3
+# Up to 20 tries in 30 minutes: after a boot, RDS is often still starting. Then give up and
+# stay failed (systemctl status and the journal show why).
+StartLimitIntervalSec=1800
+StartLimitBurst=20
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/business-software/backup.sh
+Restart=on-failure
+RestartSec=60
+TimeoutStartSec=900

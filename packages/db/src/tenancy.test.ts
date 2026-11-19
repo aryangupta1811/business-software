@@ -6,7 +6,7 @@ import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createDatabase, type Database } from './client.js';
 import { branches, businesses } from './schema.js';
-import { withBusiness, withNewBusiness } from './tenancy.js';
+import { alsoInBusiness, withBusiness, withNewBusiness, type Transaction } from './tenancy.js';
 import { startTestDatabase, testBranch, testBusiness, type TestDatabase } from './testing.js';
 
 // Drizzle wraps driver errors; the PostgreSQL error code is on `cause`.
@@ -143,6 +143,46 @@ describe('tenancy', () => {
     ]);
     expect(seenByA).toEqual([{ id: a.branchId }]);
     expect(seenByB).toEqual([{ id: b.branchId }]);
+  });
+
+  // P1.4: a login in one business ends the browser's session in another, in one transaction.
+  it('steps into another business inside one transaction, then back', async () => {
+    const names = (tx: Transaction) => tx.select({ name: businesses.name }).from(businesses);
+    const seen = await withBusiness(runtime.db, a.businessId, async (tx) => {
+      const before = await names(tx);
+      const inside = await alsoInBusiness(tx, b.businessId, names);
+      return { before, inside, after: await names(tx) };
+    });
+    expect(seen).toEqual({
+      before: [{ name: 'Shop A' }],
+      inside: [{ name: 'Shop B' }],
+      after: [{ name: 'Shop A' }],
+    });
+  });
+
+  it('steps back even when the work inside fails, and the failure rolls back both', async () => {
+    const renamed = withBusiness(runtime.db, a.businessId, async (tx) => {
+      await tx.update(branches).set({ name: 'A renamed' }).where(eq(branches.id, a.branchId));
+      const failed = await alsoInBusiness(tx, b.businessId, () => {
+        throw new Error('inside');
+      }).catch((error: unknown) => error);
+      expect(failed).toEqual(new Error('inside'));
+      expect(await tx.select({ id: businesses.id }).from(businesses)).toEqual([
+        { id: a.businessId },
+      ]);
+      await alsoInBusiness(tx, b.businessId, (inner) =>
+        inner.update(branches).set({ name: 'B renamed' }).where(eq(branches.id, b.branchId)),
+      );
+      throw new Error('outside');
+    });
+    await expect(renamed).rejects.toThrow('outside');
+    const [nameA] = await withBusiness(runtime.db, a.businessId, (tx) =>
+      tx.select({ name: branches.name }).from(branches),
+    );
+    const [nameB] = await withBusiness(runtime.db, b.businessId, (tx) =>
+      tx.select({ name: branches.name }).from(branches),
+    );
+    expect([nameA?.name, nameB?.name]).toEqual(['Shop A main', 'Shop B main']);
   });
 
   it('sees nothing for a business that does not exist', async () => {

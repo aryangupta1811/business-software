@@ -20,4 +20,4 @@ export {
   users,
   type SessionEndReason,
 } from './schema.js';
-export { withBusiness, withNewBusiness, type Transaction } from './tenancy.js';
+export { alsoInBusiness, withBusiness, withNewBusiness, type Transaction } from './tenancy.js';

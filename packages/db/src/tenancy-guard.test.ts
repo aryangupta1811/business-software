@@ -16,7 +16,9 @@ type Rule =
   | 'branch_fk'
   | 'tenant_fk'
   | 'kind'
-  | 'view';
+  | 'view'
+  | 'backup'
+  | 'backup_privileges';
 interface Violation {
   table: string;
   rule: Rule;
@@ -35,11 +37,13 @@ const appSchema = (n: string) =>
   `${n}.nspname <> 'information_schema' and ${n}.nspname not like 'pg\\_%'
    and ${n}.nspname <> all($1::name[])`;
 
-// One row per broken rule. Tables outside public are named with their schema. The policy must
-// be the only permissive one (permissive policies are ORed together) and match what
-// tenantPolicy() generates, as PostgreSQL prints it back; the tenant column is `id` on
-// businesses and business_id everywhere else. has_table_privilege counts grants to PUBLIC and
-// to any role app_runtime belongs to. $2 is the append-only list.
+// One row per broken rule. Tables outside public are named with their schema. Permissive
+// policies are ORed together, so a table has exactly the two tenantPolicies() generates, as
+// PostgreSQL prints them back: tenant_isolation (the tenant column is `id` on businesses and
+// business_id everywhere else) and backup_read (ADR 0037: SELECT, every row, app_backup only).
+// Without backup_read the nightly pg_dump, which runs with RLS on, would save the table empty.
+// has_table_privilege counts grants to PUBLIC and to any role the given role belongs to.
+// app_backup may read and nothing else. $2 is the append-only list.
 const violationsQuery = `
   with tables as (
     select c.oid, c.oid::regclass::text as relname, c.relrowsecurity, c.relforcerowsecurity,
@@ -65,7 +69,8 @@ const violationsQuery = `
     union all
     select t.relname, 'policy' from tables t
      where exists (select 1 from pg_policy p
-                    where p.polrelid = t.oid and p.polpermissive and p.polname <> 'tenant_isolation')
+                    where p.polrelid = t.oid and p.polpermissive
+                      and p.polname not in ('tenant_isolation', 'backup_read'))
         or not exists (
       select 1 from pg_policy p
        where p.polrelid = t.oid and p.polname = 'tenant_isolation'
@@ -74,6 +79,20 @@ const violationsQuery = `
          and pg_get_expr(p.polqual, p.polrelid) = format(
                '(%I = ( SELECT app_current_business_id() AS app_current_business_id))',
                t.tenant_column))
+    union all
+    select t.relname, 'backup' from tables t
+     where not exists (
+      select 1 from pg_policy p
+       where p.polrelid = t.oid and p.polname = 'backup_read'
+         and p.polcmd = 'r' and p.polpermissive and p.polroles = array['app_backup'::regrole::oid]
+         and pg_get_expr(p.polqual, p.polrelid) = 'true' and p.polwithcheck is null)
+    union all
+    select t.relname, 'backup_privileges' from tables t
+     where exists (select 1 from unnest(array['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE',
+                                              'REFERENCES', 'TRIGGER', 'MAINTAIN']) as p
+                    where has_table_privilege('app_backup', t.oid, p))
+        or exists (select 1 from unnest(array['INSERT', 'UPDATE', 'REFERENCES']) as p
+                    where has_any_column_privilege('app_backup', t.oid, p))
     union all
     select t.relname, 'business_id' from tables t
      where t.oid <> 'businesses'::regclass and not exists (
@@ -196,6 +215,18 @@ async function findRoleMemberships(pool: Pool): Promise<string[]> {
   return rows.map((row) => row.rolname);
 }
 
+// A role that inherits app_backup, or may SET ROLE to it, reads every business (ADR 0037).
+// A membership with neither (the ADMIN-only one PostgreSQL 16+ gives a non-superuser that
+// creates the role, like RDS's master user) passes on no rights.
+async function findBackupMembers(pool: Pool): Promise<string[]> {
+  const { rows } = await pool.query<{ rolname: string }>(
+    `select r.rolname from pg_auth_members m join pg_roles r on r.oid = m.member
+      where m.roleid = 'app_backup'::regrole and (m.inherit_option or m.set_option)
+      order by r.rolname collate "C"`,
+  );
+  return rows.map((row) => row.rolname);
+}
+
 const tenantColumn = 'business_id uuid not null references businesses(id)';
 const check = (column: string) => `${column} = (select app_current_business_id())`;
 const correctPolicy = (column = 'business_id') =>
@@ -208,8 +239,12 @@ interface Probe {
   force?: boolean;
   /** The policy after `AS PERMISSIVE`, or null for none. */
   policy?: string | null;
+  /** The backup_read policy after `AS PERMISSIVE`, or null for none. */
+  backup?: string | null;
   after?: string;
 }
+
+const correctBackupPolicy = 'for select to app_backup using (true)';
 
 // Each probe is a correct tenant table with exactly one thing broken.
 const probes: Probe[] = [
@@ -270,6 +305,20 @@ const probes: Probe[] = [
   },
   // Tenant tables outside public are checked too.
   { name: 'probe_schema.probe_other', enable: false },
+  // pg_dump with RLS on would save this table with no rows (ADR 0037).
+  { name: 'probe_no_backup_policy', backup: null },
+  // Every role, app_runtime included, would read every business.
+  { name: 'probe_backup_to_public', backup: 'for select to public using (true)' },
+  { name: 'probe_backup_for_all', backup: 'for all to app_backup using (true)' },
+  {
+    name: 'probe_backup_filtered',
+    backup: `for select to app_backup using (${check('business_id')})`,
+  },
+  { name: 'probe_backup_insert', after: 'grant insert on probe_backup_insert to app_backup' },
+  {
+    name: 'probe_backup_column_update',
+    after: 'grant update (id) on probe_backup_column_update to app_backup',
+  },
 ];
 
 async function createProbe(owner: Pool, probe: Probe): Promise<void> {
@@ -283,6 +332,10 @@ async function createProbe(owner: Pool, probe: Probe): Promise<void> {
   const policy = probe.policy === undefined ? correctPolicy() : probe.policy;
   if (policy !== null) {
     await owner.query(`create policy tenant_isolation on ${probe.name} as permissive ${policy}`);
+  }
+  const backup = probe.backup === undefined ? correctBackupPolicy : probe.backup;
+  if (backup !== null) {
+    await owner.query(`create policy backup_read on ${probe.name} as permissive ${backup}`);
   }
   if (probe.after) await owner.query(probe.after);
 }
@@ -317,6 +370,27 @@ describe('tenancy guard', () => {
     expect(await findRoleMemberships(owner)).toEqual([]);
   });
 
+  it('lets no role use the backup role', async () => {
+    expect(await findBackupMembers(owner)).toEqual([]);
+  });
+
+  it('reports a role that can use the backup role', async () => {
+    try {
+      await admin.query('create role probe_backup_member');
+      // ADMIN alone passes on no rights: the membership RDS's master user gets.
+      await admin.query(
+        'grant app_backup to probe_backup_member with admin true, inherit false, set false',
+      );
+      expect(await findBackupMembers(owner)).toEqual([]);
+      await admin.query('grant app_backup to probe_backup_member with inherit true');
+      expect(await findBackupMembers(owner)).toEqual(['probe_backup_member']);
+      await admin.query('grant app_backup to probe_backup_member with inherit false, set true');
+      expect(await findBackupMembers(owner)).toEqual(['probe_backup_member']);
+    } finally {
+      await admin.query('drop role if exists probe_backup_member');
+    }
+  });
+
   it('reports each broken probe table under the right rule', async () => {
     try {
       await admin.query('create role probe_role');
@@ -334,6 +408,11 @@ describe('tenancy guard', () => {
       const appendOnly = [...APPEND_ONLY, 'probe_append_only', 'probe_column_update'];
       expect(await findTenancyViolations(owner, appendOnly)).toEqual([
         { table: 'probe_append_only', rule: 'append_only' },
+        { table: 'probe_backup_column_update', rule: 'backup_privileges' },
+        { table: 'probe_backup_filtered', rule: 'backup' },
+        { table: 'probe_backup_for_all', rule: 'backup' },
+        { table: 'probe_backup_insert', rule: 'backup_privileges' },
+        { table: 'probe_backup_to_public', rule: 'backup' },
         { table: 'probe_branch_fk', rule: 'branch_fk' },
         { table: 'probe_branch_fk', rule: 'tenant_fk' },
         { table: 'probe_column_references', rule: 'privileges' },
@@ -343,6 +422,7 @@ describe('tenancy guard', () => {
         { table: 'probe_from_branch_fk', rule: 'tenant_fk' },
         { table: 'probe_inherited_delete', rule: 'privileges' },
         { table: 'probe_matview', rule: 'kind' },
+        { table: 'probe_no_backup_policy', rule: 'backup' },
         { table: 'probe_no_business_fk', rule: 'business_fk' },
         { table: 'probe_no_business_id', rule: 'business_id' },
         { table: 'probe_no_business_id', rule: 'policy' },
@@ -350,6 +430,8 @@ describe('tenancy guard', () => {
         { table: 'probe_no_policy', rule: 'policy' },
         { table: 'probe_no_rls', rule: 'rls' },
         { table: 'probe_nullable_business_id', rule: 'business_id' },
+        // PUBLIC is every role, the backup role too.
+        { table: 'probe_public_delete', rule: 'backup_privileges' },
         { table: 'probe_public_delete', rule: 'privileges' },
         { table: 'probe_schema.probe_other', rule: 'rls' },
         { table: 'probe_select_policy', rule: 'policy' },

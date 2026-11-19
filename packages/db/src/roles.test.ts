@@ -38,12 +38,19 @@ describe('app database roles', () => {
     await server.stop();
   });
 
-  it('gives neither app role superuser, BYPASSRLS, CREATEROLE or CREATEDB', async () => {
+  it('gives no app role superuser, BYPASSRLS, CREATEROLE or CREATEDB', async () => {
     const { rows } = await owner.query(
-      `select rolname, rolsuper, rolbypassrls, rolcreaterole, rolcreatedb
-         from pg_roles where rolname in ('app_owner', 'app_runtime') order by rolname`,
+      `select rolname, rolsuper, rolbypassrls, rolcreaterole, rolcreatedb from pg_roles
+        where rolname in ('app_backup', 'app_owner', 'app_runtime') order by rolname`,
     );
     expect(rows).toEqual([
+      {
+        rolname: 'app_backup',
+        rolsuper: false,
+        rolbypassrls: false,
+        rolcreaterole: false,
+        rolcreatedb: false,
+      },
       {
         rolname: 'app_owner',
         rolsuper: false,

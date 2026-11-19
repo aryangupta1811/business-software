@@ -11,6 +11,16 @@ How the demo database is backed up, how to check a backup works, and how to get 
 
 Use RDS's own copy for "undo the last few hours"; use the S3 copy for anything older, or if the RDS instance itself is gone.
 
+## What exists in AWS
+
+Applied 2026-11-19 with the owner's OK (`terraform apply`: 10 added, 0 changed, 0 destroyed; `infra/terraform/demo/backup.tf`):
+
+- the bucket: versioning on, AES256 encryption, all four public-access blocks on, ownership enforced, HTTPS-only policy, lifecycle 90 days + 30 as older versions (checked with `s3api` after the apply);
+- the server role's one extra permission, `s3:PutObject` under `postgres/`;
+- SSM `/business-software/demo/backup/bucket` (String) and `/business-software/demo/db/app-backup-password` (SecureString, write-only).
+
+**Cost:** S3 Standard in Mumbai is $0.025 per GB-month and $0.005 per 1,000 PUTs (Pricing API, 2026-11-19), so well under $0.10 a month at a few MB per dump; the rest is free. The bucket is empty until the first deploy after P1.4 installs the timer and creates `app_backup` on RDS.
+
 ## How the nightly backup works
 
 1. `business-software-backup.timer` on the server starts `business-software-backup.service`:

@@ -13,8 +13,10 @@ source "$(dirname "$0")/lib.sh"
 
 readonly service=business-software-backup.service
 
+# MSYS_NO_PATHCONV: Git Bash would turn the /business-software/… name into a Windows path
+# (C:/Program Files/Git/business-software/…) and SSM would answer ParameterNotFound.
 bucket() {
-  aws ssm get-parameter --profile "$profile" --region "$region" \
+  MSYS_NO_PATHCONV=1 aws ssm get-parameter --profile "$profile" --region "$region" \
     --name /business-software/demo/backup/bucket --query Parameter.Value --output text
 }
 

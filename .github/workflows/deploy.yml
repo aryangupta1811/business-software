@@ -9,8 +9,13 @@
 # was running before, checks again, and the job stays red.
 #
 # Run by hand (Actions → deploy → Run workflow) to deploy any commit already on main, which is
-# also the manual rollback. The same approval applies.
+# also the manual rollback. The same approval applies. An automatic run never deploys a commit
+# older than the running one (images runs can finish out of order); a run by hand may.
+#
+# Each run is named after its commit, so the list of green runs is the list of releases that
+# went live: to roll back by hand, run this with the commit of the green run before the bad one.
 name: deploy
+run-name: deploy ${{ github.event.workflow_run.head_sha || inputs.commit || 'main' }}
 
 on:
   workflow_run:
@@ -26,12 +31,6 @@ on:
 permissions:
   contents: read
 
-# One deploy at a time, never cancelled half-way. A newer deploy waiting in the queue replaces
-# an older one that hasn't started: only the newest commit is worth deploying.
-concurrency:
-  group: deploy-demo
-  cancel-in-progress: false
-
 jobs:
   deploy:
     # From the images workflow: only when it succeeded, for a commit on main.
@@ -40,7 +39,18 @@ jobs:
       (github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # One deploy at a time, never cancelled half-way. A newer deploy waiting in the queue
+    # replaces an older one that hasn't started: only the newest commit is worth deploying.
+    # On the job, not the workflow: a run whose job is skipped (images failed, or ran off main)
+    # must not join the queue and replace a real deploy waiting there.
+    concurrency:
+      group: deploy-demo
+      cancel-in-progress: false
+    # Above the worst case, so a timeout can never cut a rollback short (a job timeout cancels
+    # the job, and a cancelled job skips the rollback step): each slow step has its own limit,
+    # and a step that hits it fails, which the rollback does see. Worst case: release 3 +
+    # backup 20 + deploy 20 + live check 6 + rollback 25 = 74 minutes, plus a few for setup.
+    timeout-minutes: 85
     # The approval click: the environment requires the owner as reviewer and accepts main only.
     environment:
       name: demo
@@ -74,15 +84,16 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # The same check demo.sh makes (scripts/deploy/lib.sh), done first so nothing else runs
+      # for a commit that isn't on main.
       - name: Which commit
         id: commit
         env:
           FROM_IMAGES: ${{ github.event.workflow_run.head_sha }}
           FROM_INPUT: ${{ inputs.commit }}
         run: |
-          sha=$(git rev-parse --verify "${FROM_IMAGES:-${FROM_INPUT:-origin/main}}^{commit}")
-          git merge-base --is-ancestor "$sha" origin/main ||
-            { echo "::error::$sha is not on main"; exit 1; }
+          source scripts/deploy/lib.sh
+          sha=$(main_commit "${FROM_IMAGES:-${FROM_INPUT:-origin/main}}")
           echo "sha=$sha" >>"$GITHUB_OUTPUT"
           echo "Deploying $sha: $(git log -1 --format=%s "$sha")"
 
@@ -111,51 +122,61 @@ jobs:
       # What runs now is what a failed deploy goes back to. Empty on a server's first release.
       - name: Note the running release
         id: previous
+        timeout-minutes: 3
         run: |
           previous=$(scripts/deploy/current-release.sh)
           echo "sha=$previous" >>"$GITHUB_OUTPUT"
           echo "Running now: ${previous:-nothing}"
 
-      # Before anything changes (ADR 0037). If it fails, nothing is deployed.
+      # Images runs can finish out of order: an automatic deploy never takes the server back to
+      # an older commit. A run by hand may (that is the manual rollback).
+      - name: Not older than the running release
+        if: github.event_name == 'workflow_run'
+        env:
+          SHA: ${{ steps.commit.outputs.sha }}
+          RUNNING: ${{ steps.previous.outputs.sha }}
+        run: |
+          source scripts/deploy/lib.sh
+          not_older_than_running "$SHA" "$RUNNING"
+
+      # Before anything changes (ADR 0037). If it fails, nothing is deployed. The server stops
+      # a backup at 15 minutes; the step limit adds room for the polling.
       - name: Back up the database
+        timeout-minutes: 20
         run: scripts/deploy/backup.sh before-deploy
 
       - name: Deploy
         id: deploy
+        timeout-minutes: 20
         env:
           SHA: ${{ steps.commit.outputs.sha }}
         run: scripts/deploy/demo.sh "$SHA"
 
-      # Three tries, 15 s apart: Caddy and the API can need a moment after the restart, and a
-      # needless rollback costs more than the wait.
+      # Three tries (scripts/deploy/check-live.sh waits 15 s between them, not after the last).
       - name: Check the live site
         id: live
-        run: |
-          for try in 1 2 3; do
-            scripts/deploy/check-live.sh && exit 0
-            echo "live check failed (try $try of 3)"
-            sleep 15
-          done
-          exit 1
+        timeout-minutes: 6
+        run: scripts/deploy/check-live.sh --tries 3
 
       # Rollback: the previous release's images on the new schema, which works because every
       # migration is expand-then-contract (a step that drops what the old release uses waits
       # for a later release). The job stays red so the failure is seen.
+      # Only to a different commit: going "back" to the commit that just failed (a rerun of
+      # the running release) would redeploy it and could report it live.
       - name: Roll back to the release that was running
         if: >-
           failure() && steps.previous.outputs.sha != '' &&
+          steps.previous.outputs.sha != steps.commit.outputs.sha &&
           (steps.deploy.conclusion == 'failure' || steps.live.conclusion == 'failure')
+        timeout-minutes: 25
         env:
           PREVIOUS: ${{ steps.previous.outputs.sha }}
         run: |
           echo "::error::Deploy failed: rolling back to $PREVIOUS"
           scripts/deploy/demo.sh "$PREVIOUS"
-          for _ in 1 2 3; do
-            if scripts/deploy/check-live.sh; then
-              echo "::error::Rolled back to $PREVIOUS, which is live; the failed commit is not"
-              exit 1
-            fi
-            sleep 15
-          done
-          echo "::error::Rolled back to $PREVIOUS, but the live check still fails: look now"
+          if scripts/deploy/check-live.sh --tries 3; then
+            echo "::error::Rolled back to $PREVIOUS, which is live; the failed commit is not"
+          else
+            echo "::error::Rolled back to $PREVIOUS, but the live check still fails: look now"
+          fi
           exit 1

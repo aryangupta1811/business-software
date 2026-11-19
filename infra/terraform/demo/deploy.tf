@@ -6,9 +6,18 @@
 # "demo". That environment requires the owner's approval and accepts only main, so the
 # approval click is the manual go-ahead, and no pull request or other branch can deploy.
 #
-# What the role may do: start a shell script on this one server through Systems Manager, read
-# that command's output, and see whether the server is running. Nothing else: no Terraform,
-# no S3, no SSM parameters, no starting or stopping anything.
+# What the role may call: start a shell script on this one server through Systems Manager,
+# read that command's output, and see whether the server is running. No Terraform, no
+# starting or stopping anything, and no S3 or SSM parameter calls of its own.
+#
+# What that really amounts to: AWS-RunShellScript runs any command as root on the server, and
+# the server's own role can read the app's SSM SecureStrings and write backups to S3
+# (server.tf, backup.tf). So whoever holds this role's credentials can reach those too,
+# through the server. The real boundary is who can get the credentials: a job in the "demo"
+# environment (owner's approval, main only), running workflow code that is on main. A custom
+# SSM document that only runs install.sh <commit> would not narrow it much: install.sh runs
+# code from main as root anyway, so anyone able to merge to main has root on the server
+# (ADR 0012, 2026-11-20 note).
 
 # GitHub's token issuer, registered once in the account. AWS checks GitHub's certificate
 # against its own trusted authorities, so no thumbprint is needed.
@@ -61,9 +70,10 @@ data "aws_iam_policy_document" "deploy" {
     ]
   }
 
-  # Read the command's status and output. These two don't support resource-level rules.
+  # Read the command's status and output (scripts/deploy/lib.sh). It doesn't support
+  # resource-level rules.
   statement {
-    actions   = ["ssm:GetCommandInvocation", "ssm:ListCommandInvocations"]
+    actions   = ["ssm:GetCommandInvocation"]
     resources = ["*"]
   }
 

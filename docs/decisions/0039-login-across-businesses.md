@@ -1,7 +1,7 @@
 # 0039 — Login by email across businesses: an `auth` schema the app can't touch, two pinned definer functions
 
 - **Date:** 2026-11-19
-- **Status:** Accepted
+- **Status:** Accepted (owner's OK 2026-11-19)
 
 ## Context
 
@@ -38,6 +38,8 @@ Option A.
 It keeps the one cross-business read as narrow as a single question with a single answer, and every other step of login stays inside RLS. The database, not the API code, enforces that the app can't do more, and the guard test proves it on every run.
 
 ## Consequences
+
+- **Added 2026-11-19 (review of PR #33): one transaction may step into a second business.** Logging in to business B in a browser whose cookie holds a session of business A must end A's session in the same transaction that starts B's. `alsoInBusiness(tx, businessId, work)` in `packages/db/src/tenancy.ts` sets `app.business_id` to A for `work`, then back to B, even if `work` fails; RLS applies to each step as usual, and both commit or roll back together. It is for an action that spans two businesses by nature; tests prove it switches back and rolls back both.
 
 - Changing an owner's email (out of v1, design answer 11) will need a third function that updates the mapping in the same transaction.
 - PR 2's password reset by email and by recovery key finds the business through `app_find_owner_login` too.

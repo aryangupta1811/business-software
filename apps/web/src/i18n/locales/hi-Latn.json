@@ -175,6 +175,7 @@
       },
       "gstin": {
         "invalid": "GSTIN check karein: 15 akshar, state code se shuru",
+        "not_registered": "Jo business GST mein registered nahin hai, uska GSTIN nahin hota",
         "state_mismatch": "GSTIN ke pehle do ank state se milne chahiye",
         "pan_mismatch": "GSTIN mein PAN hona chahiye"
       },

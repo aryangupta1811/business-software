@@ -216,6 +216,8 @@ describe('settings', () => {
 
   it.each([
     ['/settings/business', { ...business, stateCode: '29' }, { gstin: 'state_mismatch' }],
+    // Module 00 #36 (G6).
+    ['/settings/business', { ...business, gstStatus: 'unregistered' }, { gstin: 'not_registered' }],
     [
       '/settings/security',
       { ownerLockMinutes: 31, staffIdleMinutes: 30 },

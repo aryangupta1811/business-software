@@ -175,6 +175,7 @@
       },
       "gstin": {
         "invalid": "Check the GSTIN: 15 characters, starting with the state code",
+        "not_registered": "A business that isn't registered for GST has no GSTIN",
         "state_mismatch": "The GSTIN's first two digits must match the state",
         "pan_mismatch": "The GSTIN must contain the PAN"
       },

@@ -175,6 +175,7 @@
       },
       "gstin": {
         "invalid": "GSTIN जाँचें: 15 अक्षर, राज्य कोड से शुरू",
+        "not_registered": "जो व्यवसाय GST में पंजीकृत नहीं है, उसका GSTIN नहीं होता",
         "state_mismatch": "GSTIN के पहले दो अंक राज्य से मिलने चाहिए",
         "pan_mismatch": "GSTIN में PAN होना चाहिए"
       },

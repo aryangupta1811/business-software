@@ -1658,3 +1658,9 @@ Entry format:
 ### 2026-11-19 — A scanner's keys and keyboard shortcuts share one keyboard `#frontend` `#gotcha` `#review`
 - **What happened:** `/` focuses the item search. A code containing `/` scanned with nothing focused triggered it mid-scan, so the rest of the code went into the search box. The scanner's listener now runs in the capture phase, before the shortcut registry, and stops any key that continues a burst already under way. The first test passed for the wrong reason: it fired every key at the page body and without the physical key code, so the shortcut never matched; the helper now sends keys to whatever has focus, with their codes, as a keyboard does.
 - **Say it in an interview:** "Scanners type through the keyboard, so shortcut keys can appear inside a barcode. I give the scanner first look at each key, and a key that continues a fast burst belongs to the scan."
+
+### 2026-11-19 — What a real-app check finds that tests don't `#frontend` `#testing`
+- **What happened:** After the tests and CI were green, I signed up a test business on my own database, logged in and used the Items page in Chrome: shortcuts, a simulated scan, prices and margin, errors in three languages, barcodes, archive and restore, light and dark, 1024 px. Everything worked, and the rows and entry log matched. It still found three wording problems no test could: a "Show archived" box that actually shows only archived items, a card promising packs that a kirana's settings hide, and one language missing the "Branch:" prefix the others had. Each got a test with the fix.
+- **Why / what I learned:** Tests check what I thought to ask; using the page as a shopkeeper checks what I didn't. A label that describes the code instead of the behaviour passes every test.
+- **Say it in an interview:** "Green CI isn't done. I use every feature once in a real browser against a real database before calling it finished, and anything I find becomes a test."
+

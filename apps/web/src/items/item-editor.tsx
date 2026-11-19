@@ -505,7 +505,10 @@ function StockCard({
   ];
 
   return (
-    <EditorCard title={t('items.cards.stock')} lead={t('items.cards.stockLead')}>
+    <EditorCard
+      title={t(showPacks ? 'items.cards.stock' : 'items.cards.stockOnly')}
+      lead={t(showPacks ? 'items.cards.stockLead' : 'items.cards.stockOnlyLead')}
+    >
       {showPacks && (
         <section aria-label={t('items.packs.title')} className="flex flex-col gap-3">
           <h3 className="font-medium">{t('items.packs.title')}</h3>

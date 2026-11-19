@@ -408,7 +408,7 @@
     "searchPlaceholder": "Name, code or barcode",
     "category": "Category",
     "allCategories": "All categories",
-    "showArchived": "Show archived",
+    "showArchived": "Archived only",
     "add": "Add item",
     "columns": {
       "name": "Name",
@@ -451,7 +451,9 @@
       "price": "Price and tax",
       "priceLead": "Prices are per stock unit. GST is worked out the way the bill will.",
       "stock": "Packs, barcodes and low stock",
-      "stockLead": "Other units it is sold or bought in, and when to warn that stock is low."
+      "stockLead": "Other units it is sold or bought in, and when to warn that stock is low.",
+      "stockOnly": "Barcodes and low stock",
+      "stockOnlyLead": "The codes printed on it, and when to warn that stock is low."
     },
     "fields": {
       "kind": "Type",
@@ -513,7 +515,7 @@
     },
     "levels": {
       "title": "Low-stock warning",
-      "for": "{{branch}}",
+      "for": "Branch: {{branch}}",
       "hint": "Warn when stock falls to this many {{unit}}. Blank: never."
     },
     "confirm": {

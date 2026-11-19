@@ -408,7 +408,7 @@
     "searchPlaceholder": "Naam, code ya barcode",
     "category": "Category",
     "allCategories": "Sabhi categories",
-    "showArchived": "Archived dikhayein",
+    "showArchived": "Sirf archived",
     "add": "Saamaan jodein",
     "columns": {
       "name": "Naam",
@@ -451,7 +451,9 @@
       "price": "Daam aur tax",
       "priceLead": "Daam stock ki ek unit ka hai. GST bill jaise hi gina jaata hai.",
       "stock": "Pack, barcode aur kam stock",
-      "stockLead": "Aur kin units mein bikta ya kharida jaata hai, aur kab kam stock ki chetavni dein."
+      "stockLead": "Aur kin units mein bikta ya kharida jaata hai, aur kab kam stock ki chetavni dein.",
+      "stockOnly": "Barcode aur kam stock",
+      "stockOnlyLead": "Is par chhape code, aur kab kam stock ki chetavni dein."
     },
     "fields": {
       "kind": "Prakaar",

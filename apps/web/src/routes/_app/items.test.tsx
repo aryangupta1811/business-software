@@ -184,6 +184,14 @@ test('shows the price with GST and the margin as you type, and warns above the M
   expect(price.getByRole('status')).toHaveTextContent('above the MRP');
 });
 
+test('without the packs feature, the last card is only about barcodes and low stock', async () => {
+  stubApi(base());
+  renderAt('/items/new');
+  const card = await screen.findByRole('region', { name: 'Barcodes and low stock' });
+  expect(within(card).queryByRole('button', { name: /pack/i })).toBeNull();
+  expect(within(card).getByLabelText('Branch: Main')).toBeInTheDocument();
+});
+
 test('hides the purchase price field without the permission, and never sends it', async () => {
   const fetchMock = stubApi({
     ...base({ ...OWNER, canViewCost: false }),
@@ -271,7 +279,7 @@ test('a scan after ticking a filter still counts', async () => {
     'GET /api/items/barcode/8901234567890': () => ({ body: { item: ATTA, packId: null } }),
   });
   const history = renderAt('/items');
-  const archived = await screen.findByRole('checkbox', { name: 'Show archived' });
+  const archived = await screen.findByRole('checkbox', { name: 'Archived only' });
   await userEvent.click(archived);
   expect(archived).toHaveFocus();
   scan('8901234567890');

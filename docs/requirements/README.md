@@ -12,9 +12,9 @@ Imported from the planning chat on claude.ai (29 Oct 2026). **This folder is now
 | 02 | Billing & GST | DECIDED (2026-11-17) | `02-billing-gst.md` |
 | 03 | Udhaar (customer credit) | DECIDED (2026-11-17) | `03-udhaar.md` |
 | 04 | Suppliers & purchases | DRAFT | `04-suppliers-purchases.md` |
-| 05 | Staff, attendance & salary | DRAFT | `05-staff-attendance-salary.md` |
-| 06 | Entry logs | DRAFT | `06-entry-logs.md` |
-| 07 | Alerts | DRAFT | `07-alerts.md` |
+| 05 | Staff, attendance & salary | DECIDED (2026-11-19) | `05-staff-attendance-salary.md` |
+| 06 | Entry logs | DECIDED (2026-11-19) | `06-entry-logs.md` |
+| 07 | Alerts | DECIDED (2026-11-19) | `07-alerts.md` |
 | 08 | Dashboard | DRAFT | `08-dashboard.md` |
 | 09 | AI assistant | DRAFT | `09-ai-assistant.md` |
 | — | Ideas not yet placed | Backlog | `ideas-backlog.md` |

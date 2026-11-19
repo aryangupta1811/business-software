@@ -30,9 +30,15 @@ const asBackupRole = {
   PGDATABASE: 'business_software',
 };
 
+// What restore-drill.sh creates in its throwaway container: an administrator with only what
+// RDS's master user has (not a superuser). A restore that only works for a superuser would
+// fail on RDS (PR #32 review), so the drill and these tests restore as this role.
+const rdsLikeAdmin = `create role rds_admin login createrole createdb;
+  alter database postgres owner to rds_admin`;
+
 /** An empty PostgreSQL holding restore-check.sh and the bootstrap files, like the drill's. */
-function startScratch(): Promise<StartedPostgreSqlContainer> {
-  return new PostgreSqlContainer(composePostgresImage())
+async function startScratch(): Promise<StartedPostgreSqlContainer> {
+  const scratch = await new PostgreSqlContainer(composePostgresImage())
     .withUsername('postgres')
     .withCopyFilesToContainer([
       { source: deployFile('restore-check.sh'), target: '/drill/restore-check.sh' },
@@ -40,11 +46,17 @@ function startScratch(): Promise<StartedPostgreSqlContainer> {
       { source: bootstrapFile('create-backup-role.sql'), target: '/drill/create-backup-role.sql' },
     ])
     .start();
+  const admin = await scratch.exec(
+    ['psql', '-X', '-v', 'ON_ERROR_STOP=1', '-d', 'postgres', '-c', rdsLikeAdmin],
+    { env: { PGUSER: 'postgres' } },
+  );
+  expect(admin.exitCode, admin.output).toBe(0);
+  return scratch;
 }
 
 function restoreCheck(scratch: StartedPostgreSqlContainer, counts = '/out/nightly.counts.tsv') {
   return scratch.exec(['bash', '/drill/restore-check.sh', '/out/nightly.dump', counts, '/drill'], {
-    env: { PGUSER: 'postgres' },
+    env: { PGUSER: 'rds_admin' },
   });
 }
 
@@ -132,6 +144,19 @@ describe('nightly backup and restore drill', () => {
         { env: { PGUSER: 'postgres' } },
       );
       expect(restored.output).toBe('Gupta Medical\nSharma Kirana\n');
+      // Owned as on the live server, so the app's grants and RLS work on the copy.
+      const owners = await scratch.exec(
+        [
+          'psql',
+          '-At',
+          '-d',
+          'business_software',
+          '-c',
+          "select distinct tableowner from pg_tables where schemaname in ('public', 'drizzle')",
+        ],
+        { env: { PGUSER: 'postgres' } },
+      );
+      expect(owners.output).toBe('app_owner\n');
     } finally {
       await scratch.stop();
     }

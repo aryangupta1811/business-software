@@ -11,9 +11,12 @@ dump_url=${1:?usage: restore-drill.sh <dump link> <counts link>}
 counts_url=${2:?usage: restore-drill.sh <dump link> <counts link>}
 readonly dir=/opt/business-software container=business-software-restore-drill
 
+# mktemp -d makes it 0700: only root reads the copy of the data. Docker runs `docker exec` as
+# root too, so the container needs no wider rights on it.
 work=$(mktemp -d /var/tmp/business-software-drill.XXXXXX)
 cleanup() {
-  docker rm -f "$container" >/dev/null 2>&1 || true
+  # -v: also the container's anonymous data volume, the restored copy.
+  docker rm -f -v "$container" >/dev/null 2>&1 || true
   rm -rf "$work"
 }
 trap cleanup EXIT
@@ -23,17 +26,32 @@ curl -fsS --max-time 60 -o "$work/backup.counts.tsv" "$counts_url"
 for file in restore-check.sh create-roles.sql create-backup-role.sql; do
   cp "$dir/$file" "$work/"
 done
-chmod -R a+rX "$work"
 
-# Data on a tmpfs: in memory, gone with the container. No port is published.
-docker run -d --name "$container" --tmpfs /var/lib/postgresql \
+# The data goes to the image's anonymous volume on disk, removed with the container. Not a
+# tmpfs: that is RAM, and the app shares this server's 2 GB. No port is published.
+docker run -d --name "$container" \
   -e POSTGRES_PASSWORD="$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')" \
   -v "$work:/drill:ro" postgres:18 >/dev/null
+ready=false
 for _ in $(seq 1 30); do
   # The image's first-start setup restarts the server once; wait for the final one.
-  docker exec "$container" pg_isready -q -h 127.0.0.1 2>/dev/null && break
+  if docker exec "$container" pg_isready -q -h 127.0.0.1 2>/dev/null; then
+    ready=true
+    break
+  fi
   sleep 2
 done
+if [[ $ready != true ]]; then
+  echo "restore drill: the throwaway PostgreSQL didn't start within 60 s:" >&2
+  docker logs --tail 20 "$container" >&2
+  exit 1
+fi
 
-docker exec -e PGUSER=postgres "$container" bash /drill/restore-check.sh \
+# Restore as RDS's master user would, not as the container's superuser: an administrator with
+# only LOGIN CREATEROLE CREATEDB that owns the postgres database (src/backup.test.ts does the
+# same). A restore that needs a superuser would pass here and fail on RDS.
+docker exec -e PGUSER=postgres "$container" psql -X -q -v ON_ERROR_STOP=1 -d postgres \
+  -c 'CREATE ROLE rds_admin LOGIN CREATEROLE CREATEDB' \
+  -c 'ALTER DATABASE postgres OWNER TO rds_admin'
+docker exec -e PGUSER=rds_admin "$container" bash /drill/restore-check.sh \
   /drill/backup.dump /drill/backup.counts.tsv /drill

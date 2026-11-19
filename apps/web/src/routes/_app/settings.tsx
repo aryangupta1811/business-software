@@ -35,8 +35,14 @@ import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Textarea } from '../../components/ui/textarea';
 import { useFieldError } from '../../lib/field-error';
+import { DevicesCard } from '../../settings/devices-card';
+import { PasswordCard } from '../../settings/password-card';
+import { RecoveryKeyCard } from '../../settings/recovery-key-card';
 
-/** Module 00 #8–16, #3 and #21/#29: the owner's settings, one card per save (design §8). */
+/**
+ * Module 00 #8–16, #3 and #21/#29: the owner's settings, one card per save (design §8). Then the
+ * login's own safety: password (#46), recovery key (#31) and remembered computers (#44).
+ */
 export const Route = createFileRoute('/_app/settings')({
   component: Settings,
   staticData: { titleKey: 'nav.settings' },
@@ -78,9 +84,17 @@ function Settings() {
   const view = settings.data;
   return (
     <div className="flex max-w-3xl flex-col gap-6">
-      <BusinessCard saved={view.business} />
-      <FeaturesCard saved={view.features} businessType={view.business.businessType} />
-      <SecurityCard saved={view.security} />
+      {/* Printing a new recovery key prints that card alone. */}
+      <div className="flex flex-col gap-6 print:hidden">
+        <BusinessCard saved={view.business} />
+        <FeaturesCard saved={view.features} businessType={view.business.businessType} />
+        <SecurityCard saved={view.security} />
+        <PasswordCard />
+      </div>
+      <RecoveryKeyCard businessName={view.business.businessName} />
+      <div className="print:hidden">
+        <DevicesCard />
+      </div>
     </div>
   );
 }

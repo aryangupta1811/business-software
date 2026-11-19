@@ -14,6 +14,8 @@ export const OWNER_SESSION: ActiveSession = {
   branch: { id: '00000000-0000-4000-8000-000000000003', name: 'Main shop' },
   csrfToken: 'made-up-csrf-token',
   idleMinutes: 5,
+  emailConfirmed: true,
+  emailLimited: false,
 };
 
 export const STAFF_SESSION: ActiveSession = {

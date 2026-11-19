@@ -14,9 +14,12 @@ import { Route as PublicRouteImport } from './routes/_public'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppDesignRouteImport } from './routes/_app/design'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as PublicForgotPasswordRouteImport } from './routes/_public/forgot-password'
 import { Route as PublicLoginRouteImport } from './routes/_public/login'
 import { Route as PublicSignupRouteImport } from './routes/_public/signup'
 import { Route as PublicSignupRecoveryKeyRouteImport } from './routes/_public/signup_.recovery-key'
+import { Route as PublicConfirmEmailBusinessIdTokenRouteImport } from './routes/_public/confirm-email.$businessId.$token'
+import { Route as PublicResetBusinessIdTokenRouteImport } from './routes/_public/reset.$businessId.$token'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -41,6 +44,11 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AppRoute,
 } as any)
+const PublicForgotPasswordRoute = PublicForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => PublicRoute,
+} as any)
 const PublicLoginRoute = PublicLoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -56,22 +64,40 @@ const PublicSignupRecoveryKeyRoute = PublicSignupRecoveryKeyRouteImport.update({
   path: '/signup/recovery-key',
   getParentRoute: () => PublicRoute,
 } as any)
+const PublicConfirmEmailBusinessIdTokenRoute =
+  PublicConfirmEmailBusinessIdTokenRouteImport.update({
+    id: '/confirm-email/$businessId/$token',
+    path: '/confirm-email/$businessId/$token',
+    getParentRoute: () => PublicRoute,
+  } as any)
+const PublicResetBusinessIdTokenRoute =
+  PublicResetBusinessIdTokenRouteImport.update({
+    id: '/reset/$businessId/$token',
+    path: '/reset/$businessId/$token',
+    getParentRoute: () => PublicRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/design': typeof AppDesignRoute
   '/settings': typeof AppSettingsRoute
+  '/forgot-password': typeof PublicForgotPasswordRoute
   '/login': typeof PublicLoginRoute
   '/signup': typeof PublicSignupRoute
   '/signup/recovery-key': typeof PublicSignupRecoveryKeyRoute
+  '/confirm-email/$businessId/$token': typeof PublicConfirmEmailBusinessIdTokenRoute
+  '/reset/$businessId/$token': typeof PublicResetBusinessIdTokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/design': typeof AppDesignRoute
   '/settings': typeof AppSettingsRoute
+  '/forgot-password': typeof PublicForgotPasswordRoute
   '/login': typeof PublicLoginRoute
   '/signup': typeof PublicSignupRoute
   '/signup/recovery-key': typeof PublicSignupRecoveryKeyRoute
+  '/confirm-email/$businessId/$token': typeof PublicConfirmEmailBusinessIdTokenRoute
+  '/reset/$businessId/$token': typeof PublicResetBusinessIdTokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -79,10 +105,13 @@ export interface FileRoutesById {
   '/_public': typeof PublicRouteWithChildren
   '/_app/design': typeof AppDesignRoute
   '/_app/settings': typeof AppSettingsRoute
+  '/_public/forgot-password': typeof PublicForgotPasswordRoute
   '/_public/login': typeof PublicLoginRoute
   '/_public/signup': typeof PublicSignupRoute
   '/_app/': typeof AppIndexRoute
   '/_public/signup_/recovery-key': typeof PublicSignupRecoveryKeyRoute
+  '/_public/confirm-email/$businessId/$token': typeof PublicConfirmEmailBusinessIdTokenRoute
+  '/_public/reset/$businessId/$token': typeof PublicResetBusinessIdTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -90,27 +119,36 @@ export interface FileRouteTypes {
     | '/'
     | '/design'
     | '/settings'
+    | '/forgot-password'
     | '/login'
     | '/signup'
     | '/signup/recovery-key'
+    | '/confirm-email/$businessId/$token'
+    | '/reset/$businessId/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/design'
     | '/settings'
+    | '/forgot-password'
     | '/login'
     | '/signup'
     | '/signup/recovery-key'
+    | '/confirm-email/$businessId/$token'
+    | '/reset/$businessId/$token'
   id:
     | '__root__'
     | '/_app'
     | '/_public'
     | '/_app/design'
     | '/_app/settings'
+    | '/_public/forgot-password'
     | '/_public/login'
     | '/_public/signup'
     | '/_app/'
     | '/_public/signup_/recovery-key'
+    | '/_public/confirm-email/$businessId/$token'
+    | '/_public/reset/$businessId/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -155,6 +193,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_public/forgot-password': {
+      id: '/_public/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof PublicForgotPasswordRouteImport
+      parentRoute: typeof PublicRoute
+    }
     '/_public/login': {
       id: '/_public/login'
       path: '/login'
@@ -176,6 +221,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PublicSignupRecoveryKeyRouteImport
       parentRoute: typeof PublicRoute
     }
+    '/_public/confirm-email/$businessId/$token': {
+      id: '/_public/confirm-email/$businessId/$token'
+      path: '/confirm-email/$businessId/$token'
+      fullPath: '/confirm-email/$businessId/$token'
+      preLoaderRoute: typeof PublicConfirmEmailBusinessIdTokenRouteImport
+      parentRoute: typeof PublicRoute
+    }
+    '/_public/reset/$businessId/$token': {
+      id: '/_public/reset/$businessId/$token'
+      path: '/reset/$businessId/$token'
+      fullPath: '/reset/$businessId/$token'
+      preLoaderRoute: typeof PublicResetBusinessIdTokenRouteImport
+      parentRoute: typeof PublicRoute
+    }
   }
 }
 
@@ -194,15 +253,22 @@ const AppRouteChildren: AppRouteChildren = {
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 interface PublicRouteChildren {
+  PublicForgotPasswordRoute: typeof PublicForgotPasswordRoute
   PublicLoginRoute: typeof PublicLoginRoute
   PublicSignupRoute: typeof PublicSignupRoute
   PublicSignupRecoveryKeyRoute: typeof PublicSignupRecoveryKeyRoute
+  PublicConfirmEmailBusinessIdTokenRoute: typeof PublicConfirmEmailBusinessIdTokenRoute
+  PublicResetBusinessIdTokenRoute: typeof PublicResetBusinessIdTokenRoute
 }
 
 const PublicRouteChildren: PublicRouteChildren = {
+  PublicForgotPasswordRoute: PublicForgotPasswordRoute,
   PublicLoginRoute: PublicLoginRoute,
   PublicSignupRoute: PublicSignupRoute,
   PublicSignupRecoveryKeyRoute: PublicSignupRecoveryKeyRoute,
+  PublicConfirmEmailBusinessIdTokenRoute:
+    PublicConfirmEmailBusinessIdTokenRoute,
+  PublicResetBusinessIdTokenRoute: PublicResetBusinessIdTokenRoute,
 }
 
 const PublicRouteWithChildren =

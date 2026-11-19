@@ -79,7 +79,7 @@ describe('newItemSchema', () => {
   });
 
   it('keeps the zero-width joiner Hindi spelling needs', () => {
-    const name = 'क्‍ष';
+    const name = 'क्\u200dष';
     expect(newItemSchema.parse({ ...item, hindiName: name }).hindiName).toBe(name);
   });
 
@@ -87,7 +87,7 @@ describe('newItemSchema', () => {
     [{ name: '' }, { name: 'required' }],
     [{ name: 'x'.repeat(101) }, { name: 'too_long' }],
     [{ name: 'Atta\u0000' }, { name: 'control_character' }],
-    [{ name: 'Atta‮' }, { name: 'control_character' }],
+    [{ name: 'Atta\u202e' }, { name: 'control_character' }],
     [{ kind: 'gift' }, { kind: 'invalid' }],
     [{ kind: null }, { kind: 'choose' }],
     [{ stockUnit: 'crate' }, { stockUnit: 'invalid' }],

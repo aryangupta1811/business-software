@@ -4,6 +4,11 @@ export interface ApiConfig {
   host: string;
   port: number;
   jsonLogs: boolean;
+  /**
+   * Cookies get `Secure` and `__Host-` names (ADR 0009). True unless COOKIE_SECURE=false, which
+   * only plain-HTTP local development sets.
+   */
+  cookieSecure?: boolean;
 }
 
 /**
@@ -25,6 +30,12 @@ function readHost(value: string | undefined): string {
   return value;
 }
 
+function readCookieSecure(value: string | undefined): boolean {
+  if (value === undefined || value === 'true') return true;
+  if (value === 'false') return false;
+  throw new Error('COOKIE_SECURE must be true or false');
+}
+
 function readPort(value: string | undefined): number {
   if (value === undefined) return 3000;
   const port = Number(value);
@@ -41,5 +52,6 @@ export function loadConfig(env: NodeJS.ProcessEnv): ApiConfig {
     host: readHost(env.HOST),
     port: readPort(env.PORT),
     jsonLogs: env.NODE_ENV === 'production',
+    cookieSecure: readCookieSecure(env.COOKIE_SECURE),
   };
 }

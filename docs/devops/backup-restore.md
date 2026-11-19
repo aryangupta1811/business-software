@@ -17,7 +17,7 @@ Applied 2026-11-19 with the owner's OK (`terraform apply`: 10 added, 0 changed, 
 
 - the bucket: versioning on, AES256 encryption, all four public-access blocks on, ownership enforced, HTTPS-only policy, lifecycle 90 days + 30 as older versions (checked with `s3api` after the apply);
 - the server role's one extra permission, `s3:PutObject` under `postgres/`;
-- **not yet applied** (PR #32 review, waiting for the owner's OK): a bucket-policy statement that refuses any write without `If-None-Match: *`, so no backup can be overwritten (see below);
+- applied 2026-11-19 with the owner's OK (0 added, 1 changed, 0 destroyed; $0), after the PR #32 review: a bucket-policy statement `DenyOverwrites` that refuses any write without `If-None-Match: *`, so no backup can be overwritten (see below);
 - SSM `/business-software/demo/backup/bucket` (String) and `/business-software/demo/db/app-backup-password` (SecureString, write-only).
 
 **Cost:** S3 Standard in Mumbai is $0.025 per GB-month and $0.005 per 1,000 PUTs (Pricing API, 2026-11-19), so well under $0.10 a month at a few MB per dump; the rest is free. The bucket is empty until the first deploy after P1.4 installs the timer and creates `app_backup` on RDS.
@@ -97,6 +97,6 @@ The roles themselves aren't in the dump (RDS forbids reading role passwords): `c
 ## Gotchas
 
 - **`--enable-row-security` is required, and dangerous.** Without it, `pg_dump` as `app_backup` fails; with it, a table missing its `backup_read` policy is dumped with no rows. The guard test (CI) and `dump.sh`'s own check stop that, so don't remove either.
-- **A new schema breaks the backup on purpose.** `app_backup` can read only what migration 0006 granted (public and drizzle). pgboss (P2.7) must be granted or excluded deliberately.
-- **Not before migration 0006 is deployed.** The backup needs `app_backup` and its grants on RDS, which arrive with the first deploy after P1.4 (deploy hold).
+- **A new schema breaks the backup on purpose.** `app_backup` can read only what migration 0007 granted (public, drizzle and auth: `auth.owner_logins` maps an owner's email to the business, and without it no restored owner could log in). pgboss (P2.7) must be granted or excluded deliberately.
+- **Not before migration 0007 is deployed.** The backup needs `app_backup` and its grants on RDS, which arrive with the first deploy after P1.4 (deploy hold).
 - **The drill's pre-signed links stay in Systems Manager's command history** (expired after 15 minutes). They grant read access to those two files only.

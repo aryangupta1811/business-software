@@ -1,5 +1,5 @@
 {
-  "id": "c12434d9-7622-4762-a7fb-906fdf1caca9",
+  "id": "08590896-0453-4179-ab27-4b190231ba80",
   "prevId": "3fa24d1f-7bc2-4bad-8e96-4a5291871388",
   "version": "7",
   "dialect": "postgresql",
@@ -115,15 +115,6 @@
           ],
           "using": "\"branches\".\"business_id\" = (select app_current_business_id())",
           "withCheck": "\"branches\".\"business_id\" = (select app_current_business_id())"
-        },
-        "backup_read": {
-          "name": "backup_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": [
-            "app_backup"
-          ],
-          "using": "true"
         }
       },
       "checkConstraints": {
@@ -236,15 +227,6 @@
           ],
           "using": "\"businesses\".\"id\" = (select app_current_business_id())",
           "withCheck": "\"businesses\".\"id\" = (select app_current_business_id())"
-        },
-        "backup_read": {
-          "name": "backup_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": [
-            "app_backup"
-          ],
-          "using": "true"
         }
       },
       "checkConstraints": {
@@ -384,21 +366,159 @@
           ],
           "using": "\"categories\".\"business_id\" = (select app_current_business_id())",
           "withCheck": "\"categories\".\"business_id\" = (select app_current_business_id())"
-        },
-        "backup_read": {
-          "name": "backup_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": [
-            "app_backup"
-          ],
-          "using": "true"
         }
       },
       "checkConstraints": {
         "categories_name_check": {
           "name": "categories_name_check",
           "value": "char_length(\"categories\".\"name\") between 1 and 60"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.devices": {
+      "name": "devices",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuidv7()"
+        },
+        "business_id": {
+          "name": "business_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "branch_id": {
+          "name": "branch_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "registered_by": {
+          "name": "registered_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "devices_business_id_businesses_id_fk": {
+          "name": "devices_business_id_businesses_id_fk",
+          "tableFrom": "devices",
+          "tableTo": "businesses",
+          "columnsFrom": [
+            "business_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "devices_branch_fk": {
+          "name": "devices_branch_fk",
+          "tableFrom": "devices",
+          "tableTo": "branches",
+          "columnsFrom": [
+            "business_id",
+            "branch_id"
+          ],
+          "columnsTo": [
+            "business_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "devices_registered_by_fk": {
+          "name": "devices_registered_by_fk",
+          "tableFrom": "devices",
+          "tableTo": "users",
+          "columnsFrom": [
+            "business_id",
+            "registered_by"
+          ],
+          "columnsTo": [
+            "business_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "devices_business_id_id_unique": {
+          "name": "devices_business_id_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "business_id",
+            "id"
+          ]
+        },
+        "devices_business_id_token_hash_unique": {
+          "name": "devices_business_id_token_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "business_id",
+            "token_hash"
+          ]
+        }
+      },
+      "policies": {
+        "tenant_isolation": {
+          "name": "tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "using": "\"devices\".\"business_id\" = (select app_current_business_id())",
+          "withCheck": "\"devices\".\"business_id\" = (select app_current_business_id())"
+        }
+      },
+      "checkConstraints": {
+        "devices_token_hash_check": {
+          "name": "devices_token_hash_check",
+          "value": "\"devices\".\"token_hash\" ~ '^[0-9a-f]{64}$'"
         }
       },
       "isRLSEnabled": false
@@ -535,15 +655,6 @@
           ],
           "using": "\"entry_log\".\"business_id\" = (select app_current_business_id())",
           "withCheck": "\"entry_log\".\"business_id\" = (select app_current_business_id())"
-        },
-        "backup_read": {
-          "name": "backup_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": [
-            "app_backup"
-          ],
-          "using": "true"
         }
       },
       "checkConstraints": {},
@@ -689,15 +800,6 @@
           ],
           "using": "\"item_barcodes\".\"business_id\" = (select app_current_business_id())",
           "withCheck": "\"item_barcodes\".\"business_id\" = (select app_current_business_id())"
-        },
-        "backup_read": {
-          "name": "backup_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": [
-            "app_backup"
-          ],
-          "using": "true"
         }
       },
       "checkConstraints": {
@@ -827,15 +929,6 @@
           ],
           "using": "\"item_branch_levels\".\"business_id\" = (select app_current_business_id())",
           "withCheck": "\"item_branch_levels\".\"business_id\" = (select app_current_business_id())"
-        },
-        "backup_read": {
-          "name": "backup_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": [
-            "app_backup"
-          ],
-          "using": "true"
         }
       },
       "checkConstraints": {
@@ -1038,15 +1131,6 @@
           ],
           "using": "\"item_units\".\"business_id\" = (select app_current_business_id())",
           "withCheck": "\"item_units\".\"business_id\" = (select app_current_business_id())"
-        },
-        "backup_read": {
-          "name": "backup_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": [
-            "app_backup"
-          ],
-          "using": "true"
         }
       },
       "checkConstraints": {
@@ -1318,15 +1402,6 @@
           ],
           "using": "\"items\".\"business_id\" = (select app_current_business_id())",
           "withCheck": "\"items\".\"business_id\" = (select app_current_business_id())"
-        },
-        "backup_read": {
-          "name": "backup_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": [
-            "app_backup"
-          ],
-          "using": "true"
         }
       },
       "checkConstraints": {
@@ -1482,21 +1557,229 @@
           ],
           "using": "\"recovery_keys\".\"business_id\" = (select app_current_business_id())",
           "withCheck": "\"recovery_keys\".\"business_id\" = (select app_current_business_id())"
-        },
-        "backup_read": {
-          "name": "backup_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": [
-            "app_backup"
-          ],
-          "using": "true"
         }
       },
       "checkConstraints": {
         "recovery_keys_key_hash_check": {
           "name": "recovery_keys_key_hash_check",
           "value": "\"recovery_keys\".\"key_hash\" ~ '^[0-9a-f]{64}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.sessions": {
+      "name": "sessions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuidv7()"
+        },
+        "business_id": {
+          "name": "business_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "branch_id": {
+          "name": "branch_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "csrf_hash": {
+          "name": "csrf_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_active_at": {
+          "name": "last_active_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "locked_at": {
+          "name": "locked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ended_at": {
+          "name": "ended_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "end_reason": {
+          "name": "end_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "sessions_open_by_user": {
+          "name": "sessions_open_by_user",
+          "columns": [
+            {
+              "expression": "business_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"sessions\".\"ended_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "sessions_business_id_businesses_id_fk": {
+          "name": "sessions_business_id_businesses_id_fk",
+          "tableFrom": "sessions",
+          "tableTo": "businesses",
+          "columnsFrom": [
+            "business_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "sessions_user_fk": {
+          "name": "sessions_user_fk",
+          "tableFrom": "sessions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "business_id",
+            "user_id"
+          ],
+          "columnsTo": [
+            "business_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "sessions_branch_fk": {
+          "name": "sessions_branch_fk",
+          "tableFrom": "sessions",
+          "tableTo": "branches",
+          "columnsFrom": [
+            "business_id",
+            "branch_id"
+          ],
+          "columnsTo": [
+            "business_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "sessions_device_fk": {
+          "name": "sessions_device_fk",
+          "tableFrom": "sessions",
+          "tableTo": "devices",
+          "columnsFrom": [
+            "business_id",
+            "device_id"
+          ],
+          "columnsTo": [
+            "business_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "sessions_business_id_token_hash_unique": {
+          "name": "sessions_business_id_token_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "business_id",
+            "token_hash"
+          ]
+        }
+      },
+      "policies": {
+        "tenant_isolation": {
+          "name": "tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "using": "\"sessions\".\"business_id\" = (select app_current_business_id())",
+          "withCheck": "\"sessions\".\"business_id\" = (select app_current_business_id())"
+        }
+      },
+      "checkConstraints": {
+        "sessions_token_hash_check": {
+          "name": "sessions_token_hash_check",
+          "value": "\"sessions\".\"token_hash\" ~ '^[0-9a-f]{64}$'"
+        },
+        "sessions_csrf_hash_check": {
+          "name": "sessions_csrf_hash_check",
+          "value": "\"sessions\".\"csrf_hash\" ~ '^[0-9a-f]{64}$'"
+        },
+        "sessions_end_reason_check": {
+          "name": "sessions_end_reason_check",
+          "value": "\"sessions\".\"end_reason\" in ('logout', 'idle', 'replaced', 'password_changed', 'deactivated', 'reset')"
+        },
+        "sessions_ended_check": {
+          "name": "sessions_ended_check",
+          "value": "(\"sessions\".\"ended_at\" is null) = (\"sessions\".\"end_reason\" is null)"
+        },
+        "sessions_user_agent_check": {
+          "name": "sessions_user_agent_check",
+          "value": "length(\"sessions\".\"user_agent\") <= 200"
         }
       },
       "isRLSEnabled": false
@@ -1624,15 +1907,6 @@
           ],
           "using": "\"units\".\"business_id\" = (select app_current_business_id())",
           "withCheck": "\"units\".\"business_id\" = (select app_current_business_id())"
-        },
-        "backup_read": {
-          "name": "backup_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": [
-            "app_backup"
-          ],
-          "using": "true"
         }
       },
       "checkConstraints": {
@@ -1693,6 +1967,30 @@
         "password_hash": {
           "name": "password_hash",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "username": {
+          "name": "username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email_confirmed_at": {
+          "name": "email_confirmed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password_changed_at": {
+          "name": "password_changed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deactivated_at": {
+          "name": "deactivated_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
@@ -1762,6 +2060,14 @@
             "business_id",
             "id"
           ]
+        },
+        "users_business_id_username_unique": {
+          "name": "users_business_id_username_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "business_id",
+            "username"
+          ]
         }
       },
       "policies": {
@@ -1774,15 +2080,6 @@
           ],
           "using": "\"users\".\"business_id\" = (select app_current_business_id())",
           "withCheck": "\"users\".\"business_id\" = (select app_current_business_id())"
-        },
-        "backup_read": {
-          "name": "backup_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": [
-            "app_backup"
-          ],
-          "using": "true"
         }
       },
       "checkConstraints": {
@@ -1797,6 +2094,14 @@
         "users_owner_email_check": {
           "name": "users_owner_email_check",
           "value": "\"users\".\"role\" <> 'owner' or \"users\".\"email\" is not null"
+        },
+        "users_username_check": {
+          "name": "users_username_check",
+          "value": "\"users\".\"username\" ~ '^[a-z0-9._-]{3,32}$'"
+        },
+        "users_owner_username_check": {
+          "name": "users_owner_username_check",
+          "value": "\"users\".\"role\" <> 'owner' or \"users\".\"username\" is null"
         }
       },
       "isRLSEnabled": false

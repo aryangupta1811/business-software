@@ -127,6 +127,8 @@ describe('nightly backup and restore drill', () => {
     expect(counts.output).toContain('businesses\t2\n');
     expect(counts.output).toContain('branches\t2\n');
     expect(counts.output).toContain('users\t2\n');
+    // Login by email needs these (ADR 0039): without them a restored shop's owners can't log in.
+    expect(counts.output).toContain('auth.owner_logins\t2\n');
     expect(counts.output).toMatch(/^drizzle\.__drizzle_migrations\t[1-9]\d*$/m);
     expect(dump.output).toMatch(/^dump: \d+ tables, \d+ rows, \d+ bytes$/m);
   });
@@ -144,6 +146,22 @@ describe('nightly backup and restore drill', () => {
         { env: { PGUSER: 'postgres' } },
       );
       expect(restored.output).toBe('Gupta Medical\nSharma Kirana\n');
+      // And both owners can still log in by email: auth.owner_logins came back, mapped right.
+      const logins = await scratch.exec(
+        [
+          'psql',
+          '-At',
+          '-d',
+          'business_software',
+          '-c',
+          `select b.name from auth.owner_logins o
+             join businesses b on b.id = o.business_id
+             join users u on u.business_id = o.business_id and u.id = o.user_id and u.email = o.email
+            order by 1`,
+        ],
+        { env: { PGUSER: 'postgres' } },
+      );
+      expect(logins.output).toBe('Gupta Medical\nSharma Kirana\n');
       // Owned as on the live server, so the app's grants and RLS work on the copy.
       const owners = await scratch.exec(
         [
@@ -152,7 +170,7 @@ describe('nightly backup and restore drill', () => {
           '-d',
           'business_software',
           '-c',
-          "select distinct tableowner from pg_tables where schemaname in ('public', 'drizzle')",
+          "select distinct tableowner from pg_tables where schemaname in ('public', 'drizzle', 'auth')",
         ],
         { env: { PGUSER: 'postgres' } },
       );

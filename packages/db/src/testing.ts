@@ -3,6 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
+import { sql } from 'drizzle-orm';
 import { runMigrations } from './migrate.js';
 import { branches, businesses, users } from './schema.js';
 import type { Transaction } from './tenancy.js';
@@ -98,5 +99,7 @@ export async function insertTestBusiness(
     .values({ businessId, role: 'owner', email: `owner-${businessId}@example.test` })
     .returning({ id: users.id });
   if (branch === undefined || owner === undefined) throw new Error('no row returned');
+  // As signup does: the owner's email finds the business at login (P1.4).
+  await tx.execute(sql`select app_register_owner_login(${owner.id})`);
   return { businessId, branchId: branch.id, ownerId: owner.id };
 }

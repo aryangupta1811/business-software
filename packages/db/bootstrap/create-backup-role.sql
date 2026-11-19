@@ -5,14 +5,14 @@
 -- BYPASSRLS role reads all of them, and RDS's master user is neither (AWS lists Bypass RLS
 -- only on rdsadmin). Instead, every tenant table has a policy `backup_read`: SELECT for this
 -- role, every row (packages/db/src/schema.ts, checked by src/tenancy-guard.test.ts). Its table
--- grants (SELECT only) come from migration 0006.
+-- grants (SELECT only) come from migration 0007.
 --
 -- Safe to run more than once: it creates the role only when missing, and sets everything else
 -- on every run, so a run that stopped half-way, or a new password in SSM, is put right by the
 -- next one. Run after create-roles.sql, by the same administrator:
 --   - Docker and the tests run it as 20-create-backup-role.sql, after 10-create-roles.sql.
 --   - On RDS, deploy/demo/bootstrap-db.sh runs it on every deploy, so a database made before
---     this file existed gets the role before migration 0006 needs it.
+--     this file existed gets the role before migration 0007 needs it.
 -- The password comes from APP_BACKUP_PASSWORD. Without it the role can't log in with a
 -- password (fine on a laptop, where only the local superuser takes backups).
 

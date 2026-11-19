@@ -80,17 +80,18 @@ The server and database run only during sessions and stop at 23:30 IST at the la
     - the exact `backup_read` policy is there;
     - `app_backup` has no write right;
     - no role inherits `app_backup` or may `SET ROLE` to it.
-- **Migration order:** migration 0006 needs the role to exist first. `create-backup-role.sql` runs:
+- **Migration order:** migration 0007 needs the role to exist first. `create-backup-role.sql` runs:
   - after `create-roles.sql` in Docker and the tests;
   - on every deploy (`bootstrap-db.sh`, idempotent).
 - **Existing local volumes:** they need it once by hand (`docs/devops/local-database.md`).
 - **A new schema** that `app_backup` can't read (`pgboss`, P2.7) makes the backup fail loudly. P2.7 decides: grant it, or exclude it.
-- **The deploy hold applies:** the backup can only run on RDS after migration 0006 is deployed, which waits for P1.4. Until then the live server runs the skeleton, which stores no business data.
+- **The deploy hold applies:** the backup can only run on RDS after migration 0007 is deployed, which waits for P1.4. Until then the live server runs the skeleton, which stores no business data.
 - **Worst case lost:** what changed since the last backup, if RDS itself is lost. RDS's own 1-day point-in-time restore covers that window while the instance exists, so `scripts/deploy/backup.sh now` before stopping closes most of the gap.
 - **Review fixes (2026-11-19, PR #32), same decision, tighter:**
   - restores run as `app_owner` (`pg_restore --role=app_owner`): RDS's master isn't a superuser, so it can't load tables another role owns. The drill restores as an administrator with only the master's rights, so the RDS path is the tested one;
   - `create-backup-role.sql` sets the password, the read-only default and `CONNECT` on every run, not only when it creates the role;
-  - the bucket policy refuses any write without `If-None-Match: *`, so a backup can be added but never overwritten (planned, $0, waiting for the owner's OK).
+  - the bucket policy refuses any write without `If-None-Match: *`, so a backup can be added but never overwritten (applied 2026-11-19 with the owner's OK, $0);
+  - after P1.4 (ADR 0039) `app_backup` also reads schema `auth` (`auth.owner_logins`, no RLS), or a restore would lock every owner out; the backup test checks the owners' logins come back.
 - **Not covered here:**
   - no alert on a failed backup yet: that's stage 9 (observability);
   - no copy in a second Region or account.

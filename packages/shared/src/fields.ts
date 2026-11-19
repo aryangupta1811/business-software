@@ -12,6 +12,12 @@ const CONTROL = /(?![\u200C\u200D])[\p{Cc}\p{Cf}]/u;
 // The same, but allowing tab, line feed and carriage return in multi-line fields.
 const CONTROL_EXCEPT_LINES = /(?![\t\n\r\u200C\u200D])[\p{Cc}\p{Cf}]/u;
 
+/** An id the API handed out. */
+export const uuid = () => z.uuid({ error: 'invalid' });
+
+/** True for an id: one from a path or a cursor is checked before it reaches PostgreSQL. */
+export const isUuid = (value: unknown): value is string => uuid().safeParse(value).success;
+
 interface TextOptions {
   /** Allow new lines (an address). */
   multiline?: boolean;

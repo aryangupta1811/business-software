@@ -29,6 +29,8 @@
 | Regular | Tax invoice with CGST + SGST (same state) or IGST (other state) |
 | Composition scheme | Bill of supply, no tax shown separately |
 
+36. **GST status and GSTIN agree** (sitting 2, G6): a GSTIN on a business whose status is "Not registered" is refused. A registered business (regular or composition) may sign up without a GSTIN, but needs one on its head office before its first tax invoice or bill of supply (`02` #25).
+
 ## Business details
 
 7. **Asked at signup** (kept short so signup is quick): business name, business type, phone, state, GST status, owner's email, and the owner's password. Email is the owner's login (#27) and the way to reset a forgotten password (#30). The password has at least 10 characters, with no forced symbols, and can't be the email or the phone number; one box with a show/hide button.
@@ -86,3 +88,4 @@ None. The five raised while importing were answered on 2026-11-02 (see the Chang
 - 2026-10-30 — Owner (session 6, P0.5): #25 now includes Hinglish as a third interface language, next to English and Hindi.
 - 2026-11-02 — Owner answered the open questions (session 15). Auto-lock: #21 now says 5 minutes by default, owner-settable from 1 to 30. Counters: #18 reworded (each counter is shared; a shop can have several). Password reset: by email link plus a printed recovery key (#30–#33). SMS OTP was rejected because of its per-message cost and DLT registration. **#7 changed:** the owner's email moved from settings (#8) to signup, which now has 6 fields. Deactivation confirmed (#34). Staff branches (#35). Two follow-ups Claude raised: login identifiers (#27, #28) and staff idle logout (#29).
 - 2026-11-18 — Owner's answers for P1.3 (fast track Day 2). **#7 changed:** signup also asks for the owner's password (7 fields), at least 10 characters, no forced symbols, not the email or the phone number. Reason: email delivery is limited (D1, SES sandbox), so the owner needs a password from the start. **#29:** the staff idle time is settable from 5 to 120 minutes. Also settled, no decided line changed: address, PIN code, state, GSTIN, drug licence and FSSAI number are kept per branch (#8, #14); logo and signature arrive with printing (P1.15), the invoice number format with saving a bill (P1.14), the terms footer with printing (P1.15).
+- 2026-11-19 — Fast-track sitting 2, G6: added #36, GST status and GSTIN must agree (a GSTIN on a not-registered business is refused; a registered one needs a GSTIN before its first tax invoice, checked at bill saving). No earlier point changed.

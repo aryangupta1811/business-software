@@ -16,7 +16,7 @@ ADR 0011 asks for a nightly `pg_dump` to S3, a monthly restore drill and a runbo
 
 - AWS's role listing for RDS for PostgreSQL shows "Bypass RLS" only on `rdsadmin`, AWS's own superuser. The master user has `rds_superuser`, which doesn't include it ([Viewing roles and their privileges](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.PostgreSQL.CommonDBATasks.Roles.View.html)).
 - Since PostgreSQL 16, only a role that has `BYPASSRLS` may give it to another, so the master can't create one either.
-- Not yet checked on our instance. The owner approved a probe on 2026-11-19 (read `rolbypassrls` for `postgres_admin` over Run Command), but the server couldn't start, twice an hour apart: AWS had no spare `t4g.small` capacity in its zone (`docs/devops/terraform.md`, Errors). It runs at the next session. This design works whichever way it comes out.
+- Not yet checked on our instance. The owner approved a probe on 2026-11-19 (read `rolbypassrls` for `postgres_admin` over Run Command), but the server couldn't start, twice an hour apart: AWS had no spare `t4g.small` capacity in its zone (`docs/devops/terraform.md`, Errors). The owner chose to keep `t4g.small` in `ap-south-1a` and retry (2026-11-19), so it runs at the next start. This design works whichever way it comes out.
 
 The server and database run only during sessions and stop at 23:30 IST at the latest (ADR 0032), so "nightly at a fixed time" alone would miss most days.
 
@@ -80,12 +80,12 @@ The server and database run only during sessions and stop at 23:30 IST at the la
     - the exact `backup_read` policy is there;
     - `app_backup` has no write right;
     - no role inherits `app_backup` or may `SET ROLE` to it.
-- **Migration order:** migration 0005 needs the role to exist first. `create-backup-role.sql` runs:
+- **Migration order:** migration 0006 needs the role to exist first. `create-backup-role.sql` runs:
   - after `create-roles.sql` in Docker and the tests;
   - on every deploy (`bootstrap-db.sh`, idempotent).
 - **Existing local volumes:** they need it once by hand (`docs/devops/local-database.md`).
 - **A new schema** that `app_backup` can't read (`pgboss`, P2.7) makes the backup fail loudly. P2.7 decides: grant it, or exclude it.
-- **The deploy hold applies:** the backup can only run on RDS after migration 0005 is deployed, which waits for P1.4. Until then the live server runs the skeleton, which stores no business data.
+- **The deploy hold applies:** the backup can only run on RDS after migration 0006 is deployed, which waits for P1.4. Until then the live server runs the skeleton, which stores no business data.
 - **Worst case lost:** what changed since the last backup, if RDS itself is lost. RDS's own 1-day point-in-time restore covers that window while the instance exists, so `scripts/deploy/backup.sh now` before stopping closes most of the gap.
 - **Not covered here:**
   - no alert on a failed backup yet: that's stage 9 (observability);

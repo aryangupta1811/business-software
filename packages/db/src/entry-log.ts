@@ -8,6 +8,21 @@ export const ENTRY_ACTIONS = {
   'business.created': { reasonRequired: false }, // Module 00 #7, at signup
   'business.updated': { reasonRequired: false }, // Module 00 #10, settings
   'stock.adjusted': { reasonRequired: true }, // Module 01 #11
+  // P1.7 (Module 01 #1-3, #8, #16): items, their barcodes, categories and own units.
+  'item.created': { reasonRequired: false },
+  'item.updated': { reasonRequired: false },
+  'item.archived': { reasonRequired: false },
+  'item.restored': { reasonRequired: false },
+  'item.barcode_added': { reasonRequired: false },
+  'item.barcode_removed': { reasonRequired: false },
+  'category.created': { reasonRequired: false },
+  'category.updated': { reasonRequired: false },
+  'category.archived': { reasonRequired: false },
+  'category.restored': { reasonRequired: false },
+  'unit.created': { reasonRequired: false },
+  'unit.updated': { reasonRequired: false },
+  'unit.archived': { reasonRequired: false },
+  'unit.restored': { reasonRequired: false },
 } as const satisfies Record<string, { reasonRequired: boolean }>;
 
 export type EntryAction = keyof typeof ENTRY_ACTIONS;

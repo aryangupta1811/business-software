@@ -18,7 +18,11 @@ type Rule =
   | 'kind'
   | 'view'
   | 'backup'
-  | 'backup_privileges';
+  | 'backup_privileges'
+  | 'unique_business'
+  | 'fk_valid'
+  | 'append_only_missing'
+  | 'schema_usage';
 interface Violation {
   table: string;
   rule: Rule;
@@ -27,7 +31,21 @@ interface Violation {
 /** Tables the app may only insert into and read (ADRs 0007, 0028). */
 const APPEND_ONLY = ['entry_log'];
 
-/** Schemas that hold no tenant data. `pgboss` joins in P2.7 (ADR 0022). */
+/**
+ * Unique keys on tenant tables without business_id, each on purpose (P1.7 rule
+ * `unique_business`). Any other one would let one business's values collide with, and so
+ * reveal, another's.
+ */
+const UNIQUE_WITHOUT_BUSINESS = [
+  // Module 00 #27: one owner account per email across the whole app (ADR 0027's 2026-11-18 note).
+  'users_owner_email_unique',
+];
+
+/**
+ * Schemas that hold no tenant data, which app_runtime can't even look into (rule
+ * `schema_usage`). `pgboss` joins in P2.7 (ADR 0022). A non-tenant schema the app must use
+ * (P1.4's rate-limit counters) needs its own list and rules, not this one.
+ */
 const NOT_TENANT_SCHEMAS = [
   'drizzle', // drizzle-kit's migration history; app_runtime can't read it
 ];
@@ -43,7 +61,7 @@ const appSchema = (n: string) =>
 // business_id everywhere else) and backup_read (ADR 0037: SELECT, every row, app_backup only).
 // Without backup_read the nightly pg_dump, which runs with RLS on, would save the table empty.
 // has_table_privilege counts grants to PUBLIC and to any role the given role belongs to.
-// app_backup may read and nothing else. $2 is the append-only list.
+// app_backup may read and nothing else. $2 is the append-only list, $3 UNIQUE_WITHOUT_BUSINESS.
 const violationsQuery = `
   with tables as (
     select c.oid, c.oid::regclass::text as relname, c.relrowsecurity, c.relforcerowsecurity,
@@ -115,9 +133,18 @@ const violationsQuery = `
         -- REFERENCES and UPDATE can also be granted per column.
         or has_any_column_privilege('app_runtime', t.oid, 'REFERENCES')
     union all
+    -- An append-only table's partitions are append-only too: rows can be updated through them.
     select t.relname, 'append_only' from tables t
-     where t.relname = any($2::text[])
+     where t.oid in (select to_regclass(l.name) from unnest($2::text[]) as l(name)
+                     union all
+                     -- pg_partition_tree lists nothing for a table that isn't partitioned.
+                     select p.relid from unnest($2::text[]) as l(name)
+                       cross join lateral pg_partition_tree(to_regclass(l.name)) as p)
        and has_any_column_privilege('app_runtime', t.oid, 'UPDATE')
+    union all
+    -- A misspelt or renamed name would otherwise protect nothing, silently.
+    select l.name, 'append_only_missing' from unnest($2::text[]) as l(name)
+     where to_regclass(l.name) is null
     union all
     select t.relname, 'branch_fk' from tables t
      where exists (select 1 from pg_attribute a
@@ -136,6 +163,24 @@ const violationsQuery = `
        and coalesce(array_position(f.columns, 'business_id'::name)
                     = array_position(f.referenced, 'business_id'::name), false) = false
     union all
+    -- Unique keys see every row, whatever RLS hides: without business_id, one business's
+    -- values collide with another's, and the error tells it they exist.
+    select distinct t.relname, 'unique_business' from tables t
+      join pg_index i on i.indrelid = t.oid
+     where i.indisunique and not i.indisprimary and t.oid <> 'businesses'::regclass
+       and i.indexrelid::regclass::text <> all($3::text[])
+       and not exists (select 1 from pg_attribute a
+                        where a.attrelid = t.oid and a.attname = 'business_id'
+                          and a.attnum = any(i.indkey::int2[]))
+    union all
+    -- A NOT VALID key never checked the rows that were there when it was added.
+    select distinct t.relname, 'fk_valid' from tables t
+      join pg_constraint c on c.conrelid = t.oid
+     where c.contype = 'f' and not c.convalidated
+    union all
+    select n.nspname::text, 'schema_usage' from pg_namespace n
+     where n.nspname = any($1::name[]) and has_schema_privilege('app_runtime', n.oid, 'USAGE')
+    union all
     -- RLS never applies to these, so they can't hold tenant data.
     select c.oid::regclass::text, 'kind' from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
@@ -152,7 +197,11 @@ const violationsQuery = `
   order by relname collate "C", rule collate "C"`;
 
 async function findTenancyViolations(pool: Pool, appendOnly = APPEND_ONLY): Promise<Violation[]> {
-  const { rows } = await pool.query<Violation>(violationsQuery, [NOT_TENANT_SCHEMAS, appendOnly]);
+  const { rows } = await pool.query<Violation>(violationsQuery, [
+    NOT_TENANT_SCHEMAS,
+    appendOnly,
+    UNIQUE_WITHOUT_BUSINESS,
+  ]);
   return rows;
 }
 
@@ -319,7 +368,43 @@ const probes: Probe[] = [
     name: 'probe_backup_column_update',
     after: 'grant update (id) on probe_backup_column_update to app_backup',
   },
+  // P1.7: a unique key without business_id, as a constraint or an expression index.
+  { name: 'probe_unique_no_business', columns: `${tenantColumn}, code text unique` },
+  {
+    name: 'probe_unique_expression',
+    columns: `${tenantColumn}, code text`,
+    after:
+      'create unique index probe_unique_expression_code on probe_unique_expression (lower(code))',
+  },
+  {
+    name: 'probe_good_unique',
+    columns: `${tenantColumn}, code text, unique (business_id, code)`,
+    after: `create unique index probe_good_unique_lower on probe_good_unique (business_id, lower(code))
+              where code is not null`,
+  },
+  // A key added NOT VALID passes business_fk but never checked the rows already there.
+  {
+    name: 'probe_fk_not_valid',
+    columns: 'business_id uuid not null',
+    after:
+      'alter table probe_fk_not_valid add foreign key (business_id) references businesses(id) not valid',
+  },
 ];
+
+// A partitioned tenant table on the append-only list whose partition still has UPDATE.
+const partitionedProbe = `
+  create table probe_parted (id uuid not null, business_id uuid not null references businesses(id),
+    primary key (business_id, id)) partition by list (business_id);
+  create table probe_parted_one partition of probe_parted default;
+  alter table probe_parted enable row level security;
+  alter table probe_parted force row level security;
+  create policy tenant_isolation on probe_parted as permissive ${correctPolicy()};
+  create policy backup_read on probe_parted as permissive ${correctBackupPolicy};
+  alter table probe_parted_one enable row level security;
+  alter table probe_parted_one force row level security;
+  create policy tenant_isolation on probe_parted_one as permissive ${correctPolicy()};
+  create policy backup_read on probe_parted_one as permissive ${correctBackupPolicy};
+  revoke update on probe_parted from app_runtime`;
 
 async function createProbe(owner: Pool, probe: Probe): Promise<void> {
   const columns = probe.columns ?? tenantColumn;
@@ -397,6 +482,9 @@ describe('tenancy guard', () => {
       await admin.query('grant probe_role to app_runtime');
       await admin.query('create schema probe_schema authorization app_owner');
       for (const probe of probes) await createProbe(owner, probe);
+      await owner.query(partitionedProbe);
+      // drizzle's schema holds migration history, not tenant data: the app needn't see it.
+      await owner.query('grant usage on schema drizzle to app_runtime');
       // RLS never applies to a materialized view: it holds whatever its refresh could see.
       await owner.query('create materialized view probe_matview as select id from branches');
       // A plain view checks the base table's rights as its owner (app_owner), so app_runtime's
@@ -405,8 +493,15 @@ describe('tenancy guard', () => {
       await owner.query(
         'create view probe_invoker_view with (security_invoker = true) as select * from entry_log',
       );
-      const appendOnly = [...APPEND_ONLY, 'probe_append_only', 'probe_column_update'];
+      const appendOnly = [
+        ...APPEND_ONLY,
+        'probe_append_only',
+        'probe_column_update',
+        'probe_parted',
+        'probe_missing',
+      ];
       expect(await findTenancyViolations(owner, appendOnly)).toEqual([
+        { table: 'drizzle', rule: 'schema_usage' },
         { table: 'probe_append_only', rule: 'append_only' },
         { table: 'probe_backup_column_update', rule: 'backup_privileges' },
         { table: 'probe_backup_filtered', rule: 'backup' },
@@ -419,9 +514,11 @@ describe('tenancy guard', () => {
         { table: 'probe_column_update', rule: 'append_only' },
         { table: 'probe_delete_grant', rule: 'privileges' },
         { table: 'probe_extra_permissive', rule: 'policy' },
+        { table: 'probe_fk_not_valid', rule: 'fk_valid' },
         { table: 'probe_from_branch_fk', rule: 'tenant_fk' },
         { table: 'probe_inherited_delete', rule: 'privileges' },
         { table: 'probe_matview', rule: 'kind' },
+        { table: 'probe_missing', rule: 'append_only_missing' },
         { table: 'probe_no_backup_policy', rule: 'backup' },
         { table: 'probe_no_business_fk', rule: 'business_fk' },
         { table: 'probe_no_business_id', rule: 'business_id' },
@@ -430,11 +527,14 @@ describe('tenancy guard', () => {
         { table: 'probe_no_policy', rule: 'policy' },
         { table: 'probe_no_rls', rule: 'rls' },
         { table: 'probe_nullable_business_id', rule: 'business_id' },
+        { table: 'probe_parted_one', rule: 'append_only' },
         // PUBLIC is every role, the backup role too.
         { table: 'probe_public_delete', rule: 'backup_privileges' },
         { table: 'probe_public_delete', rule: 'privileges' },
         { table: 'probe_schema.probe_other', rule: 'rls' },
         { table: 'probe_select_policy', rule: 'policy' },
+        { table: 'probe_unique_expression', rule: 'unique_business' },
+        { table: 'probe_unique_no_business', rule: 'unique_business' },
         { table: 'probe_view', rule: 'view' },
         { table: 'probe_wrong_policy', rule: 'policy' },
       ]);
@@ -443,6 +543,8 @@ describe('tenancy guard', () => {
       await owner.query('drop view if exists probe_view, probe_invoker_view');
       await owner.query('drop materialized view if exists probe_matview');
       await owner.query(`drop table if exists ${probes.map((p) => p.name).join(', ')}`);
+      await owner.query('drop table if exists probe_parted');
+      await owner.query('revoke usage on schema drizzle from app_runtime');
       await admin.query('drop schema if exists probe_schema cascade');
       await admin.query('revoke probe_role from app_runtime');
       await admin.query('drop role if exists probe_role');

@@ -95,6 +95,6 @@ The roles themselves aren't in the dump (RDS forbids reading role passwords): `c
 ## Gotchas
 
 - **`--enable-row-security` is required, and dangerous.** Without it, `pg_dump` as `app_backup` fails; with it, a table missing its `backup_read` policy is dumped with no rows. The guard test (CI) and `dump.sh`'s own check stop that, so don't remove either.
-- **A new schema breaks the backup on purpose.** `app_backup` can read only what migration 0005 granted (public and drizzle). pgboss (P2.7) must be granted or excluded deliberately.
-- **Not before migration 0005 is deployed.** The backup needs `app_backup` and its grants on RDS, which arrive with the first deploy after P1.4 (deploy hold).
+- **A new schema breaks the backup on purpose.** `app_backup` can read only what migration 0006 granted (public and drizzle). pgboss (P2.7) must be granted or excluded deliberately.
+- **Not before migration 0006 is deployed.** The backup needs `app_backup` and its grants on RDS, which arrive with the first deploy after P1.4 (deploy hold).
 - **The drill's pre-signed links stay in Systems Manager's command history** (expired after 15 minutes). They grant read access to those two files only.

@@ -77,6 +77,11 @@ The safety rules from ADRs 0006 and 0007 only hold if the roles are set up exact
 - Migrations run locally with `drizzle-kit migrate`. P0.4 decides how production runs them.
 - Upgrade Drizzle to 1.0 once it is stable, with `drizzle-kit up`.
 - Item-name sorting (P1.7) needs an ICU collation decision. The image choice alone doesn't make sorting identical to RDS.
+- **Added 2026-11-19 (P1.7): the ICU collation `item_name`.**
+  - Migration 0005 creates `item_name` (`provider = icu, locale = 'und-u-kn-true'`): ICU's root order with numbers compared by value, deterministic.
+  - Queries name it (`order by name collate item_name`); the columns keep the database default, so equality and the `lower(name)` unique indexes are unchanged.
+  - On `postgres:18` (PostgreSQL 18.6, ICU collation version 153.128) it sorts Latin before Devanagari, Devanagari in Hindi dictionary order, "Atta 2 kg" before "Atta 10 kg", and ignores case. `packages/db/src/items.test.ts` pins that order.
+  - **Not yet checked on RDS** (stopped on 2026-11-19): on its next start, run the same query and compare the order and `pg_collation.collversion`. A different ICU version can order rare characters differently; after an ICU upgrade the indexes using it need `REINDEX`.
 
 ## Interview note
 

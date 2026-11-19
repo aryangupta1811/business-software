@@ -79,7 +79,7 @@ Order by `id`: entries written in one transaction share `created_at` (it's the t
 
 ## Things to know
 
-- **A volume made before 2026-11-19 has no `app_backup` role,** so migration 0005 fails with `role "app_backup" does not exist`. Create it once, then migrate:
+- **A volume made before 2026-11-19 has no `app_backup` role,** so migration 0006 fails with `role "app_backup" does not exist`. Create it once, then migrate:
   ```bash
   docker compose exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1 < packages/db/bootstrap/create-backup-role.sql
   pnpm db:migrate

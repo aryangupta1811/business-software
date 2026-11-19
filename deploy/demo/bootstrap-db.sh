@@ -3,7 +3,7 @@
 # root by install.sh on every deploy, before the migrations:
 # - create-roles.sql once: skipped when the business_software database already exists;
 # - create-backup-role.sql every time: it does nothing once app_backup exists, and gives a
-#   database made before it existed the role that migration 0005 needs.
+#   database made before it existed the role that migration 0006 needs.
 # Uses the same packages/db/bootstrap files as local Docker and the tests, run by psql from
 # the postgres:18 image as RDS's master user, over TLS that checks RDS's certificate.
 set -euo pipefail

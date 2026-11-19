@@ -10,6 +10,7 @@ import {
   inStoreSerial,
   PERMISSIONS,
   type ItemPage,
+  type ItemsContext,
   type ItemView,
   type Permission,
 } from '@business-software/shared';
@@ -173,6 +174,28 @@ describe('items', () => {
     await app.close();
     await admin.close();
     await server.stop();
+  });
+
+  describe('the form context', () => {
+    it('tells the page what the caller may do, the GST rule, the features and the branches', async () => {
+      const context = await call<ItemsContext>('GET', '/items/context', a);
+      expect(context.status).toBe(200);
+      expect(context.body).toEqual({
+        canViewCost: true,
+        canManage: true,
+        needsGst: true,
+        features: expect.any(Array) as unknown,
+        branches: [{ id: aBranch, name: expect.any(String) as unknown }],
+      });
+      const viewer = await call<ItemsContext>('GET', '/items/context', staff(b, ['items.view']));
+      expect(viewer.body).toMatchObject({
+        canViewCost: false,
+        canManage: false,
+        needsGst: false,
+        branches: [{ id: bBranch }],
+      });
+      expect((await call('GET', '/items/context', staff(a, []))).status).toBe(403);
+    });
   });
 
   describe('creating', () => {

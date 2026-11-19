@@ -2,6 +2,7 @@
 // forms and the API parse the same schemas (ADR 0036). Money is whole paise, rates basis points
 // and quantities thousandths of the item's stock unit (ADR 0008).
 import { z } from 'zod';
+import type { Feature } from './business.js';
 import { optionalText, text, uuid } from './fields.js';
 import type { Paise } from './money.js';
 import { BUILT_IN_UNITS, isBuiltInUnit, packSizeFor, type BuiltInUnit } from './units.js';
@@ -365,6 +366,23 @@ export interface CategoryView {
   id: string;
   name: string;
   archived: boolean;
+}
+
+/**
+ * What the Items page needs to know before it shows a form (`GET /api/items/context`). Until
+ * P1.5 gives the web the caller's permissions, this is where the page learns them.
+ */
+export interface ItemsContext {
+  /** `items.view_cost`: the purchase price column and field show. */
+  canViewCost: boolean;
+  /** `items.manage`: the add, edit, archive and barcode controls show. */
+  canManage: boolean;
+  /** A regular GST business: every item needs a GST rate and an HSN code (G5). */
+  needsGst: boolean;
+  /** Switched-on features: `multiple_units` shows packs, `wholesale_price` the wholesale price. */
+  features: Feature[];
+  /** The branches a low-stock level can be set for. */
+  branches: { id: string; name: string }[];
 }
 
 export interface UnitView {

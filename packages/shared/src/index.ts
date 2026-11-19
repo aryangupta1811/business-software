@@ -80,6 +80,7 @@ export {
   type ItemPage,
   type ItemQuery,
   type ItemRow,
+  type ItemsContext,
   type ItemUpdateInput,
   type ItemView,
   type LevelView,

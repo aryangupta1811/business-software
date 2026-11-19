@@ -7,6 +7,13 @@ import { DatabaseModule } from './database.module.js';
 import { UnhandledErrorFilter } from './error-filter.js';
 import { HealthController } from './health.controller.js';
 import { HttpRulesModule } from './http/http-rules.module.js';
+import { CatalogueService } from './items/catalogue.service.js';
+import {
+  CategoriesController,
+  ItemsController,
+  UnitsController,
+} from './items/items.controller.js';
+import { ItemsService } from './items/items.service.js';
 import type { SessionResolver } from './http/session.js';
 import { SettingsController } from './settings/settings.controller.js';
 import { SettingsService } from './settings/settings.service.js';
@@ -14,7 +21,14 @@ import { SignupController } from './signup/signup.controller.js';
 import { SignupService } from './signup/signup.service.js';
 
 /** Every controller the API serves; the route census test reads this list. */
-export const API_CONTROLLERS = [HealthController, SettingsController, SignupController];
+export const API_CONTROLLERS = [
+  HealthController,
+  SettingsController,
+  SignupController,
+  ItemsController,
+  CategoriesController,
+  UnitsController,
+];
 
 export interface AppOptions {
   /** Who is calling; tests pass a fake. Defaults to nobody until P1.4. */
@@ -31,7 +45,7 @@ class ApiModule {
         HttpRulesModule.register(options.sessions),
       ],
       controllers: API_CONTROLLERS,
-      providers: [SettingsService, SignupService],
+      providers: [SettingsService, SignupService, ItemsService, CatalogueService],
     };
   }
 }

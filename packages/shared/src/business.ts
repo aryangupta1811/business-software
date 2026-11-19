@@ -45,5 +45,12 @@ export type GstStatus = (typeof GST_STATUSES)[number];
  * Every permission a route can require (ADR 0036). The owner has all of them; P1.5 lets the
  * owner give staff logins a subset.
  */
-export const PERMISSIONS = ['settings.view', 'settings.manage'] as const;
+export const PERMISSIONS = [
+  'settings.view',
+  'settings.manage',
+  // P1.7: list and look items up; change them; see and change the purchase price (`01` #1).
+  'items.view',
+  'items.manage',
+  'items.view_cost',
+] as const;
 export type Permission = (typeof PERMISSIONS)[number];

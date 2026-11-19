@@ -28,6 +28,7 @@ const APPEND_ONLY = ['entry_log'];
 /** Schemas that hold no tenant data. `pgboss` joins in P2.7 (ADR 0022). */
 const NOT_TENANT_SCHEMAS = [
   'drizzle', // drizzle-kit's migration history; app_runtime can't read it
+  'auth', // P1.4: owner email -> business for login; app_runtime has no USAGE, only the definers
 ];
 
 // Every schema except PostgreSQL's own and NOT_TENANT_SCHEMAS (always query parameter $1).
@@ -139,11 +140,16 @@ async function findTenancyViolations(pool: Pool, appendOnly = APPEND_ONLY): Prom
 
 interface FunctionViolation {
   name: string;
-  rule: 'definer' | 'function_pin';
+  rule: 'definer' | 'definer_search_path' | 'function_pin';
 }
 
-/** SECURITY DEFINER functions the app may call, each with its reason. None yet (P1.4). */
-const DEFINER_ALLOWED: string[] = [];
+/** SECURITY DEFINER functions the app may call, each with its reason. */
+const DEFINER_ALLOWED: string[] = [
+  // P1.4: login by email comes before any business is known; returns two IDs, never a hash.
+  'app_find_owner_login',
+  // P1.4: signup registers its own owner's email; RLS limits it to the current business.
+  'app_register_owner_login',
+];
 
 // The policy function's body exactly as migration 0001 writes it (ADR 0027).
 const businessIdFunctionBody =
@@ -154,11 +160,12 @@ const businessIdFunctionBody =
 // DEFINER_ALLOWED. function_pin: there must be exactly one app_current_business_id, the
 // zero-argument one in public, still a plain STABLE SQL function with its exact body; an
 // overload with the right body would otherwise hide a changed original. $2 is that body,
-// $3 is DEFINER_ALLOWED.
+// $3 is DEFINER_ALLOWED. definer_search_path: every SECURITY DEFINER function the app may run
+// pins search_path, so an object the caller creates can't stand in for one the function names.
 const functionViolationsQuery = `
   with functions as (
     select p.oid, p.oid::regproc::text as name, p.proname, p.prosecdef, p.provolatile,
-           p.prosrc, l.lanname
+           p.prosrc, p.proconfig, l.lanname
       from pg_proc p
       join pg_namespace n on n.oid = p.pronamespace
       join pg_language l on l.oid = p.prolang
@@ -168,6 +175,10 @@ const functionViolationsQuery = `
     select f.name, 'definer' as rule from functions f
      where f.prosecdef and has_function_privilege('app_runtime', f.oid, 'EXECUTE')
        and f.name <> all($3::text[])
+    union all
+    select f.name, 'definer_search_path' from functions f
+     where f.prosecdef and has_function_privilege('app_runtime', f.oid, 'EXECUTE')
+       and not exists (select 1 from unnest(f.proconfig) c where c like 'search_path=%')
     union all
     select 'app_current_business_id', 'function_pin'
      where (select count(*) from functions f where f.proname = 'app_current_business_id') <> 1
@@ -185,6 +196,25 @@ async function findFunctionViolations(pool: Pool): Promise<FunctionViolation[]> 
     DEFINER_ALLOWED,
   ]);
   return rows;
+}
+
+/** Columns only the database fills, never app_runtime (sitting 2, D4; ADR 0028 note). */
+const DATABASE_SET_COLUMNS: Record<string, string[]> = {
+  entry_log: ['id', 'business_id', 'created_at'],
+};
+
+// table.column pairs where app_runtime may INSERT or UPDATE a database-set column.
+async function findDatabaseSetColumnGrants(pool: Pool): Promise<string[]> {
+  const { rows } = await pool.query<{ name: string }>(
+    `select t.table_name || '.' || c.column_name as name
+       from jsonb_each($1::jsonb) t(table_name, columns),
+            jsonb_array_elements_text(t.columns) c(column_name)
+      where has_column_privilege('app_runtime', t.table_name::regclass, c.column_name, 'INSERT')
+         or has_column_privilege('app_runtime', t.table_name::regclass, c.column_name, 'UPDATE')
+      order by (t.table_name || '.' || c.column_name) collate "C"`,
+    [JSON.stringify(DATABASE_SET_COLUMNS)],
+  );
+  return rows.map((row) => row.name);
 }
 
 // Membership is how privileges are inherited, so app_runtime belongs to no role.
@@ -313,6 +343,17 @@ describe('tenancy guard', () => {
     expect(await findFunctionViolations(owner)).toEqual([]);
   });
 
+  it('leaves database-set columns to the database', async () => {
+    expect(await findDatabaseSetColumnGrants(owner)).toEqual([]);
+    try {
+      await owner.query('grant insert (created_at) on entry_log to app_runtime');
+      expect(await findDatabaseSetColumnGrants(owner)).toEqual(['entry_log.created_at']);
+    } finally {
+      await owner.query('revoke insert (created_at) on entry_log from app_runtime');
+    }
+    expect(await findDatabaseSetColumnGrants(owner)).toEqual([]);
+  });
+
   it('keeps app_runtime out of every other role', async () => {
     expect(await findRoleMemberships(owner)).toEqual([]);
   });
@@ -383,13 +424,22 @@ describe('tenancy guard', () => {
         revoke execute on function probe_definer_granted() from public;
         grant execute on function probe_definer_granted() to app_runtime`);
       await owner.query('alter function app_current_business_id() security definer');
+      // Allowed, but no longer pinned.
+      await owner.query('alter function app_find_owner_login(text) reset search_path');
       expect(await findFunctionViolations(owner)).toEqual([
         { name: 'app_current_business_id', rule: 'definer' },
+        { name: 'app_current_business_id', rule: 'definer_search_path' },
         { name: 'app_current_business_id', rule: 'function_pin' },
+        { name: 'app_find_owner_login', rule: 'definer_search_path' },
         { name: 'probe_definer', rule: 'definer' },
+        { name: 'probe_definer', rule: 'definer_search_path' },
         { name: 'probe_definer_granted', rule: 'definer' },
+        { name: 'probe_definer_granted', rule: 'definer_search_path' },
       ]);
     } finally {
+      await owner.query(
+        'alter function app_find_owner_login(text) set search_path = pg_catalog, pg_temp',
+      );
       await owner.query('alter function app_current_business_id() security invoker');
       await owner.query('drop function if exists probe_definer(), probe_definer_granted()');
     }

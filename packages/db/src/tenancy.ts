@@ -25,6 +25,36 @@ export function withBusiness<T>(
 }
 
 /**
+ * Inside a `withBusiness` (or `withNewBusiness`) transaction, runs `work` as `businessId`, then
+ * switches back to the transaction's own business, even if `work` fails. Both steps commit or
+ * roll back together. Only for an action that spans two businesses by nature: a login in one
+ * ends the browser's session in another (P1.4, ADR 0039).
+ */
+export async function alsoInBusiness<T>(
+  tx: Transaction,
+  businessId: string,
+  work: (tx: Transaction) => Promise<T>,
+): Promise<T> {
+  const { rows } = await tx.execute<{ id: string | null }>(
+    sql`select app_current_business_id()::text as id`,
+  );
+  const own = rows[0]?.id;
+  if (own === undefined || own === null) throw new Error('alsoInBusiness needs a business set');
+  await setBusiness(tx, businessId);
+  let result: T;
+  try {
+    result = await work(tx);
+  } catch (error) {
+    // After a failed statement PostgreSQL refuses everything until rollback, the switch back
+    // included; the caller must see the first error, not that one.
+    await setBusiness(tx, own).catch(() => undefined);
+    throw error;
+  }
+  await setBusiness(tx, own);
+  return result;
+}
+
+/**
  * For signup: picks the new business's ID and sets it before anything is inserted, so the
  * `businesses` row passes its own policy with no bypass. `work` inserts that row.
  */

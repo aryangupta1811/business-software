@@ -6,6 +6,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { App } from '../../app';
 import { createQueryClient } from '../../query-client';
 import { createAppRouter } from '../../router';
+import { OWNER_SESSION } from '../../test/fake-api';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -32,9 +33,13 @@ const VIEW: SettingsView = {
   security: { ownerLockMinutes: 5, staffIdleMinutes: 30 },
 };
 
-/** Answers GET /api/settings with `load`, every PUT with the view it was sent merged in. */
+/**
+ * The owner is logged in; GET /api/settings answers `load`, every PUT the view it was sent
+ * merged in.
+ */
 function stubApi(load: { status: number; body: unknown }) {
   const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+    if (url === '/api/session') return Promise.resolve(Response.json(OWNER_SESSION));
     if (url === '/api/settings') return Promise.resolve(Response.json(load.body, load));
     if (url.startsWith('/api/settings/')) {
       const card = url.slice('/api/settings/'.length);

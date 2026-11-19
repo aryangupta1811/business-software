@@ -72,6 +72,19 @@ Numbered from 27 so earlier numbers keep their meaning.
 34. **When a staff member leaves**, their login is **deactivated, never deleted** (zero data loss, ADR 0007): they can't log in, their open sessions end at once, and everything they did stays in the records and the entry log. The owner can reactivate the login later.
 35. **Staff and branches:** every staff member, with or without a login, has one **home branch**, where their attendance and salary are recorded. The owner can also let a staff login work in other branches.
 
+Added 2026-11-19 from the P1.4 design answers (owner took every recommendation):
+
+37. **Signup logs the owner in**, and that computer becomes the business's counter, so staff can log in on it (#28).
+38. **The lock screen** (#21) shows a password box and a "Switch user" button. Unlocking returns to the same page with nothing lost. A staff login on a locked computer ends the owner's session. The owner can also lock at once with a "Lock now" button or `Alt+L`.
+39. **Several counters at once:** the owner and each staff member may be logged in on more than one computer at the same time (#22); each computer has its own session.
+40. **Closing Chrome logs the person out.** The computer still remembers its business (#28), so staff only type their username and password again.
+41. **Failed logins:** after 10 wrong passwords for one login within 15 minutes, that login waits 15 minutes ("Try again at 14:35"); a computer gets 30 attempts in 15 minutes. The recovery key (#31) has its own limit and always gets the owner back in.
+42. **Link lifetimes:** a password reset link works for 30 minutes, an email confirmation link for 7 days; each works once.
+43. **Staff usernames:** 3 to 32 characters (letters, digits, dot, dash, underscore), not case-sensitive (`Ramesh` is `ramesh`), unique within the business only (#28).
+44. **Remembered computers:** a computer stays remembered for 400 days (Chrome's longest), renewed at each owner login. Settings lists them with a Forget button, which needs the owner's password.
+45. **Email in the demo** (no domain, D1): confirmation and reset emails reach only verified addresses; other visitors are told to use their recovery key (#31).
+46. **Changing your own password** in Settings needs the current password and logs you out on every other computer. Changing the owner's email is not in v1.
+
 ## Language & notifications
 
 25. The app runs in **English, Hindi and Hinglish** (Hindi words written in English letters, e.g. "Bill banao"), switchable at any time. Whether bills also print in Hindi is decided in Module 02.
@@ -89,3 +102,4 @@ None. The five raised while importing were answered on 2026-11-02 (see the Chang
 - 2026-11-02 — Owner answered the open questions (session 15). Auto-lock: #21 now says 5 minutes by default, owner-settable from 1 to 30. Counters: #18 reworded (each counter is shared; a shop can have several). Password reset: by email link plus a printed recovery key (#30–#33). SMS OTP was rejected because of its per-message cost and DLT registration. **#7 changed:** the owner's email moved from settings (#8) to signup, which now has 6 fields. Deactivation confirmed (#34). Staff branches (#35). Two follow-ups Claude raised: login identifiers (#27, #28) and staff idle logout (#29).
 - 2026-11-18 — Owner's answers for P1.3 (fast track Day 2). **#7 changed:** signup also asks for the owner's password (7 fields), at least 10 characters, no forced symbols, not the email or the phone number. Reason: email delivery is limited (D1, SES sandbox), so the owner needs a password from the start. **#29:** the staff idle time is settable from 5 to 120 minutes. Also settled, no decided line changed: address, PIN code, state, GSTIN, drug licence and FSSAI number are kept per branch (#8, #14); logo and signature arrive with printing (P1.15), the invoice number format with saving a bill (P1.14), the terms footer with printing (P1.15).
 - 2026-11-19 — Fast-track sitting 2, G6: added #36, GST status and GSTIN must agree (a GSTIN on a not-registered business is refused; a registered one needs a GSTIN before its first tax invoice, checked at bill saving). No earlier point changed.
+- 2026-11-19 — P1.4 design answers: the owner took all 11 recommendations in `docs/plans/2026-11-19-p1.4-login-design.md` (section 13). Added #37–#46 (signup logs in, lock screen, several counters, closing Chrome logs out, failed-login limits, link lifetimes, staff usernames, remembered computers, email in the demo, changing your own password). The staff password-reset and deactivate buttons come with P1.5's staff page; P1.4 builds the rules. No earlier point changed meaning.

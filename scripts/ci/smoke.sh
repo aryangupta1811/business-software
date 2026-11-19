@@ -66,6 +66,27 @@ expect_status "$headers" "$url" 200
 expect_header "$headers" "$url" 'content-type: image/'
 echo "ok: favicon is an image"
 
+# 5c. API answers through Caddy are never cached (ADR 0038, the shared counter's browser).
+url=http://127.0.0.1:8080/api/session
+headers=$({ curl -sS --max-time 15 -D - -o /dev/null "$url" || true; } | tr -d '\r' | tr '[:upper:]' '[:lower:]')
+expect_status "$headers" "$url" 200
+expect_header "$headers" "$url" 'cache-control: no-store'
+echo "ok: api answers are no-store"
+
+# 5d. The per-computer login limit (30 in 15 minutes) holds whatever X-Forwarded-For a client
+# sends: Caddy replaces it, and the API trusts exactly one hop. Each try uses a new unknown
+# email, so only the per-computer limit can answer 429.
+url=http://127.0.0.1:8080/api/login
+for try in $(seq 1 31); do
+  got=$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' -X POST "$url" \
+    -H 'content-type: application/json' -H "x-forwarded-for: 203.0.113.$try" \
+    -d "{\"email\":\"smoke-$try@example.com\",\"password\":\"not the password\"}" || true)
+  expected=401
+  [[ $try == 31 ]] && expected=429
+  [[ $got == "$expected" ]] || fail "$url try $try with a forged X-Forwarded-For: expected $expected, got $got"
+done
+echo "ok: login rate limit ignores a forged x-forwarded-for"
+
 # 6. A migration with a wrong password fails (exit 1), so api and worker would never start.
 set +e
 docker compose run --rm --no-deps \

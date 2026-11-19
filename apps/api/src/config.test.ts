@@ -10,6 +10,7 @@ describe('loadConfig', () => {
       host: '127.0.0.1',
       port: 3000,
       jsonLogs: false,
+      cookieSecure: true,
     });
   });
 
@@ -22,7 +23,16 @@ describe('loadConfig', () => {
       host: '0.0.0.0',
       port: 8080,
       jsonLogs: true,
+      cookieSecure: true,
     });
+  });
+
+  // Plain-HTTP local development only (ADR 0009 note).
+  it('reads COOKIE_SECURE and refuses anything but true or false', () => {
+    expect(loadConfig({ DATABASE_URL, COOKIE_SECURE: 'false' }).cookieSecure).toBe(false);
+    expect(() => loadConfig({ DATABASE_URL, COOKIE_SECURE: 'no' })).toThrow(
+      'COOKIE_SECURE must be true or false',
+    );
   });
 
   it('refuses to start without DATABASE_URL', () => {

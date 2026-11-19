@@ -7,13 +7,17 @@ export {
   branches,
   businesses,
   categories,
+  devices,
   entryLog,
   itemBarcodes,
   itemBranchLevels,
   items,
   itemUnits,
   recoveryKeys,
+  SESSION_END_REASONS,
+  sessions,
   units,
   users,
+  type SessionEndReason,
 } from './schema.js';
-export { withBusiness, withNewBusiness, type Transaction } from './tenancy.js';
+export { alsoInBusiness, withBusiness, withNewBusiness, type Transaction } from './tenancy.js';

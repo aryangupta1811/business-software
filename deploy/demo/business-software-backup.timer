@@ -1,0 +1,14 @@
+# When the backup runs (ADR 0037). The server and database stop at 23:30 IST every night
+# (infra/terraform/demo/schedule.tf), and usually earlier, by hand, after each session.
+# - 22:45 IST: on nights the server is still running.
+# - Persistent: if the server was off at 22:45, the backup runs at its next boot. Nothing can
+#   change while both are stopped, so that copy is the end of the last session.
+[Unit]
+Description=Nightly Business Software database backup
+
+[Timer]
+OnCalendar=*-*-* 22:45:00 Asia/Kolkata
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -33,6 +33,18 @@ export type StaffLoginInput = z.infer<typeof staffLoginSchema>;
 export const unlockSchema = z.strictObject({ password: typedPassword() });
 export type UnlockInput = z.infer<typeof unlockSchema>;
 
+/** A logged-in session, as `GET /api/session` and the login routes answer it. */
+export interface ActiveSession {
+  state: 'active' | 'locked';
+  user: { id: string; role: 'owner' | 'staff'; name: string };
+  business: { id: string; name: string };
+  branch: { id: string; name: string };
+  /** Sent back as `X-CSRF-Token` on every unsafe request (ADR 0009). */
+  csrfToken: string;
+  /** Minutes of inactivity before the owner's session locks or a staff session ends. */
+  idleMinutes: number;
+}
+
 /** What `GET /api/session` answers. */
 export type SessionView =
   | {
@@ -40,13 +52,4 @@ export type SessionView =
       /** The business this computer remembers, for the staff login tab (#28). */
       device: { businessName: string } | null;
     }
-  | {
-      state: 'active' | 'locked';
-      user: { id: string; role: 'owner' | 'staff'; name: string };
-      business: { id: string; name: string };
-      branch: { id: string; name: string };
-      /** Sent back as `X-CSRF-Token` on every unsafe request (ADR 0009). */
-      csrfToken: string;
-      /** Minutes of inactivity before the owner's session locks or a staff session ends. */
-      idleMinutes: number;
-    };
+  | ActiveSession;

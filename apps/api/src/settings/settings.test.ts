@@ -8,9 +8,12 @@ import { startTestDatabase, type TestDatabase } from '@business-software/db/test
 import { PERMISSIONS } from '@business-software/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../app.js';
+import { hashToken } from '../auth/tokens.js';
 import type { Caller, SessionResolver } from '../http/session.js';
 
-// Tests say who is calling in a header; P1.4's resolver reads a session cookie instead.
+// Tests say who is calling in a header, so these tests can use any caller; the real resolver
+// reads the session cookie (auth/session.test.ts).
+const CSRF = 'csrf-token-for-tests';
 const headerSessions: SessionResolver = {
   resolve(request: IncomingMessage) {
     const header = request.headers['x-test-caller'];
@@ -62,6 +65,7 @@ describe('settings', () => {
       method,
       headers: {
         'content-type': 'application/json',
+        'x-csrf-token': CSRF,
         ...(caller && { 'x-test-caller': JSON.stringify(caller) }),
       },
       ...(body !== undefined && { body: JSON.stringify(body) }),
@@ -76,7 +80,16 @@ describe('settings', () => {
       "select id from users where business_id = $1 and role = 'owner'",
       [businessId],
     );
-    return { businessId, userId: rows[0]?.id ?? '', permissions: PERMISSIONS };
+    return {
+      businessId,
+      userId: rows[0]?.id ?? '',
+      sessionId: '0190f0f0-0000-7000-8000-0000000000c1',
+      branchId: '0190f0f0-0000-7000-8000-0000000000d1',
+      role: 'owner',
+      permissions: PERMISSIONS,
+      locked: false,
+      csrfHash: hashToken(CSRF),
+    };
   }
 
   const updates = async (businessId: string) => {

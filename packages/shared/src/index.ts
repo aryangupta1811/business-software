@@ -4,6 +4,7 @@ export {
   unlockSchema,
   username,
   USERNAME_PATTERN,
+  type ActiveSession,
   type OwnerLoginInput,
   type SessionView,
   type StaffLoginInput,

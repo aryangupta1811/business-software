@@ -1,6 +1,6 @@
 import type { ItemPage, ItemsContext, ItemView } from '@business-software/shared';
 import { createMemoryHistory } from '@tanstack/react-router';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 import { App } from '../../app';
@@ -67,7 +67,10 @@ const PAGE: ItemPage = {
   next: null,
 };
 
-type Answer = { status?: number; body: unknown };
+interface Answer {
+  status?: number;
+  body: unknown;
+}
 type Route = (body: unknown) => Answer;
 
 /** Answers `METHOD /path` (query strings ignored) from `routes`; anything else is healthy. */
@@ -75,7 +78,8 @@ function stubApi(routes: Record<string, Route>) {
   const fetchMock = vi.fn((url: string, init?: RequestInit) => {
     const key = `${init?.method ?? 'GET'} ${url.split('?')[0] ?? url}`;
     const route = routes[key];
-    if (route === undefined) return Promise.resolve(Response.json({ status: 'ok', database: 'ok' }));
+    if (route === undefined)
+      return Promise.resolve(Response.json({ status: 'ok', database: 'ok' }));
     const answer = route(init?.body === undefined ? undefined : JSON.parse(init.body as string));
     return Promise.resolve(Response.json(answer.body, { status: answer.status ?? 200 }));
   });
@@ -95,6 +99,11 @@ function renderAt(path: string) {
   const history = createMemoryHistory({ initialEntries: [path] });
   render(<App router={createAppRouter(history)} queryClient={createQueryClient()} />);
   return history;
+}
+
+/** A scanner's burst: every key at once, then Enter, with no field focused. */
+function scan(code: string) {
+  for (const key of [...Array.from(code), 'Enter']) fireEvent.keyDown(document.body, { key });
 }
 
 const sentTo = (fetchMock: ReturnType<typeof stubApi>, method: string, path: string) =>
@@ -134,7 +143,7 @@ test('a scan of an unknown code opens a new item with the code filled in', async
   });
   const history = renderAt('/items');
   await screen.findByRole('table', { name: 'Items' });
-  await userEvent.keyboard('8901234567890{Enter}');
+  scan('8901234567890');
   expect(await screen.findByLabelText('Barcode 1')).toHaveValue('8901234567890');
   expect(history.location.pathname).toBe('/items/new');
 });
@@ -146,7 +155,7 @@ test('a scan of a known code opens its item', async () => {
   });
   const history = renderAt('/items');
   await screen.findByRole('table', { name: 'Items' });
-  await userEvent.keyboard('8901234567890{Enter}');
+  scan('8901234567890');
   expect(await screen.findByLabelText('Name')).toHaveValue('Aashirvaad Atta');
   expect(history.location.pathname).toBe(`/items/${ITEM}`);
 });
@@ -222,7 +231,9 @@ test('archives only after the dialog is confirmed', async () => {
   await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
   expect(fetchMock.mock.calls.some(([url]) => url.endsWith('/archive'))).toBe(false);
   await userEvent.click(screen.getByRole('button', { name: 'Archive' }));
-  await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Archive' }));
+  await userEvent.click(
+    within(screen.getByRole('dialog')).getByRole('button', { name: 'Archive' }),
+  );
   expect(await screen.findByText(/This item is archived/)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Restore' })).toBeInTheDocument();
 });

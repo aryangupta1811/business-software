@@ -32,13 +32,11 @@ mv "$dir/certs/rds-ca.pem.new" "$dir/certs/rds-ca.pem"
 
 "$dir/bootstrap-db.sh"
 
-# The release this one replaces, kept for a person rolling back by hand (the deploy workflow
-# reads it before deploying, with scripts/deploy/current-release.sh). Not on a rerun of the
-# same commit, which would overwrite it with itself.
-if [[ -f $dir/release.env ]] && ! grep -qx "IMAGE_TAG=$sha" "$dir/release.env"; then
-  echo "replacing: $(cat "$dir/release.env")"
-  cp "$dir/release.env" "$dir/previous-release.env"
-fi
+# The release that runs from now on. The deploy workflow reads the one it replaces first
+# (scripts/deploy/current-release.sh) and rolls back to it if this one fails. No "previous
+# release" is kept here: after a rollback it would name the failed release. The deploy
+# workflow's green runs, each named after its commit, are the record of what went live.
+[[ ! -f $dir/release.env ]] || echo "replacing: $(cat "$dir/release.env")"
 printf 'IMAGE_TAG=%s\n' "$sha" >"$dir/release.env"
 systemctl daemon-reload
 systemctl enable business-software.service

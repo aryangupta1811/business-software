@@ -111,7 +111,10 @@ case " $* " in
     esac
     ;;
   *"%{http_code}"*) printf '200 application/json' ;;
-  *) echo "time: fake" ;;
+  *)
+    [[ -z ${TIMING_FAILS:-} ]] || { echo "curl: (28) Operation timed out" >&2; exit 28; }
+    echo "time: fake"
+    ;;
 esac
 FAKE
 chmod +x "$fake/curl"
@@ -133,6 +136,94 @@ expect 1 "check-live: a site that stays down fails after the last try" live 999 
 expect_output "check-live: reports the last try" "try 3 of 3 failed"
 expect_equal "check-live: no wait after the last try" "$(grep -c 'trying again' <<<"$out")" 2
 expect 2 "check-live: refuses a bad --tries" live 0 --tries zero
+TIMING_FAILS=1 expect 0 "check-live: a failed timing request (only informational) passes" live 0
+
+# --- run_on_server and wait_for_command: Run Command through a fake AWS CLI. ----------------
+# The fake answers send-command with a command ID and keeps what was sent; each Status query
+# takes the next line of $STATUSES ("ERR:<message>" fails like the CLI does).
+cat >"$fake/aws" <<'FAKE'
+#!/usr/bin/env bash
+args=" $* "
+case $args in
+  *" send-command "*)
+    params=${args##*--parameters file://}
+    cp "${params%% *}" "$SENT"
+    echo cmd-1
+    ;;
+  *" get-command-invocation "*"--query Status"*)
+    line=$(head -n 1 "$STATUSES")
+    [[ -z $line ]] && line=InProgress || sed -i 1d "$STATUSES"
+    if [[ $line == ERR:* ]]; then
+      echo "${line#ERR:}" >&2
+      exit 254
+    fi
+    echo "$line"
+    ;;
+  *" get-command-invocation "*)
+    echo '{"StandardOutputContent": "out from server", "StandardErrorContent": ""}'
+    ;;
+  *) echo "fake aws: unexpected call: $*" >&2; exit 99 ;;
+esac
+FAKE
+chmod +x "$fake/aws"
+
+# The environment for scripts run against the fake AWS CLI: $1 holds the Status answers, one
+# word each. GITHUB_OUTPUT points at a file of this test's own, also when CI runs it.
+fake_aws_env() {
+  tr ' ' '\n' <<<"$1" >"$work/statuses"
+  rm -f "$work/sent.json" "$work/github-output"
+  export PATH="$fake:$PATH" STATUSES=$work/statuses SENT=$work/sent.json \
+    GITHUB_OUTPUT=$work/github-output DEMO_INSTANCE_ID=i-0123456789abcdef0 RUN_POLL_SECONDS=0
+}
+
+# server <status answers> -- <command>...: runs a lib.sh function against the fake AWS CLI.
+server() {
+  local answers=$1
+  shift 2
+  (
+    fake_aws_env "$answers"
+    # shellcheck source=scripts/deploy/lib.sh
+    source "$here/lib.sh"
+    "$@"
+  )
+}
+
+expect 0 "run_on_server: waits while the command runs, then succeeds" \
+  server "Pending InProgress Success" -- run_on_server test 60 'echo hi'
+expect_output "run_on_server: prints the server's output" "out from server"
+expect_output "run_on_server: prints the final status" "status: Success"
+expect_equal "run_on_server: gives the command ID to the next workflow step" \
+  "$(cat "$work/github-output")" "command_id=cmd-1"
+expect 0 "run_on_server: retries while the invocation doesn't exist yet" \
+  server "ERR:An_error_(InvocationDoesNotExist) Success" -- run_on_server test 60 'echo hi'
+expect 0 "run_on_server: retries when throttled" \
+  server "ERR:An_error_(ThrottlingException) Success" -- run_on_server test 60 'echo hi'
+expect 1 "run_on_server: stops at once on an auth error" \
+  server "ERR:An_error_(ExpiredTokenException) Success" -- run_on_server test 60 'echo hi'
+expect_output "run_on_server: reports the auth error" "ExpiredTokenException"
+expect 1 "run_on_server: a failed command fails" \
+  server "InProgress Failed" -- run_on_server test 60 'false'
+expect 2 "wait_for_command: still running at the deadline" \
+  server "InProgress" -- wait_for_command cmd-1 i-0123456789abcdef0 0
+expect_output "wait_for_command: says it is still running" "still InProgress"
+expect 1 "wait_for_command: a finished failed command" \
+  server "Failed" -- wait_for_command cmd-1 i-0123456789abcdef0 60
+
+# --- backup.sh before-deploy: never deploys without a fresh backup unless told to. ----------
+backup() {
+  (
+    fake_aws_env Success
+    "$here/backup.sh" "$@"
+  )
+}
+expect 0 "backup: before-deploy sends the backup" backup before-deploy
+out=$(cat "$work/sent.json")
+expect_output "backup: before-deploy fails on the server when there's no backup service" \
+  "no backup service.*exit 1"
+expect 0 "backup: before-deploy --first-backup-release sends the backup" backup before-deploy --first-backup-release
+out=$(cat "$work/sent.json")
+expect_output "backup: --first-backup-release skips only a missing backup service" "skipped.*exit 0"
+expect 2 "backup: refuses an unknown option" backup before-deploy --yes
 
 echo "$passed passed, $failed failed"
 ((failed == 0))

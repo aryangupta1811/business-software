@@ -88,7 +88,8 @@ for ((try = 1; ; try++)); do
   sleep "$delay"
 done
 
-# 6. Timing from here (the owner's laptop is in India), for the record.
+# 6. Timing from here (the owner's laptop is in India), for the record only: a failure here
+# must not fail the check, or a slow moment after a restart would roll back a healthy release.
 curl -sS -o /dev/null --max-time 15 \
   -w 'time: dns %{time_namelookup}s, connect %{time_connect}s, tls %{time_appconnect}s, first byte %{time_starttransfer}s, total %{time_total}s\n' \
-  "$base/"
+  "$base/" || echo "time: not measured (the request failed)"

@@ -87,8 +87,30 @@ resource "aws_s3_bucket_lifecycle_configuration" "backups" {
   depends_on = [aws_s3_bucket_versioning.backups]
 }
 
-# Refuse any request that isn't over HTTPS.
+# Refuse any request that isn't over HTTPS, and any write that could replace a backup.
 data "aws_iam_policy_document" "backups_bucket" {
+  # Backups are only ever added. A write must carry `If-None-Match: *`, which S3 refuses (412)
+  # when the key exists, so not even the server (put-only) can overwrite one: versioning would
+  # keep the old copy, but only for 30 days. For every principal, admin included, and it covers
+  # multipart uploads too: their steps are s3:PutObject and don't carry the header (PR #32 review).
+  statement {
+    sid       = "DenyOverwrites"
+    effect    = "Deny"
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.backups.arn}/*"]
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "Null"
+      variable = "s3:if-none-match"
+      values   = ["true"]
+    }
+  }
+
   statement {
     sid     = "DenyInsecureTransport"
     effect  = "Deny"
@@ -119,7 +141,8 @@ resource "aws_s3_bucket_policy" "backups" {
 }
 
 # The server's one right on the bucket: add a file under postgres/. backup.sh uploads with a
-# single PutObject per file (no multipart, so no other action is needed).
+# single PutObject per file (no multipart, so no other action is needed), each with
+# `If-None-Match: *` (the bucket policy refuses any other write).
 data "aws_iam_policy_document" "server_backups" {
   statement {
     actions   = ["s3:PutObject"]

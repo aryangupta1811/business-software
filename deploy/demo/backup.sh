@@ -25,9 +25,11 @@ bucket=$(param backup/bucket)
 PGPASSWORD=$(param db/app-backup-password)
 export PGPASSWORD
 
-# Each backup's name carries its UTC time, so no upload ever replaces another.
-name="business_software-$(date -u +%Y%m%dT%H%M%SZ)"
-key="postgres/$(date -u +%Y/%m/%d)/$name"
+# Each backup's name carries its UTC time, so no upload ever replaces another. One reading of
+# the clock for the name and the folder: two could fall either side of midnight.
+now=$(date -u +%s)
+name="business_software-$(date -u -d "@$now" +%Y%m%dT%H%M%SZ)"
+key="postgres/$(date -u -d "@$now" +%Y/%m/%d)/$name"
 work=$(mktemp -d /var/tmp/business-software-backup.XXXXXX)
 trap 'rm -rf "$work"' EXIT
 
@@ -40,9 +42,12 @@ docker run --rm -e PGPASSWORD \
   postgres:18 bash /backup/dump.sh /out "$name"
 
 # One PutObject per file (no multipart), with a SHA-256 checksum S3 verifies on arrival.
-# The counts go last: a backup is complete when its .counts.tsv exists.
+# --if-none-match '*': add, never replace. The bucket policy refuses a write without it, and S3
+# answers 412 if the key exists. The counts go last: a backup is complete when its
+# .counts.tsv exists.
 for file in "$name.dump" "$name.counts.tsv"; do
   "$aws" s3api put-object --region "$region" --bucket "$bucket" --key "$key${file#"$name"}" \
-    --body "$work/$file" --checksum-algorithm SHA256 --output text --query ETag >/dev/null
+    --body "$work/$file" --checksum-algorithm SHA256 --if-none-match '*' \
+    --output text --query ETag >/dev/null
 done
 echo "backup: $key.dump uploaded"

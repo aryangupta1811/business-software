@@ -86,7 +86,13 @@ The database is the guarantee (ADR 0006), and the guard test guarantees that the
 - P1.4 must look up a user's business at login, before any business is set: probably a narrow `SECURITY DEFINER` function with PUBLIC's EXECUTE revoked. Decided there.
 - P2.7's worker calls `withBusiness` per job, with the business stored in the job.
 - **Added 2026-11-18 (P1.3): one unique key without `business_id`, on purpose.** Module 00 #27 makes an owner's email unique across the whole app, so `users_owner_email_unique` is a partial unique index on `users (email) where role = 'owner'`. PostgreSQL checks a unique index against every row, including rows RLS hides, so a second signup with the same email fails with `23505` inside its own transaction: signup needs no cross-business read and no `SECURITY DEFINER` function. The cost is that the error reveals the email has an account, which #27 accepts (P1.4's rate limit covers signup). P1.7's planned guard rule ("every unique key on a tenant table includes `business_id`") must list this index as its one exception, with this reason.
-- **Settled 2026-11-19 (P1.4, ADR 0039): the login lookup.** As predicted above: `app_find_owner_login(email)`, a `SECURITY DEFINER` function over `auth.owner_logins`, a schema `app_runtime` has no USAGE on. The guard now also requires every allowed definer function to pin its `search_path`.
+- **Added 2026-11-19 (P1.7): four more guard rules.**
+  - `unique_business`: every unique constraint or index on a tenant table (other than the primary key) has `business_id` among its columns. Its exceptions list, `UNIQUE_WITHOUT_BUSINESS`, holds only `users_owner_email_unique`.
+  - `fk_valid`: a foreign key added `NOT VALID` never checked the rows already there, so it fails.
+  - `append_only` now covers an append-only table's partitions, and `append_only_missing` fails on a listed name that doesn't exist. Writing it found that `pg_partition_tree` returns nothing for a table that isn't partitioned; the probes caught the rule silently skipping `entry_log`.
+  - `schema_usage`: `app_runtime` has no `USAGE` on a `NOT_TENANT_SCHEMAS` schema. A non-tenant schema the app must use (P1.4's rate limits) needs its own list.
+- **Added 2026-11-19 (P1.7): item tables default `business_id` to `app_current_business_id()`,** like `entry_log`, so services never pass a business ID and can't pass a wrong one; the policy still checks it.
+- **Settled 2026-11-19 (P1.4, ADR 0039): the login lookup.** As predicted above: `app_find_owner_login(email)`, a `SECURITY DEFINER` function over `auth.owner_logins`, a schema `app_runtime` has no USAGE on. The guard now also requires every allowed definer function to pin its `search_path`. `auth` is on `NOT_TENANT_SCHEMAS`, so P1.7's `schema_usage` rule checks the app can't use it; the rate limits live in memory (ADR 0038), so no schema the app must use was needed after all.
 
 ## Interview note
 

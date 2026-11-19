@@ -309,6 +309,20 @@ describe('logins and sessions', () => {
       expect(await owner.call('GET', '/settings')).toMatchObject({ body: { code: 'locked' } });
     });
 
+    // Typing a long bill sends no requests: the web app tells the server someone is there.
+    it('counts "still here" as activity, and refuses it on a locked session', async () => {
+      const { owner } = await signUp('still-here@example.com');
+      clock.advance(4 * MINUTE);
+      expect((await owner.call('POST', '/session/active')).status).toBe(204);
+      clock.advance(4 * MINUTE);
+      expect((await owner.call('GET', '/settings')).status).toBe(200);
+      clock.advance(6 * MINUTE);
+      expect(await owner.call('POST', '/session/active')).toMatchObject({
+        status: 401,
+        body: { code: 'locked' },
+      });
+    });
+
     it('refuses to lock a staff session', async () => {
       const { owner, businessId } = await signUp('staff-lock@example.com');
       await addStaff(businessId, 'meena');

@@ -127,6 +127,18 @@ export class SessionController {
     await this.sessions.lock(caller);
   }
 
+  /**
+   * "Someone is still at the counter": the web app sends this at most every 30 seconds while
+   * keys are pressed, since typing a long bill makes no other request. The guard records the
+   * activity; there is nothing else to do.
+   */
+  @Permission('session.own')
+  @Post('session/active')
+  @HttpCode(204)
+  active(): void {
+    // The guard has already refreshed `last_active_at`.
+  }
+
   /** #21: unlocking needs the password. */
   @Permission('session.own')
   @AllowLocked()

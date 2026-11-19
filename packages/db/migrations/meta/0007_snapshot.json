@@ -1,5 +1,5 @@
 {
-  "id": "7fd65f08-2462-4c03-b33a-ac4bb07fd492",
+  "id": "a90984b6-8259-40e6-80da-9f2937454010",
   "prevId": "08590896-0453-4179-ab27-4b190231ba80",
   "version": "7",
   "dialect": "postgresql",
@@ -1916,7 +1916,7 @@
         },
         "sessions_end_reason_check": {
           "name": "sessions_end_reason_check",
-          "value": "\"sessions\".\"end_reason\" in ('logout', 'idle', 'replaced', 'password_changed', 'deactivated', 'reset')"
+          "value": "\"sessions\".\"end_reason\" in ('logout', 'idle', 'replaced', 'password_changed', 'deactivated', 'reset', 'device_forgotten')"
         },
         "sessions_ended_check": {
           "name": "sessions_ended_check",

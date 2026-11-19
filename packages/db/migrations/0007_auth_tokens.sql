@@ -1,5 +1,7 @@
--- P1.4 email links (Module 00 #30, #32; design docs/plans/2026-11-19-p1.4-login-design.md,
--- section 6): one-time tokens for email confirmation and password reset, stored as hashes.
+-- P1.4 email links and remembered computers (Module 00 #30, #32, #44; design
+-- docs/plans/2026-11-19-p1.4-login-design.md, sections 6 and 10): one-time tokens for email
+-- confirmation and password reset, stored as hashes, and a session end reason for a computer
+-- the owner forgets. The check is replaced, not loosened: every existing reason stays allowed.
 CREATE TABLE "auth_tokens" (
 	"id" uuid PRIMARY KEY DEFAULT uuidv7() NOT NULL,
 	"business_id" uuid NOT NULL,
@@ -17,7 +19,9 @@ CREATE TABLE "auth_tokens" (
 ALTER TABLE "auth_tokens" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 -- Hand-written: owners skip RLS unless it is forced, and app_owner owns every table.
 ALTER TABLE "auth_tokens" FORCE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "sessions" DROP CONSTRAINT "sessions_end_reason_check";--> statement-breakpoint
 ALTER TABLE "auth_tokens" ADD CONSTRAINT "auth_tokens_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "auth_tokens" ADD CONSTRAINT "auth_tokens_user_fk" FOREIGN KEY ("business_id","user_id") REFERENCES "public"."users"("business_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "auth_tokens_one_open_per_user" ON "auth_tokens" USING btree ("business_id","user_id","kind") WHERE "auth_tokens"."used_at" is null;--> statement-breakpoint
+ALTER TABLE "sessions" ADD CONSTRAINT "sessions_end_reason_check" CHECK ("sessions"."end_reason" in ('logout', 'idle', 'replaced', 'password_changed', 'deactivated', 'reset', 'device_forgotten'));--> statement-breakpoint
 CREATE POLICY "tenant_isolation" ON "auth_tokens" AS PERMISSIVE FOR ALL TO public USING ("auth_tokens"."business_id" = (select app_current_business_id())) WITH CHECK ("auth_tokens"."business_id" = (select app_current_business_id()));

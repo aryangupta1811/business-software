@@ -284,6 +284,7 @@ export const SESSION_END_REASONS = [
   'password_changed',
   'deactivated',
   'reset',
+  'device_forgotten',
 ] as const;
 export type SessionEndReason = (typeof SESSION_END_REASONS)[number];
 

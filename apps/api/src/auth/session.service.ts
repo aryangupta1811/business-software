@@ -16,6 +16,7 @@ import {
   withBusiness,
   type Database,
   type SessionEndReason,
+  type SQL,
   type Transaction,
 } from '@business-software/db';
 import {
@@ -80,6 +81,13 @@ export class SessionEndedError extends Error {
   }
 }
 
+/** A wrong current or owner password on a signed-in screen (#17, #46). */
+export class WrongPasswordError extends Error {
+  constructor() {
+    super('Wrong password');
+  }
+}
+
 /** Rate limits (Module 00 #41; P1.4 design, section 7). */
 export class LoginLimits {
   /** Attempts per computer (IP address). */
@@ -89,12 +97,20 @@ export class LoginLimits {
   readonly signup: RateLimiter;
   /** Wrong unlock passwords per session. */
   readonly unlock: RateLimiter;
+  /** Owner-password and current-password checks per session (section 6). */
+  readonly ownerPassword: RateLimiter;
+  /** Reset requests, recovery-key tries and "Send again", per IP and per email or user. */
+  readonly recoveryByIp: RateLimiter;
+  readonly recoveryByAccount: RateLimiter;
 
   constructor(clock: Clock) {
     this.ip = new RateLimiter(30, 15 * MINUTE, clock);
     this.failures = new RateLimiter(10, 15 * MINUTE, clock);
     this.signup = new RateLimiter(5, 60 * MINUTE, clock);
     this.unlock = new RateLimiter(10, 15 * MINUTE, clock);
+    this.ownerPassword = new RateLimiter(10, 15 * MINUTE, clock);
+    this.recoveryByIp = new RateLimiter(5, 60 * MINUTE, clock);
+    this.recoveryByAccount = new RateLimiter(5, 60 * MINUTE, clock);
   }
 }
 
@@ -124,12 +140,14 @@ interface StartOptions {
   device: FoundDevice | null;
 }
 
-function throwUnless(verdict: Verdict): void {
+export function throwUnless(verdict: Verdict): void {
   if (!verdict.allowed) throw new TooManyAttemptsError(verdict.retryAt);
 }
 
 export interface AuthSettings {
   cookieSecure: boolean;
+  /** Module 00 #45: the demo's email reaches verified addresses only. */
+  emailLimited: boolean;
 }
 
 export class SessionService {
@@ -357,7 +375,86 @@ export class SessionService {
     });
   }
 
+  /** Expires the device cookie: this computer no longer knows its business (#44). */
+  clearDeviceCookie(): string {
+    return serializeCookie(this.names.device, '', {
+      secure: this.settings.cookieSecure,
+      maxAge: 0,
+    });
+  }
+
+  /** The device row this computer's cookie names, if any (#44's "This computer"). */
+  deviceTokenHashOf(context: RequestContext): string | null {
+    const cookie = readCookieToken(context.cookies.get(this.names.device));
+    return cookie === null ? null : hashToken(cookie.token);
+  }
+
+  /**
+   * Section 6: sensitive routes take the owner's password in the body. Stateless, and counted
+   * per session before the check, like a login; the right password takes the count back.
+   */
+  async requireOwnerPassword(caller: Caller, password: string): Promise<void> {
+    await this.requirePassword(caller, password, eq(users.role, 'owner'));
+  }
+
+  /** #46: the caller's own current password, under the same limit. */
+  async requireOwnPassword(caller: Caller, password: string): Promise<void> {
+    await this.requirePassword(caller, password, eq(users.id, caller.userId));
+  }
+
+  /** A new password's hash, made in the one Argon2 queue outside any transaction. */
+  hashNewPassword(password: string): Promise<string> {
+    return this.gate.run(() => hashPassword(password));
+  }
+
+  /**
+   * Sets a user's new password inside the caller's transaction and ends their sessions, all
+   * of them or all but `keep` (#30, #31, #46).
+   */
+  async setPasswordIn(
+    tx: Transaction,
+    userId: string,
+    passwordHash: string,
+    reason: 'reset' | 'password_changed',
+    keep?: string,
+  ): Promise<void> {
+    await tx
+      .update(users)
+      .set({ passwordHash, passwordChangedAt: this.clock.now() })
+      .where(eq(users.id, userId));
+    await this.endSessionsIn(tx, eq(sessions.userId, userId), reason, keep);
+  }
+
+  /** Ends every open session matching `where`, except `keep`, each with its log entry. */
+  async endSessionsIn(
+    tx: Transaction,
+    where: SQL | undefined,
+    reason: SessionEndReason,
+    keep?: string,
+  ): Promise<void> {
+    const open = await tx
+      .select({ id: sessions.id, userId: sessions.userId, branchId: sessions.branchId })
+      .from(sessions)
+      .where(and(where, isNull(sessions.endedAt)));
+    for (const row of open) {
+      if (row.id !== keep) await this.end(tx, row.id, row.userId, row.branchId, reason);
+    }
+  }
+
   // ---------------------------------------------------------------------------------------
+
+  private async requirePassword(caller: Caller, password: string, who: SQL): Promise<void> {
+    throwUnless(this.limits.ownerPassword.hit(caller.sessionId));
+    const hash = await withBusiness(this.database.db, caller.businessId, async (tx) => {
+      const [row] = await tx
+        .select({ passwordHash: users.passwordHash })
+        .from(users)
+        .where(and(who, isNull(users.deactivatedAt)));
+      return row?.passwordHash ?? null;
+    });
+    if (!(await this.checkPassword(password, hash))) throw new WrongPasswordError();
+    this.limits.ownerPassword.reset(caller.sessionId);
+  }
 
   private async checkPassword(password: string, stored: string | null): Promise<boolean> {
     const hash = stored ?? (await this.standInHash());
@@ -624,6 +721,7 @@ export class SessionService {
         branchName: branches.name,
         ownerLockMinutes: businesses.ownerLockMinutes,
         staffIdleMinutes: businesses.staffIdleMinutes,
+        emailConfirmedAt: users.emailConfirmedAt,
       })
       .from(users)
       .innerJoin(businesses, eq(businesses.id, users.businessId))
@@ -640,6 +738,9 @@ export class SessionService {
       branch: { id: caller.branchId, name: row.branchName },
       csrfToken,
       idleMinutes: caller.role === 'owner' ? row.ownerLockMinutes : row.staffIdleMinutes,
+      // Staff have no email: nothing for them to confirm (#32).
+      emailConfirmed: caller.role === 'staff' || row.emailConfirmedAt !== null,
+      emailLimited: this.settings.emailLimited,
     };
   }
 }

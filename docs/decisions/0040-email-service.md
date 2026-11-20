@@ -1,7 +1,7 @@
 # 0040 — Email: one `Mailer` interface, Mailpit on this computer, Amazon SES in its sandbox on the demo server
 
 - **Date:** 2026-11-20
-- **Status:** Proposed
+- **Status:** Accepted (owner's OK 2026-11-20)
 
 ## Context
 

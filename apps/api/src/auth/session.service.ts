@@ -100,9 +100,15 @@ export class LoginLimits {
   readonly unlock: RateLimiter;
   /** Owner-password and current-password checks per session (section 6). */
   readonly ownerPassword: RateLimiter;
-  /** Reset requests, recovery-key tries and "Send again", per IP and per email or user. */
+  /** Reset-link requests per IP, and reset-link requests and "Send again" per email or user. */
   readonly recoveryByIp: RateLimiter;
   readonly recoveryByAccount: RateLimiter;
+  /**
+   * Wrong recovery keys per IP, and nothing per email (owner, 2026-11-20; #41). Only wrong keys
+   * count, and a right key is never refused, so neither a stranger who knows the email nor one
+   * sharing the owner's IP can lock the owner out.
+   */
+  readonly recoveryKeyByIp: RateLimiter;
 
   constructor(clock: Clock) {
     this.ip = new RateLimiter(30, 15 * MINUTE, clock);
@@ -112,6 +118,7 @@ export class LoginLimits {
     this.ownerPassword = new RateLimiter(10, 15 * MINUTE, clock);
     this.recoveryByIp = new RateLimiter(5, 60 * MINUTE, clock);
     this.recoveryByAccount = new RateLimiter(5, 60 * MINUTE, clock);
+    this.recoveryKeyByIp = new RateLimiter(5, 60 * MINUTE, clock);
   }
 }
 

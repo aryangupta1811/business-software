@@ -157,9 +157,10 @@ export class AccountService {
 
   /**
    * #31: the recovery key resets the password, stops working, and a new key is answered once.
-   * Its own limit, separate from the login's: 5 per IP an hour, and none per email (owner,
-   * 2026-11-20; #41): the key has 160 random bits, so a per-email limit couldn't stop a guess
-   * that has no chance anyway, but would let anyone who knows the email lock the owner out.
+   * Its own limit, separate from the login's and the reset links' (owner, 2026-11-20; #41):
+   * 5 wrong keys per IP an hour, none per email, and a right key is never refused. The key has
+   * 160 random bits, so the limit only slows a guess that has no chance anyway; it must never
+   * let someone who knows the email, or shares the owner's IP, lock the owner out.
    */
   async resetWithRecoveryKey(
     email: string,
@@ -167,10 +168,13 @@ export class AccountService {
     newPassword: string,
     context: RequestContext,
   ): Promise<string> {
-    throwUnless(this.sessions.limits.recoveryByIp.hit(context.ip));
+    const wrongKey = () => {
+      throwUnless(this.sessions.limits.recoveryKeyByIp.hit(context.ip));
+      return new WrongRecoveryKeyError();
+    };
     const keyHash = hashRecoveryKey(typedKey);
     const found = await this.sessions.findOwnerLogin(email);
-    if (keyHash === null || found === undefined) throw new WrongRecoveryKeyError();
+    if (keyHash === null || found === undefined) throw wrongKey();
     const businessId = found.businessId;
     const userId = found.userId;
     const unusedKey = and(
@@ -182,7 +186,8 @@ export class AccountService {
       const [key] = await tx.select({ id: recoveryKeys.id }).from(recoveryKeys).where(unusedKey);
       return key === undefined ? null : accountOf(tx, userId);
     });
-    if (account === null) throw new WrongRecoveryKeyError();
+    if (account === null) throw wrongKey();
+    this.sessions.limits.recoveryKeyByIp.reset(context.ip);
     refuseWeak(newPassword, account);
     const passwordHash = await this.sessions.hashNewPassword(newPassword);
     const next = makeRecoveryKey();

@@ -419,6 +419,39 @@ describe('account recovery and remembered computers', () => {
       });
     });
 
+    it('a right key works from an IP that used up its tries, and clears them (shared IPs)', async () => {
+      const email = 'recover-shared-ip@example.com';
+      const { recoveryKey } = await signUp(email);
+      const shared = browser();
+      const reset = (key: string, newPassword: string) =>
+        shared.call('POST', '/recovery/reset', { email, recoveryKey: key, newPassword });
+      const wrongKey = madeUpRecoveryKey();
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        expect((await reset(wrongKey, NEW_PASSWORD)).status).toBe(401);
+      }
+      expect((await reset(wrongKey, NEW_PASSWORD)).status).toBe(429);
+
+      const right = await reset(recoveryKey, NEW_PASSWORD);
+      expect(right.status).toBe(200);
+      expect((await reset(wrongKey, 'another new password')).status).toBe(401);
+    });
+
+    it("reset-link requests don't use up the recovery key's tries from the same IP", async () => {
+      const email = 'recover-after-links@example.com';
+      const { recoveryKey } = await signUp(email);
+      await confirmEmail(email);
+      const shop = browser();
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        expect((await shop.call('POST', '/password-reset/request', { email })).status).toBe(202);
+      }
+      const answer = await shop.call('POST', '/recovery/reset', {
+        email,
+        recoveryKey,
+        newPassword: NEW_PASSWORD,
+      });
+      expect(answer.status).toBe(200);
+    });
+
     it("someone who knows the email can't lock the owner out of recovery (#41)", async () => {
       // Owner, 2026-11-20: no limit per email on recovery-key tries, only per IP. The key has
       // 160 random bits, so guessing it is hopeless; a per-email limit would only let anyone who

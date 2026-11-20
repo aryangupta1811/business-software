@@ -5,6 +5,7 @@ import { newPassword, passwordProblem } from './auth.js';
 import { BUSINESS_TYPES, FEATURES, GST_STATUSES } from './business.js';
 import { email, isValidGstin, optionalText, phone, text } from './fields.js';
 import { isBranchStateCode } from './states.js';
+import { NEGATIVE_STOCK_SETTINGS } from './stock.js';
 
 // A pick-one field left empty says `choose`, not `invalid`: missing from the body, an empty
 // select (''), or a radio group with nothing picked (the form library sends null).
@@ -118,9 +119,16 @@ export const settingsSecuritySchema = z.strictObject({
 });
 export type SettingsSecurityInput = z.infer<typeof settingsSecuritySchema>;
 
+/** Module 01 #12 (owner answer 1A): selling past zero stock warns, or is blocked. */
+export const settingsStockSchema = z.strictObject({
+  negativeStock: z.enum(NEGATIVE_STOCK_SETTINGS, { error: 'invalid' }),
+});
+export type SettingsStockInput = z.infer<typeof settingsStockSchema>;
+
 /** What `GET /api/settings` answers, and every save returns. */
 export interface SettingsView {
   business: SettingsBusinessInput;
   features: SettingsFeaturesInput['features'];
   security: SettingsSecurityInput;
+  stock: SettingsStockInput;
 }

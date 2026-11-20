@@ -250,6 +250,8 @@ export const itemQuerySchema = z.strictObject({
   q: optionalText(100).optional(),
   category: uuid().optional(),
   archived: z.enum(['true', 'false'], { error: 'invalid' }).optional(),
+  /** Only items at or below their low-stock level at the caller's branch (P1.8). */
+  low: z.enum(['true', 'false'], { error: 'invalid' }).optional(),
   after: z.string().max(400, { error: 'too_long' }).optional(),
 });
 export type ItemQuery = z.infer<typeof itemQuerySchema>;
@@ -348,6 +350,10 @@ export interface ItemRow {
   mrp: Paise | null;
   gstRate: number | null;
   archived: boolean;
+  /** Stock at the caller's branch (P1.8); absent for a caller without `stock.view`. */
+  stock?: number;
+  /** At or below the branch's low-stock level (Module 07 #4); absent with `stock`. */
+  low?: boolean;
 }
 
 export interface ItemPage {

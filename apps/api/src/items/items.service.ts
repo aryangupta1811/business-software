@@ -19,6 +19,7 @@ import {
   itemBarcodes,
   itemBranchLevels,
   items,
+  itemStock,
   itemUnits,
   recordEntry,
   sql,
@@ -27,6 +28,7 @@ import {
   type Transaction,
 } from '@business-software/db';
 import {
+  isLow,
   inStoreBarcode,
   inStoreSerial,
   text,
@@ -58,6 +60,9 @@ type ItemRecord = typeof items.$inferSelect;
 
 /** Module 01 #1: the purchase price is hidden from staff unless the owner allows it. */
 const seesCost = (caller: Caller) => caller.permissions.includes('items.view_cost');
+
+/** P1.8: stock quantities show only with `stock.view`. */
+const seesStock = (caller: Caller) => caller.permissions.includes('stock.view');
 
 /** The view without the purchase price for a caller who may not see it (the key is absent). */
 function forCaller<T extends { purchasePrice?: number | null }>(view: T, caller: Caller): T {
@@ -141,6 +146,10 @@ export class ItemsService {
   }
 
   list(caller: Caller, query: ItemQuery): Promise<ItemPage> {
+    // The filter would tell a caller who may not see stock which items are low.
+    if (query.low === 'true' && !seesStock(caller)) {
+      throw new ForbiddenException({ code: 'forbidden' });
+    }
     return this.inBusiness(caller, async (tx) => {
       const term = query.q ?? null;
       const exactCode = term === null ? sql`false` : sql`lower(${items.code}) = lower(${term})`;
@@ -160,6 +169,12 @@ export class ItemsService {
         query.archived === 'true' ? isNotNull(items.archivedAt) : isNull(items.archivedAt),
       ];
       if (query.category !== undefined) conditions.push(eq(items.categoryId, query.category));
+      if (query.low === 'true') {
+        conditions.push(
+          sql`coalesce(${itemBranchLevels.lowStockLevel}, 0) > 0
+            and coalesce(${itemStock.quantity}, 0) <= ${itemBranchLevels.lowStockLevel}`,
+        );
+      }
       if (term !== null) {
         const like = `%${escapeLike(term)}%`;
         conditions.push(
@@ -174,16 +189,38 @@ export class ItemsService {
             > (${cursor.rank}::int, ${cursor.name}::text collate item_name, ${cursor.id}::uuid)`,
         );
       }
+      // Stock and the low-stock level at the caller's branch (P1.8); none yet means 0 and no level.
       const rows = await tx
-        .select({ item: items, rank })
+        .select({
+          item: items,
+          rank,
+          stock: itemStock.quantity,
+          level: itemBranchLevels.lowStockLevel,
+        })
         .from(items)
+        .leftJoin(
+          itemStock,
+          and(eq(itemStock.itemId, items.id), eq(itemStock.branchId, caller.branchId)),
+        )
+        .leftJoin(
+          itemBranchLevels,
+          and(
+            eq(itemBranchLevels.itemId, items.id),
+            eq(itemBranchLevels.branchId, caller.branchId),
+          ),
+        )
         .where(and(...conditions))
         .orderBy(rank, sql`${items.name} collate item_name`, asc(items.id))
         .limit(PAGE_SIZE + 1);
       const page = rows.slice(0, PAGE_SIZE);
       const last = page.at(-1);
       return {
-        items: page.map(({ item }) => forCaller(toRow(item), caller)),
+        items: page.map(({ item, stock, level }) => {
+          const row = forCaller(toRow(item), caller);
+          if (!seesStock(caller) || item.kind !== 'goods') return row;
+          const quantity = stock ?? 0;
+          return { ...row, stock: quantity, low: isLow(quantity, level) };
+        }),
         next:
           rows.length > PAGE_SIZE && last !== undefined
             ? encodeCursor({ rank: last.rank, name: last.item.name, id: last.item.id })

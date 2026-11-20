@@ -28,6 +28,7 @@ const SETTINGS: SettingsView = {
   },
   features: ['expiry_dates'],
   security: { ownerLockMinutes: 5, staffIdleMinutes: 30 },
+  stock: { negativeStock: 'warn' },
 };
 
 const HERE: DeviceView = {

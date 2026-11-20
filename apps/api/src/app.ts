@@ -37,6 +37,8 @@ import { SettingsController } from './settings/settings.controller.js';
 import { SettingsService } from './settings/settings.service.js';
 import { SignupController } from './signup/signup.controller.js';
 import { SignupService } from './signup/signup.service.js';
+import { StockController } from './stock/stock.controller.js';
+import { StockService } from './stock/stock.service.js';
 
 /** Every controller the API serves; the route census test reads this list. */
 export const API_CONTROLLERS = [
@@ -49,6 +51,7 @@ export const API_CONTROLLERS = [
   ItemsController,
   CategoriesController,
   UnitsController,
+  StockController,
 ];
 
 export interface AppOptions {
@@ -92,6 +95,7 @@ class ApiModule {
         },
         ItemsService,
         CatalogueService,
+        StockService,
         // One Argon2 queue for signup and logins (ADR 0038).
         { provide: HASH_GATE, useValue: options.hashGate ?? new HashGate() },
         {

@@ -24,7 +24,24 @@ class BoomController {
   }
 }
 
-@Module({ controllers: [BoomController] })
+// What a query that waited past lock_timeout throws (ADR 0041): PostgreSQL's 55P03 on `cause`.
+@Controller('locked')
+class LockedController {
+  @Get()
+  locked(): never {
+    throw new Error(
+      `Failed query: select 1 from "item_stock" for update
+params: fake-value`,
+      {
+        cause: Object.assign(new Error('canceling statement due to lock timeout'), {
+          code: '55P03',
+        }),
+      },
+    );
+  }
+}
+
+@Module({ controllers: [BoomController, LockedController] })
 class BoomModule {}
 
 function fakeLogger() {
@@ -57,6 +74,25 @@ describe('UnhandledErrorFilter', () => {
     // Nest's Logger passes (message, stack, context); there is no stack to pass.
     expect(logger.error.mock.calls).toEqual([
       [`Request failed: ${FAILED_QUERY} → ${REASON}`, undefined, 'Api'],
+    ]);
+  });
+
+  // Another counter held the row past lock_timeout: the screen may retry (P1.8 design §7).
+  it('answers 503 busy with Retry-After for a lock timeout, and warns without values', async () => {
+    const logger = fakeLogger();
+    app = await NestFactory.create(BoomModule, { logger });
+    app.useGlobalFilters(new UnhandledErrorFilter(app.getHttpAdapter()));
+    const response = await fetch(`${await listen(app)}/locked`);
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('1');
+    expect(await response.json()).toEqual({ code: 'busy' });
+    expect(logger.error).not.toHaveBeenCalled();
+    expect(logger.warn.mock.calls).toEqual([
+      [
+        'Request busy: Failed query: select 1 from "item_stock" for update → canceling statement due to lock timeout',
+        'Api',
+      ],
     ]);
   });
 

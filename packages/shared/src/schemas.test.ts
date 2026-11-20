@@ -6,6 +6,7 @@ import {
   settingsBusinessSchema,
   settingsFeaturesSchema,
   settingsSecuritySchema,
+  settingsStockSchema,
   signupSchema,
 } from './schemas.js';
 
@@ -210,5 +211,18 @@ describe('settingsSecuritySchema', () => {
     expect(
       errorsOf(settingsSecuritySchema, { ownerLockMinutes: 5, staffIdleMinutes: 30, ...change }),
     ).toEqual(expected);
+  });
+});
+
+describe('settingsStockSchema (Module 01 #12, owner answer 1A)', () => {
+  it('takes warn or block, nothing else', () => {
+    expect(settingsStockSchema.parse({ negativeStock: 'warn' })).toEqual({ negativeStock: 'warn' });
+    expect(settingsStockSchema.parse({ negativeStock: 'block' })).toEqual({
+      negativeStock: 'block',
+    });
+    expect(errorsOf(settingsStockSchema, { negativeStock: 'allow' })).toEqual({
+      negativeStock: 'invalid',
+    });
+    expect(errorsOf(settingsStockSchema, {})).toEqual({ negativeStock: 'invalid' });
   });
 });

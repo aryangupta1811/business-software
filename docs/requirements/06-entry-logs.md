@@ -50,3 +50,4 @@ None. Moved to `ideas-backlog.md`: a fourth flag rule, "price lowered and raised
 - 2026-10-29 — Draft created from the planning chat on claude.ai.
 - 2026-10-29 — Kickoff session: noted that `00` #20 already answers the owner-logging question.
 - 2026-11-19 — Finalized in fast-track sitting 2 (`docs/plans/2026-11-18-sitting-2.md`, items 1 and 7–10): the owner took every recommendation, with flag rules 1–3 only (rule 4 to the backlog), and answered D4 "yes": only the database sets an entry's ID and time.
+- 2026-11-20 — Owner, P1.8 design (question 5, as recommended): #7's "value at purchase price" for a stock write-down is the branch's average cost of that stock (Module 01 #4), falling back to the item's purchase price when the item has no stock history. No numbered point changed.

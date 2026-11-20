@@ -83,6 +83,12 @@ variable "nightly_stop_timezone" {
   default     = "Asia/Kolkata"
 }
 
+variable "github_repository" {
+  description = "owner/name of the GitHub repository whose demo environment may deploy (stage 6)."
+  type        = string
+  default     = "aryangupta1811/business-software"
+}
+
 variable "backup_retention_days" {
   description = "Days a nightly database backup is kept in S3 before it expires (ADR 0037); 30 more as an older version."
   type        = number

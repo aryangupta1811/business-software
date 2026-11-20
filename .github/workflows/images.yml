@@ -1,6 +1,6 @@
 # Publishes the two images for every commit on main (ADR 0034): built on GitHub's ARM64
-# runner for the Graviton server, pushed to GitHub Container Registry, tagged with the commit
-# hash. scripts/deploy/demo.sh deploys a commit by that tag.
+# runner for the Graviton server, smoke-tested, then pushed to GitHub Container Registry,
+# tagged with the commit hash. The deploy workflow (stage 6) deploys a commit by that tag.
 # Not a required check: it runs after the merge, on main only. Never on pull requests, so
 # code that hasn't been reviewed can't push an image.
 name: images
@@ -31,35 +31,28 @@ jobs:
       contents: read
       # Only this job may write packages, with a token that expires when the job ends.
       packages: write
-    strategy:
-      matrix:
-        include:
-          - image: business-software-app
-            dockerfile: apps/api/Dockerfile
-          - image: business-software-web
-            dockerfile: apps/web/Dockerfile
+    env:
+      REGISTRY: ghcr.io/${{ github.repository_owner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      # Stage 6: the image that runs on the server must be the image that was tested (CI's
+      # smoke job tests x86 builds of pull requests). So both are built into the local Docker
+      # first, under the names compose.yaml uses, smoke-tested with the same action CI uses,
+      # and only then pushed.
+      - uses: ./.github/actions/smoke
+        with:
+          arch: arm64
       - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push ${{ matrix.image }}
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          platforms: linux/arm64
-          push: true
-          # The owner name must be lowercase in an image name; this repository's already is.
-          tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ github.sha }}
-          # Links the package to this repository on GitHub.
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=gha,scope=${{ matrix.image }}-arm64
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-arm64
+      # The owner name must be lowercase in an image name; this repository's already is.
+      - name: Push the tested images
+        run: |
+          for image in business-software-app business-software-web; do
+            docker tag "$image:local" "$REGISTRY/$image:$GITHUB_SHA"
+            docker push --quiet "$REGISTRY/$image:$GITHUB_SHA"
+          done

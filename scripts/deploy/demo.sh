@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Deploys a commit of main to the demo server, from the laptop (Git Bash):
+# Deploys a commit of main to the demo server, from the laptop (Git Bash) or the deploy
+# workflow (stage 6, .github/workflows/deploy.yml):
 #   scripts/deploy/demo.sh [commit]        default: origin/main
-# Needs `aws login --profile business-software`, the server and RDS running, and the
-# images for that commit on GHCR (the images workflow builds them on every push to main).
+# Needs AWS credentials (scripts/deploy/lib.sh), the server and RDS running, and the images
+# for that commit on GHCR (the images workflow smoke-tests and pushes them for every commit on
+# main).
 #
 # How: Systems Manager Run Command tells the server to download this repo at exactly that
 # commit from GitHub, then run deploy/demo/install.sh from it. No SSH, no open port, and the
@@ -13,9 +15,7 @@ source "$(dirname "$0")/lib.sh"
 
 readonly repo=aryangupta1811/business-software
 
-sha=$(git rev-parse --verify "${1:-origin/main}^{commit}")
-git merge-base --is-ancestor "$sha" origin/main ||
-  { echo "$sha is not on origin/main: only merged commits are deployed" >&2; exit 1; }
+sha=$(main_commit "${1:-origin/main}")
 
 # Needs Docker Desktop running; works without a login once the packages are public.
 for image in business-software-app business-software-web; do

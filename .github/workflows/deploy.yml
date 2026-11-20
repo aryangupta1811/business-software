@@ -1,0 +1,235 @@
+# Deploys a commit of main to the demo server (stage 6, ADR 0012; design:
+# docs/plans/2026-11-19-stage-6-cd.md). Runs after the images workflow has smoke-tested and
+# pushed that commit's ARM64 images, and waits for the owner's approval in the GitHub
+# environment "demo". No AWS keys are stored anywhere: the job swaps GitHub's OIDC token for
+# one-hour credentials of a role that may only run commands on the demo server.
+#
+# Flow: deploy hold → credentials → server running? → note the running release → backup →
+# deploy → live check. If the deploy or the live check fails, it redeploys the release that
+# was running before, checks again, and the job stays red.
+#
+# Run by hand (Actions → deploy → Run workflow) to deploy any commit already on main, which is
+# also the manual rollback. The same approval applies. An automatic run never deploys a commit
+# older than the running one (images runs can finish out of order); a run by hand may.
+#
+# Each run is named after its commit, so the list of green runs is the list of releases that
+# went live: to roll back by hand, run this with the commit of the green run before the bad one.
+name: deploy
+run-name: deploy ${{ github.event.workflow_run.head_sha || inputs.commit || 'main' }}
+
+on:
+  workflow_run:
+    workflows: [images]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: Commit on main to deploy (full or short hash; empty for the newest)
+        required: false
+        type: string
+      first_backup_release:
+        description: >-
+          First release with nightly backups (stage 7) on a server that has none yet: skip the
+          pre-deploy backup if the backup service is missing. Leave off otherwise.
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    # From the images workflow: only when it succeeded, for a commit on main.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    # One deploy at a time, never cancelled half-way. A newer deploy waiting in the queue
+    # replaces an older one that hasn't started: only the newest commit is worth deploying.
+    # On the job, not the workflow: a run whose job is skipped (images failed, or ran off main)
+    # must not join the queue and replace a real deploy waiting there.
+    concurrency:
+      group: deploy-demo
+      cancel-in-progress: false
+    # Above the worst case, so a timeout can never cut a rollback short (a job timeout cancels
+    # the job, and a cancelled job skips the rollback step): each slow step has its own limit,
+    # and a step that hits it fails, which the rollback does see. Worst case: release 5 +
+    # backup 22 + deploy 22 + live check 6 + rollback 45 = 100 minutes, plus a few for setup.
+    # The first credentials last an hour, enough for everything before the rollback (55
+    # minutes at most); the rollback gets fresh ones.
+    timeout-minutes: 110
+    # The approval click: the environment requires the owner as reviewer and accepts main only.
+    environment:
+      name: demo
+      url: https://business-software.duckdns.org
+    permissions:
+      contents: read
+      # To ask GitHub for the OIDC token AWS trusts (infra/terraform/demo/deploy.tf).
+      id-token: write
+      # To check the images exist on GHCR before telling the server to pull them.
+      packages: read
+    env:
+      DEMO_INSTANCE_ID: ${{ vars.DEMO_INSTANCE_ID }}
+    steps:
+      # Fails closed: deploys only while DEPLOY_HOLD is exactly "off". Unset (the environment
+      # isn't set up yet) or any other text (the reason for the hold) stops here, before AWS.
+      - name: Deploy hold
+        env:
+          DEPLOY_HOLD: ${{ vars.DEPLOY_HOLD }}
+        run: |
+          if [[ $DEPLOY_HOLD != off ]]; then
+            echo "::error::Deploy hold: ${DEPLOY_HOLD:-DEPLOY_HOLD is not set}"
+            exit 1
+          fi
+          [[ $DEMO_INSTANCE_ID =~ ^i-[0-9a-f]+$ ]] ||
+            { echo "::error::Variable DEMO_INSTANCE_ID is not set"; exit 1; }
+
+      # Every branch, so demo.sh can check the commit is on main (origin/main).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      # The same check demo.sh makes (scripts/deploy/lib.sh), done first so nothing else runs
+      # for a commit that isn't on main.
+      - name: Which commit
+        id: commit
+        env:
+          FROM_IMAGES: ${{ github.event.workflow_run.head_sha }}
+          FROM_INPUT: ${{ inputs.commit }}
+        run: |
+          source scripts/deploy/lib.sh
+          sha=$(main_commit "${FROM_IMAGES:-${FROM_INPUT:-origin/main}}")
+          echo "sha=$sha" >>"$GITHUB_OUTPUT"
+          echo "Deploying $sha: $(git log -1 --format=%s "$sha")"
+
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: deploy-${{ github.run_id }}
+          role-duration-seconds: 3600
+          aws-region: ap-south-1
+
+      # The server and RDS are stopped outside sessions (ADR 0033). The deploy role may not
+      # start them: a person does, RDS first, then approves again.
+      - name: Is the server running
+        run: |
+          state=$(aws ec2 describe-instances --instance-ids "$DEMO_INSTANCE_ID" \
+            --query 'Reservations[0].Instances[0].State.Name' --output text)
+          [[ $state == running ]] ||
+            { echo "::error::The server is $state: start RDS, then the server, then run this again"; exit 1; }
+
+      # What runs now is what a failed deploy goes back to. Empty on a server's first release.
+      - name: Note the running release
+        id: previous
+        timeout-minutes: 5
+        run: |
+          previous=$(scripts/deploy/current-release.sh)
+          echo "sha=$previous" >>"$GITHUB_OUTPUT"
+          echo "Running now: ${previous:-nothing}"
+
+      # Images runs can finish out of order: an automatic deploy never takes the server back to
+      # an older commit. A run by hand may (that is the manual rollback).
+      - name: Not older than the running release
+        if: github.event_name == 'workflow_run'
+        env:
+          SHA: ${{ steps.commit.outputs.sha }}
+          RUNNING: ${{ steps.previous.outputs.sha }}
+        run: |
+          source scripts/deploy/lib.sh
+          not_older_than_running "$SHA" "$RUNNING"
+
+      # Before anything changes (ADR 0037). If it fails, nothing is deployed. A server without
+      # the backup service stops the deploy, except on the run a person marks as the first
+      # release with backups (that release installs the service).
+      - name: Back up the database
+        timeout-minutes: 22
+        env:
+          FIRST_BACKUP_RELEASE: ${{ inputs.first_backup_release && 'yes' || '' }}
+        run: scripts/deploy/backup.sh before-deploy ${FIRST_BACKUP_RELEASE:+--first-backup-release}
+
+      # demo.sh waits until the server's command has finished (scripts/deploy/lib.sh), so this
+      # limit is only a backstop. Once the command is sent, it sets the output command_id.
+      - name: Deploy
+        id: deploy
+        timeout-minutes: 22
+        env:
+          SHA: ${{ steps.commit.outputs.sha }}
+        run: scripts/deploy/demo.sh "$SHA"
+
+      # Three tries (scripts/deploy/check-live.sh waits 15 s between them, not after the last).
+      - name: Check the live site
+        id: live
+        timeout-minutes: 6
+        run: scripts/deploy/check-live.sh --tries 3
+
+      # After a failure: roll back only if something reached the server (a failure before the
+      # deploy command was sent, such as missing images, changed nothing), and only to a
+      # different release (going "back" to the commit that just failed would redeploy it and
+      # could report it live).
+      - name: Decide on a rollback
+        id: rollback
+        if: failure()
+        env:
+          SENT: ${{ steps.deploy.outputs.command_id }}
+          PREVIOUS: ${{ steps.previous.outputs.sha }}
+          SHA: ${{ steps.commit.outputs.sha }}
+        run: |
+          if [[ -z $SENT ]]; then
+            echo "Nothing was sent to the server: no rollback needed."
+          elif [[ -z $PREVIOUS ]]; then
+            echo "::error::The server's first release failed: there is no release to go back to. Look now."
+          elif [[ $PREVIOUS == "$SHA" ]]; then
+            echo "::error::The failed commit is the release that was running: not rolling back to itself. Look now."
+          else
+            echo "needed=true" >>"$GITHUB_OUTPUT"
+          fi
+
+      # The first credentials can run out (one hour) by the time a slow deploy has failed.
+      - name: Fresh AWS credentials for the rollback
+        if: failure() && steps.rollback.outputs.needed == 'true'
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: rollback-${{ github.run_id }}
+          role-duration-seconds: 3600
+          aws-region: ap-south-1
+
+      # The previous release's images on the new schema, which works because every migration
+      # is expand-then-contract (a step that drops what the old release uses waits for a later
+      # release). First it waits for the failed deploy's command to finish on the server, so
+      # two installs never run at once. The job stays red so the failure is seen.
+      - name: Roll back to the release that was running
+        if: failure() && steps.rollback.outputs.needed == 'true'
+        timeout-minutes: 45
+        env:
+          PREVIOUS: ${{ steps.previous.outputs.sha }}
+          DEPLOY_COMMAND: ${{ steps.deploy.outputs.command_id }}
+        run: |
+          source scripts/deploy/lib.sh
+          echo "::error::Deploy failed: rolling back to $PREVIOUS"
+          finished=0
+          wait_for_command "$DEPLOY_COMMAND" "$DEMO_INSTANCE_ID" 1080 || finished=$?
+          if ((finished == 2)); then
+            echo "::error::The failed deploy may still be running on the server: not rolling back. Look now."
+            exit 1
+          fi
+          if ! scripts/deploy/demo.sh "$PREVIOUS"; then
+            echo "::error::The rollback to $PREVIOUS failed too: the site may be down. Look now."
+            exit 1
+          fi
+          if scripts/deploy/check-live.sh --tries 3; then
+            echo "::error::Rolled back to $PREVIOUS, which is live; the failed commit is not"
+          else
+            echo "::error::Rolled back to $PREVIOUS, but the live check still fails. Look now."
+          fi
+          exit 1

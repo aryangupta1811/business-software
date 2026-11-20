@@ -1,0 +1,38 @@
+# Builds both images and smoke-tests them exactly as compose.yaml runs them. Shared by CI's
+# smoke job (x86, every pull request) and the images workflow (ARM64, every commit on main,
+# before it pushes these same images), so both test the same way. Needs the repository checked
+# out first.
+name: Build and smoke-test the images
+description: Build both images in parallel with Bake, start the stack and run scripts/ci/smoke.sh
+
+inputs:
+  arch:
+    description: amd64 or arm64; the runner must be that architecture
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+    # Both images at once (docker-bake.hcl), loaded into the runner's Docker with layers from
+    # GitHub's cache. `source: .` builds the checked-out files (the default is the commit
+    # fetched again from GitHub, which also ignores .dockerignore).
+    - uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7.5.0
+      env:
+        ARCH: ${{ inputs.arch }}
+      with:
+        source: .
+        files: docker-bake.hcl
+        load: true
+    # The example's fake passwords are fine for a database thrown away after the job.
+    - shell: bash
+      run: cp .env.example .env
+    - shell: bash
+      run: docker compose up -d --wait --wait-timeout 180 --no-build --quiet-pull
+    - shell: bash
+      run: scripts/ci/smoke.sh
+    - name: Container logs
+      # Also on a timeout, which cancels the job instead of failing a step.
+      if: failure() || cancelled()
+      shell: bash
+      run: docker compose logs --no-color

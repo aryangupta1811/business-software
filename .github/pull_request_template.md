@@ -12,4 +12,5 @@
 - [ ] Tests cover every business rule touched (GST math, stock, udhaar balances, salary and advances)
 - [ ] No secrets, `.env` files or real customer data
 - [ ] Database: no hard deletes and no destructive migration (zero data loss)
+- [ ] Migration: the release before this one still runs on the new schema (expand, then contract), so a failed deploy can roll back to it
 - [ ] Docs updated: `PROGRESS.md`, an ADR for any tech choice, an `INTERVIEW_LOG.md` entry

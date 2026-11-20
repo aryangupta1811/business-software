@@ -105,7 +105,8 @@ interface Balance {
 /**
  * Applies `lines` at one branch: locks each item's stock row in item-ID order (so two calls
  * can never deadlock), checks the rules, writes one movement per line and updates the totals.
- * Throws `StockRuleError` before writing anything if a line breaks a rule.
+ * Throws `StockRuleError` before writing any movement if a line breaks a rule; the caller's
+ * transaction should still roll back.
  */
 export async function moveStock(tx: Transaction, input: MoveStockInput): Promise<MovedLine[]> {
   if (input.requestKey !== undefined && input.lines.length !== 1) {
@@ -171,11 +172,14 @@ export async function moveStock(tx: Transaction, input: MoveStockInput): Promise
     .for('update');
   const balances = new Map<string, Balance>(stockRows.map((row) => [row.itemId, { ...row }]));
 
-  const moved: MovedLine[] = [];
+  // Every line's rules are checked before any movement is written, so a refusal leaves no
+  // movement behind even for a caller that catches it (only empty stock rows, which hold).
+  const planned: (Omit<MovedLine, 'movementId'> & { line: StockLine })[] = [];
+  const moved = new Set<string>();
   for (const line of input.lines) {
     const item = entry(facts, line.itemId);
     const balance = entry(balances, line.itemId);
-    if (line.kind === 'opening' && balance.lastMovementId !== null) {
+    if (line.kind === 'opening' && (balance.lastMovementId !== null || moved.has(line.itemId))) {
       throw new StockRuleError('opening_exists', line.itemId);
     }
     const balanceAfter = balance.quantity + line.quantity;
@@ -187,14 +191,29 @@ export async function moveStock(tx: Transaction, input: MoveStockInput): Promise
     if (line.kind === 'opening' && unitCost === null) {
       throw new StockRuleError('cost_required', line.itemId);
     }
-    const value = unitCost === null ? null : movementValue(line.quantity, unitCost);
     const averageCost = averageAfter(
       balance.quantity,
       balance.averageCost,
       line.quantity,
       unitCost,
     );
+    planned.push({
+      line,
+      itemId: line.itemId,
+      quantity: line.quantity,
+      balanceBefore: balance.quantity,
+      balanceAfter,
+      unitCost,
+      value: unitCost === null ? null : movementValue(line.quantity, unitCost),
+      averageCost,
+      warned: outcome === 'warn',
+    });
+    moved.add(line.itemId);
+    balances.set(line.itemId, { ...balance, quantity: balanceAfter, averageCost });
+  }
 
+  const results: MovedLine[] = [];
+  for (const { line, ...result } of planned) {
     const [row] = await tx
       .insert(stockMovements)
       .values({
@@ -202,9 +221,9 @@ export async function moveStock(tx: Transaction, input: MoveStockInput): Promise
         itemId: line.itemId,
         kind: line.kind,
         quantity: line.quantity,
-        unitCost,
-        value,
-        balanceAfter,
+        unitCost: result.unitCost,
+        value: result.value,
+        balanceAfter: result.balanceAfter,
         businessDate: input.businessDate,
         reason: line.reason ?? null,
         note: line.note ?? null,
@@ -213,19 +232,8 @@ export async function moveStock(tx: Transaction, input: MoveStockInput): Promise
       })
       .returning({ id: stockMovements.id });
     if (row === undefined) throw new Error('No movement row returned');
-
-    moved.push({
-      movementId: row.id,
-      itemId: line.itemId,
-      quantity: line.quantity,
-      balanceBefore: balance.quantity,
-      balanceAfter,
-      unitCost,
-      value,
-      averageCost,
-      warned: outcome === 'warn',
-    });
-    balances.set(line.itemId, { quantity: balanceAfter, averageCost, lastMovementId: row.id });
+    results.push({ movementId: row.id, ...result });
+    entry(balances, line.itemId).lastMovementId = row.id;
   }
 
   for (const itemId of itemIds) {
@@ -240,7 +248,7 @@ export async function moveStock(tx: Transaction, input: MoveStockInput): Promise
       })
       .where(and(eq(itemStock.branchId, input.branchId), eq(itemStock.itemId, itemId)));
   }
-  return moved;
+  return results;
 }
 
 export interface StockMismatch {

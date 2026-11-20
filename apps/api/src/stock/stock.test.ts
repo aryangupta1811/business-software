@@ -446,6 +446,39 @@ describe('stock', () => {
       expect((await stock(a, atta.id)).branches[0]).toMatchObject({ quantity: 1_000 });
     });
 
+    // Review of PR #38: the copy that waited on the row lock saw the winner's stock and
+    // answered a rule (opening_exists, below_zero) instead of the winner's movement.
+    it('answers simultaneous copies the same even when the rules would refuse a second change', async () => {
+      const first = await item(a);
+      const openBody = { quantity: 1_000, unitCost: 4_000, requestKey: key() };
+      const openings = await Promise.all(
+        Array.from({ length: 5 }, () =>
+          call<MovementView>('POST', `/items/${first.id}/stock/opening`, a, openBody),
+        ),
+      );
+      expect(openings.map((answer) => answer.status)).toEqual([201, 201, 201, 201, 201]);
+      expect(new Set(openings.map((answer) => answer.body.id)).size).toBe(1);
+
+      const writeOff = { quantity: -1_000, reason: 'damaged', note: null, requestKey: key() };
+      const writeOffs = await Promise.all(
+        Array.from({ length: 5 }, () =>
+          call<MovementView>('POST', `/items/${first.id}/stock/adjustments`, a, writeOff),
+        ),
+      );
+      expect(writeOffs.map((answer) => answer.status)).toEqual([201, 201, 201, 201, 201]);
+      expect(new Set(writeOffs.map((answer) => answer.body.id)).size).toBe(1);
+      expect((await stock(a, first.id)).branches[0]).toMatchObject({ quantity: 0 });
+    });
+
+    it('refuses an opening retry with a different cost', async () => {
+      const atta = await item(a);
+      const requestKey = key();
+      await open(a, atta.id, { quantity: 1_000, unitCost: 4_000, requestKey });
+      expect(await open(a, atta.id, { quantity: 1_000, unitCost: 4_500, requestKey })).toEqual(
+        expect.objectContaining({ status: 422, body: { code: 'key_reused' } }),
+      );
+    });
+
     it('refuses a key reused for a different change', async () => {
       const atta = await item(a);
       const requestKey = key();

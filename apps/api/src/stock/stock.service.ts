@@ -58,6 +58,8 @@ interface Expected {
   quantity: number;
   reason: AdjustmentReason | null;
   note: string | null;
+  /** Opening stock with a cost sent: the stored cost must match. */
+  unitCost?: number | null;
 }
 
 /** A rule `moveStock` refused: the answer the screen understands. */
@@ -186,6 +188,7 @@ export class StockService {
       quantity: input.quantity,
       reason: null,
       note: null,
+      ...(input.unitCost !== undefined && { unitCost: input.unitCost }),
     };
     return this.change(caller, input.requestKey, line, expected, (moved) => ({
       action: 'stock.opening_set',
@@ -254,19 +257,14 @@ export class StockService {
       return await this.inBusiness(caller, async (tx) => {
         const replay = await this.replay(tx, caller, requestKey, expected);
         if (replay !== null) return replay;
-        let moved;
-        try {
-          [moved] = await moveStock(tx, {
-            branchId: caller.branchId,
-            actorId: caller.userId,
-            businessDate: date,
-            belowZero: 'refuse',
-            requestKey,
-            lines: [line],
-          });
-        } catch (error) {
-          throw error instanceof StockRuleError ? answerFor(error) : error;
-        }
+        const [moved] = await moveStock(tx, {
+          branchId: caller.branchId,
+          actorId: caller.userId,
+          businessDate: date,
+          belowZero: 'refuse',
+          requestKey,
+          lines: [line],
+        });
         if (moved === undefined) throw new Error('No movement returned');
         const entry = log(moved);
         await recordEntry(tx, {
@@ -281,8 +279,19 @@ export class StockService {
         return this.mustReplay(tx, caller, requestKey, expected);
       });
     } catch (error) {
-      if (!isKeyTaken(error)) throw error;
-      return this.inBusiness(caller, (tx) => this.mustReplay(tx, caller, requestKey, expected));
+      // A copy of this request that waited on the item's row lock sees the first copy's stock:
+      // its insert collides on the key, or a rule refuses it (opening_exists, below_zero). Either
+      // way the first copy has committed, so answer its movement; only a refusal with no such
+      // movement is the screen's to show.
+      if (isKeyTaken(error)) {
+        return this.inBusiness(caller, (tx) => this.mustReplay(tx, caller, requestKey, expected));
+      }
+      if (!(error instanceof StockRuleError)) throw error;
+      const first = await this.inBusiness(caller, (tx) =>
+        this.replay(tx, caller, requestKey, expected),
+      );
+      if (first !== null) return first;
+      throw answerFor(error);
     }
   }
 
@@ -306,6 +315,7 @@ export class StockService {
       stored.quantity === expected.quantity &&
       stored.reason === expected.reason &&
       stored.note === expected.note &&
+      (expected.unitCost === undefined || stored.unitCost === expected.unitCost) &&
       stored.branchId === caller.branchId;
     if (!same) {
       throw new HttpException({ code: 'key_reused' }, HttpStatus.UNPROCESSABLE_ENTITY);

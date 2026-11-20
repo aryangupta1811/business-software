@@ -1742,3 +1742,8 @@ Entry format:
 - **Why / what I learned:** a pool is a small shared resource; anything that can wait for ever eventually takes all of it. Fail fast with a clear, retryable error instead.
 - **Say it in an interview:** "Every app connection has a lock timeout, a statement timeout and an idle-in-transaction timeout. A counter that loses a lock race gets a 503 and retries safely with its idempotency key, instead of hanging and starving the pool."
 
+### 2026-11-20 — An idempotency key that lost to its own rules `#backend` `#concurrency` `#review` `#bug`
+- **What happened:** The stock API checks a request's key before moving stock, and a unique index on the key is the backstop when two copies arrive together. The review of PR #38 found a gap: the second copy waits on the item's row lock, then reads the stock the first copy just wrote, so a rule (opening stock already set, or a write-down past zero) refused it with a 409 before its insert could hit the unique index. The counter would show an error for a save that worked. The fix: when a rule refuses, look for a committed movement with the same key in a fresh transaction and answer it. A test sends five copies of an opening and of a write-down to exactly zero.
+- **Why / what I learned:** an idempotency check before a lock is only a fast path; the truth is what's committed after the lock. Every way the second copy can fail (key collision or a business rule) must fall back to "did the first copy already do this?".
+- **Say it in an interview:** "Retries carry the same key. A duplicate that waited on a row lock can fail a business rule because the first copy already changed the data, so on any refusal I re-check for the committed result of that key before answering an error."
+

@@ -446,6 +446,29 @@ describe('stock ledger', () => {
       expect(await movementsOf(a, x)).toEqual([]);
     });
 
+    // Review of PR #38: a refused later line must not leave an earlier line's movement behind,
+    // even for a caller that catches the error and commits.
+    it('writes no movement at all when a later line breaks a rule, even if committed', async () => {
+      const x = await addItem(a);
+      await open(a, x, 1_000, 4_000);
+      await inShop(a, async (tx) => {
+        await expect(
+          moveStock(tx, {
+            branchId: a.branchId,
+            actorId: a.ownerId,
+            businessDate: '2026-11-20',
+            belowZero: 'refuse',
+            lines: [
+              { itemId: x, kind: 'adjustment', quantity: 1_000, reason: 'count_mismatch' },
+              { itemId: x, kind: 'adjustment', quantity: -5_000, reason: 'damaged' },
+            ],
+          }),
+        ).rejects.toEqual(ruleError('below_zero'));
+      });
+      expect(await movementsOf(a, x)).toHaveLength(1);
+      expect(await stockOf(a, x)).toMatchObject({ quantity: 1_000 });
+    });
+
     it('takes a request key only for a single line', async () => {
       const x = await addItem(a);
       await expect(

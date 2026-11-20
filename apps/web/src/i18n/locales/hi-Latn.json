@@ -233,6 +233,15 @@
       },
       "username": {
         "invalid": "3 se 32 akshar, ank, dot, dash ya underscore likhein"
+      },
+      "newPassword": {
+        "too_short": "Kam se kam 10 akshar rakhein"
+      },
+      "currentPassword": {
+        "wrong": "Yeh aapka abhi ka password nahi hai"
+      },
+      "ownerPassword": {
+        "wrong": "Yeh maalik ka password nahi hai"
       }
     },
     "too_small": "Yeh bahut kam hai",
@@ -271,18 +280,10 @@
       "title": "Key sirf ek baar dikhti hai",
       "body": "Aapki suraksha ke liye ise dobara kholne laayak kahin nahi rakha jaata. Login karne ke baad aap nayi key bana sakte hain.",
       "home": "Home par jaayein"
-    }
+    },
+    "printedOn": "Recovery key, {{date}} ko bani"
   },
   "states": {
-    "01": "Jammu and Kashmir",
-    "02": "Himachal Pradesh",
-    "03": "Punjab",
-    "04": "Chandigarh",
-    "05": "Uttarakhand",
-    "06": "Haryana",
-    "07": "Delhi",
-    "08": "Rajasthan",
-    "09": "Uttar Pradesh",
     "10": "Bihar",
     "11": "Sikkim",
     "12": "Arunachal Pradesh",
@@ -310,7 +311,16 @@
     "36": "Telangana",
     "37": "Andhra Pradesh",
     "38": "Ladakh",
-    "97": "Other Territory"
+    "97": "Other Territory",
+    "01": "Jammu and Kashmir",
+    "02": "Himachal Pradesh",
+    "03": "Punjab",
+    "04": "Chandigarh",
+    "05": "Uttarakhand",
+    "06": "Haryana",
+    "07": "Delhi",
+    "08": "Rajasthan",
+    "09": "Uttar Pradesh"
   },
   "settings": {
     "loading": "Settings load ho rahi hain…",
@@ -572,7 +582,8 @@
     "busy": "Server busy hai. Kuch second baad phir koshish karein.",
     "failed": "Login nahi ho saka. Connection check karein aur phir koshish karein.",
     "newBusiness": "Naye hain?",
-    "signUp": "Account banayein"
+    "signUp": "Account banayein",
+    "forgot": "Password bhool gaye?"
   },
   "lock": {
     "title": "Counter lock hai",
@@ -590,5 +601,106 @@
     },
     "lockNow": "Abhi lock karein",
     "logout": "Logout"
+  },
+  "forgot": {
+    "title": "Password bhool gaye?",
+    "lead": "Email se naya password banane ka link paayein, ya signup ke samay rakhi recovery key use karein.",
+    "way": "Waapas aane ka tareeka",
+    "ways": {
+      "email": "Email se",
+      "key": "Recovery key"
+    },
+    "email": {
+      "lead": "Hum naya password chunne ka link email karenge. Yeh sirf pakke kiye gaye email par aata hai.",
+      "submit": "Link bhejein",
+      "sending": "Bhej rahe hain…",
+      "sent": "Agar {{email}} ka pakka kiya hua account hai, to link bhej diya gaya hai. Yeh 30 minute tak chalega.",
+      "noEmail": "Kuch minute mein email nahi aaya? Spam dekhein, ya apni recovery key use karein."
+    },
+    "key": {
+      "lead": "Recovery key se password turant badal jaata hai. Har key ek hi baar chalti hai, isliye phir aapko nayi key milegi.",
+      "label": "Recovery key",
+      "hint": "32 akshar aur ank, jaise aapne likhe the. Dash aur khaali jagah se fark nahi padta.",
+      "submit": "Password badlein",
+      "submitting": "Badal rahe hain…",
+      "wrong": "Email aur recovery key match nahi karte. Dono check karein aur phir koshish karein.",
+      "done": "Aapka password badal gaya aur aap har jagah se logout ho gaye. Purani key ab nahi chalegi: yeh nayi key sambhaal kar rakhein."
+    },
+    "newPassword": "Naya password",
+    "tooMany": "Bahut zyada koshishein. {{time}} par phir koshish karein.",
+    "failed": "Bheja nahi ja saka. Connection check karein aur phir koshish karein.",
+    "toLogin": "Login par jaayein",
+    "backToLogin": "Login par waapas"
+  },
+  "resetPage": {
+    "title": "Naya password chunein",
+    "lead": "Iske baad aap har computer se logout ho jaayenge, aur naye password se login karenge.",
+    "submit": "Naya password save karein",
+    "saving": "Save ho raha hai…",
+    "done": "Aapka password badal gaya. Aap har computer se logout ho gaye hain.",
+    "toLogin": "Login karein",
+    "invalid": "Yeh link purana ho gaya ya pehle hi use ho chuka hai. Link 30 minute tak, ek baar chalta hai.",
+    "askAgain": "Naya link maangein",
+    "failed": "Save nahi ho saka. Connection check karein aur phir koshish karein."
+  },
+  "confirmPage": {
+    "title": "Apna email pakka karein",
+    "lead": "Yeh email pakka karne ke liye button dabaayein. Phir password bhoolne par aap email se naya password bana sakenge.",
+    "submit": "Email pakka karein",
+    "sending": "Pakka kar rahe hain…",
+    "done": "Aapka email pakka ho gaya.",
+    "toApp": "App par jaayein",
+    "invalid": "Yeh link purana ho gaya ya pehle hi use ho chuka hai. Naye link ke liye login karein aur banner par \"Phir bhejein\" dabaayein.",
+    "failed": "Pakka nahi ho saka. Connection check karein aur phir koshish karein."
+  },
+  "emailBanner": {
+    "label": "Email pakka karna",
+    "body": "Apna email pakka karein: humne aapko ek link bheja hai. Tab tak bhoola hua password sirf recovery key se badal sakta hai.",
+    "limited": "Is demo mein email sirf humare jaanche hue patton par jaata hai. Email na aaye to apni recovery key sambhaal kar rakhein: waapas aane ka raasta wahi hai.",
+    "sendAgain": "Phir bhejein",
+    "sending": "Bhej rahe hain…",
+    "sent": "Bhej diya. Link 7 din tak chalega.",
+    "tooMany": "Bahut zyada koshishein. {{time}} par phir koshish karein.",
+    "failed": "Bheja nahi ja saka. Connection check karein aur phir koshish karein."
+  },
+  "account": {
+    "passwordHint": "Kam se kam 10 akshar. Aapka email ya phone number nahi.",
+    "ownerPassword": "Maalik ka password",
+    "cancel": "Radd karein",
+    "tooMany": "Bahut zyada koshishein. {{time}} par phir koshish karein.",
+    "failed": "Save nahi ho saka. Connection check karein aur phir koshish karein.",
+    "password": {
+      "title": "Password",
+      "lead": "Badalne par aap baaki har computer se logout ho jaayenge.",
+      "current": "Abhi ka password",
+      "submit": "Password badlein",
+      "saving": "Badal rahe hain…",
+      "done": "Password badal gaya. Baaki computer logout ho gaye."
+    },
+    "recoveryKey": {
+      "title": "Recovery key",
+      "lead": "Key kho gayi ya use ho gayi? Nayi banaayein. Purani key chalna band ho jaayegi.",
+      "submit": "Nayi key banaayein",
+      "making": "Bana rahe hain…",
+      "done": "Ho gaya"
+    },
+    "devices": {
+      "title": "Computer",
+      "lead": "Woh counter jo is business ko yaad rakhte hain, taaki staff wahan login kar sake. Jo ab kaam mein nahi, use bhool jaayein.",
+      "unnamed": "Bina naam ka computer",
+      "thisComputer": "Yeh computer",
+      "details": "{{branch}} · aakhri use {{time}}",
+      "rename": "Naam badlein",
+      "renameNamed": "{{name}} ka naam badlein",
+      "forget": "Bhool jaayein",
+      "forgetNamed": "{{name}} ko bhool jaayein",
+      "name": "Naam",
+      "nameHint": "Jaise: Aage wala counter",
+      "saveName": "Save karein",
+      "forgetThis": "Isse aap yahan logout ho jaayenge, aur jab tak aap is computer par phir login nahi karte, staff yahan login nahi kar sakega.",
+      "forgetOther": "Wahan jo bhi login hai, logout ho jaayega, aur jab tak aap us par phir login nahi karte, staff wahan login nahi kar sakega.",
+      "confirmForget": "Computer bhool jaayein",
+      "loadFailed": "Computers ki list nahi khul saki."
+    }
   }
 }

@@ -1,4 +1,4 @@
-# Local services. `pnpm db:up` starts only the database (for `pnpm dev`); `pnpm app:up`
+# Local services. `pnpm db:up` starts the database and Mailpit (for `pnpm dev`); `pnpm app:up`
 # starts everything. See docs/devops/local-database.md.
 name: business-software
 
@@ -53,6 +53,11 @@ services:
       DATABASE_URL: postgresql://app_runtime:${APP_RUNTIME_PASSWORD}@db:5432/business_software
       # Every interface inside the container; the port below is published on 127.0.0.1 only.
       HOST: 0.0.0.0
+      # Email goes to Mailpit (ADR 0040); links open the web service below.
+      MAIL_TRANSPORT: smtp
+      SMTP_URL: smtp://mailpit:1025
+      MAIL_FROM: no-reply@example.test
+      APP_URL: http://127.0.0.1:8080
     ports:
       - 127.0.0.1:3000:3000
     healthcheck:
@@ -98,6 +103,20 @@ services:
     restart: unless-stopped
     # No depends_on: if the api is down, the page still loads and says it can't reach the
     # server, which is what the connection badge is for.
+
+  # Catches every email the app sends on this computer (ADR 0040); read them at
+  # http://127.0.0.1:8025. Nothing leaves the computer. Pinned by digest, like a lockfile.
+  mailpit:
+    image: axllent/mailpit:v1.34.0@sha256:23a2ef85bc50853ab3093645d1d64679afd8887e89da5e48a88940c172591a4e
+    ports:
+      - 127.0.0.1:1025:1025
+      - 127.0.0.1:8025:8025
+    healthcheck:
+      test: [CMD, /mailpit, readyz]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
 
 volumes:
   pgdata:

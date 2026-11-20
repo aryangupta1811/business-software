@@ -233,6 +233,15 @@
       },
       "username": {
         "invalid": "Use 3 to 32 letters, digits, dots, dashes or underscores"
+      },
+      "newPassword": {
+        "too_short": "Use at least 10 characters"
+      },
+      "currentPassword": {
+        "wrong": "That isn't your current password"
+      },
+      "ownerPassword": {
+        "wrong": "That isn't the owner's password"
       }
     },
     "too_small": "This is too small",
@@ -271,18 +280,10 @@
       "title": "The key is shown only once",
       "body": "For your safety it isn't kept anywhere you can open again. You can make a new one after you log in.",
       "home": "Go to home"
-    }
+    },
+    "printedOn": "Recovery key, made on {{date}}"
   },
   "states": {
-    "01": "Jammu and Kashmir",
-    "02": "Himachal Pradesh",
-    "03": "Punjab",
-    "04": "Chandigarh",
-    "05": "Uttarakhand",
-    "06": "Haryana",
-    "07": "Delhi",
-    "08": "Rajasthan",
-    "09": "Uttar Pradesh",
     "10": "Bihar",
     "11": "Sikkim",
     "12": "Arunachal Pradesh",
@@ -310,7 +311,16 @@
     "36": "Telangana",
     "37": "Andhra Pradesh",
     "38": "Ladakh",
-    "97": "Other Territory"
+    "97": "Other Territory",
+    "01": "Jammu and Kashmir",
+    "02": "Himachal Pradesh",
+    "03": "Punjab",
+    "04": "Chandigarh",
+    "05": "Uttarakhand",
+    "06": "Haryana",
+    "07": "Delhi",
+    "08": "Rajasthan",
+    "09": "Uttar Pradesh"
   },
   "settings": {
     "loading": "Loading settings…",
@@ -572,7 +582,8 @@
     "busy": "The server is busy. Try again in a few seconds.",
     "failed": "Couldn't log in. Check the connection and try again.",
     "newBusiness": "New here?",
-    "signUp": "Create an account"
+    "signUp": "Create an account",
+    "forgot": "Forgot password?"
   },
   "lock": {
     "title": "Counter locked",
@@ -590,5 +601,106 @@
     },
     "lockNow": "Lock now",
     "logout": "Log out"
+  },
+  "forgot": {
+    "title": "Forgot your password?",
+    "lead": "Get a reset link by email, or use the recovery key you saved at signup.",
+    "way": "How to get back in",
+    "ways": {
+      "email": "By email",
+      "key": "Recovery key"
+    },
+    "email": {
+      "lead": "We'll email a link to choose a new password. It works only for a confirmed email.",
+      "submit": "Send link",
+      "sending": "Sending…",
+      "sent": "If {{email}} has a confirmed account, a link is on its way. It works for 30 minutes.",
+      "noEmail": "No email after a few minutes? Check spam, or use your recovery key."
+    },
+    "key": {
+      "lead": "Your recovery key changes the password at once. Each key works once, so you then get a new one.",
+      "label": "Recovery key",
+      "hint": "32 letters and digits, as you wrote it down. Dashes and spaces don't matter.",
+      "submit": "Change password",
+      "submitting": "Changing…",
+      "wrong": "That email and recovery key don't match. Check both and try again.",
+      "done": "Your password is changed and you're logged out everywhere. Your old key no longer works: save this new one."
+    },
+    "newPassword": "New password",
+    "tooMany": "Too many tries. Try again at {{time}}.",
+    "failed": "Couldn't send. Check the connection and try again.",
+    "toLogin": "Go to login",
+    "backToLogin": "Back to login"
+  },
+  "resetPage": {
+    "title": "Choose a new password",
+    "lead": "After this you're logged out on every computer, and you log in with the new password.",
+    "submit": "Save new password",
+    "saving": "Saving…",
+    "done": "Your password is changed. You're logged out on every computer.",
+    "toLogin": "Log in",
+    "invalid": "This link has expired or was already used. A link works for 30 minutes, once.",
+    "askAgain": "Ask for a new link",
+    "failed": "Couldn't save. Check the connection and try again."
+  },
+  "confirmPage": {
+    "title": "Confirm your email",
+    "lead": "Press the button to confirm this email. Then, if you forget your password, you can reset it by email.",
+    "submit": "Confirm email",
+    "sending": "Confirming…",
+    "done": "Your email is confirmed.",
+    "toApp": "Go to the app",
+    "invalid": "This link has expired or was already used. Log in and press \"Send again\" on the banner for a new one.",
+    "failed": "Couldn't confirm. Check the connection and try again."
+  },
+  "emailBanner": {
+    "label": "Email confirmation",
+    "body": "Confirm your email: we sent you a link. Until then, only your recovery key can reset a forgotten password.",
+    "limited": "In this demo, email reaches only addresses we have verified. If no email comes, keep your recovery key safe: it is your way back in.",
+    "sendAgain": "Send again",
+    "sending": "Sending…",
+    "sent": "Sent. The link works for 7 days.",
+    "tooMany": "Too many tries. Try again at {{time}}.",
+    "failed": "Couldn't send. Check the connection and try again."
+  },
+  "account": {
+    "passwordHint": "At least 10 characters. Not your email or phone number.",
+    "ownerPassword": "Owner's password",
+    "cancel": "Cancel",
+    "tooMany": "Too many tries. Try again at {{time}}.",
+    "failed": "Couldn't save. Check the connection and try again.",
+    "password": {
+      "title": "Password",
+      "lead": "Changing it logs you out on every other computer.",
+      "current": "Current password",
+      "submit": "Change password",
+      "saving": "Changing…",
+      "done": "Password changed. Other computers are logged out."
+    },
+    "recoveryKey": {
+      "title": "Recovery key",
+      "lead": "Lost your key, or used it? Make a new one. The old key stops working.",
+      "submit": "Make a new key",
+      "making": "Making…",
+      "done": "Done"
+    },
+    "devices": {
+      "title": "Computers",
+      "lead": "Counters that remember this business, so staff can log in there. Forget one you no longer use.",
+      "unnamed": "Unnamed computer",
+      "thisComputer": "This computer",
+      "details": "{{branch}} · last used {{time}}",
+      "rename": "Rename",
+      "renameNamed": "Rename {{name}}",
+      "forget": "Forget",
+      "forgetNamed": "Forget {{name}}",
+      "name": "Name",
+      "nameHint": "For example: Front counter",
+      "saveName": "Save",
+      "forgetThis": "This logs you out here, and staff can't log in on this computer until you log in on it again.",
+      "forgetOther": "Anyone logged in there is logged out, and staff can't log in there until you log in on it again.",
+      "confirmForget": "Forget computer",
+      "loadFailed": "Couldn't load the computers."
+    }
   }
 }

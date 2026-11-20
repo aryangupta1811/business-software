@@ -13,6 +13,8 @@ The repo is public, so anything in git, in a published image, in the browser's J
 
 Each process gets only what it needs: `migrate` gets `MIGRATION_DATABASE_URL` (owner role), while `api` and `worker` get `DATABASE_URL` (runtime role) (ADR 0021). The nightly backup on the server reads only `app-backup-password`, for the read-only role `app_backup` (ADR 0037); it passes it to the `postgres:18` container as a bare `-e PGPASSWORD`, so it is never on a command line. The restore drill gets two pre-signed S3 links that work for 15 minutes; they stay in Systems Manager's command history after they expire.
 
+Email has **no secret at all** (ADR 0040): on the server, SES is signed by the instance role; locally, Mailpit takes SMTP without a password. Not SES's SMTP interface, whose IAM SMTP password is a long-lived key. The sender address (`MAIL_FROM`) is personal data, not a secret: it lives in SSM or `.env`, never in the repo. Emails hold one-time links, so the API logs only an email's subject or the send error's message, never its body.
+
 ## The five ways a secret leaks, and the rule for each
 
 1. **Git.**

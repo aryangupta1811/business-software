@@ -5,7 +5,7 @@ PostgreSQL 18 runs in Docker Compose (`compose.yaml`), next to the app's own con
 ## First time
 
 1. Copy `.env.example` to `.env` and replace every `change-me` value with a random string of letters and digits. Use the same owner password inside `MIGRATION_DATABASE_URL` and the same runtime password inside `DATABASE_URL`.
-2. `pnpm db:up` creates the volume, runs `packages/db/bootstrap/create-roles.sql` (roles + database) and waits until the database is healthy.
+2. `pnpm db:up` creates the volume, runs `packages/db/bootstrap/create-roles.sql` (roles + database) and waits until the database is healthy. It also starts **Mailpit**, which catches every email the app sends on this computer (ADR 0040).
 3. `pnpm db:migrate` applies the migrations as `app_owner`.
 
 ## Running the whole app in containers
@@ -38,6 +38,7 @@ For day-to-day coding, run only the database (`pnpm db:up`) and the API and web 
 | New migration from schema changes | `pnpm db:generate` (review the SQL before committing) |
 | Hand-written migration | `pnpm db:generate --custom --name=<what_it_does>` |
 | Logs | `docker compose logs db` |
+| Read the app's emails (confirmation, reset links) | http://127.0.0.1:8025 (Mailpit; nothing leaves the computer) |
 
 ## Connecting with psql
 
@@ -78,6 +79,8 @@ select created_at, actor_id, action, entity_type, reason, before, after
 Order by `id`: entries written in one transaction share `created_at` (it's the transaction's start time), but their UUIDv7 IDs keep the order. `UPDATE`, `DELETE` and `TRUNCATE` fail with `permission denied` as `app_runtime`, even for debugging. That's the point: fix a wrong entry by recording a correcting one, never by editing.
 
 ## Things to know
+
+- **Email settings (ADR 0040).** `.env.example` sends to Mailpit (`MAIL_TRANSPORT=smtp`, `SMTP_URL=smtp://127.0.0.1:1025`); inside Compose the api uses `smtp://mailpit:1025` and links open `http://127.0.0.1:8080`. With `MAIL_TRANSPORT` unset or `none`, nothing is sent and the API logs one line with the subject. `EMAIL_LIMITED=true` shows the demo's "email reaches verified addresses only" notice.
 
 - **A volume made before 2026-11-19 has no `app_backup` role,** so migration 0007 fails with `role "app_backup" does not exist`. Create it once, then migrate:
   ```bash

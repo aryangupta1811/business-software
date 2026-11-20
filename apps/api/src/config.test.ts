@@ -11,6 +11,9 @@ describe('loadConfig', () => {
       port: 3000,
       jsonLogs: false,
       cookieSecure: true,
+      mail: { transport: 'none' },
+      appUrl: 'http://127.0.0.1:5173',
+      emailLimited: false,
     });
   });
 
@@ -24,6 +27,9 @@ describe('loadConfig', () => {
       port: 8080,
       jsonLogs: true,
       cookieSecure: true,
+      mail: { transport: 'none' },
+      appUrl: 'http://127.0.0.1:5173',
+      emailLimited: false,
     });
   });
 
@@ -65,5 +71,67 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ DATABASE_URL, PORT })).toThrow(
       'PORT must be a whole number from 1 to 65535',
     );
+  });
+
+  // ADR 0040: Mailpit through SMTP on this computer, SES on the server.
+  describe('email', () => {
+    const MAIL_FROM = 'shop-app@example.test';
+
+    it('sends to Mailpit through SMTP', () => {
+      const config = loadConfig({
+        DATABASE_URL,
+        MAIL_TRANSPORT: 'smtp',
+        SMTP_URL: 'smtp://127.0.0.1:1025',
+        MAIL_FROM,
+        APP_URL: 'http://127.0.0.1:8080/',
+      });
+      expect(config.mail).toEqual({
+        transport: 'smtp',
+        smtpUrl: 'smtp://127.0.0.1:1025',
+        from: MAIL_FROM,
+      });
+      // No trailing slash, so links join cleanly.
+      expect(config.appUrl).toBe('http://127.0.0.1:8080');
+    });
+
+    it('sends through SES in Mumbai unless AWS_REGION says otherwise', () => {
+      expect(loadConfig({ DATABASE_URL, MAIL_TRANSPORT: 'ses', MAIL_FROM }).mail).toEqual({
+        transport: 'ses',
+        region: 'ap-south-1',
+        from: MAIL_FROM,
+      });
+      expect(
+        loadConfig({ DATABASE_URL, MAIL_TRANSPORT: 'ses', MAIL_FROM, AWS_REGION: 'us-east-1' })
+          .mail,
+      ).toEqual({ transport: 'ses', region: 'us-east-1', from: MAIL_FROM });
+    });
+
+    it('reads EMAIL_LIMITED for the demo (Module 00 #45)', () => {
+      expect(loadConfig({ DATABASE_URL, EMAIL_LIMITED: 'true' }).emailLimited).toBe(true);
+      expect(() => loadConfig({ DATABASE_URL, EMAIL_LIMITED: 'yes' })).toThrow(
+        'EMAIL_LIMITED must be true or false',
+      );
+    });
+
+    it.each([
+      [{ MAIL_TRANSPORT: 'post' }, 'MAIL_TRANSPORT must be none, smtp or ses'],
+      [{ MAIL_TRANSPORT: 'ses' }, 'MAIL_FROM is not set'],
+      [{ MAIL_TRANSPORT: 'ses', MAIL_FROM: 'not an email' }, 'MAIL_FROM is not an email address'],
+      [{ MAIL_TRANSPORT: 'smtp', MAIL_FROM }, 'SMTP_URL is not set'],
+      [
+        { MAIL_TRANSPORT: 'smtp', MAIL_FROM, SMTP_URL: 'http://x' },
+        'SMTP_URL is not an smtp:// URL',
+      ],
+      [{ APP_URL: 'ftp://shop' }, 'APP_URL is not an http(s) URL'],
+    ])('refuses %j', (env, message) => {
+      expect(() => loadConfig({ DATABASE_URL, ...env })).toThrow(message);
+    });
+
+    // The SMTP URL may hold a password one day; errors name the variable only.
+    it('never shows SMTP_URL in its error', () => {
+      expect(() =>
+        loadConfig({ DATABASE_URL, MAIL_TRANSPORT: 'smtp', MAIL_FROM, SMTP_URL: 's3cretpw' }),
+      ).toThrow(/^SMTP_URL is not an smtp:\/\/ URL$/);
+    });
   });
 });

@@ -15,6 +15,13 @@ export const ENTRY_ACTIONS = {
   'session.locked': { reasonRequired: false }, // Module 00 #21, #38
   'session.unlocked': { reasonRequired: false },
   'device.registered': { reasonRequired: false }, // Module 00 #28, #37
+  // P1.4 PR 2: account recovery and remembered computers (Module 00 #30-32, #44, #46).
+  'user.email_confirmed': { reasonRequired: false },
+  'user.password_changed': { reasonRequired: false },
+  'user.password_reset': { reasonRequired: false }, // after.via: email, recovery_key
+  'recovery_key.replaced': { reasonRequired: false },
+  'device.renamed': { reasonRequired: false },
+  'device.revoked': { reasonRequired: false },
   // P1.7 (Module 01 #1-3, #8, #16): items, their barcodes, categories and own units.
   'item.created': { reasonRequired: false },
   'item.updated': { reasonRequired: false },

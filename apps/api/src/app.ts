@@ -1,17 +1,29 @@
 import 'reflect-metadata';
-import { ConsoleLogger, Module, type DynamicModule, type INestApplication } from '@nestjs/common';
+import {
+  ConsoleLogger,
+  Logger,
+  Module,
+  type DynamicModule,
+  type INestApplication,
+} from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Database } from '@business-software/db';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { AccountController } from './account/account.controller.js';
+import { AccountService } from './account/account.service.js';
+import { DevicesController } from './account/devices.controller.js';
+import { DevicesService } from './account/devices.service.js';
+import { EMAIL_LINKS, EmailLinks } from './account/email-links.js';
 import { CLOCK, SYSTEM_CLOCK, type Clock } from './auth/clock.js';
 import { HASH_GATE, HashGate } from './auth/hash-gate.js';
 import { CookieSessionResolver, SessionController } from './auth/session.controller.js';
 import { LoginLimits, SESSION_SERVICE, SessionService } from './auth/session.service.js';
-import type { ApiConfig } from './config.js';
+import { DEFAULT_APP_URL, type ApiConfig } from './config.js';
 import { DATABASE, DatabaseModule } from './database.module.js';
 import { UnhandledErrorFilter } from './error-filter.js';
 import { HealthController } from './health.controller.js';
+import { createMailer, MAILER, type Mailer } from './mail/mailer.js';
 import { httpRules } from './http/http-rules.js';
 import { SESSION_RESOLVER, type SessionResolver } from './http/session.js';
 import { CatalogueService } from './items/catalogue.service.js';
@@ -32,6 +44,8 @@ import { StockService } from './stock/stock.service.js';
 export const API_CONTROLLERS = [
   HealthController,
   SessionController,
+  AccountController,
+  DevicesController,
   SettingsController,
   SignupController,
   ItemsController,
@@ -47,6 +61,8 @@ export interface AppOptions {
   clock?: Clock;
   /** Tests fill the Argon2 queue to check the busy answer. */
   hashGate?: HashGate;
+  /** Tests read the emails instead of sending them (ADR 0040). */
+  mailer?: Mailer;
 }
 
 @Module({})
@@ -59,18 +75,37 @@ class ApiModule {
       providers: [
         SettingsService,
         SignupService,
+        AccountService,
+        DevicesService,
+        { provide: CLOCK, useValue: options.clock ?? SYSTEM_CLOCK },
+        {
+          provide: MAILER,
+          useFactory: () => options.mailer ?? createMailer(config.mail ?? { transport: 'none' }),
+        },
+        {
+          provide: EMAIL_LINKS,
+          inject: [MAILER, CLOCK],
+          useFactory: (mailer: Mailer, clock: Clock) => {
+            const logger = new Logger('Mail');
+            const appUrl = config.appUrl ?? DEFAULT_APP_URL;
+            return new EmailLinks(mailer, clock, appUrl, (line) => {
+              logger.warn(line);
+            });
+          },
+        },
         ItemsService,
         CatalogueService,
         StockService,
-        { provide: CLOCK, useValue: options.clock ?? SYSTEM_CLOCK },
         // One Argon2 queue for signup and logins (ADR 0038).
         { provide: HASH_GATE, useValue: options.hashGate ?? new HashGate() },
         {
           provide: SESSION_SERVICE,
-          inject: [DATABASE, HASH_GATE],
-          useFactory: (database: Database, gate: HashGate) => {
-            const clock = options.clock ?? SYSTEM_CLOCK;
-            const settings = { cookieSecure: config.cookieSecure ?? true };
+          inject: [DATABASE, HASH_GATE, CLOCK],
+          useFactory: (database: Database, gate: HashGate, clock: Clock) => {
+            const settings = {
+              cookieSecure: config.cookieSecure ?? true,
+              emailLimited: config.emailLimited ?? false,
+            };
             return new SessionService(database, settings, clock, new LoginLimits(clock), gate);
           },
         },

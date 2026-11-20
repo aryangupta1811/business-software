@@ -35,6 +35,10 @@ export default defineConfig({
     // Undo vi.stubGlobal (the tests' fake fetch) and vi.spyOn after each test.
     unstubGlobals: true,
     restoreMocks: true,
+    // The form tests type every character through user-event in jsdom: about 2 s alone, but
+    // past Vitest's 5 s default when several worktrees run tests at once (signup, login,
+    // recovery and Settings timed out on 2026-11-19 and 11-20 while CI stayed green).
+    testTimeout: 15_000,
     // Vitest blanks CSS files, even `?raw` imports; the contrast test reads the tokens.
     css: { include: [/src\/styles\.css/] },
   },

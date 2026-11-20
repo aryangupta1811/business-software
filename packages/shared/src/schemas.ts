@@ -1,8 +1,9 @@
 // Request bodies for signup and settings (ADR 0036): the server parses them, and the forms
 // use the same schemas, so the screen and the API can't disagree.
 import { z } from 'zod';
+import { newPassword, passwordProblem } from './auth.js';
 import { BUSINESS_TYPES, FEATURES, GST_STATUSES } from './business.js';
-import { email, isValidGstin, normalizePhone, optionalText, phone, text } from './fields.js';
+import { email, isValidGstin, optionalText, phone, text } from './fields.js';
 import { isBranchStateCode } from './states.js';
 import { NEGATIVE_STOCK_SETTINGS } from './stock.js';
 
@@ -45,20 +46,12 @@ export const signupSchema = z
     stateCode: stateCode(),
     gstStatus: gstStatus(),
     email: email(),
-    // Never trimmed: spaces are part of a password. At least 10 characters, no forced symbols.
-    password: z
-      .string({ error: 'required' })
-      .min(1, { error: 'required' })
-      .min(10, { error: 'too_short' })
-      .max(128, { error: 'too_long' }),
+    password: newPassword(),
   })
   .superRefine((value, context) => {
-    if (value.password.trim().toLowerCase() === value.email) {
-      context.addIssue({ code: 'custom', path: ['password'], message: 'same_as_email' });
-    }
-    if (normalizePhone(value.password) === value.phone) {
-      context.addIssue({ code: 'custom', path: ['password'], message: 'same_as_phone' });
-    }
+    const problem = passwordProblem(value.password, value);
+    if (problem !== null)
+      context.addIssue({ code: 'custom', path: ['password'], message: problem });
   });
 export type SignupInput = z.infer<typeof signupSchema>;
 

@@ -143,6 +143,19 @@ test("keeps the switches and offers the type's defaults", async () => {
   ]);
 });
 
+test('switches negative stock at billing from warn to block', async () => {
+  const fetchMock = stubApi({ status: 200, body: VIEW });
+  renderSettings();
+  const user = userEvent.setup();
+  const stock = within(await card('Stock'));
+  expect(stock.getByRole('radio', { name: /^Warn/ })).toBeChecked();
+  await user.click(stock.getByRole('radio', { name: /^Block/ }));
+  await user.click(stock.getByRole('button', { name: 'Save' }));
+  expect(await stock.findByRole('status')).toHaveTextContent('Saved');
+  expect(putsTo(fetchMock, 'stock')).toEqual([{ negativeStock: 'block' }]);
+  expect(stock.getByRole('radio', { name: /^Block/ })).toBeChecked();
+});
+
 test('keeps lock times in their range', async () => {
   const fetchMock = stubApi({ status: 200, body: VIEW });
   renderSettings();

@@ -13,6 +13,8 @@ export class ApiError extends Error {
     readonly retryAt?: string,
     /** The rest of the answer, such as the item that already has a barcode. */
     readonly detail: Readonly<Record<string, unknown>> = {},
+    /** With `busy` (a 503): the seconds the `Retry-After` header asks to wait (ADR 0041). */
+    readonly retryAfterSeconds?: number,
   ) {
     super(`API answered ${String(status)} ${code}`);
   }
@@ -66,7 +68,15 @@ export async function apiRequest<T>(method: string, path: string, body?: unknown
     if (response.status === 401 && AUTH_CODES.has(code)) {
       for (const listener of authListeners) listener(code);
     }
-    throw new ApiError(response.status, code, answer?.fields, answer?.retryAt, answer ?? {});
+    const retryAfter = Number.parseInt(response.headers.get('retry-after') ?? '', 10);
+    throw new ApiError(
+      response.status,
+      code,
+      answer?.fields,
+      answer?.retryAt,
+      answer ?? {},
+      Number.isSafeInteger(retryAfter) && retryAfter >= 0 ? retryAfter : undefined,
+    );
   }
   return answer as T;
 }

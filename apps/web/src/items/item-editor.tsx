@@ -30,7 +30,7 @@ import { Field } from '../components/ui/field';
 import { Input } from '../components/ui/input';
 import { Select } from '../components/ui/select';
 import { useFieldError } from '../lib/field-error';
-import { itemKeys } from './api';
+import { itemKeys, useItemStock } from './api';
 import {
   emptyItemForm,
   fixedPackSize,
@@ -42,6 +42,8 @@ import {
   type ItemForm,
 } from './item-form';
 import { gstRateText, unitName } from './labels';
+import { StockPanel } from './stock';
+import { stockText } from './stock-form';
 
 /** The field each 409 belongs under (design §7: conflicts are shown under their field). */
 const CONFLICT_FIELDS: Partial<Record<string, FieldPath<ItemForm>>> = {
@@ -158,6 +160,9 @@ export function ItemEditor({
         {kind === 'goods' && <StockCard form={form} context={context} units={units} item={item} />}
       </fieldset>
       {item && <Barcodes item={item} context={context} readOnly={readOnly} onSaved={showSaved} />}
+      {item?.kind === 'goods' && context.canViewStock && (
+        <StockPanel item={item} context={context} />
+      )}
 
       {banner && <BannerText banner={banner} />}
       <div className="sticky bottom-0 flex items-center gap-4 border-t border-border bg-background py-4">
@@ -174,6 +179,7 @@ export function ItemEditor({
         {item && context.canManage && (
           <ArchiveControl
             item={item}
+            context={context}
             dirty={form.formState.isDirty}
             onDone={(view) => {
               showSaved(view);
@@ -805,10 +811,12 @@ function Barcodes({
 /** Archive or restore; refused while the form has unsaved changes, which it would discard. */
 function ArchiveControl({
   item,
+  context,
   dirty,
   onDone,
 }: {
   item: ItemView;
+  context: ItemsContext;
   dirty: boolean;
   onDone: (view: ItemView) => void;
 }) {
@@ -816,6 +824,9 @@ function ArchiveControl({
   const [open, setOpen] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const action = item.archived ? 'restore' : 'archive';
+  // Archiving hides an item, it isn't a write-off: say what stays (owner answer 7A).
+  const stockLeft = useStockLeft(item, context);
+  const body = t(`items.confirm.${action}Body`);
   return (
     <>
       <Button
@@ -838,7 +849,7 @@ function ArchiveControl({
       <ConfirmDialog
         open={open}
         title={t(`items.confirm.${action}Title`, { name: item.name })}
-        body={t(`items.confirm.${action}Body`)}
+        body={action === 'archive' && stockLeft !== '' ? `${body} ${stockLeft}` : body}
         confirm={t(`items.${action}`)}
         onClose={() => {
           setOpen(false);
@@ -855,4 +866,16 @@ function ArchiveControl({
       />
     </>
   );
+}
+
+/** "Stock left: Main 12.5 kg." for the archive confirm (owner answer 7A); '' when none is left. */
+function useStockLeft(item: ItemView, context: ItemsContext): string {
+  const { t } = useTranslation();
+  const stock = useItemStock(item.id, context.canViewStock && item.kind === 'goods');
+  const left = (stock.data?.branches ?? []).filter((row) => row.quantity !== 0);
+  if (left.length === 0) return '';
+  const list = left
+    .map((row) => `${row.branchName} ${stockText(t, row.quantity, item.stockUnit)}`)
+    .join(', ');
+  return t('items.stock.archiveLeft', { list });
 }

@@ -9,7 +9,7 @@ Every AWS resource in this project comes from the Terraform in `infra/terraform/
 | Folder | What it holds | State |
 | --- | --- | --- |
 | `infra/terraform/bootstrap/` | The S3 bucket for Terraform's state, and the `monthly-credit-burn` budget | In the bucket it made (`bootstrap/terraform.tfstate`) |
-| `infra/terraform/demo/` | VPC, subnets, security groups, RDS, the EC2 server, its role, the SSM parameters (master password, app role passwords, database host, DuckDNS token placeholder), the two nightly stop schedules | In the same bucket (`demo/terraform.tfstate`) |
+| `infra/terraform/demo/` | VPC, subnets, security groups, RDS, the EC2 server, its role, the SSM parameters (master password, app role passwords, database host, DuckDNS token placeholder), the two nightly stop schedules, the backup bucket (stage 7), and the GitHub OIDC provider with the deploy role (stage 6, `deploy.tf`: planned 2026-11-19, 3 to add, 0 to change, 0 to destroy, $0; not applied yet) | In the same bucket (`demo/terraform.tfstate`) |
 
 Git-ignored files each root needs:
 - `terraform.tfvars`, holding `allowed_account_ids` (and the budget's alert email in `bootstrap/`);

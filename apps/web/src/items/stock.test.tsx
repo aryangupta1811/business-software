@@ -527,3 +527,78 @@ test('the archive confirm says how much stock is left', async () => {
     'Stock left: Main 12.5 kg. The stock and its history stay with the item.',
   );
 });
+
+test('saving a stock change never submits the item form around it', async () => {
+  const fetchMock = stubApi({
+    ...base(),
+    [`PUT /api/items/${ITEM}`]: () => ({ body: ATTA }),
+    [`POST /api/items/${ITEM}/stock/adjustments`]: () => ({
+      status: 201,
+      body: HISTORY.movements[0],
+    }),
+  });
+  renderItem();
+  await userEvent.click(await (await stockCard()).findByRole('button', { name: 'Adjust stock' }));
+  const dialog = within(screen.getByRole('dialog'));
+  await userEvent.selectOptions(dialog.getByLabelText('Reason'), 'Damaged');
+  // Enter in the field, as a person (or a scanner) would.
+  await userEvent.type(dialog.getByLabelText('Quantity (kg)'), '1{Enter}');
+  await waitFor(() => {
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+  expect(sentTo(fetchMock, 'POST', `/api/items/${ITEM}/stock/adjustments`)).toHaveLength(1);
+  expect(sentTo(fetchMock, 'PUT', `/api/items/${ITEM}`)).toEqual([]);
+});
+
+test('an item archived meanwhile shows as archived after the refusal', async () => {
+  let item = ATTA;
+  stubApi({
+    ...base(),
+    [`GET /api/items/${ITEM}`]: () => ({ body: item }),
+    [`POST /api/items/${ITEM}/stock/adjustments`]: () => {
+      item = { ...ATTA, archived: true, version: 4 };
+      return { status: 409, body: { code: 'archived' } };
+    },
+  });
+  renderItem();
+  const card = await stockCard();
+  await userEvent.click(await card.findByRole('button', { name: 'Adjust stock' }));
+  const dialog = within(screen.getByRole('dialog'));
+  await userEvent.selectOptions(dialog.getByLabelText('Reason'), 'Damaged');
+  await userEvent.type(dialog.getByLabelText('Quantity (kg)'), '1');
+  await userEvent.click(dialog.getByRole('button', { name: 'Save adjustment' }));
+  expect(await dialog.findByRole('alert')).toHaveTextContent('This item is archived');
+  await userEvent.click(dialog.getByRole('button', { name: 'Cancel' }));
+  expect(await screen.findByRole('button', { name: 'Restore' })).toBeInTheDocument();
+  expect(card.queryByRole('button', { name: 'Adjust stock' })).toBeNull();
+});
+
+test('says saving failed when the API refuses a field the dialog does not show', async () => {
+  stubApi({
+    ...base(),
+    [`POST /api/items/${ITEM}/stock/adjustments`]: () => ({
+      status: 400,
+      body: { code: 'invalid_body', fields: { requestKey: 'invalid' } },
+    }),
+  });
+  renderItem();
+  await userEvent.click(await (await stockCard()).findByRole('button', { name: 'Adjust stock' }));
+  const dialog = within(screen.getByRole('dialog'));
+  await userEvent.selectOptions(dialog.getByLabelText('Reason'), 'Damaged');
+  await userEvent.type(dialog.getByLabelText('Quantity (kg)'), '1');
+  await userEvent.click(dialog.getByRole('button', { name: 'Save adjustment' }));
+  expect(await dialog.findByRole('alert')).toHaveTextContent("Couldn't save.");
+});
+
+test('the archive confirm says when the stock left could not be checked', async () => {
+  stubApi({
+    ...base(),
+    [`GET /api/items/${ITEM}/stock`]: () => ({ status: 500, body: { code: 'server' } }),
+  });
+  renderItem();
+  await (await stockCard()).findByText("Couldn't load the stock.");
+  await userEvent.click(screen.getByRole('button', { name: 'Archive' }));
+  expect(screen.getByRole('dialog', { name: /Archive/ })).toHaveTextContent(
+    "The stock left couldn't be checked. Whatever there is stays with the item.",
+  );
+});

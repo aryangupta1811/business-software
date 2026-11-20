@@ -655,7 +655,8 @@
         "forbidden": "You aren't allowed to change stock.",
         "failed": "Couldn't save. Check the connection and try again."
       },
-      "archiveLeft": "Stock left: {{list}}. The stock and its history stay with the item."
+      "archiveLeft": "Stock left: {{list}}. The stock and its history stay with the item.",
+      "archiveUnknown": "The stock left couldn't be checked. Whatever there is stays with the item."
     }
   },
   "password": {

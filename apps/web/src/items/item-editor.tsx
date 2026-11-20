@@ -868,11 +868,17 @@ function ArchiveControl({
   );
 }
 
-/** "Stock left: Main 12.5 kg." for the archive confirm (owner answer 7A); '' when none is left. */
+/**
+ * "Stock left: Main 12.5 kg." for the archive confirm (owner answer 7A); '' when none is left,
+ * and a plain warning when the stock couldn't be read, so silence never means "none left".
+ */
 function useStockLeft(item: ItemView, context: ItemsContext): string {
   const { t } = useTranslation();
-  const stock = useItemStock(item.id, context.canViewStock && item.kind === 'goods');
-  const left = (stock.data?.branches ?? []).filter((row) => row.quantity !== 0);
+  const checks = context.canViewStock && item.kind === 'goods';
+  const stock = useItemStock(item.id, checks);
+  if (!checks) return '';
+  if (stock.data === undefined) return t('items.stock.archiveUnknown');
+  const left = stock.data.branches.filter((row) => row.quantity !== 0);
   if (left.length === 0) return '';
   const list = left
     .map((row) => `${row.branchName} ${stockText(t, row.quantity, item.stockUnit)}`)

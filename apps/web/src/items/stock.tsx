@@ -9,6 +9,7 @@ import {
 } from '@business-software/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import {
   useForm,
   useWatch,
@@ -350,7 +351,7 @@ const KNOWN_REFUSALS = new Set([
   'forbidden',
 ]);
 
-/** Answers that mean the card's numbers are out of date. */
+/** Answers that mean what the page shows is out of date: the item itself, or its stock. */
 const REFRESH_ON = new Set(['opening_exists', 'key_reused', 'below_zero', 'archived']);
 
 /**
@@ -360,6 +361,8 @@ const REFRESH_ON = new Set(['opening_exists', 'key_reused', 'below_zero', 'archi
 function useStockChange<Form extends FieldValues>(
   item: ItemView,
   path: 'opening' | 'adjustments',
+  /** The fields the dialog shows: an error on any other has nowhere to appear. */
+  shown: readonly FieldPath<Form>[],
   setError: (field: FieldPath<Form>, code: string) => void,
   onDone: () => void,
 ) {
@@ -372,6 +375,10 @@ function useStockChange<Form extends FieldValues>(
       queryClient.invalidateQueries({ queryKey: itemKeys.stock(item.id) }),
       queryClient.invalidateQueries({ queryKey: [...itemKeys.all, 'list'] }),
     ]);
+  // A refusal can mean the item changed too (archived at another counter): read it again, so
+  // the page shows Restore instead of offering changes that can't be made.
+  const refreshAll = () =>
+    Promise.all([refresh(), queryClient.invalidateQueries({ queryKey: itemKeys.one(item.id) })]);
 
   const send = async (body: unknown) => {
     setRefusal(null);
@@ -383,14 +390,18 @@ function useStockChange<Form extends FieldValues>(
       await refresh();
       onDone();
     } catch (error) {
-      if (error instanceof ApiError && error.code === 'invalid_body') {
-        for (const [field, code] of Object.entries(error.fields)) {
-          setError(field as FieldPath<Form>, code);
-        }
+      const onFields =
+        error instanceof ApiError && error.code === 'invalid_body'
+          ? Object.entries(error.fields).filter(([field]) =>
+              shown.includes(field as FieldPath<Form>),
+            )
+          : [];
+      if (onFields.length > 0) {
+        for (const [field, code] of onFields) setError(field as FieldPath<Form>, code);
       } else {
         const code = error instanceof ApiError ? error.code : 'failed';
         setRefusal(KNOWN_REFUSALS.has(code) ? code : 'failed');
-        if (REFRESH_ON.has(code)) void refresh();
+        if (REFRESH_ON.has(code)) void refreshAll();
       }
     } finally {
       setSaving(false);
@@ -399,7 +410,12 @@ function useStockChange<Form extends FieldValues>(
   return { send, requestKey, refusal, saving };
 }
 
-/** The browser's own modal `<dialog>` (ADR 0026), open while mounted; Esc or Cancel closes it. */
+/**
+ * The browser's own modal `<dialog>` (ADR 0026), open while mounted; Esc or Cancel closes it.
+ * The Stock card sits inside the item's form, so the dialog is put at the end of the page (no
+ * form inside a form) and its submit stops here: React passes events up its own tree, portal or
+ * not, and the item form would otherwise save too.
+ */
 function StockDialog({
   title,
   lead,
@@ -418,12 +434,15 @@ function StockDialog({
     const element = dialog.current;
     if (element && !element.open) element.showModal();
   }, []);
-  return (
+  return createPortal(
     <dialog
       ref={dialog}
       aria-labelledby={titleId}
       aria-describedby={leadId}
       onClose={onClose}
+      onSubmit={(event) => {
+        event.stopPropagation();
+      }}
       className="m-auto w-full max-w-lg rounded-lg bg-surface p-6 text-foreground shadow-card"
     >
       <h2 id={titleId} className="text-section font-semibold">
@@ -433,7 +452,8 @@ function StockDialog({
         {lead}
       </p>
       <div className="mt-5">{children}</div>
-    </dialog>
+    </dialog>,
+    document.body,
   );
 }
 
@@ -493,6 +513,7 @@ function OpeningDialog({
   const change = useStockChange<OpeningForm>(
     item,
     'opening',
+    showCost ? ['quantity', 'unitCost'] : ['quantity'],
     (field, code) => {
       form.setError(field, { message: code });
     },
@@ -580,6 +601,7 @@ function AdjustDialog({
   const change = useStockChange<AdjustForm>(
     item,
     'adjustments',
+    ['direction', 'reason', 'quantity', 'note'],
     (field, code) => {
       form.setError(field, { message: code });
     },

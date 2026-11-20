@@ -655,7 +655,8 @@
         "forbidden": "Aapko stock badalne ki anumati nahi hai.",
         "failed": "Save nahi ho saka. Connection check karein aur phir koshish karein."
       },
-      "archiveLeft": "Bacha stock: {{list}}. Stock aur uski history saamaan ke saath rehte hain."
+      "archiveLeft": "Bacha stock: {{list}}. Stock aur uski history saamaan ke saath rehte hain.",
+      "archiveUnknown": "Bacha stock jaancha nahi ja saka. Jo bhi hai, saamaan ke saath rehta hai."
     }
   },
   "password": {

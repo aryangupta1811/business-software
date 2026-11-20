@@ -19,7 +19,7 @@ import { CLOCK, SYSTEM_CLOCK, type Clock } from './auth/clock.js';
 import { HASH_GATE, HashGate } from './auth/hash-gate.js';
 import { CookieSessionResolver, SessionController } from './auth/session.controller.js';
 import { LoginLimits, SESSION_SERVICE, SessionService } from './auth/session.service.js';
-import type { ApiConfig } from './config.js';
+import { DEFAULT_APP_URL, type ApiConfig } from './config.js';
 import { DATABASE, DatabaseModule } from './database.module.js';
 import { UnhandledErrorFilter } from './error-filter.js';
 import { HealthController } from './health.controller.js';
@@ -84,7 +84,7 @@ class ApiModule {
           inject: [MAILER, CLOCK],
           useFactory: (mailer: Mailer, clock: Clock) => {
             const logger = new Logger('Mail');
-            const appUrl = config.appUrl ?? 'http://127.0.0.1:5173';
+            const appUrl = config.appUrl ?? DEFAULT_APP_URL;
             return new EmailLinks(mailer, clock, appUrl, (line) => {
               logger.warn(line);
             });

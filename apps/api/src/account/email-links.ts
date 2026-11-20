@@ -7,6 +7,7 @@ import {
   eq,
   gt,
   isNull,
+  users,
   type AuthTokenKind,
   type Transaction,
 } from '@business-software/db';
@@ -14,6 +15,15 @@ import type { Clock } from '../auth/clock.js';
 import { hashToken, newToken } from '../auth/tokens.js';
 import { sendAfterCommit, type MailLog, type Mailer } from '../mail/mailer.js';
 import { confirmEmailMessage, resetPasswordMessage } from '../mail/messages.js';
+
+/**
+ * Locks the user's row until the transaction ends, so two requests that replace this user's
+ * one open link or unused recovery key run one after the other. Without it, both mark the old
+ * one used, both insert, and the second insert fails the partial unique index (a 500).
+ */
+export async function lockUserIn(tx: Transaction, userId: string): Promise<void> {
+  await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for('update');
+}
 
 /** Injection token for the one EmailLinks. */
 export const EMAIL_LINKS = 'EMAIL_LINKS';
@@ -50,6 +60,7 @@ export class EmailLinks {
     userId: string,
     kind: AuthTokenKind,
   ): Promise<string> {
+    await lockUserIn(tx, userId);
     const now = this.clock.now();
     await tx
       .update(authTokens)

@@ -4,6 +4,7 @@ import {
   alsoInBusiness,
   and,
   asc,
+  authTokens,
   branches,
   businesses,
   devices,
@@ -120,6 +121,12 @@ export interface RequestContext {
   cookies: Map<string, string>;
 }
 
+/** An owner found by email (ADR 0039). */
+export interface OwnerLogin {
+  businessId: string;
+  userId: string;
+}
+
 export interface LoginResult {
   setCookies: string[];
   view: ActiveSession;
@@ -177,6 +184,18 @@ export class SessionService {
     };
   }
 
+  /**
+   * The one cross-business read (ADR 0039): which business and owner an email belongs to.
+   * Never a password hash: that is read under RLS once the business is known.
+   */
+  async findOwnerLogin(email: string): Promise<OwnerLogin | undefined> {
+    const { rows } = await this.database.db.execute<{ business_id: string; user_id: string }>(
+      sql`select business_id, user_id from app_find_owner_login(${email})`,
+    );
+    const row = rows[0];
+    return row === undefined ? undefined : { businessId: row.business_id, userId: row.user_id };
+  }
+
   /** Module 00 #27: email and password. */
   async loginOwner(email: string, password: string, context: RequestContext): Promise<LoginResult> {
     throwUnless(this.limits.ip.hit(context.ip));
@@ -184,34 +203,27 @@ export class SessionService {
     // a right password takes the count back.
     const loginKey = `owner:${email}`;
     throwUnless(this.limits.failures.hit(loginKey));
-    const { rows } = await this.database.db.execute<{ business_id: string; user_id: string }>(
-      sql`select business_id, user_id from app_find_owner_login(${email})`,
-    );
-    const found = rows[0];
+    const found = await this.findOwnerLogin(email);
     const user =
       found === undefined
         ? undefined
-        : await withBusiness(this.database.db, found.business_id, async (tx) => {
+        : await withBusiness(this.database.db, found.businessId, async (tx) => {
             const [row] = await tx
               .select({ passwordHash: users.passwordHash, deactivatedAt: users.deactivatedAt })
               .from(users)
-              .where(eq(users.id, found.user_id));
+              .where(eq(users.id, found.userId));
             return row;
           });
     const ok = await this.checkPassword(password, user?.passwordHash ?? null);
     if (!ok || found === undefined || user?.deactivatedAt !== null) throw new WrongLoginError();
     this.limits.failures.reset(loginKey);
     const rehash = await this.rehashIfOld(password, user.passwordHash);
-    const businessId = found.business_id;
+    const businessId = found.businessId;
     // One transaction: the new session and the end of the old, or neither (#18).
     return withBusiness(this.database.db, businessId, async (tx) => {
-      await rehash?.(tx, found.user_id);
+      await rehash?.(tx, found.userId);
       const device = await this.findDeviceIn(tx, businessId, context);
-      return this.startIn(
-        tx,
-        { businessId, userId: found.user_id, role: 'owner', device },
-        context,
-      );
+      return this.startIn(tx, { businessId, userId: found.userId, role: 'owner', device }, context);
     });
   }
 
@@ -409,7 +421,8 @@ export class SessionService {
 
   /**
    * Sets a user's new password inside the caller's transaction and ends their sessions, all
-   * of them or all but `keep` (#30, #31, #46).
+   * of them or all but `keep` (#30, #31, #46). An emailed reset link still open stops working
+   * too: it was asked for before this password, maybe by whoever this change locks out.
    */
   async setPasswordIn(
     tx: Transaction,
@@ -422,6 +435,16 @@ export class SessionService {
       .update(users)
       .set({ passwordHash, passwordChangedAt: this.clock.now() })
       .where(eq(users.id, userId));
+    await tx
+      .update(authTokens)
+      .set({ usedAt: this.clock.now() })
+      .where(
+        and(
+          eq(authTokens.userId, userId),
+          eq(authTokens.kind, 'reset_password'),
+          isNull(authTokens.usedAt),
+        ),
+      );
     await this.endSessionsIn(tx, eq(sessions.userId, userId), reason, keep);
   }
 

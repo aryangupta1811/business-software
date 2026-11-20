@@ -6,10 +6,10 @@ import {
   and,
   businesses,
   eq,
+  isNotNull,
   isNull,
   recordEntry,
   recoveryKeys,
-  sql,
   users,
   withBusiness,
   type Database,
@@ -32,7 +32,7 @@ import {
   WeakPasswordError,
   WrongRecoveryKeyError,
 } from './account.errors.js';
-import { EMAIL_LINKS, type EmailLinks } from './email-links.js';
+import { EMAIL_LINKS, lockUserIn, type EmailLinks } from './email-links.js';
 
 interface Account {
   email: string | null;
@@ -108,23 +108,23 @@ export class AccountService {
   async requestReset(email: string, context: RequestContext): Promise<void> {
     throwUnless(this.sessions.limits.recoveryByIp.hit(context.ip));
     throwUnless(this.sessions.limits.recoveryByAccount.hit(`reset:${email}`));
-    const found = await this.findOwner(email);
+    const found = await this.sessions.findOwnerLogin(email);
     if (found === undefined) return;
-    const token = await withBusiness(this.database.db, found.business_id, async (tx) => {
+    const token = await withBusiness(this.database.db, found.businessId, async (tx) => {
       const [user] = await tx
         .select({ id: users.id })
         .from(users)
         .where(
           and(
-            eq(users.id, found.user_id),
-            sql`${users.emailConfirmedAt} is not null`,
+            eq(users.id, found.userId),
+            isNotNull(users.emailConfirmedAt),
             isNull(users.deactivatedAt),
           ),
         );
       if (user === undefined) return null;
-      return this.links.issueIn(tx, found.business_id, user.id, 'reset_password');
+      return this.links.issueIn(tx, found.businessId, user.id, 'reset_password');
     });
-    if (token !== null) void this.links.send(email, found.business_id, 'reset_password', token);
+    if (token !== null) void this.links.send(email, found.businessId, 'reset_password', token);
   }
 
   /**
@@ -169,10 +169,10 @@ export class AccountService {
     const limitKey = `recovery:${email}`;
     throwUnless(this.sessions.limits.recoveryByAccount.hit(limitKey));
     const keyHash = hashRecoveryKey(typedKey);
-    const found = await this.findOwner(email);
+    const found = await this.sessions.findOwnerLogin(email);
     if (keyHash === null || found === undefined) throw new WrongRecoveryKeyError();
-    const businessId = found.business_id;
-    const userId = found.user_id;
+    const businessId = found.businessId;
+    const userId = found.userId;
     const unusedKey = and(
       eq(recoveryKeys.userId, userId),
       eq(recoveryKeys.keyHash, keyHash),
@@ -187,6 +187,7 @@ export class AccountService {
     const passwordHash = await this.sessions.hashNewPassword(newPassword);
     const next = makeRecoveryKey();
     await withBusiness(this.database.db, businessId, async (tx) => {
+      await lockUserIn(tx, userId);
       const used = await tx
         .update(recoveryKeys)
         .set({ usedAt: this.clock.now() })
@@ -207,6 +208,7 @@ export class AccountService {
     await this.sessions.requireOwnerPassword(caller, ownerPassword);
     const next = makeRecoveryKey();
     await withBusiness(this.database.db, caller.businessId, async (tx) => {
+      await lockUserIn(tx, caller.userId);
       await tx
         .update(recoveryKeys)
         .set({ usedAt: this.clock.now() })
@@ -254,13 +256,6 @@ export class AccountService {
   }
 
   // ---------------------------------------------------------------------------------------
-
-  private async findOwner(email: string) {
-    const { rows } = await this.database.db.execute<{ business_id: string; user_id: string }>(
-      sql`select business_id, user_id from app_find_owner_login(${email})`,
-    );
-    return rows[0];
-  }
 
   private async logReset(tx: Transaction, userId: string, via: 'email' | 'recovery_key') {
     await recordEntry(tx, {

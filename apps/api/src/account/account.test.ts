@@ -301,6 +301,61 @@ describe('account recovery and remembered computers', () => {
       ).toBe(204);
     });
 
+    it('answers 202 to requests that arrive together, and keeps one open link', async () => {
+      const email = 'reset-together@example.com';
+      const { businessId } = await signUp(email);
+      await confirmEmail(email);
+      const answers = await Promise.all(
+        [1, 2, 3, 4].map(() => browser().call('POST', '/password-reset/request', { email })),
+      );
+      expect(answers.map((answer) => answer.status)).toEqual([202, 202, 202, 202]);
+      const open = await query<{ count: string }>(
+        `select count(*) from auth_tokens
+         where business_id = $1 and kind = 'reset_password' and used_at is null`,
+        [businessId],
+      );
+      expect(open[0]?.count).toBe('1');
+    });
+
+    it('a new password, by recovery key or in Settings, stops an open reset link', async () => {
+      const email = 'reset-stale@example.com';
+      const { recoveryKey } = await signUp(email);
+      await confirmEmail(email);
+      const complete = (link: { businessId: string; token: string }) =>
+        browser().call('POST', '/password-reset/complete', { ...link, newPassword: NEW_PASSWORD });
+
+      await browser().call('POST', '/password-reset/request', { email });
+      const beforeRecovery = lastLink(email, 'reset');
+      const recovered = await browser().call('POST', '/recovery/reset', {
+        email,
+        recoveryKey,
+        newPassword: 'the recovered password',
+      });
+      expect(recovered.status).toBe(200);
+      expect(await complete(beforeRecovery)).toMatchObject({
+        status: 400,
+        body: { code: 'invalid_link' },
+      });
+
+      const again = browser();
+      await again.call('POST', '/login', { email, password: 'the recovered password' });
+      await again.session();
+      await browser().call('POST', '/password-reset/request', { email });
+      const beforeChange = lastLink(email, 'reset');
+      expect(
+        (
+          await again.call('POST', '/password', {
+            currentPassword: 'the recovered password',
+            newPassword: 'the changed password',
+          })
+        ).status,
+      ).toBe(204);
+      expect(await complete(beforeChange)).toMatchObject({
+        status: 400,
+        body: { code: 'invalid_link' },
+      });
+    });
+
     it('takes 5 requests per email per hour (section 7)', async () => {
       const email = 'reset-limit@example.com';
       for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -397,6 +452,25 @@ describe('account recovery and remembered computers', () => {
       expect((await actions(businessId)).map((row) => row.action)).toContain(
         'recovery_key.replaced',
       );
+    });
+
+    it('two new keys made at once both answer, and only one key works', async () => {
+      const email = 'new-key-together@example.com';
+      const { owner, businessId } = await signUp(email);
+      const other = browser();
+      await other.call('POST', '/login', { email, password: PASSWORD });
+      await other.session();
+      const made = await Promise.all(
+        [owner, other, owner, other].map((who) =>
+          who.call('POST', '/recovery-key', { ownerPassword: PASSWORD }),
+        ),
+      );
+      expect(made.map((answer) => answer.status)).toEqual([200, 200, 200, 200]);
+      const unused = await query<{ count: string }>(
+        'select count(*) from recovery_keys where business_id = $1 and used_at is null',
+        [businessId],
+      );
+      expect(unused[0]?.count).toBe('1');
     });
 
     it('checks the owner password at most 10 times per session in 15 minutes', async () => {

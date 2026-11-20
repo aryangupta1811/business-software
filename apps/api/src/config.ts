@@ -86,8 +86,11 @@ function readMail(env: NodeJS.ProcessEnv): MailSettings {
   }
 }
 
+/** Where emailed links point when APP_URL is unset: the web app under `pnpm dev`. */
+export const DEFAULT_APP_URL = 'http://127.0.0.1:5173';
+
 function readAppUrl(env: NodeJS.ProcessEnv): string {
-  if (env.APP_URL === undefined) return 'http://127.0.0.1:5173';
+  if (env.APP_URL === undefined) return DEFAULT_APP_URL;
   return readUrl(env, 'APP_URL', ['http:', 'https:'], 'an http(s)').replace(/\/+$/, '');
 }
 

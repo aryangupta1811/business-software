@@ -16,11 +16,12 @@ readonly src dir=/opt/business-software
 install -d -m 755 "$dir" "$dir/certs"
 install -m 644 "$src/compose.yaml" "$dir/compose.yaml"
 install -m 755 "$src/start.sh" "$src/bootstrap-db.sh" "$src/backup.sh" "$src/dump.sh" \
-  "$src/restore-drill.sh" "$src/restore-check.sh" "$dir/"
+  "$src/restore-drill.sh" "$src/restore-check.sh" "$src/mail-credentials.sh" "$dir/"
 install -m 644 "$src/../../packages/db/bootstrap/create-roles.sql" \
   "$src/../../packages/db/bootstrap/create-backup-role.sql" "$dir/"
 install -m 644 "$src/business-software.service" "$src/business-software-backup.service" \
-  "$src/business-software-backup.timer" /etc/systemd/system/
+  "$src/business-software-backup.timer" "$src/business-software-mail-credentials.service" \
+  "$src/business-software-mail-credentials.timer" /etc/systemd/system/
 
 # Amazon's certificate authorities for RDS in Mumbai (public, from AWS's trust store). The
 # app and psql check RDS's certificate against these (sslmode=verify-full).
@@ -45,6 +46,9 @@ systemctl enable business-software.service
 # The nightly backup (ADR 0037). Enabling the timer runs nothing now; the first backup comes at
 # 22:45 IST or the next boot, or by hand with scripts/deploy/backup.sh now.
 systemctl enable --now business-software-backup.timer
+# The api's mail credentials, refreshed every 20 minutes (ADR 0040's 2026-11-20 note). start.sh
+# writes the first ones; a refresh that fails while mail isn't set up yet does no harm.
+systemctl enable --now business-software-mail-credentials.timer
 systemctl reset-failed business-software.service || true
 # restart = stop the old containers, then start.sh with the new images: a few seconds of
 # downtime (stage 6 can make this smoother). --no-block, then wait for the outcome: a first

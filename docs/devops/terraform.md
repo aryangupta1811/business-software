@@ -112,6 +112,16 @@ A new token (duckdns.org can make one) goes in the same way; the next boot or de
 
 **If `bootstrap-db.sh` stopped halfway** (roles created, database not): it fails at `CREATE ROLE` on the next deploy. Finish by hand as the master in a Session Manager shell (the rest of `create-roles.sql`), then deploy again.
 
+## Email (SES)
+
+ADR 0040 and its 2026-11-20 note; `infra/terraform/demo/mail.tf`.
+
+- **The sender** is `mail_from` in the git-ignored `terraform.tfvars` (sensitive, so a plan shows it hidden); extra sandbox recipients go in `mail_recipients`. The first apply makes AWS email each address a verification link. Until it's clicked, SES refuses to send from it (or, in the sandbox, to it). Check with `aws sesv2 get-email-identity --email-identity <address> --query VerifiedForSendingStatus`.
+- **Sandbox (D1):** mail reaches verified addresses only, 200 a day, 1 a second. Everyone else uses the recovery key, and the app says so (`EMAIL_LIMITED=true`).
+- **How the api gets credentials:** containers can't reach the server's role (metadata hop limit 1). `mail-credentials.sh` on the host assumes `business-software-demo-mail` (send only, only as `mail_from`) and writes 1-hour credentials to `/run/business-software-mail`, mounted read-only into the api at `/aws`. `business-software-mail-credentials.timer` refreshes them every 20 minutes. Check on the server: `systemctl list-timers business-software-mail-credentials.timer` and `journalctl -u business-software-mail-credentials -n 5`.
+- **Mail never stops the app from starting.** If the parameters or the role are missing, `start.sh` logs `mail: off` and runs `MAIL_TRANSPORT=none`. `journalctl -u business-software | grep mail:` shows which one is live.
+- **Price:** $0.10 per 1,000 recipients. The identities, the role and the parameters are free.
+
 ## The database
 
 - PostgreSQL 18.6 on `db.t4g.micro`, in private subnets. Port 5432 is open only to the server's security group; from the laptop the name resolves to a private `10.20.x.x` address and nothing answers.

@@ -157,7 +157,9 @@ export class AccountService {
 
   /**
    * #31: the recovery key resets the password, stops working, and a new key is answered once.
-   * Its own limits (5 per IP and per email an hour), separate from the login's.
+   * Its own limit, separate from the login's: 5 per IP an hour, and none per email (owner,
+   * 2026-11-20; #41): the key has 160 random bits, so a per-email limit couldn't stop a guess
+   * that has no chance anyway, but would let anyone who knows the email lock the owner out.
    */
   async resetWithRecoveryKey(
     email: string,
@@ -166,8 +168,6 @@ export class AccountService {
     context: RequestContext,
   ): Promise<string> {
     throwUnless(this.sessions.limits.recoveryByIp.hit(context.ip));
-    const limitKey = `recovery:${email}`;
-    throwUnless(this.sessions.limits.recoveryByAccount.hit(limitKey));
     const keyHash = hashRecoveryKey(typedKey);
     const found = await this.sessions.findOwnerLogin(email);
     if (keyHash === null || found === undefined) throw new WrongRecoveryKeyError();
@@ -198,7 +198,6 @@ export class AccountService {
       await this.sessions.setPasswordIn(tx, userId, passwordHash, 'reset');
       await this.logReset(tx, userId, 'recovery_key');
     });
-    this.sessions.limits.recoveryByAccount.reset(limitKey);
     this.sessions.limits.failures.reset(`owner:${email}`);
     return next.key;
   }

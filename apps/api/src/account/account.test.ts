@@ -396,32 +396,52 @@ describe('account recovery and remembered computers', () => {
       });
     });
 
-    it('gives one answer for a wrong key and an unknown email, 5 tries per email an hour', async () => {
+    it('gives one answer for a wrong key and an unknown email, 5 tries per IP an hour', async () => {
       const email = 'recover-limit@example.com';
       await signUp(email);
       const wrongKey = madeUpRecoveryKey();
-      expect(
-        await browser().call('POST', '/recovery/reset', {
-          email: 'nobody@example.com',
-          recoveryKey: wrongKey,
-          newPassword: NEW_PASSWORD,
-        }),
-      ).toMatchObject({ status: 401, body: { code: 'wrong_recovery_key' } });
-      for (let attempt = 0; attempt < 5; attempt += 1) {
-        const answer = await browser().call('POST', '/recovery/reset', {
-          email,
-          recoveryKey: attempt === 0 ? 'not a key' : wrongKey,
+      const guesser = browser();
+      const guess = (address: string, key: string) =>
+        guesser.call('POST', '/recovery/reset', {
+          email: address,
+          recoveryKey: key,
           newPassword: NEW_PASSWORD,
         });
-        expect(answer).toMatchObject({ status: 401, body: { code: 'wrong_recovery_key' } });
+      const wrong = { status: 401, body: { code: 'wrong_recovery_key' } };
+      expect(await guess('nobody@example.com', wrongKey)).toMatchObject(wrong);
+      expect(await guess(email, 'not a key')).toMatchObject(wrong);
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        expect(await guess(email, wrongKey)).toMatchObject(wrong);
       }
-      expect(
-        await browser().call('POST', '/recovery/reset', {
-          email,
-          recoveryKey: wrongKey,
-          newPassword: NEW_PASSWORD,
-        }),
-      ).toMatchObject({ status: 429, body: { code: 'too_many_attempts' } });
+      expect(await guess(email, wrongKey)).toMatchObject({
+        status: 429,
+        body: { code: 'too_many_attempts' },
+      });
+    });
+
+    it("someone who knows the email can't lock the owner out of recovery (#41)", async () => {
+      // Owner, 2026-11-20: no limit per email on recovery-key tries, only per IP. The key has
+      // 160 random bits, so guessing it is hopeless; a per-email limit would only let anyone who
+      // knows the email block the owner's way back in for an hour.
+      const email = 'recover-lockout@example.com';
+      const { recoveryKey } = await signUp(email);
+      const wrongKey = madeUpRecoveryKey();
+      for (let attempt = 0; attempt < 12; attempt += 1) {
+        expect(
+          await browser().call('POST', '/recovery/reset', {
+            email,
+            recoveryKey: wrongKey,
+            newPassword: NEW_PASSWORD,
+          }),
+        ).toMatchObject({ status: 401, body: { code: 'wrong_recovery_key' } });
+      }
+      const owner = await browser().call('POST', '/recovery/reset', {
+        email,
+        recoveryKey,
+        newPassword: NEW_PASSWORD,
+      });
+      expect(owner.status).toBe(200);
+      expect((await login(email, NEW_PASSWORD)).status).toBe(200);
     });
 
     it('the owner makes a new key with their password; the old key stops working', async () => {

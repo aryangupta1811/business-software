@@ -1,7 +1,7 @@
-// Login request schemas and the session view (Module 00 #27, #28, #43; P1.4 design). Error
-// messages are codes the web app translates (ADR 0036).
+// Login, recovery and password request schemas and the session view (Module 00 #27-#33, #43,
+// #46; P1.4 design). Error messages are codes the web app translates (ADR 0036).
 import { z } from 'zod';
-import { email } from './fields.js';
+import { email, normalizePhone, text } from './fields.js';
 
 /** A password exactly as typed: never trimmed (ADR 0035). */
 const typedPassword = () =>
@@ -28,6 +28,88 @@ export const staffLoginSchema = z.strictObject({
   password: typedPassword(),
 });
 export type StaffLoginInput = z.infer<typeof staffLoginSchema>;
+
+/** A new password (Module 00 #7, ADR 0035): never trimmed, at least 10 characters, no forced symbols. */
+export const newPassword = () =>
+  z
+    .string({ error: 'required' })
+    .min(1, { error: 'required' })
+    .min(10, { error: 'too_short' })
+    .max(128, { error: 'too_long' });
+
+/** Module 00 #7: a password can't be the account's email or the business's phone number. */
+export function passwordProblem(
+  password: string,
+  account: { email: string | null; phone: string },
+): 'same_as_email' | 'same_as_phone' | null {
+  if (account.email !== null && password.trim().toLowerCase() === account.email) {
+    return 'same_as_email';
+  }
+  return normalizePhone(password) === account.phone ? 'same_as_phone' : null;
+}
+
+/** A link's token: 32 random bytes in base64url (P1.4 design, section 4). */
+const linkToken = () =>
+  z.string({ error: 'required' }).regex(/^[A-Za-z0-9_-]{43}$/, { error: 'invalid' });
+const businessId = () => z.uuid({ error: 'invalid' });
+
+/** #32: the confirmation link's page posts what the link carries. */
+export const confirmEmailSchema = z.strictObject({ businessId: businessId(), token: linkToken() });
+export type ConfirmEmailInput = z.infer<typeof confirmEmailSchema>;
+
+/** #30: "send me a reset link". */
+export const resetRequestSchema = z.strictObject({ email: email() });
+export type ResetRequestInput = z.infer<typeof resetRequestSchema>;
+
+/** #30, #42: the reset link's page, with the new password. */
+export const resetCompleteSchema = z.strictObject({
+  businessId: businessId(),
+  token: linkToken(),
+  newPassword: newPassword(),
+});
+export type ResetCompleteInput = z.infer<typeof resetCompleteSchema>;
+
+/** #31: the recovery key, typed with dashes or spaces or neither. */
+export const recoveryResetSchema = z.strictObject({
+  email: email(),
+  recoveryKey: z
+    .string({ error: 'required' })
+    .min(1, { error: 'required' })
+    .max(64, { error: 'too_long' }),
+  newPassword: newPassword(),
+});
+export type RecoveryResetInput = z.infer<typeof recoveryResetSchema>;
+
+/** #17: a sensitive change carries the owner's password in its body (design, section 6). */
+export const ownerPasswordSchema = z.strictObject({ ownerPassword: typedPassword() });
+export type OwnerPasswordInput = z.infer<typeof ownerPasswordSchema>;
+
+/** #46: changing your own password needs the current one. */
+export const changePasswordSchema = z.strictObject({
+  currentPassword: typedPassword(),
+  newPassword: newPassword(),
+});
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
+/** #44: what the owner calls a counter computer. */
+export const deviceNameSchema = z.strictObject({ name: text(40) });
+export type DeviceNameInput = z.infer<typeof deviceNameSchema>;
+
+/** A new recovery key, shown once (#31). */
+export interface RecoveryKeyResult {
+  recoveryKey: string;
+}
+
+/** A remembered computer in Settings (#44). */
+export interface DeviceView {
+  id: string;
+  name: string | null;
+  branchName: string;
+  createdAt: string;
+  lastSeenAt: string;
+  /** The computer this request came from. */
+  thisComputer: boolean;
+}
 
 /** #21, #38: unlocking needs the password again. */
 export const unlockSchema = z.strictObject({ password: typedPassword() });
@@ -56,6 +138,10 @@ export interface ActiveSession {
   csrfToken: string;
   /** Minutes of inactivity before the owner's session locks or a staff session ends. */
   idleMinutes: number;
+  /** #32: the owner's email is confirmed (staff have none: always true). */
+  emailConfirmed: boolean;
+  /** #45: this server sends email only to a few verified addresses (the demo). */
+  emailLimited: boolean;
 }
 
 /** What `GET /api/session` answers. */

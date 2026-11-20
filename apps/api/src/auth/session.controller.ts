@@ -1,6 +1,8 @@
 // Login, session, lock and logout routes (Module 00 #21, #27, #28, #38; P1.4 design, section 5).
 import {
+  BadRequestException,
   Body,
+  ConflictException,
   Controller,
   ForbiddenException,
   Get,
@@ -26,6 +28,12 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { AllowLocked, CurrentCaller, Permission, Public } from '../http/permission.decorator.js';
 import type { Caller, SessionResolver } from '../http/session.js';
 import { ZodBodyPipe } from '../http/zod-body.pipe.js';
+import {
+  AlreadyConfirmedError,
+  InvalidLinkError,
+  WeakPasswordError,
+  WrongRecoveryKeyError,
+} from '../account/account.errors.js';
 import { BusyError } from './hash-gate.js';
 import {
   NoDeviceError,
@@ -34,6 +42,7 @@ import {
   SessionService,
   TooManyAttemptsError,
   WrongLoginError,
+  WrongPasswordError,
 } from './session.service.js';
 
 /** Maps the session service's errors to HTTP answers with codes (ADR 0036). */
@@ -50,10 +59,25 @@ export function toHttpError(error: unknown): unknown {
     );
   }
   if (error instanceof BusyError) return new ServiceUnavailableException({ code: 'busy' });
+  if (error instanceof WrongPasswordError) {
+    return new UnauthorizedException({ code: 'wrong_password' });
+  }
+  if (error instanceof WrongRecoveryKeyError) {
+    return new UnauthorizedException({ code: 'wrong_recovery_key' });
+  }
+  if (error instanceof InvalidLinkError) return new BadRequestException({ code: 'invalid_link' });
+  // The same shape as a schema error, so the form shows it under the password box.
+  if (error instanceof WeakPasswordError) {
+    return new BadRequestException({ code: 'invalid_body', fields: { newPassword: error.code } });
+  }
+  if (error instanceof AlreadyConfirmedError) {
+    return new ConflictException({ code: 'already_confirmed' });
+  }
   return error;
 }
 
-async function answer<T>(work: () => Promise<T>): Promise<T> {
+/** Runs a service call, mapping its errors to HTTP answers. */
+export async function answer<T>(work: () => Promise<T>): Promise<T> {
   try {
     return await work();
   } catch (error) {

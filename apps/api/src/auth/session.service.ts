@@ -4,6 +4,7 @@ import {
   alsoInBusiness,
   and,
   asc,
+  authTokens,
   branches,
   businesses,
   devices,
@@ -16,6 +17,7 @@ import {
   withBusiness,
   type Database,
   type SessionEndReason,
+  type SQL,
   type Transaction,
 } from '@business-software/db';
 import {
@@ -80,6 +82,13 @@ export class SessionEndedError extends Error {
   }
 }
 
+/** A wrong current or owner password on a signed-in screen (#17, #46). */
+export class WrongPasswordError extends Error {
+  constructor() {
+    super('Wrong password');
+  }
+}
+
 /** Rate limits (Module 00 #41; P1.4 design, section 7). */
 export class LoginLimits {
   /** Attempts per computer (IP address). */
@@ -89,12 +98,27 @@ export class LoginLimits {
   readonly signup: RateLimiter;
   /** Wrong unlock passwords per session. */
   readonly unlock: RateLimiter;
+  /** Owner-password and current-password checks per session (section 6). */
+  readonly ownerPassword: RateLimiter;
+  /** Reset-link requests per IP, and reset-link requests and "Send again" per email or user. */
+  readonly recoveryByIp: RateLimiter;
+  readonly recoveryByAccount: RateLimiter;
+  /**
+   * Wrong recovery keys per IP, and nothing per email (owner, 2026-11-20; #41). Only wrong keys
+   * count, and a right key is never refused, so neither a stranger who knows the email nor one
+   * sharing the owner's IP can lock the owner out.
+   */
+  readonly recoveryKeyByIp: RateLimiter;
 
   constructor(clock: Clock) {
     this.ip = new RateLimiter(30, 15 * MINUTE, clock);
     this.failures = new RateLimiter(10, 15 * MINUTE, clock);
     this.signup = new RateLimiter(5, 60 * MINUTE, clock);
     this.unlock = new RateLimiter(10, 15 * MINUTE, clock);
+    this.ownerPassword = new RateLimiter(10, 15 * MINUTE, clock);
+    this.recoveryByIp = new RateLimiter(5, 60 * MINUTE, clock);
+    this.recoveryByAccount = new RateLimiter(5, 60 * MINUTE, clock);
+    this.recoveryKeyByIp = new RateLimiter(5, 60 * MINUTE, clock);
   }
 }
 
@@ -102,6 +126,12 @@ export interface RequestContext {
   ip: string;
   userAgent: string | undefined;
   cookies: Map<string, string>;
+}
+
+/** An owner found by email (ADR 0039). */
+export interface OwnerLogin {
+  businessId: string;
+  userId: string;
 }
 
 export interface LoginResult {
@@ -124,12 +154,14 @@ interface StartOptions {
   device: FoundDevice | null;
 }
 
-function throwUnless(verdict: Verdict): void {
+export function throwUnless(verdict: Verdict): void {
   if (!verdict.allowed) throw new TooManyAttemptsError(verdict.retryAt);
 }
 
 export interface AuthSettings {
   cookieSecure: boolean;
+  /** Module 00 #45: the demo's email reaches verified addresses only. */
+  emailLimited: boolean;
 }
 
 export class SessionService {
@@ -159,6 +191,18 @@ export class SessionService {
     };
   }
 
+  /**
+   * The one cross-business read (ADR 0039): which business and owner an email belongs to.
+   * Never a password hash: that is read under RLS once the business is known.
+   */
+  async findOwnerLogin(email: string): Promise<OwnerLogin | undefined> {
+    const { rows } = await this.database.db.execute<{ business_id: string; user_id: string }>(
+      sql`select business_id, user_id from app_find_owner_login(${email})`,
+    );
+    const row = rows[0];
+    return row === undefined ? undefined : { businessId: row.business_id, userId: row.user_id };
+  }
+
   /** Module 00 #27: email and password. */
   async loginOwner(email: string, password: string, context: RequestContext): Promise<LoginResult> {
     throwUnless(this.limits.ip.hit(context.ip));
@@ -166,34 +210,27 @@ export class SessionService {
     // a right password takes the count back.
     const loginKey = `owner:${email}`;
     throwUnless(this.limits.failures.hit(loginKey));
-    const { rows } = await this.database.db.execute<{ business_id: string; user_id: string }>(
-      sql`select business_id, user_id from app_find_owner_login(${email})`,
-    );
-    const found = rows[0];
+    const found = await this.findOwnerLogin(email);
     const user =
       found === undefined
         ? undefined
-        : await withBusiness(this.database.db, found.business_id, async (tx) => {
+        : await withBusiness(this.database.db, found.businessId, async (tx) => {
             const [row] = await tx
               .select({ passwordHash: users.passwordHash, deactivatedAt: users.deactivatedAt })
               .from(users)
-              .where(eq(users.id, found.user_id));
+              .where(eq(users.id, found.userId));
             return row;
           });
     const ok = await this.checkPassword(password, user?.passwordHash ?? null);
     if (!ok || found === undefined || user?.deactivatedAt !== null) throw new WrongLoginError();
     this.limits.failures.reset(loginKey);
     const rehash = await this.rehashIfOld(password, user.passwordHash);
-    const businessId = found.business_id;
+    const businessId = found.businessId;
     // One transaction: the new session and the end of the old, or neither (#18).
     return withBusiness(this.database.db, businessId, async (tx) => {
-      await rehash?.(tx, found.user_id);
+      await rehash?.(tx, found.userId);
       const device = await this.findDeviceIn(tx, businessId, context);
-      return this.startIn(
-        tx,
-        { businessId, userId: found.user_id, role: 'owner', device },
-        context,
-      );
+      return this.startIn(tx, { businessId, userId: found.userId, role: 'owner', device }, context);
     });
   }
 
@@ -357,7 +394,97 @@ export class SessionService {
     });
   }
 
+  /** Expires the device cookie: this computer no longer knows its business (#44). */
+  clearDeviceCookie(): string {
+    return serializeCookie(this.names.device, '', {
+      secure: this.settings.cookieSecure,
+      maxAge: 0,
+    });
+  }
+
+  /** The device row this computer's cookie names, if any (#44's "This computer"). */
+  deviceTokenHashOf(context: RequestContext): string | null {
+    const cookie = readCookieToken(context.cookies.get(this.names.device));
+    return cookie === null ? null : hashToken(cookie.token);
+  }
+
+  /**
+   * Section 6: sensitive routes take the owner's password in the body. Stateless, and counted
+   * per session before the check, like a login; the right password takes the count back.
+   */
+  async requireOwnerPassword(caller: Caller, password: string): Promise<void> {
+    await this.requirePassword(caller, password, eq(users.role, 'owner'));
+  }
+
+  /** #46: the caller's own current password, under the same limit. */
+  async requireOwnPassword(caller: Caller, password: string): Promise<void> {
+    await this.requirePassword(caller, password, eq(users.id, caller.userId));
+  }
+
+  /** A new password's hash, made in the one Argon2 queue outside any transaction. */
+  hashNewPassword(password: string): Promise<string> {
+    return this.gate.run(() => hashPassword(password));
+  }
+
+  /**
+   * Sets a user's new password inside the caller's transaction and ends their sessions, all
+   * of them or all but `keep` (#30, #31, #46). An emailed reset link still open stops working
+   * too: it was asked for before this password, maybe by whoever this change locks out.
+   */
+  async setPasswordIn(
+    tx: Transaction,
+    userId: string,
+    passwordHash: string,
+    reason: 'reset' | 'password_changed',
+    keep?: string,
+  ): Promise<void> {
+    await tx
+      .update(users)
+      .set({ passwordHash, passwordChangedAt: this.clock.now() })
+      .where(eq(users.id, userId));
+    await tx
+      .update(authTokens)
+      .set({ usedAt: this.clock.now() })
+      .where(
+        and(
+          eq(authTokens.userId, userId),
+          eq(authTokens.kind, 'reset_password'),
+          isNull(authTokens.usedAt),
+        ),
+      );
+    await this.endSessionsIn(tx, eq(sessions.userId, userId), reason, keep);
+  }
+
+  /** Ends every open session matching `where`, except `keep`, each with its log entry. */
+  async endSessionsIn(
+    tx: Transaction,
+    where: SQL | undefined,
+    reason: SessionEndReason,
+    keep?: string,
+  ): Promise<void> {
+    const open = await tx
+      .select({ id: sessions.id, userId: sessions.userId, branchId: sessions.branchId })
+      .from(sessions)
+      .where(and(where, isNull(sessions.endedAt)));
+    for (const row of open) {
+      if (row.id !== keep) await this.end(tx, row.id, row.userId, row.branchId, reason);
+    }
+  }
+
   // ---------------------------------------------------------------------------------------
+
+  private async requirePassword(caller: Caller, password: string, who: SQL): Promise<void> {
+    throwUnless(this.limits.ownerPassword.hit(caller.sessionId));
+    const hash = await withBusiness(this.database.db, caller.businessId, async (tx) => {
+      const [row] = await tx
+        .select({ passwordHash: users.passwordHash })
+        .from(users)
+        .where(and(who, isNull(users.deactivatedAt)));
+      return row?.passwordHash ?? null;
+    });
+    if (!(await this.checkPassword(password, hash))) throw new WrongPasswordError();
+    this.limits.ownerPassword.reset(caller.sessionId);
+  }
 
   private async checkPassword(password: string, stored: string | null): Promise<boolean> {
     const hash = stored ?? (await this.standInHash());
@@ -624,6 +751,7 @@ export class SessionService {
         branchName: branches.name,
         ownerLockMinutes: businesses.ownerLockMinutes,
         staffIdleMinutes: businesses.staffIdleMinutes,
+        emailConfirmedAt: users.emailConfirmedAt,
       })
       .from(users)
       .innerJoin(businesses, eq(businesses.id, users.businessId))
@@ -640,6 +768,9 @@ export class SessionService {
       branch: { id: caller.branchId, name: row.branchName },
       csrfToken,
       idleMinutes: caller.role === 'owner' ? row.ownerLockMinutes : row.staffIdleMinutes,
+      // Staff have no email: nothing for them to confirm (#32).
+      emailConfirmed: caller.role === 'staff' || row.emailConfirmedAt !== null,
+      emailLimited: this.settings.emailLimited,
     };
   }
 }

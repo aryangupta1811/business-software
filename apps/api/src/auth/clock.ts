@@ -4,3 +4,6 @@ export interface Clock {
 }
 
 export const SYSTEM_CLOCK: Clock = { now: () => new Date() };
+
+/** Injection token for the one Clock (AppOptions.clock in tests). */
+export const CLOCK = 'CLOCK';

@@ -18,6 +18,7 @@ import {
   type SessionService,
 } from '../auth/session.service.js';
 import { DATABASE } from '../database.module.js';
+import { EMAIL_LINKS, type EmailLinks } from '../account/email-links.js';
 import { makeRecoveryKey } from './recovery-key.js';
 
 /** The owner's email already has an account (Module 00 #27). */
@@ -40,6 +41,7 @@ export class SignupService {
     @Inject(DATABASE) private readonly database: Database,
     @Inject(SESSION_SERVICE) private readonly sessions: SessionService,
     @Inject(HASH_GATE) private readonly gate: HashGate,
+    @Inject(EMAIL_LINKS) private readonly links: EmailLinks,
   ) {}
 
   /**
@@ -103,9 +105,16 @@ export class SignupService {
           owner.id,
           context,
         );
-        return { businessId, setCookies };
+        // #32: confirming the email comes after signup; the link goes out after the commit.
+        const confirmToken = await this.links.issueIn(tx, businessId, owner.id, 'confirm_email');
+        return { businessId, setCookies, confirmToken };
       });
-      return { ...created, recoveryKey: recoveryKey.key };
+      void this.links.send(input.email, created.businessId, 'confirm_email', created.confirmToken);
+      return {
+        businessId: created.businessId,
+        setCookies: created.setCookies,
+        recoveryKey: recoveryKey.key,
+      };
     } catch (error) {
       if (isOwnerEmailTaken(error)) throw new EmailTakenError();
       throw error;

@@ -9,7 +9,19 @@ export interface ApiConfig {
    * only plain-HTTP local development sets.
    */
   cookieSecure?: boolean;
+  /** How email leaves (ADR 0040); tests pass a fake mailer instead. */
+  mail?: MailSettings;
+  /** The web app's address, the start of every emailed link. No trailing slash. */
+  appUrl?: string;
+  /** Module 00 #45: the demo's SES sandbox reaches verified addresses only. */
+  emailLimited?: boolean;
 }
+
+/** ADR 0040: Mailpit through SMTP on this computer, SES on the server, or no email at all. */
+export type MailSettings =
+  | { transport: 'none' }
+  | { transport: 'smtp'; smtpUrl: string; from: string }
+  | { transport: 'ses'; region: string; from: string };
 
 /**
  * Reads a PostgreSQL URL from the environment. Errors name the variable but never show its
@@ -30,10 +42,56 @@ function readHost(value: string | undefined): string {
   return value;
 }
 
-function readCookieSecure(value: string | undefined): boolean {
-  if (value === undefined || value === 'true') return true;
+function readFlag(env: NodeJS.ProcessEnv, name: string, fallback: boolean): boolean {
+  const value = env[name];
+  if (value === undefined) return fallback;
+  if (value === 'true') return true;
   if (value === 'false') return false;
-  throw new Error('COOKIE_SECURE must be true or false');
+  throw new Error(`${name} must be true or false`);
+}
+
+// Like readDatabaseUrl: errors name the variable, never its value.
+function readUrl(env: NodeJS.ProcessEnv, name: string, protocols: string[], what: string): string {
+  const value = env[name];
+  if (value === undefined || value === '') throw new Error(`${name} is not set`);
+  if (!URL.canParse(value) || !protocols.includes(new URL(value).protocol)) {
+    throw new Error(`${name} is not ${what} URL`);
+  }
+  return value;
+}
+
+function readMailFrom(env: NodeJS.ProcessEnv): string {
+  const value = env.MAIL_FROM;
+  if (value === undefined || value === '') throw new Error('MAIL_FROM is not set');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+    throw new Error('MAIL_FROM is not an email address');
+  }
+  return value;
+}
+
+function readMail(env: NodeJS.ProcessEnv): MailSettings {
+  switch (env.MAIL_TRANSPORT ?? 'none') {
+    case 'none':
+      return { transport: 'none' };
+    case 'smtp':
+      return {
+        transport: 'smtp',
+        smtpUrl: readUrl(env, 'SMTP_URL', ['smtp:', 'smtps:'], 'an smtp://'),
+        from: readMailFrom(env),
+      };
+    case 'ses':
+      return { transport: 'ses', region: env.AWS_REGION ?? 'ap-south-1', from: readMailFrom(env) };
+    default:
+      throw new Error('MAIL_TRANSPORT must be none, smtp or ses');
+  }
+}
+
+/** Where emailed links point when APP_URL is unset: the web app under `pnpm dev`. */
+export const DEFAULT_APP_URL = 'http://127.0.0.1:5173';
+
+function readAppUrl(env: NodeJS.ProcessEnv): string {
+  if (env.APP_URL === undefined) return DEFAULT_APP_URL;
+  return readUrl(env, 'APP_URL', ['http:', 'https:'], 'an http(s)').replace(/\/+$/, '');
 }
 
 function readPort(value: string | undefined): number {
@@ -52,6 +110,9 @@ export function loadConfig(env: NodeJS.ProcessEnv): ApiConfig {
     host: readHost(env.HOST),
     port: readPort(env.PORT),
     jsonLogs: env.NODE_ENV === 'production',
-    cookieSecure: readCookieSecure(env.COOKIE_SECURE),
+    cookieSecure: readFlag(env, 'COOKIE_SECURE', true),
+    mail: readMail(env),
+    appUrl: readAppUrl(env),
+    emailLimited: readFlag(env, 'EMAIL_LIMITED', false),
   };
 }

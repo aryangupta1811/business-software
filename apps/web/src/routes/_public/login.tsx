@@ -63,6 +63,14 @@ function Login() {
           </div>
         )}
         {who === 'owner' ? <OwnerForm /> : <StaffForm />}
+        {who === 'owner' && (
+          <Link
+            to="/forgot-password"
+            className="-mt-2 self-start text-accent underline-offset-4 hover:underline"
+          >
+            {t('login.forgot')}
+          </Link>
+        )}
         <p className="text-muted">
           {t('login.newBusiness')}{' '}
           <Link to="/signup" className="text-accent underline-offset-4 hover:underline">

@@ -57,6 +57,13 @@
       "when": 1795108788783,
       "tag": "0007_backup_read_policies",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795115075593,
+      "tag": "0008_auth_tokens",
+      "breakpoints": true
     }
   ]
 }

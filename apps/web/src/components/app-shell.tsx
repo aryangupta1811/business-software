@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { keyLabels } from '../shortcuts/keys';
 import { useOpenShortcutHelp, useShortcut } from '../shortcuts/use-shortcut';
 import { ConnectionBadge } from './connection-badge';
+import { EmailBanner } from './email-banner';
 import { LanguageSwitcher } from './language-switcher';
 import { SessionPanel } from './session-panel';
 import { ThemeToggle } from './theme-toggle';
@@ -53,7 +54,7 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen">
-      <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col overflow-y-auto border-r border-border bg-sidebar px-3 py-4">
+      <aside className="sticky top-0 flex h-screen print:hidden w-56 shrink-0 flex-col overflow-y-auto border-r border-border bg-sidebar px-3 py-4">
         <Link to="/" className="mb-6 flex items-center gap-2.5 px-2 font-semibold">
           <img src="/favicon.svg" alt="" className="size-6" />
           {t('app.name')}
@@ -103,7 +104,7 @@ export function AppShell({
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-10 flex min-h-14 items-center justify-between gap-6 border-b border-border bg-background px-8 py-2">
+        <header className="sticky top-0 z-10 flex min-h-14 print:hidden items-center justify-between gap-6 border-b border-border bg-background px-8 py-2">
           {titleKey ? <h1 className="text-title font-semibold">{t(titleKey)}</h1> : <span />}
           <div className="flex items-center gap-4">
             <ConnectionBadge />
@@ -111,6 +112,7 @@ export function AppShell({
             <ThemeToggle />
           </div>
         </header>
+        {session !== null && <EmailBanner session={session} />}
         <main className="flex-1 px-8 py-6">{children}</main>
       </div>
     </div>

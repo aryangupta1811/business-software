@@ -41,6 +41,7 @@ function stubApi(load: { status: number; body: unknown }) {
   const fetchMock = vi.fn((url: string, init?: RequestInit) => {
     if (url === '/api/session') return Promise.resolve(Response.json(OWNER_SESSION));
     if (url === '/api/settings') return Promise.resolve(Response.json(load.body, load));
+    if (url === '/api/devices') return Promise.resolve(Response.json([]));
     if (url.startsWith('/api/settings/')) {
       const card = url.slice('/api/settings/'.length);
       const sent = JSON.parse(init?.body as string) as Record<string, unknown>;

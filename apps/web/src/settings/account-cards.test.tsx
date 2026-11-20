@@ -142,8 +142,18 @@ test('Rename and Forget put the cursor in their box, and Cancel puts it back on 
 });
 
 test('forgetting this computer goes to the login page', async () => {
+  // Like the real server: once this computer is forgotten, its session and memory are gone.
+  let forgotten = false;
   const { history } = openSettings({
-    'POST /api/devices/00000000-0000-4000-8000-0000000000d1/forget': { status: 204 },
+    'POST /api/devices/00000000-0000-4000-8000-0000000000d1/forget': () => {
+      forgotten = true;
+      return { status: 204 };
+    },
+    'GET /api/session': () => ({
+      body: forgotten ? { state: 'none', device: null } : OWNER_SESSION,
+    }),
+    'GET /api/settings': () =>
+      forgotten ? { status: 401, body: { code: 'not_logged_in' } } : { body: SETTINGS },
   });
   const region = within(await card('Computers'));
   const user = userEvent.setup();
@@ -151,7 +161,6 @@ test('forgetting this computer goes to the login page', async () => {
   expect(region.getByText(/This logs you out here/)).toBeVisible();
   await user.type(region.getByLabelText("Owner's password"), 'correct horse battery');
   await user.click(region.getByRole('button', { name: 'Forget computer' }));
-  await vi.waitFor(() => {
-    expect(history.location.pathname).toBe('/login');
-  });
+  expect(await screen.findByRole('heading', { name: 'Log in' })).toBeInTheDocument();
+  expect(history.location.pathname).toBe('/login');
 });

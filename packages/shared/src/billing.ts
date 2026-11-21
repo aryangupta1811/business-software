@@ -3,11 +3,13 @@
 // search. The screen and the server (P1.14) call the same functions, so they can't disagree.
 // Money in paise, rates and shares in basis points, quantities in thousandths (ADR 0008).
 import { z } from 'zod';
+import type { Feature } from './business.js';
 import { optionalText, uuid } from './fields.js';
 import { calculateBill, type BillInput, type Discount, type TaxScheme } from './gst.js';
 import { MAX_PAISE, MAX_THOUSANDTHS, packPrice, type ItemKind } from './items.js';
 import type { Paise } from './money.js';
 import { isStateCode } from './states.js';
+import type { NegativeStockSetting } from './stock.js';
 import type { BuiltInUnit } from './units.js';
 
 /** Question 10: one switch per bill; an item with no wholesale price sells at retail. */
@@ -84,6 +86,25 @@ export interface CatalogueView {
   stock: CatalogueStock[] | null;
   /** Ask the next sync for changes since 60 s before this (design §4, the overlap). */
   serverTime: string;
+}
+
+/** `GET /api/billing/context`: what the counter needs besides the catalogue. */
+export interface BillingContext {
+  /** The business's GST status, which is the GST engine's scheme. */
+  scheme: TaxScheme;
+  /** The caller's branch's state: the supplier's state and the default place of supply. */
+  branchStateCode: string;
+  /** `wholesale_price` shows the retail/wholesale switch (F8). */
+  features: Feature[];
+  /** What the save does with a line that takes stock below zero (P1.14). */
+  negativeStock: NegativeStockSetting;
+  canViewStock: boolean;
+  /** `items.manage`: an unknown code offers "Add item" (question 8). */
+  canManageItems: boolean;
+  canViewCustomers: boolean;
+  canManageCustomers: boolean;
+  /** `billing.discount`: discounts up to the session's limit; above it, the owner's OK. */
+  canDiscount: boolean;
 }
 
 /** `GET /api/billing/catalogue`: everything, or only what changed at or after `since`. */

@@ -98,6 +98,7 @@ export {
   type CatalogueItem,
   type CataloguePack,
   type CatalogueStock,
+  type BillingContext,
   type CatalogueView,
   type DiscardBillInput,
   type DiscountLimits,

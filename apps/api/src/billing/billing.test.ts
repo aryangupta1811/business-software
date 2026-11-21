@@ -8,6 +8,7 @@ import { startTestDatabase, type TestDatabase } from '@business-software/db/test
 import {
   PERMISSIONS,
   type ApprovalView,
+  type BillingContext,
   type CatalogueItem,
   type CatalogueView,
   type HeldBillView,
@@ -284,6 +285,34 @@ describe('billing counter', () => {
   it('needs billing.sell, and refuses a since that is not a time', async () => {
     expect((await catalogue(staff(a, ['session.own', 'items.view']))).status).toBe(403);
     expect((await catalogue(a, 'yesterday')).status).toBe(400);
+  });
+
+  // ---- The counter's context ----
+
+  it("sends the scheme, the branch's state and what the caller may do", async () => {
+    expect(await call<BillingContext>('GET', '/billing/context', a)).toEqual({
+      status: 200,
+      body: {
+        scheme: 'regular',
+        branchStateCode: '27',
+        features: expect.any(Array) as unknown,
+        negativeStock: 'warn',
+        canViewStock: true,
+        canManageItems: true,
+        canViewCustomers: true,
+        canManageCustomers: true,
+        canDiscount: true,
+      },
+    });
+    const cashier = staff(a, ['session.own', 'billing.sell']);
+    expect((await call<BillingContext>('GET', '/billing/context', cashier)).body).toMatchObject({
+      canViewStock: false,
+      canManageItems: false,
+      canViewCustomers: false,
+      canManageCustomers: false,
+      canDiscount: false,
+    });
+    expect((await call('GET', '/billing/context', staff(a, ['session.own']))).status).toBe(403);
   });
 
   // ---- Held bills (design §9) ----

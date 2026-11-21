@@ -2,6 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   and,
   asc,
+  branches,
+  businesses,
   eq,
   isNull,
   itemBarcodes,
@@ -22,6 +24,7 @@ import {
   APPROVAL_MINUTES,
   type ApprovalInput,
   type ApprovalView,
+  type BillingContext,
   type BuiltInUnit,
   type CatalogueBarcode,
   type CatalogueEntry,
@@ -30,7 +33,10 @@ import {
   type CatalogueStock,
   type CatalogueView,
   type DiscardBillInput,
+  type Feature,
   type ItemKind,
+  type NegativeStockSetting,
+  type TaxScheme,
 } from '@business-software/shared';
 import { CLOCK, type Clock } from '../auth/clock.js';
 import { SESSION_SERVICE, type SessionService } from '../auth/session.service.js';
@@ -54,6 +60,40 @@ export class BillingService {
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(SESSION_SERVICE) private readonly sessions: SessionService,
   ) {}
+
+  /** What the counter needs besides the catalogue: the tax scheme, the branch's state, switches. */
+  context(caller: Caller): Promise<BillingContext> {
+    return inBusiness(this.database, caller, async (tx) => {
+      const [business] = await tx
+        .select({
+          gstStatus: businesses.gstStatus,
+          features: businesses.features,
+          negativeStock: businesses.negativeStock,
+        })
+        .from(businesses);
+      const [branch] = await tx
+        .select({ stateCode: branches.stateCode })
+        .from(branches)
+        .where(eq(branches.id, caller.branchId));
+      if (business === undefined || branch === undefined) {
+        throw new Error("The caller's business or branch is missing");
+      }
+      const can = (permission: Caller['permissions'][number]) =>
+        caller.permissions.includes(permission);
+      return {
+        // GST_STATUSES and the engine's schemes are the same three words.
+        scheme: business.gstStatus as TaxScheme,
+        branchStateCode: branch.stateCode,
+        features: business.features as Feature[],
+        negativeStock: business.negativeStock as NegativeStockSetting,
+        canViewStock: can('stock.view'),
+        canManageItems: can('items.manage'),
+        canViewCustomers: can('customers.view'),
+        canManageCustomers: can('customers.manage'),
+        canDiscount: can('billing.discount'),
+      };
+    });
+  }
 
   /**
    * The counter's copy of the catalogue (design §4, ADR 0043): every item, or only those changed

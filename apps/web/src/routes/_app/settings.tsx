@@ -8,10 +8,12 @@ import {
   settingsBusinessSchema,
   settingsFeaturesSchema,
   settingsSecuritySchema,
+  settingsStockSchema,
   type BusinessType,
   type SettingsBusinessInput,
   type SettingsFeaturesInput,
   type SettingsSecurityInput,
+  type SettingsStockInput,
   type SettingsView,
 } from '@business-software/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -40,7 +42,8 @@ import { PasswordCard } from '../../settings/password-card';
 import { RecoveryKeyCard } from '../../settings/recovery-key-card';
 
 /**
- * Module 00 #8–16, #3 and #21/#29: the owner's settings, one card per save (design §8). Then the
+ * Module 00 #8–16, #3 and #21/#29, and Module 01 #12: the owner's settings, one card per save
+ * (design §8). Then the
  * login's own safety: password (#46), recovery key (#31) and remembered computers (#44).
  */
 export const Route = createFileRoute('/_app/settings')({
@@ -89,6 +92,7 @@ function Settings() {
         <BusinessCard saved={view.business} />
         <FeaturesCard saved={view.features} businessType={view.business.businessType} />
         <SecurityCard saved={view.security} />
+        <StockCard saved={view.stock} />
         <PasswordCard />
       </div>
       <RecoveryKeyCard businessName={view.business.businessName} />
@@ -104,7 +108,7 @@ function Settings() {
  * case) and updates the page's copy, so the other cards see the new business type.
  */
 function useSave<Form extends FieldValues>(
-  card: 'business' | 'features' | 'security',
+  card: 'business' | 'features' | 'security' | 'stock',
   setError: UseFormSetError<Form>,
   onSaved: (view: SettingsView) => void,
 ) {
@@ -401,6 +405,40 @@ function SecurityCard({ saved }: { saved: SettingsSecurityInput }) {
           t('settings.security.staffIdleHint'),
         )}
       </div>
+    </SettingsCard>
+  );
+}
+
+/** Module 01 #12 (owner answer 1A): one switch for the whole business; billing uses it (P1.14). */
+function StockCard({ saved }: { saved: SettingsStockInput }) {
+  const { t } = useTranslation();
+  const errorText = useFieldError();
+  const form = useForm<SettingsStockInput>({
+    resolver: zodResolver(settingsStockSchema),
+    defaultValues: saved,
+  });
+  const { save, state } = useSave<SettingsStockInput>('stock', form.setError, (view) => {
+    form.reset(view.stock);
+  });
+
+  return (
+    <SettingsCard
+      title={t('settings.stock.title')}
+      lead={t('settings.stock.lead')}
+      state={state}
+      dirty={form.formState.isDirty}
+      submitting={form.formState.isSubmitting}
+      onSubmit={() => void form.handleSubmit(save)()}
+    >
+      <ChoiceCards
+        label={t('settings.stock.negative')}
+        error={errorText('negativeStock', form.formState.errors.negativeStock?.message)}
+        choices={[
+          { value: 'warn', title: t('settings.stock.warn'), hint: t('settings.stock.warnHint') },
+          { value: 'block', title: t('settings.stock.block'), hint: t('settings.stock.blockHint') },
+        ]}
+        inputProps={form.register('negativeStock')}
+      />
     </SettingsCard>
   );
 }

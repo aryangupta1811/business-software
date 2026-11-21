@@ -383,6 +383,12 @@ export interface ItemsContext {
   canViewCost: boolean;
   /** `items.manage`: the add, edit, archive and barcode controls show. */
   canManage: boolean;
+  /** `stock.view`: the stock column, the low-stock filter and the item's stock card show (P1.8). */
+  canViewStock: boolean;
+  /** `stock.adjust`: opening stock and adjustments can be made (Module 01 #11). */
+  canAdjustStock: boolean;
+  /** The caller's branch: where opening stock and adjustments land. */
+  branchId: string;
   /** A regular GST business: every item needs a GST rate and an HSN code (G5). */
   needsGst: boolean;
   /** Switched-on features: `multiple_units` shows packs, `wholesale_price` the wholesale price. */

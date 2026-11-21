@@ -1,4 +1,4 @@
-import type { ItemPage, ItemsContext, ItemView } from '@business-software/shared';
+import type { ItemPage, ItemRow, ItemsContext, ItemView } from '@business-software/shared';
 import { createMemoryHistory } from '@tanstack/react-router';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -18,6 +18,9 @@ const ITEM = '0b6f6f3e-3a3b-4c4d-8e8f-000000000003';
 const OWNER: ItemsContext = {
   canViewCost: true,
   canManage: true,
+  canViewStock: true,
+  canAdjustStock: true,
+  branchId: BRANCH,
   needsGst: true,
   features: ['wholesale_price'],
   branches: [{ id: BRANCH, name: 'Main' }],
@@ -46,23 +49,32 @@ const ATTA: ItemView = {
   levels: [{ branchId: BRANCH, lowStockLevel: 0 }],
 };
 
-const PAGE: ItemPage = {
+/** The row as someone without `stock.view` gets it (and as a service always is). */
+const BARE_ROW: ItemRow = {
+  id: ITEM,
+  kind: 'goods',
+  name: 'Aashirvaad Atta',
+  hindiName: 'आशीर्वाद आटा',
+  code: 'ATTA',
+  categoryId: null,
+  brand: 'Aashirvaad',
+  stockUnit: 'kg',
+  sellingPrice: 5_200,
+  purchasePrice: 4_500,
+  mrp: 5_500,
+  gstRate: 500,
+  archived: false,
+};
+
+const PAGE: ItemPage = { items: [{ ...BARE_ROW, stock: 12_500, low: false }], next: null };
+
+/** More goods rows and a service, for the stock column's badges. */
+const STOCK_PAGE: ItemPage = {
   items: [
-    {
-      id: ITEM,
-      kind: 'goods',
-      name: 'Aashirvaad Atta',
-      hindiName: 'आशीर्वाद आटा',
-      code: 'ATTA',
-      categoryId: null,
-      brand: 'Aashirvaad',
-      stockUnit: 'kg',
-      sellingPrice: 5_200,
-      purchasePrice: 4_500,
-      mrp: 5_500,
-      gstRate: 500,
-      archived: false,
-    },
+    { ...BARE_ROW, stock: 4_000, low: true },
+    { ...BARE_ROW, id: `${ITEM.slice(0, -1)}4`, name: 'Tata Salt', stock: 0, low: false },
+    { ...BARE_ROW, id: `${ITEM.slice(0, -1)}5`, name: 'Maggi', stock: -2_000, low: false },
+    { ...BARE_ROW, id: `${ITEM.slice(0, -1)}6`, name: 'Home delivery', kind: 'service' },
   ],
   next: null,
 };
@@ -93,6 +105,23 @@ const base = (context: ItemsContext = OWNER): Record<string, Route> => ({
   'GET /api/units': () => ({ body: [] }),
   'GET /api/items': () => ({ body: PAGE }),
   [`GET /api/items/${ITEM}`]: () => ({ body: ATTA }),
+  [`GET /api/items/${ITEM}/stock`]: () => ({
+    body: {
+      itemId: ITEM,
+      stockUnit: 'kg',
+      branches: [
+        {
+          branchId: BRANCH,
+          branchName: 'Main',
+          quantity: 0,
+          lowStockLevel: null,
+          low: false,
+          canOpen: true,
+        },
+      ],
+    },
+  }),
+  [`GET /api/items/${ITEM}/stock/movements`]: () => ({ body: { movements: [], next: null } }),
 });
 
 function renderAt(path: string) {
@@ -141,6 +170,45 @@ test('hides the cost column, and the add button, from someone who may only look'
   const table = await screen.findByRole('table', { name: 'Items' });
   expect(within(table).queryByRole('columnheader', { name: 'Cost' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Add item/ })).not.toBeInTheDocument();
+});
+
+test('shows stock at your branch with a badge when it is low, out or below zero', async () => {
+  stubApi({ ...base(), 'GET /api/items': () => ({ body: STOCK_PAGE }) });
+  renderAt('/items');
+  const table = await screen.findByRole('table', { name: 'Items' });
+  expect(within(table).getByRole('columnheader', { name: 'Stock' })).toBeInTheDocument();
+  const atta = await within(table).findByRole('row', { name: /Aashirvaad Atta/ });
+  expect(within(atta).getByText('4 kg')).toBeInTheDocument();
+  expect(within(atta).getByText('Low')).toBeInTheDocument();
+  const salt = within(table).getByRole('row', { name: /Tata Salt/ });
+  expect(within(salt).getByText('Out of stock')).toBeInTheDocument();
+  const maggi = within(table).getByRole('row', { name: /Maggi/ });
+  expect(within(maggi).getByText('-2 kg')).toBeInTheDocument();
+  expect(within(maggi).getByText('Below zero')).toBeInTheDocument();
+  const service = within(table).getByRole('row', { name: /Home delivery/ });
+  expect(within(service).queryByText(/Low|Out of stock|Below zero/)).toBeNull();
+});
+
+test('filters to low stock', async () => {
+  const fetchMock = stubApi(base());
+  renderAt('/items');
+  await screen.findByRole('row', { name: /Aashirvaad Atta/ });
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Low stock only' }));
+  await waitFor(() => {
+    expect(fetchMock.mock.calls.map(([url]) => url)).toContain('/api/items?low=true');
+  });
+});
+
+test('no stock column or filter without stock.view', async () => {
+  stubApi({
+    ...base({ ...OWNER, canViewStock: false }),
+    'GET /api/items': () => ({ body: { items: [BARE_ROW], next: null } }),
+  });
+  renderAt('/items');
+  const table = await screen.findByRole('table', { name: 'Items' });
+  await within(table).findByRole('row', { name: /Aashirvaad Atta/ });
+  expect(within(table).queryByRole('columnheader', { name: 'Stock' })).toBeNull();
+  expect(screen.queryByRole('checkbox', { name: 'Low stock only' })).toBeNull();
 });
 
 test('a scan of an unknown code opens a new item with the code filled in', async () => {

@@ -1,11 +1,22 @@
-import type { CategoryView, ItemsContext, ItemView, UnitView } from '@business-software/shared';
-import { useQuery } from '@tanstack/react-query';
+import type {
+  CategoryView,
+  ItemsContext,
+  ItemStockView,
+  ItemView,
+  MovementPage,
+  UnitView,
+} from '@business-software/shared';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../api/client';
 
 export const itemKeys = {
   all: ['items'] as const,
   list: (filters: object) => ['items', 'list', filters] as const,
   one: (id: string) => ['items', 'one', id] as const,
+  /** An item's stock and its history (P1.8): refreshed together after every change. */
+  stock: (id: string) => ['items', 'stock', id] as const,
+  movements: (id: string, branchId: string) =>
+    ['items', 'stock', id, 'movements', branchId] as const,
   context: ['items', 'context'] as const,
   categories: ['categories'] as const,
   units: ['units'] as const,
@@ -39,5 +50,31 @@ export const useItem = (id: string) =>
   useQuery({
     queryKey: itemKeys.one(id),
     queryFn: () => apiRequest<ItemView>('GET', `/api/items/${encodeURIComponent(id)}`),
+    ...once,
+  });
+
+/** Stock at each branch; off when the caller may not see it. */
+export const useItemStock = (id: string, enabled: boolean) =>
+  useQuery({
+    queryKey: itemKeys.stock(id),
+    queryFn: () => apiRequest<ItemStockView>('GET', `/api/items/${encodeURIComponent(id)}/stock`),
+    enabled,
+    ...once,
+  });
+
+/** The history at one branch, newest first, 50 at a time. */
+export const useMovements = (id: string, branchId: string) =>
+  useInfiniteQuery({
+    queryKey: itemKeys.movements(id, branchId),
+    queryFn: ({ pageParam }) => {
+      const params = new URLSearchParams({ branch: branchId });
+      if (pageParam) params.set('after', pageParam);
+      return apiRequest<MovementPage>(
+        'GET',
+        `/api/items/${encodeURIComponent(id)}/stock/movements?${params.toString()}`,
+      );
+    },
+    initialPageParam: '',
+    getNextPageParam: (page) => page.next ?? undefined,
     ...once,
   });

@@ -16,6 +16,8 @@ import { Catalogue } from '../../items/catalogue';
 import { gstRateText, unitName } from '../../items/labels';
 import { QueryGate } from '../../items/query-gate';
 import { useScanner } from '../../items/scan';
+import { StockBadge } from '../../items/stock';
+import { stockText } from '../../items/stock-form';
 import { keyLabels } from '../../shortcuts/keys';
 import { useShortcut } from '../../shortcuts/use-shortcut';
 
@@ -79,6 +81,7 @@ function ItemList() {
   const [q, setQ] = useState('');
   const [category, setCategory] = useState('');
   const [archived, setArchived] = useState(false);
+  const [low, setLow] = useState(false);
   // What a scan's lookup ended in, when it didn't open an item.
   const [scanError, setScanError] = useState<{
     code: string;
@@ -95,7 +98,10 @@ function ItemList() {
     };
   }, [typed]);
 
-  const filters = { q, category, archived };
+  const showStock = context?.canViewStock ?? false;
+  // The filter needs `stock.view` (the API refuses it otherwise, as it would show what is low).
+  const lowOnly = low && showStock;
+  const filters = { q, category, archived, low: lowOnly };
   const list = useInfiniteQuery({
     queryKey: itemKeys.list(filters),
     queryFn: ({ pageParam }) => {
@@ -103,6 +109,7 @@ function ItemList() {
       if (q) params.set('q', q);
       if (category) params.set('category', category);
       if (archived) params.set('archived', 'true');
+      if (lowOnly) params.set('low', 'true');
       if (pageParam) params.set('after', pageParam);
       const query = params.toString();
       return apiRequest<ItemPage>('GET', `/api/items${query ? `?${query}` : ''}`);
@@ -204,6 +211,19 @@ function ItemList() {
           />
           {t('items.showArchived')}
         </label>
+        {showStock && (
+          <label className="flex h-10 items-center gap-2 text-muted">
+            <input
+              type="checkbox"
+              className="size-4 accent-primary"
+              checked={low}
+              onChange={(event) => {
+                setLow(event.target.checked);
+              }}
+            />
+            {t('items.lowOnly')}
+          </label>
+        )}
         {context?.canManage && (
           <Button
             aria-keyshortcuts={NEW_ITEM_KEYS}
@@ -243,6 +263,11 @@ function ItemList() {
               <th scope="col" className="px-4 py-3 font-medium">
                 {t('items.columns.unit')}
               </th>
+              {showStock && (
+                <th scope="col" className="px-4 py-3 text-right font-medium">
+                  {t('items.columns.stock')}
+                </th>
+              )}
               <th scope="col" className="px-4 py-3 text-right font-medium">
                 {t('items.columns.price')}
               </th>
@@ -282,6 +307,16 @@ function ItemList() {
                 <td className="px-4 py-2.5 text-muted">
                   {row.kind === 'service' ? t('items.service') : unitName(t, row.stockUnit)}
                 </td>
+                {showStock && (
+                  <td className="px-4 py-2.5 text-right">
+                    {row.stock !== undefined && (
+                      <span className="inline-flex items-center gap-2">
+                        <StockBadge quantity={row.stock} low={row.low ?? false} />
+                        {stockText(t, row.stock, row.stockUnit)}
+                      </span>
+                    )}
+                  </td>
+                )}
                 <td className="px-4 py-2.5 text-right">{formatPaise(row.sellingPrice)}</td>
                 <td className="px-4 py-2.5 text-right text-muted">
                   {row.mrp === null ? '' : formatPaise(row.mrp)}
@@ -307,7 +342,7 @@ function ItemList() {
         )}
         {list.isSuccess && rows.length === 0 && (
           <p className="px-4 py-10 text-center text-muted">
-            {q || category || archived ? t('items.noMatches') : t('items.empty')}
+            {q || category || archived || lowOnly ? t('items.noMatches') : t('items.empty')}
           </p>
         )}
       </Card>

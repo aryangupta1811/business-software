@@ -242,6 +242,16 @@
       },
       "ownerPassword": {
         "wrong": "Yeh maalik ka password nahi hai"
+      },
+      "quantity": {
+        "invalid": "5 ya 2.5 jaisi sankhya likhein",
+        "too_small": "0 se zyada likhein",
+        "too_big": "Yeh bahut bada hai",
+        "whole_units_only": "Yeh unit poori sankhya mein gini jaati hai",
+        "wrong_direction": "Sirf ginti mein antar se stock badhta hai"
+      },
+      "unitCost": {
+        "invalid": "45.00 jaisi rakam likhein"
       }
     },
     "too_small": "Yeh bahut kam hai",
@@ -361,6 +371,15 @@
       "ownerLockHint": "Itne minute istemaal na hone par maalik ka login lock ho jaata hai.",
       "staffIdle": "Staff ka logout",
       "staffIdleHint": "Itne minute istemaal na hone par staff ka login band ho jaata hai."
+    },
+    "stock": {
+      "title": "Stock",
+      "lead": "Saamaan khatam hone par billing kya kare.",
+      "negative": "Jab bill se stock shunya se neeche jaaye",
+      "warn": "Chetavni dein",
+      "warnHint": "Bill save hota hai; counter ko chetavni dikhti hai.",
+      "block": "Rokein",
+      "blockHint": "Stock daalne tak bill ruka rehta hai."
     }
   },
   "features": {
@@ -428,7 +447,8 @@
       "price": "Daam",
       "mrp": "MRP",
       "cost": "Kharid",
-      "gst": "GST"
+      "gst": "GST",
+      "stock": "Stock"
     },
     "archived": "Archived",
     "service": "Seva",
@@ -556,6 +576,87 @@
       "unknown": "Barcode {{code}} kisi saamaan par nahi hai.",
       "loggedOut": "Barcode {{code}} dekhne ke liye phir se login karein.",
       "failed": "Barcode {{code}} dekha nahi ja saka. Connection check karein aur phir scan karein."
+    },
+    "lowOnly": "Sirf kam stock",
+    "stock": {
+      "title": "Stock",
+      "lead": "Har branch mein kitna hai. Har badlaav turant save hota hai aur history mein rehta hai.",
+      "branch": "Branch",
+      "quantity": "Stock mein",
+      "level": "Chetavni",
+      "noLevel": "Tay nahi",
+      "averageCost": "Ausat laagat",
+      "value": "Laagat par mulya",
+      "yourBranch": "Aapki branch",
+      "badges": {
+        "low": "Kam",
+        "out": "Stock khatam",
+        "negative": "Shunya se neeche"
+      },
+      "open": "Shuruaati stock daalein",
+      "adjust": "Stock theek karein",
+      "loadFailed": "Stock load nahi ho saka.",
+      "history": "History",
+      "historyBranch": "Branch",
+      "noHistory": "Is branch mein abhi tak kuch nahi badla.",
+      "historyColumns": {
+        "date": "Taareekh",
+        "what": "Kya",
+        "change": "Badlaav",
+        "balance": "Baad mein stock",
+        "who": "Kisne",
+        "value": "Mulya"
+      },
+      "kinds": {
+        "opening": "Shuruaati stock",
+        "adjustment": "Sudhaar"
+      },
+      "reasons": {
+        "damaged": "Kharaab",
+        "expired": "Expire",
+        "theft": "Chori ya gum",
+        "own_use": "Apne istemaal mein",
+        "count_mismatch": "Ginti mein antar",
+        "other": "Anya"
+      },
+      "more": "Aur dikhayein",
+      "saving": "Save ho raha hai…",
+      "openingDialog": {
+        "title": "Shuruaati stock: {{name}}",
+        "lead": "{{branch}} mein abhi shelf par kitna hai. Yeh ek baar daalta hai; baad ke badlaav sudhaar hote hain.",
+        "quantity": "Maatra ({{unit}})",
+        "unitCost": "Prati {{unit}} laagat (₹)",
+        "unitCostHint": "Kharid daam se bhara gaya.",
+        "save": "Shuruaati stock save karein"
+      },
+      "adjustDialog": {
+        "title": "Stock theek karein: {{name}}",
+        "lead": "{{branch}} mein. Abhi stock: {{quantity}}.",
+        "direction": "Badlaav",
+        "remove": "Stock ghatayein",
+        "removeHint": "Kharaab, expire, gum ya istemaal mein liya gaya.",
+        "add": "Stock badhayein",
+        "addHint": "Sirf ginti ke baad. Kharida maal kharid se aata hai.",
+        "reason": "Kaaran",
+        "choose": "Chunein…",
+        "quantity": "Maatra ({{unit}})",
+        "note": "Tippani",
+        "noteHint": "“Anya” ke liye zaroori.",
+        "save": "Sudhaar save karein"
+      },
+      "errors": {
+        "below_zero": "Is branch ke stock se zyada nahi ghata sakte.",
+        "opening_exists": "Is branch mein stock pehle hi badal chuka hai, isliye shuruaati stock tay hai. \"Stock theek karein\" istemaal karein.",
+        "cost_required": "Is saamaan ka kharid daam nahi hai. Laagat dekh sakne wala vyakti iska shuruaati stock daale.",
+        "archived": "Yeh saamaan archive hai. Pehle ise wapas laayein.",
+        "service_has_no_stock": "Service ka stock nahi hota.",
+        "busy": "Doosra counter abhi yahi saamaan badal raha hai. Phir koshish karein.",
+        "key_reused": "Yeh badlaav pehle hi save ho chuka hai. Dobara karne se pehle history dekhein.",
+        "forbidden": "Aapko stock badalne ki anumati nahi hai.",
+        "failed": "Save nahi ho saka. Connection check karein aur phir koshish karein."
+      },
+      "archiveLeft": "Bacha stock: {{list}}. Stock aur uski history saamaan ke saath rehte hain.",
+      "archiveUnknown": "Bacha stock jaancha nahi ja saka. Jo bhi hai, saamaan ke saath rehta hai."
     }
   },
   "password": {

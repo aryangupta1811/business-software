@@ -198,6 +198,9 @@ describe('items', () => {
       expect(context.body).toEqual({
         canViewCost: true,
         canManage: true,
+        canViewStock: true,
+        canAdjustStock: true,
+        branchId: aBranch,
         needsGst: true,
         features: expect.any(Array) as unknown,
         branches: [{ id: aBranch, name: expect.any(String) as unknown }],
@@ -206,9 +209,18 @@ describe('items', () => {
       expect(viewer.body).toMatchObject({
         canViewCost: false,
         canManage: false,
+        canViewStock: false,
+        canAdjustStock: false,
+        branchId: bBranch,
         needsGst: false,
         branches: [{ id: bBranch }],
       });
+      const counter = await call<ItemsContext>(
+        'GET',
+        '/items/context',
+        staff(b, ['items.view', 'stock.view']),
+      );
+      expect(counter.body).toMatchObject({ canViewStock: true, canAdjustStock: false });
       expect((await call('GET', '/items/context', staff(a, []))).status).toBe(403);
     });
   });

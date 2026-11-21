@@ -207,7 +207,10 @@ export interface MovementView {
   note: string | null;
   businessDate: string;
   actorId: string;
+  /** The person's name, else their username; null for an owner who hasn't set a name. */
   actorName: string | null;
+  /** So the page can still say who it was when there is no name: "Owner". */
+  actorRole: 'owner' | 'staff';
   createdAt: string;
 }
 

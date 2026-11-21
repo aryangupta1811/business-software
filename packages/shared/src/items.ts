@@ -3,7 +3,7 @@
 // and quantities thousandths of the item's stock unit (ADR 0008).
 import { z } from 'zod';
 import type { Feature } from './business.js';
-import { optionalText, text, uuid } from './fields.js';
+import { branchScope, optionalText, text, uuid } from './fields.js';
 import type { Paise } from './money.js';
 import { BUILT_IN_UNITS, isBuiltInUnit, packSizeFor, type BuiltInUnit } from './units.js';
 
@@ -253,6 +253,8 @@ export const itemQuerySchema = z.strictObject({
   archived: z.enum(['true', 'false'], { error: 'invalid' }).optional(),
   /** Only items at or below their low-stock level at the caller's branch (P1.8). */
   low: z.enum(['true', 'false'], { error: 'invalid' }).optional(),
+  /** The branch the stock column shows: an id, or `all` to add them up (owner only; P1.6). */
+  branch: branchScope().optional(),
   after: z.string().max(400, { error: 'too_long' }).optional(),
 });
 export type ItemQuery = z.infer<typeof itemQuerySchema>;

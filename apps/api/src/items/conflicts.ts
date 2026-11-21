@@ -10,6 +10,8 @@ const CONFLICTS: Record<string, string> = {
   item_units_live_unit_unique: 'duplicate_pack',
   categories_live_name_unique: 'name_taken',
   units_live_name_unique: 'name_taken',
+  // Branch codes: unique per business, archived branches keep theirs (P1.6).
+  branches_business_id_code_unique: 'code_taken',
   customers_live_phone_unique: 'phone_taken',
   customers_live_gstin_unique: 'gstin_taken',
   // Staff usernames: stored lower case, deactivated logins keep theirs (Module 00 #34, #43).

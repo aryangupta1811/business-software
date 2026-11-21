@@ -1,7 +1,7 @@
 // Stock (Module 01 #4, #9–12; design `docs/plans/2026-11-20-p1.8-stock-ledger-design.md`).
 // Quantities are signed whole thousandths of the item's stock unit, money whole paise (ADR 0008).
 import { z } from 'zod';
-import { optionalText, uuid } from './fields.js';
+import { branchScope, optionalText, uuid } from './fields.js';
 import type { Paise } from './money.js';
 import type { BuiltInUnit } from './units.js';
 
@@ -165,9 +165,14 @@ export const adjustmentSchema = z
   });
 export type AdjustmentInput = z.infer<typeof adjustmentSchema>;
 
+/** `GET /api/items/:id/stock`: which branch's row (the owner's choice; `all` is the default). */
+export const stockQuerySchema = z.strictObject({ branch: branchScope().optional() });
+export type StockQuery = z.infer<typeof stockQuerySchema>;
+
 /** The history's filters (`GET /api/items/:id/stock/movements`). */
 export const movementQuerySchema = z.strictObject({
-  branch: uuid().optional(),
+  /** One branch's id, or `all` (owner only; staff always get their session's branch). */
+  branch: branchScope().optional(),
   /** The last movement id of the previous page. */
   after: uuid().optional(),
 });

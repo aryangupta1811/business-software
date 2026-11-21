@@ -16,7 +16,7 @@ export const OWNER_SESSION: ActiveSession = {
   state: 'active',
   user: { id: '00000000-0000-4000-8000-000000000001', role: 'owner', name: 'Ravi Sharma' },
   business: { id: '00000000-0000-4000-8000-000000000002', name: 'Sharma Medical' },
-  branch: { id: '00000000-0000-4000-8000-000000000003', name: 'Main shop' },
+  branch: { id: '00000000-0000-4000-8000-000000000003', code: 'HO', name: 'Main shop' },
   csrfToken: 'made-up-csrf-token',
   idleMinutes: 5,
   emailConfirmed: true,

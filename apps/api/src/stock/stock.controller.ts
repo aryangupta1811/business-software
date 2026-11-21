@@ -3,12 +3,14 @@ import {
   adjustmentSchema,
   movementQuerySchema,
   openingStockSchema,
+  stockQuerySchema,
   type AdjustmentInput,
   type ItemStockView,
   type MovementPage,
   type MovementQuery,
   type MovementView,
   type OpeningStockInput,
+  type StockQuery,
 } from '@business-software/shared';
 import { CurrentCaller, Permission } from '../http/permission.decorator.js';
 import type { Caller } from '../http/session.js';
@@ -23,8 +25,12 @@ export class StockController {
 
   @Permission('stock.view')
   @Get()
-  view(@CurrentCaller() caller: Caller, @Param('id', UuidPipe) id: string): Promise<ItemStockView> {
-    return this.stock.view(caller, id);
+  view(
+    @CurrentCaller() caller: Caller,
+    @Param('id', UuidPipe) id: string,
+    @Query(new ZodBodyPipe(stockQuerySchema)) query: StockQuery,
+  ): Promise<ItemStockView> {
+    return this.stock.view(caller, id, query);
   }
 
   @Permission('stock.view')

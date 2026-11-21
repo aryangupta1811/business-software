@@ -85,8 +85,8 @@ export function testBusiness(name: string, id?: string) {
 }
 
 /** A valid `branches` row. */
-export function testBranch(businessId: string, name: string) {
-  return { businessId, name, stateCode: '27' };
+export function testBranch(businessId: string, name: string, code = 'HO') {
+  return { businessId, name, code, stateCode: '27' };
 }
 
 /** Inside `withNewBusiness`: the business, its first branch and its owner, as signup makes them. */

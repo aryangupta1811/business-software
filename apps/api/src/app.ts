@@ -16,6 +16,8 @@ import { DevicesController } from './account/devices.controller.js';
 import { DevicesService } from './account/devices.service.js';
 import { EMAIL_LINKS, EmailLinks } from './account/email-links.js';
 import { CLOCK, SYSTEM_CLOCK, type Clock } from './auth/clock.js';
+import { BranchesController } from './branches/branches.controller.js';
+import { BranchesService } from './branches/branches.service.js';
 import { BillingController } from './billing/billing.controller.js';
 import { BillingService } from './billing/billing.service.js';
 import { HeldBillsController } from './billing/held-bills.controller.js';
@@ -64,6 +66,7 @@ export const API_CONTROLLERS = [
   HeldBillsController,
   CustomersController,
   StaffController,
+  BranchesController,
 ];
 
 export interface AppOptions {
@@ -112,6 +115,7 @@ class ApiModule {
         HeldBillsService,
         CustomersService,
         StaffService,
+        BranchesService,
         // One Argon2 queue for signup and logins (ADR 0038).
         { provide: HASH_GATE, useValue: options.hashGate ?? new HashGate() },
         {

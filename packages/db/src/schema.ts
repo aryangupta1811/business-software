@@ -132,12 +132,16 @@ export const branches = pgTable(
     id: id(),
     businessId: businessId(),
     name: text('name').notNull(),
+    /** Short code for invoice numbers and lists: 1 to 6 capital letters or digits (P1.6). */
+    code: text('code').notNull(),
     stateCode: text('state_code').notNull(),
     address: text('address'),
     pinCode: text('pin_code'),
     gstin: text('gstin'),
     drugLicence: text('drug_licence'),
     fssai: text('fssai'),
+    /** Archived, never deleted (ADR 0007): its history stays readable. */
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -146,6 +150,8 @@ export const branches = pgTable(
   (t) => [
     ...tenantPolicies(t.businessId),
     unique('branches_business_id_id_unique').on(t.businessId, t.id),
+    unique('branches_business_id_code_unique').on(t.businessId, t.code),
+    check('branches_code_check', sql`${t.code} ~ '^[A-Z0-9]{1,6}$'`),
     // Not 97 (Other Territory): a place of supply outside any state, never a shop's address.
     check(
       'branches_state_code_check',
@@ -246,6 +252,38 @@ export const users = pgTable(
       'users_owner_permissions_check',
       sql`${t.role} <> 'owner' or (cardinality(${t.permissionsAdded}) = 0 and cardinality(${t.permissionsRemoved}) = 0 and ${t.discountLimitBasisPoints} is null)`,
     ),
+  ],
+);
+
+// The extra branches a staff login may work at (Module 00 #35, P1.6); the home branch is
+// always allowed and isn't repeated here. Permission data, not a business record: unticking a
+// branch deletes its row (the only delete the app may do) and every change is in the entry log.
+export const staffBranches = pgTable(
+  'staff_branches',
+  {
+    id: id(),
+    businessId: businessId(),
+    userId: uuid('user_id').notNull(),
+    branchId: uuid('branch_id').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    unique('staff_branches_business_id_user_id_branch_id_unique').on(
+      t.businessId,
+      t.userId,
+      t.branchId,
+    ),
+    foreignKey({
+      name: 'staff_branches_user_fk',
+      columns: [t.businessId, t.userId],
+      foreignColumns: [users.businessId, users.id],
+    }),
+    foreignKey({
+      name: 'staff_branches_branch_fk',
+      columns: [t.businessId, t.branchId],
+      foreignColumns: [branches.businessId, branches.id],
+    }),
   ],
 );
 
@@ -353,6 +391,8 @@ export const SESSION_END_REASONS = [
   'deactivated',
   'reset',
   'device_forgotten',
+  'device_moved',
+  'branch_removed',
 ] as const;
 export type SessionEndReason = (typeof SESSION_END_REASONS)[number];
 

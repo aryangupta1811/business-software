@@ -241,6 +241,8 @@ export interface StaffView {
   username: string | null;
   homeBranchId: string;
   homeBranchName: string;
+  /** The extra branches the owner allowed (P1.6); the home branch is always allowed and not in it. */
+  extraBranchIds: string[];
   /** False after "Deactivate"; the history stays. */
   active: boolean;
   /** Everything the login may do, as the session view shows it. */

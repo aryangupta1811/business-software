@@ -22,6 +22,7 @@ type Rule =
   | 'unique_business'
   | 'fk_valid'
   | 'append_only_missing'
+  | 'deletable_missing'
   | 'schema_usage';
 interface Violation {
   table: string;
@@ -30,6 +31,13 @@ interface Violation {
 
 /** Tables the app may only insert into and read (ADRs 0007, 0028). */
 const APPEND_ONLY = ['entry_log', 'stock_movements'];
+
+/**
+ * Permission data the app may DELETE from, and nothing else (ADR 0007's one exception): a
+ * staff login's extra branches, removed when the owner unticks one (P1.6). Every change is in
+ * the entry log. Any other table with a DELETE grant is a violation.
+ */
+const DELETABLE = ['staff_branches'];
 
 /**
  * Unique keys on tenant tables without business_id, each on purpose (P1.7 rule
@@ -130,7 +138,8 @@ const violationsQuery = `
     union all
     select t.relname, 'privileges' from tables t
      where exists (select 1 from unnest(array['DELETE', 'TRUNCATE', 'TRIGGER', 'MAINTAIN']) as p
-                    where has_table_privilege('app_runtime', t.oid, p))
+                    where has_table_privilege('app_runtime', t.oid, p)
+                      and not (p = 'DELETE' and t.relname = any($4::text[])))
         -- REFERENCES and UPDATE can also be granted per column.
         or has_any_column_privilege('app_runtime', t.oid, 'REFERENCES')
     union all
@@ -145,6 +154,10 @@ const violationsQuery = `
     union all
     -- A misspelt or renamed name would otherwise protect nothing, silently.
     select l.name, 'append_only_missing' from unnest($2::text[]) as l(name)
+     where to_regclass(l.name) is null
+    union all
+    -- A misspelt or renamed name would otherwise exempt nothing, silently.
+    select l.name, 'deletable_missing' from unnest($4::text[]) as l(name)
      where to_regclass(l.name) is null
     union all
     select t.relname, 'branch_fk' from tables t
@@ -197,11 +210,16 @@ const violationsQuery = `
   ) as violations
   order by relname collate "C", rule collate "C"`;
 
-async function findTenancyViolations(pool: Pool, appendOnly = APPEND_ONLY): Promise<Violation[]> {
+async function findTenancyViolations(
+  pool: Pool,
+  appendOnly = APPEND_ONLY,
+  deletable = DELETABLE,
+): Promise<Violation[]> {
   const { rows } = await pool.query<Violation>(violationsQuery, [
     NOT_TENANT_SCHEMAS,
     appendOnly,
     UNIQUE_WITHOUT_BUSINESS,
+    deletable,
   ]);
   return rows;
 }
@@ -541,7 +559,8 @@ describe('tenancy guard', () => {
         'probe_parted',
         'probe_missing',
       ];
-      expect(await findTenancyViolations(owner, appendOnly)).toEqual([
+      const deletable = [...DELETABLE, 'probe_missing_delete'];
+      expect(await findTenancyViolations(owner, appendOnly, deletable)).toEqual([
         { table: 'drizzle', rule: 'schema_usage' },
         { table: 'probe_append_only', rule: 'append_only' },
         { table: 'probe_backup_column_update', rule: 'backup_privileges' },
@@ -560,6 +579,7 @@ describe('tenancy guard', () => {
         { table: 'probe_inherited_delete', rule: 'privileges' },
         { table: 'probe_matview', rule: 'kind' },
         { table: 'probe_missing', rule: 'append_only_missing' },
+        { table: 'probe_missing_delete', rule: 'deletable_missing' },
         { table: 'probe_no_backup_policy', rule: 'backup' },
         { table: 'probe_no_business_fk', rule: 'business_fk' },
         { table: 'probe_no_business_id', rule: 'business_id' },

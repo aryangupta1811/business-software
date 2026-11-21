@@ -99,6 +99,13 @@
       "when": 1795292422359,
       "tag": "0013_staff_permissions",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1795294302987,
+      "tag": "0014_branches",
+      "breakpoints": true
     }
   ]
 }

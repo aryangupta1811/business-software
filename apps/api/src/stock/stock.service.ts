@@ -40,8 +40,10 @@ import {
   type MovementView,
   type OpeningStockInput,
   type StockMovementKind,
+  type StockQuery,
 } from '@business-software/shared';
 import { CLOCK, type Clock } from '../auth/clock.js';
+import { branchScope } from '../branches/scope.js';
 import { DATABASE } from '../database.module.js';
 import type { Caller } from '../http/session.js';
 
@@ -105,9 +107,14 @@ export class StockService {
 
   // ---- Reading ----
 
-  view(caller: Caller, itemId: string): Promise<ItemStockView> {
+  /**
+   * Every branch's stock for the owner (or the one in `?branch=`); staff get only the branch
+   * they are logged in at, whatever they send (P1.6, ADR 0045).
+   */
+  view(caller: Caller, itemId: string, query: StockQuery): Promise<ItemStockView> {
     return this.inBusiness(caller, async (tx) => {
       const item = await this.goods(tx, itemId);
+      const scope = branchScope(caller, query.branch, 'all');
       const rows = await tx
         .select({
           branchId: branches.id,
@@ -123,6 +130,7 @@ export class StockService {
           itemBranchLevels,
           and(eq(itemBranchLevels.branchId, branches.id), eq(itemBranchLevels.itemId, itemId)),
         )
+        .where(scope === 'all' ? undefined : eq(branches.id, scope))
         .orderBy(sql`${branches.name} collate item_name`, asc(branches.id));
       return {
         itemId,
@@ -153,10 +161,9 @@ export class StockService {
   movements(caller: Caller, itemId: string, query: MovementQuery): Promise<MovementPage> {
     return this.inBusiness(caller, async (tx) => {
       await this.goods(tx, itemId);
-      const conditions = [
-        eq(stockMovements.itemId, itemId),
-        eq(stockMovements.branchId, query.branch ?? caller.branchId),
-      ];
+      const scope = branchScope(caller, query.branch, 'caller');
+      const conditions = [eq(stockMovements.itemId, itemId)];
+      if (scope !== 'all') conditions.push(eq(stockMovements.branchId, scope));
       if (query.after !== undefined) conditions.push(sql`${stockMovements.id} < ${query.after}`);
       // Movements of one item at one branch are written one at a time under its row lock, so
       // their time-ordered ids are in the order they happened.

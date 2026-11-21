@@ -2,7 +2,7 @@
 // #46; P1.4 design). Error messages are codes the web app translates (ADR 0036).
 import { z } from 'zod';
 import type { Permission } from './business.js';
-import { email, normalizePhone, text } from './fields.js';
+import { email, normalizePhone, text, uuid } from './fields.js';
 
 /** A password exactly as typed: never trimmed (ADR 0035). */
 const typedPassword = () =>
@@ -20,7 +20,12 @@ export const username = () =>
     .regex(USERNAME_PATTERN, { error: 'invalid' });
 
 /** #27: the owner logs in with email and password. */
-export const ownerLoginSchema = z.strictObject({ email: email(), password: typedPassword() });
+export const ownerLoginSchema = z.strictObject({
+  email: email(),
+  password: typedPassword(),
+  /** P1.6: the branch a new computer is in, sent after the login answered `choose_branch`. */
+  branchId: uuid().optional(),
+});
 export type OwnerLoginInput = z.infer<typeof ownerLoginSchema>;
 
 /** #28: staff log in with username and password on a computer that knows its business. */
@@ -105,6 +110,8 @@ export interface RecoveryKeyResult {
 export interface DeviceView {
   id: string;
   name: string | null;
+  branchId: string;
+  branchCode: string;
   branchName: string;
   createdAt: string;
   lastSeenAt: string;
@@ -134,7 +141,10 @@ export interface ActiveSession {
   state: 'active' | 'locked';
   user: { id: string; role: 'owner' | 'staff'; name: string };
   business: { id: string; name: string };
-  branch: { id: string; name: string };
+  /** The branch this computer is in: everything done here is recorded there (P1.6, ADR 0045). */
+  branch: { id: string; code: string; name: string };
+  /** The owner's count of active branches, so screens hide branch things with one; absent for staff. */
+  branchCount?: number;
   /** Sent back as `X-CSRF-Token` on every unsafe request (ADR 0009). */
   csrfToken: string;
   /** Minutes of inactivity before the owner's session locks or a staff session ends. */

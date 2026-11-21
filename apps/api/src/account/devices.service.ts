@@ -1,7 +1,7 @@
 // Remembered computers (Module 00 #44): Settings lists them, renames them and forgets them.
-// Forgetting needs the owner's password (section 6); the row is kept with `revoked_at` and
-// every session open on that computer ends.
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+// Forgetting, and moving a computer to another branch (P1.6), need the owner's password (section
+// 6); a forgotten row is kept with `revoked_at`, and every session open on that computer ends.
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   and,
   asc,
@@ -72,6 +72,56 @@ export class DevicesService {
    * Forgets a computer: staff can't log in on it until the owner logs in there again, and its
    * open sessions end. Answers whether it was this computer, whose cookies then go too.
    */
+  /**
+   * Moves a computer to another branch (owner answer 3A): it decides where bills and stock go,
+   * so it needs the owner's password. Sessions open on it end (they were started for the old
+   * branch). The same branch again changes nothing. Answers whether that ended this browser's
+   * own session, whose cookie then goes.
+   */
+  async move(
+    caller: Caller,
+    id: string,
+    branchId: string,
+    ownerPassword: string,
+    context: RequestContext,
+  ): Promise<{ device: DeviceView; endedOwnSession: boolean }> {
+    await this.sessions.requireOwnerPassword(caller, ownerPassword);
+    const mine = this.sessions.deviceTokenHashOf(context);
+    return withBusiness(this.database.db, caller.businessId, async (tx) => {
+      const [target] = await tx
+        .select({ id: branches.id })
+        .from(branches)
+        .where(and(eq(branches.id, branchId), isNull(branches.archivedAt)))
+        .for('share');
+      if (target === undefined) {
+        throw new BadRequestException({ code: 'invalid_body', fields: { branchId: 'invalid' } });
+      }
+      const [before] = await tx
+        .select({ branchId: devices.branchId, tokenHash: devices.tokenHash })
+        .from(devices)
+        .where(and(eq(devices.id, id), isNull(devices.revokedAt)))
+        .for('update');
+      if (before === undefined) throw new NotFoundException({ code: 'not_found' });
+      const moved = before.branchId !== branchId;
+      if (moved) {
+        await tx.update(devices).set({ branchId }).where(eq(devices.id, id));
+        await this.sessions.endSessionsIn(tx, eq(sessions.deviceId, id), 'device_moved');
+        await recordEntry(tx, {
+          actorId: caller.userId,
+          action: 'device.moved',
+          entityType: 'device',
+          entityId: id,
+          branchId: caller.branchId,
+          before: { branchId: before.branchId },
+          after: { branchId },
+        });
+      }
+      const device = (await this.viewsIn(tx, mine, id))[0];
+      if (device === undefined) throw new Error('Moved device not found');
+      return { device, endedOwnSession: moved && before.tokenHash === mine };
+    });
+  }
+
   async forget(
     caller: Caller,
     id: string,
@@ -103,6 +153,8 @@ export class DevicesService {
       .select({
         id: devices.id,
         name: devices.name,
+        branchId: branches.id,
+        branchCode: branches.code,
         branchName: branches.name,
         createdAt: devices.createdAt,
         lastSeenAt: devices.lastSeenAt,

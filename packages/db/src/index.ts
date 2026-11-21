@@ -1,5 +1,18 @@
 // Query operators, re-exported so the apps use the same Drizzle as the schema.
-export { and, asc, desc, eq, gt, inArray, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
+export {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  ne,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 export {
   APP_TIMEOUTS,
   createDatabase,
@@ -28,6 +41,7 @@ export {
   recoveryKeys,
   SESSION_END_REASONS,
   sessions,
+  staffBranches,
   stockMovements,
   units,
   users,

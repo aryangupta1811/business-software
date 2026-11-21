@@ -116,3 +116,16 @@ export function loadConfig(env: NodeJS.ProcessEnv): ApiConfig {
     emailLimited: readFlag(env, 'EMAIL_LIMITED', false),
   };
 }
+
+/** What the worker reads: the api's settings, plus the job queue's own database login (ADR 0022). */
+export interface WorkerConfig extends ApiConfig {
+  queueDatabaseUrl: string;
+}
+
+/**
+ * Only the worker reads QUEUE_DATABASE_URL; the api's `loadConfig` never does, so the api
+ * can't be handed the queue's credentials by mistake (ADR 0021).
+ */
+export function loadWorkerConfig(env: NodeJS.ProcessEnv): WorkerConfig {
+  return { ...loadConfig(env), queueDatabaseUrl: readDatabaseUrl(env, 'QUEUE_DATABASE_URL') };
+}

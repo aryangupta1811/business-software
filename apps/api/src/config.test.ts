@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadConfig } from './config.js';
+import { loadConfig, loadWorkerConfig } from './config.js';
 
 const DATABASE_URL = 'postgresql://app_runtime:pw@127.0.0.1:5432/business_software';
 
@@ -133,5 +133,37 @@ describe('loadConfig', () => {
         loadConfig({ DATABASE_URL, MAIL_TRANSPORT: 'smtp', MAIL_FROM, SMTP_URL: 's3cretpw' }),
       ).toThrow(/^SMTP_URL is not an smtp:\/\/ URL$/);
     });
+  });
+});
+
+describe('loadWorkerConfig', () => {
+  const QUEUE_DATABASE_URL = 'postgresql://app_queue:pw@127.0.0.1:5432/business_software';
+
+  it('adds the queue database URL to everything the api reads', () => {
+    expect(loadWorkerConfig({ DATABASE_URL, QUEUE_DATABASE_URL })).toEqual({
+      ...loadConfig({ DATABASE_URL }),
+      queueDatabaseUrl: QUEUE_DATABASE_URL,
+    });
+  });
+
+  it('refuses to start without QUEUE_DATABASE_URL', () => {
+    expect(() => loadWorkerConfig({ DATABASE_URL })).toThrow('QUEUE_DATABASE_URL is not set');
+  });
+
+  // Like DATABASE_URL: the URL holds a password, and startup errors end up in logs.
+  it('names a malformed QUEUE_DATABASE_URL without showing its password', () => {
+    let message = '';
+    try {
+      loadWorkerConfig({ DATABASE_URL, QUEUE_DATABASE_URL: 'mysql://u:s3cretpw@h/d' });
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toBe('QUEUE_DATABASE_URL is not a postgresql:// URL');
+    expect(message).not.toContain('s3cretpw');
+  });
+
+  // ADR 0021: the api never gets the queue's credentials, so its config never reads them.
+  it('is the only config that reads QUEUE_DATABASE_URL', () => {
+    expect(loadConfig({ DATABASE_URL, QUEUE_DATABASE_URL })).not.toHaveProperty('queueDatabaseUrl');
   });
 });

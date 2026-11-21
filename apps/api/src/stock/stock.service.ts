@@ -50,6 +50,12 @@ const PAGE_SIZE = 50;
 const seesCost = (caller: Caller) => caller.permissions.includes('items.view_cost');
 
 type MovementRecord = typeof stockMovements.$inferSelect;
+/** Who made a movement, read with it from `users`. */
+interface Actor {
+  name: string | null;
+  username: string | null;
+  role: string;
+}
 
 /** What a retried request must match to be the same request (ADR 0007 rule 7). */
 interface Expected {
@@ -155,7 +161,12 @@ export class StockService {
       // Movements of one item at one branch are written one at a time under its row lock, so
       // their time-ordered ids are in the order they happened.
       const rows = await tx
-        .select({ movement: stockMovements, name: users.name, username: users.username })
+        .select({
+          movement: stockMovements,
+          name: users.name,
+          username: users.username,
+          role: users.role,
+        })
         .from(stockMovements)
         .innerJoin(users, eq(users.id, stockMovements.actorId))
         .where(and(...conditions))
@@ -163,7 +174,7 @@ export class StockService {
         .limit(PAGE_SIZE + 1);
       const page = rows.slice(0, PAGE_SIZE);
       return {
-        movements: page.map((row) => this.toView(row.movement, row.name ?? row.username, caller)),
+        movements: page.map((row) => this.toView(row.movement, row, caller)),
         next: rows.length > PAGE_SIZE ? (page.at(-1)?.movement.id ?? null) : null,
       };
     });
@@ -303,7 +314,12 @@ export class StockService {
     expected: Expected,
   ): Promise<MovementView | null> {
     const [row] = await tx
-      .select({ movement: stockMovements, name: users.name, username: users.username })
+      .select({
+        movement: stockMovements,
+        name: users.name,
+        username: users.username,
+        role: users.role,
+      })
       .from(stockMovements)
       .innerJoin(users, eq(users.id, stockMovements.actorId))
       .where(eq(stockMovements.requestKey, requestKey));
@@ -320,7 +336,7 @@ export class StockService {
     if (!same) {
       throw new HttpException({ code: 'key_reused' }, HttpStatus.UNPROCESSABLE_ENTITY);
     }
-    return this.toView(stored, row.name ?? row.username, caller);
+    return this.toView(stored, row, caller);
   }
 
   private async mustReplay(
@@ -347,7 +363,7 @@ export class StockService {
     return { stockUnit: item.stockUnit as BuiltInUnit };
   }
 
-  private toView(movement: MovementRecord, actorName: string | null, caller: Caller): MovementView {
+  private toView(movement: MovementRecord, actor: Actor, caller: Caller): MovementView {
     return {
       id: movement.id,
       branchId: movement.branchId,
@@ -359,7 +375,8 @@ export class StockService {
       note: movement.note,
       businessDate: movement.businessDate,
       actorId: movement.actorId,
-      actorName,
+      actorName: actor.name ?? actor.username,
+      actorRole: actor.role as MovementView['actorRole'],
       createdAt: movement.createdAt.toISOString(),
     };
   }

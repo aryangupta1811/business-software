@@ -102,6 +102,7 @@ const movement = (overrides: Partial<MovementView>): MovementView => ({
   businessDate: '2026-11-20',
   actorId: USER,
   actorName: 'Ravi Sharma',
+  actorRole: 'staff',
   createdAt: '2026-11-20T06:30:00.000Z',
   ...overrides,
 });
@@ -504,6 +505,20 @@ test('pages through the history and switches branch', async () => {
       `/api/items/${ITEM}/stock/movements?branch=${GODOWN}`,
     );
   });
+});
+
+test('names the owner as "Owner" in the history when they have not set a name', async () => {
+  stubApi({
+    ...base(),
+    [`GET /api/items/${ITEM}/stock/movements`]: () => ({
+      body: { movements: [movement({ actorName: null, actorRole: 'owner' })], next: null },
+    }),
+  });
+  renderItem();
+  const card = await stockCard();
+  const table = within(await card.findByRole('table', { name: 'History' }));
+  const row = await table.findByRole('row', { name: /Damaged/ });
+  expect(within(row).getByText('Owner')).toBeInTheDocument();
 });
 
 test('speaks Hindi', async () => {

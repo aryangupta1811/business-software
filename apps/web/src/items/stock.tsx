@@ -308,7 +308,7 @@ function History({ item, context }: { item: ItemView; context: ItemsContext }) {
                   {row.value === null || row.value === undefined ? '—' : formatPaise(row.value)}
                 </td>
               )}
-              <td className="py-2.5">{row.actorName ?? ''}</td>
+              <td className="py-2.5">{row.actorName ?? t(`session.roles.${row.actorRole}`)}</td>
             </tr>
           ))}
         </tbody>

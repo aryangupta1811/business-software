@@ -155,7 +155,13 @@ describe('alerts', () => {
       const itemId = await addItem(a);
       const second = await addBranch(a);
       await inShop(a, async (tx) => {
-        await tx.insert(alerts).values({ ...raw(a, itemId), clearedAt: new Date() });
+        // Raised a minute ago: the database's now() has microseconds, new Date() only milliseconds,
+        // so a clear stamped by this clock could land just before a raise stamped by the database.
+        await tx.insert(alerts).values({
+          ...raw(a, itemId),
+          raisedAt: new Date(Date.now() - 60_000),
+          clearedAt: new Date(),
+        });
         await tx.insert(alerts).values(raw(a, itemId));
         await tx.insert(alerts).values(raw(a, itemId, { branchId: second }));
       });

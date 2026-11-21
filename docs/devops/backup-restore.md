@@ -70,7 +70,7 @@ Write the date, the key and the result in the log below. The same scripts run in
 
 | Date | Backup key | Result |
 | --- | --- | --- |
-| | | |
+| 2026-11-21 | `postgres/2026/11/21/business_software-20261121T091115Z.dump` (87 KB; the first backup, taken by hand right after the first deploy) | OK: 18 tables, 10 rows, every count matches |
 
 ## Getting data back
 

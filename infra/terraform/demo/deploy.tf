@@ -44,6 +44,9 @@ data "aws_iam_policy_document" "deploy_assume" {
 
     # Exact match, no wildcard: this repository, a job in the "demo" environment. A
     # pull_request, a fork or any other workflow gets a different subject and is refused.
+    # The repository uses GitHub's immutable subject (owner and repository IDs next to the
+    # names), so a deleted and re-created repository of the same name can't match. The
+    # name-only form was refused on the first real deploy (2026-11-21).
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"

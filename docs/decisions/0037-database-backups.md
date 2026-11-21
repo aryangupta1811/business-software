@@ -17,6 +17,7 @@ ADR 0011 asks for a nightly `pg_dump` to S3, a monthly restore drill and a runbo
 - AWS's role listing for RDS for PostgreSQL shows "Bypass RLS" only on `rdsadmin`, AWS's own superuser. The master user has `rds_superuser`, which doesn't include it ([Viewing roles and their privileges](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.PostgreSQL.CommonDBATasks.Roles.View.html)).
 - Since PostgreSQL 16, only a role that has `BYPASSRLS` may give it to another, so the master can't create one either.
 - Not yet checked on our instance. The owner approved a probe on 2026-11-19 (read `rolbypassrls` for `postgres_admin` over Run Command), but the server couldn't start, twice an hour apart: AWS had no spare `t4g.small` capacity in its zone (`docs/devops/terraform.md`, Errors). The owner chose to keep `t4g.small` in `ap-south-1a` and retry (2026-11-19), so it runs at the next start. This design works whichever way it comes out.
+- **Checked 2026-11-21** (PostgreSQL 18.6 on RDS, over Run Command from the new server): `select rolname, rolsuper, rolbypassrls from pg_roles where rolname = current_user` returned `postgres_admin|f|f`. The master is neither a superuser nor able to bypass RLS, as the docs said, so the read-only `app_backup` role is the only way a dump sees every business's rows.
 
 The server and database run only during sessions and stop at 23:30 IST at the latest (ADR 0032), so "nightly at a fixed time" alone would miss most days.
 

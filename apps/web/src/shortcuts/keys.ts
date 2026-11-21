@@ -9,8 +9,23 @@ export interface KeyCombo {
 const FUNCTION_KEY = /^F([1-9]|1[0-2])$/;
 const MODIFIERS = { Ctrl: 'ctrl', Alt: 'alt', Shift: 'shift' } as const;
 
-// Reload, full screen, dev tools, and new/close/reload tab, new window, address bar.
-const BROWSER_KEYS = ['F5', 'F11', 'F12', 'Ctrl+T', 'Ctrl+W', 'Ctrl+N', 'Ctrl+R', 'Ctrl+L'];
+// New/close tab, new window and address bar; with Shift, reopen a closed tab, close the window,
+// open a private window and reload without the cache; and closing a tab or the window by F4.
+const BROWSER_KEYS = [
+  'Ctrl+T',
+  'Ctrl+W',
+  'Ctrl+N',
+  'Ctrl+R',
+  'Ctrl+L',
+  'Ctrl+Shift+T',
+  'Ctrl+Shift+W',
+  'Ctrl+Shift+N',
+  'Ctrl+Shift+R',
+  'Ctrl+F4',
+  'Alt+F4',
+];
+// Reload, full screen and dev tools: reserved with any modifier (Ctrl+F5, Shift+F5, Ctrl+Shift+F12…).
+const BROWSER_FUNCTION_KEYS = new Set(['F5', 'F11', 'F12']);
 
 /** True for keys that type a character, so they fire with no modifier only outside fields. */
 export function isFunctionOrEscape(key: string): boolean {
@@ -44,10 +59,16 @@ export function sameCombo(a: KeyCombo, b: KeyCombo): boolean {
 
 const RESERVED = BROWSER_KEYS.map(parse);
 
+function isReserved(combo: KeyCombo): boolean {
+  return (
+    BROWSER_FUNCTION_KEYS.has(combo.key) || RESERVED.some((reserved) => sameCombo(reserved, combo))
+  );
+}
+
 /** Parses `F2`, `Escape`, `?`, `/`, `Alt+H`, `Ctrl+Shift+K`, refusing the browser's own keys. */
 export function parseKeys(keys: string): KeyCombo {
   const combo = parse(keys);
-  if (RESERVED.some((reserved) => sameCombo(reserved, combo))) {
+  if (isReserved(combo)) {
     throw new Error(`Shortcut "${keys}" belongs to the browser`);
   }
   return combo;
@@ -81,4 +102,13 @@ export function isTypingTarget(target: EventTarget | null): boolean {
 /** The key chips to show: `Alt+H` → `['Alt', 'H']`. */
 export function keyLabels(keys: string): string[] {
   return keys.split('+');
+}
+
+/**
+ * True while a modal dialog is open. Every dialog here is a native `<dialog>` opened with
+ * `showModal()` (ADR 0026), so `[open]` is enough; `:modal` would be exact in a browser but
+ * jsdom's test polyfill can't set it.
+ */
+export function isModalOpen(): boolean {
+  return document.querySelector('dialog[open]') !== null;
 }

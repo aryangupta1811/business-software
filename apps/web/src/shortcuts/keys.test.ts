@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { keyLabels, matches, parseKeys } from './keys';
+import { isModalOpen, keyLabels, matches, parseKeys } from './keys';
 
 test('parses function keys, Escape and ?', () => {
   expect(parseKeys('F2')).toEqual({ ctrl: false, alt: false, shift: false, key: 'F2' });
@@ -23,6 +23,28 @@ test("the browser's own keys are refused", () => {
   }
 });
 
+test('F5, F11 and F12 are refused with any modifier, and so are the browser’s Ctrl+Shift keys', () => {
+  const refused = [
+    'Ctrl+F5',
+    'Shift+F5',
+    'Alt+F11',
+    'Ctrl+Shift+F11',
+    'Ctrl+F12',
+    'Ctrl+Shift+F12',
+    'Ctrl+Shift+T',
+    'Ctrl+Shift+W',
+    'Ctrl+Shift+N',
+    'Ctrl+Shift+R',
+    'Ctrl+F4',
+    'Alt+F4',
+  ];
+  for (const keys of refused) expect(() => parseKeys(keys), keys).toThrow(/browser/);
+  // Neighbours stay free.
+  for (const keys of ['F4', 'Shift+F4', 'Ctrl+Shift+K', 'Alt+F6', 'Ctrl+Shift+F6', 'Alt+T']) {
+    expect(() => parseKeys(keys), keys).not.toThrow();
+  }
+});
+
 test('unknown keys are refused', () => {
   expect(() => parseKeys('Alt+Ä')).toThrow(/Unknown key/);
   expect(() => parseKeys('Hyper+H')).toThrow(/Unknown key/);
@@ -41,4 +63,15 @@ test('/ is the slash key by position, without Shift, so ? and / never collide', 
   expect(matches(slash, press({ key: 'य', code: 'Slash' }))).toBe(true);
   expect(matches(slash, press({ key: '?', code: 'Slash', shiftKey: true }))).toBe(false);
   expect(matches(parseKeys('?'), press({ key: '/', code: 'Slash' }))).toBe(false);
+});
+
+test('knows when a modal dialog is open', () => {
+  expect(isModalOpen()).toBe(false);
+  const dialog = document.body.appendChild(document.createElement('dialog'));
+  expect(isModalOpen()).toBe(false);
+  dialog.showModal();
+  expect(isModalOpen()).toBe(true);
+  dialog.close();
+  expect(isModalOpen()).toBe(false);
+  dialog.remove();
 });

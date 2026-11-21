@@ -1,6 +1,7 @@
 import type { ParseKeys } from 'i18next';
 import {
   isFunctionOrEscape,
+  isModalOpen,
   isTypingTarget,
   matches,
   parseKeys,
@@ -16,6 +17,19 @@ export interface Shortcut {
   description: ParseKeys;
   group: ShortcutGroup;
   action: () => void;
+  /**
+   * For keys that belong to a dialog: they work only while a modal dialog is open (and the
+   * page's own shortcuts are off). Register them from a component rendered inside the dialog.
+   */
+  inDialog?: boolean | undefined;
+}
+
+export interface RegistryOptions {
+  /**
+   * What a clash does: throw (so a developer sees it at once) or warn and keep the first
+   * (so a shop's counter never breaks on a mistake). Defaults to throwing in development and tests.
+   */
+  throwOnClash?: boolean;
 }
 
 /** The shortcuts that work right now. Components add theirs while they're on screen. */
@@ -24,11 +38,23 @@ export class ShortcutRegistry {
   #active: readonly Shortcut[] = [];
   #listeners = new Set<() => void>();
   #paused = false;
+  readonly #throwOnClash: boolean;
+
+  constructor({ throwOnClash = import.meta.env.DEV }: RegistryOptions = {}) {
+    this.#throwOnClash = throwOnClash;
+  }
 
   register(shortcut: Shortcut): () => void {
     const combo = parseKeys(shortcut.keys);
-    if (this.#entries.some((entry) => sameCombo(entry.combo, combo))) {
-      throw new Error(`Shortcut "${shortcut.keys}" is already registered`);
+    const inDialog = shortcut.inDialog === true;
+    const clash = this.#entries.some(
+      (entry) => (entry.shortcut.inDialog === true) === inDialog && sameCombo(entry.combo, combo),
+    );
+    if (clash) {
+      const message = `Shortcut "${shortcut.keys}" is already registered`;
+      if (this.#throwOnClash) throw new Error(message);
+      console.warn(`${message}; keeping the first`);
+      return () => undefined;
     }
     const entry = { shortcut, combo };
     this.#entries.push(entry);
@@ -39,7 +65,7 @@ export class ShortcutRegistry {
     };
   }
 
-  /** The same array until something changes, as useSyncExternalStore needs. */
+  /** The page's shortcuts: the same array until something changes, as useSyncExternalStore needs. */
   active(): readonly Shortcut[] {
     return this.#active;
   }
@@ -49,27 +75,44 @@ export class ShortcutRegistry {
     return () => this.#listeners.delete(listener);
   }
 
-  /** While paused (the help panel is open), no shortcut fires. */
+  /** While paused (the lock screen), no shortcut fires. */
   setPaused(paused: boolean): void {
     this.#paused = paused;
   }
 
-  /** Runs the matching shortcut's action; true if one ran. */
+  /**
+   * Runs the shortcut this keydown is, and keeps the browser from also acting on it; true if one
+   * ran. While a dialog is open, only the dialog's own shortcuts (`inDialog`) run, and while
+   * paused none do.
+   */
   handle(event: KeyboardEvent): boolean {
-    // A held key repeats, and an IME sends keys while it builds a word: neither is a command.
-    if (this.#paused || event.repeat || event.isComposing) return false;
+    // A field that handled the key itself has said it isn't a command; an IME sends keys while
+    // it builds a word, and cancelling those would break the word.
+    if (event.defaultPrevented || event.isComposing) return false;
     const typing = isTypingTarget(event.target);
-    const entry = this.#entries.find(
+    const modal = isModalOpen();
+    const ours = this.#entries.filter(
       ({ combo }) =>
         matches(combo, event) &&
         !(typing && !combo.ctrl && !combo.alt && !isFunctionOrEscape(combo.key)),
     );
-    entry?.shortcut.action();
-    return entry !== undefined;
+    if (ours.length === 0) return false;
+    // A held key repeats: it isn't a new command.
+    const runnable =
+      this.#paused || event.repeat
+        ? undefined
+        : ours.find(({ shortcut }) => (shortcut.inDialog === true) === modal);
+    // Our key, even when ignored: Chrome must not get a held F3 (find) or an F10 pressed over a
+    // dialog. Escape is the exception, so it can still close the dialog.
+    if (runnable || !(event.key === 'Escape' && (modal || this.#paused))) event.preventDefault();
+    runnable?.shortcut.action();
+    return runnable !== undefined;
   }
 
   #changed() {
-    this.#active = this.#entries.map(({ shortcut }) => shortcut);
+    this.#active = this.#entries
+      .map(({ shortcut }) => shortcut)
+      .filter((shortcut) => shortcut.inDialog !== true);
     for (const listener of this.#listeners) listener();
   }
 }

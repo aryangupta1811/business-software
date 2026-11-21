@@ -7,8 +7,10 @@ import { createDatabase, type Database } from '@business-software/db';
 import { startTestDatabase, type TestDatabase } from '@business-software/db/testing';
 import {
   PERMISSIONS,
+  type ApprovalView,
   type CatalogueItem,
   type CatalogueView,
+  type HeldBillView,
   type ItemView,
   type Permission,
 } from '@business-software/shared';
@@ -28,7 +30,7 @@ const headerSessions: SessionResolver = {
 
 type Body = Record<string, unknown>;
 
-describe('billing catalogue', () => {
+describe('billing counter', () => {
   let server: TestDatabase;
   let admin: Database;
   let app: INestApplication;
@@ -282,6 +284,213 @@ describe('billing catalogue', () => {
   it('needs billing.sell, and refuses a since that is not a time', async () => {
     expect((await catalogue(staff(a, ['session.own', 'items.view']))).status).toBe(403);
     expect((await catalogue(a, 'yesterday')).status).toBe(400);
+  });
+
+  // ---- Held bills (design §9) ----
+
+  const cart = (overrides: Body = {}) => ({
+    billKey: crypto.randomUUID(),
+    priceList: 'retail',
+    customerId: null,
+    placeOfSupplyStateCode: '27',
+    lines: [
+      {
+        itemId: crypto.randomUUID(),
+        packId: null,
+        quantityThousandths: 2_000,
+        shownUnitPricePaise: 2_800,
+      },
+    ],
+    ...overrides,
+  });
+
+  const hold = (caller: Caller, draft = cart(), label: string | null = null) =>
+    call<HeldBillView>('POST', '/held-bills', caller, { label, draft, shownTotalPaise: 5_600 });
+
+  const heldList = async (caller: Caller) =>
+    (await call<HeldBillView[]>('GET', '/held-bills', caller)).body;
+
+  const logOf = async (action: string, entityId: string) =>
+    (
+      await admin.pool.query<{ actor_id: string; branch_id: string | null; after: Body }>(
+        'select actor_id, branch_id, after from entry_log where action = $1 and entity_id = $2',
+        [action, entityId],
+      )
+    ).rows;
+
+  it('holds a bill, lists it for the branch, and resumes it once', async () => {
+    const draft = cart();
+    const held = await hold(a, draft, 'blue shirt uncle');
+    expect(held).toEqual({
+      status: 201,
+      body: {
+        id: expect.any(String) as unknown,
+        label: 'blue shirt uncle',
+        lineCount: 1,
+        totalPaise: 5_600,
+        heldBy: { id: a.userId, name: 'billing-a@example.com' },
+        heldAt: expect.any(String) as unknown,
+      },
+    });
+    expect((await heldList(a)).map((bill) => bill.id)).toContain(held.body.id);
+
+    const resumed = await call('POST', `/held-bills/${held.body.id}/resume`, a);
+    expect(resumed).toEqual({ status: 200, body: { draft } });
+    expect((await heldList(a)).map((bill) => bill.id)).not.toContain(held.body.id);
+    expect(await call('POST', `/held-bills/${held.body.id}/resume`, a)).toEqual({
+      status: 409,
+      body: { code: 'held_bill_closed' },
+    });
+  });
+
+  it('answers a retried hold with the first copy', async () => {
+    const draft = cart();
+    const first = await hold(a, draft);
+    const again = await hold(a, draft);
+    expect(again).toEqual({ status: 201, body: first.body });
+  });
+
+  it('lists newest first and never shows another branch or business', async () => {
+    const older = await hold(a);
+    const newer = await hold(a);
+    const ids = (await heldList(a)).map((bill) => bill.id);
+    expect(ids.indexOf(newer.body.id)).toBeLessThan(ids.indexOf(older.body.id));
+    expect((await heldList(b)).map((bill) => bill.id)).not.toContain(newer.body.id);
+    expect((await call('POST', `/held-bills/${newer.body.id}/resume`, b)).status).toBe(404);
+  });
+
+  it('discards a held bill and logs it with its lines and total (question 7)', async () => {
+    const draft = cart();
+    const held = await hold(a, draft, 'gone');
+    const response = await call('POST', `/held-bills/${held.body.id}/discard`, a);
+    expect(response).toEqual({ status: 200, body: { billKey: draft.billKey } });
+    expect(await logOf('bill.draft_discarded', draft.billKey)).toEqual([
+      {
+        actor_id: a.userId,
+        branch_id: a.branchId,
+        after: {
+          heldBillId: held.body.id,
+          label: 'gone',
+          lines: draft.lines,
+          lineCount: 1,
+          totalPaise: 5_600,
+        },
+      },
+    ]);
+    expect((await call('POST', `/held-bills/${held.body.id}/discard`, a)).status).toBe(409);
+  });
+
+  it('logs an open bill cleared without saving (Alt+N, question 7)', async () => {
+    const draft = cart();
+    const response = await call('POST', '/billing/discard', a, { draft, shownTotalPaise: 5_600 });
+    expect(response).toEqual({ status: 200, body: { billKey: draft.billKey } });
+    expect(await logOf('bill.draft_discarded', draft.billKey)).toEqual([
+      {
+        actor_id: a.userId,
+        branch_id: a.branchId,
+        after: {
+          heldBillId: null,
+          label: null,
+          lines: draft.lines,
+          lineCount: 1,
+          totalPaise: 5_600,
+        },
+      },
+    ]);
+  });
+
+  it('refuses a held bill with payments in it', async () => {
+    const response = await call('POST', '/held-bills', a, {
+      label: null,
+      draft: { ...cart(), payments: [] },
+      shownTotalPaise: 0,
+    });
+    expect(response.status).toBe(400);
+  });
+
+  // ---- Owner approvals (design §6, question 5) ----
+
+  const approve = (caller: Caller, overrides: Body = {}) =>
+    call<ApprovalView>('POST', '/billing/approvals', caller, {
+      billKey: crypto.randomUUID(),
+      kind: 'discount',
+      lineBasisPoints: 1_500,
+      billBasisPoints: 500,
+      ownerPassword: 'correct horse battery',
+      ...overrides,
+    });
+
+  it("stores the owner's OK for 30 minutes and logs it, for a cashier at the counter", async () => {
+    const cashier = staff(a, ['session.own', 'billing.sell']);
+    const billKey = crypto.randomUUID();
+    const before = Date.now();
+    const response = await approve(cashier, { billKey });
+    expect(response.status).toBe(201);
+    const expires = Date.parse(response.body.expiresAt);
+    expect(expires - before).toBeGreaterThanOrEqual(30 * 60_000 - 1_000);
+    expect(expires - Date.now()).toBeLessThanOrEqual(30 * 60_000);
+
+    const { rows } = await admin.pool.query<Body>(
+      `select bill_key, kind, line_basis_points, bill_basis_points, requested_by, approved_by,
+              used_at from owner_approvals where id = $1`,
+      [response.body.approvalId],
+    );
+    expect(rows).toEqual([
+      {
+        bill_key: billKey,
+        kind: 'discount',
+        line_basis_points: 1_500,
+        bill_basis_points: 500,
+        requested_by: a.userId,
+        approved_by: a.userId,
+        used_at: null,
+      },
+    ]);
+    expect(await logOf('discount.approved', response.body.approvalId)).toEqual([
+      {
+        actor_id: a.userId,
+        branch_id: a.branchId,
+        after: {
+          billKey,
+          kind: 'discount',
+          lineBasisPoints: 1_500,
+          billBasisPoints: 500,
+          approvedBy: a.userId,
+          expiresAt: response.body.expiresAt,
+        },
+      },
+    ]);
+  });
+
+  it('refuses a wrong password and stores nothing', async () => {
+    const billKey = crypto.randomUUID();
+    expect(await approve(a, { billKey, ownerPassword: 'wrong password' })).toEqual({
+      status: 401,
+      body: { code: 'wrong_password' },
+    });
+    const { rows } = await admin.pool.query('select 1 from owner_approvals where bill_key = $1', [
+      billKey,
+    ]);
+    expect(rows).toEqual([]);
+  });
+
+  it("is approved by this business's owner, never another's", async () => {
+    // Shop B's owner has the same password; only Shop A's owner may approve for Shop A.
+    const response = await approve(a);
+    const { rows } = await admin.pool.query<{ approved_by: string }>(
+      'select approved_by from owner_approvals where id = $1',
+      [response.body.approvalId],
+    );
+    expect(rows).toEqual([{ approved_by: a.userId }]);
+  });
+
+  it('needs billing.sell for held bills, discards and approvals', async () => {
+    const viewer = staff(a, ['session.own', 'items.view']);
+    expect((await call('GET', '/held-bills', viewer)).status).toBe(403);
+    expect((await hold(viewer)).status).toBe(403);
+    expect((await approve(viewer)).status).toBe(403);
+    const discard = { draft: cart(), shownTotalPaise: 0 };
+    expect((await call('POST', '/billing/discard', viewer, discard)).status).toBe(403);
   });
 });
 

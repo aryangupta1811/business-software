@@ -5,6 +5,7 @@ import {
   BUSINESS_TYPES,
   FEATURES,
   ADJUSTMENT_REASONS,
+  APPROVAL_KINDS,
   GST_RATES,
   GST_STATUSES,
   INDIAN_STATES,
@@ -692,6 +693,112 @@ export const customers = pgTable(
       sql`${t.stateCode} in (${literals(INDIAN_STATES.map((s) => s.code))})`,
     ),
     check('customers_version_check', sql`${t.version} >= 1`),
+  ],
+);
+
+// ---- Held bills (P1.13 design §9; `02` #8) ----
+// A bill put aside to serve the next customer. It never touches stock. Closed by resuming or
+// discarding it, never deleted: a discarded bill stays visible (question 7).
+export const heldBills = pgTable(
+  'held_bills',
+  {
+    id: id(),
+    businessId: ownBusinessId(),
+    branchId: uuid('branch_id').notNull(),
+    /** The bill's idempotency key (ADR 0007); it stays with the bill when resumed. */
+    billKey: uuid('bill_key').notNull(),
+    label: text('label'),
+    /** The cart as billCartSchema, checked before it's stored. */
+    draft: jsonb('draft').notNull(),
+    /** As shown when held, for the list; the save re-prices everything. */
+    totalPaise: money('total_paise').notNull(),
+    lineCount: integer('line_count').notNull(),
+    heldBy: uuid('held_by').notNull(),
+    closedBy: uuid('closed_by'),
+    resumedAt: timestamp('resumed_at', { withTimezone: true }),
+    discardedAt: timestamp('discarded_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    unique('held_bills_business_id_id_unique').on(t.businessId, t.id),
+    foreignKey({
+      name: 'held_bills_branch_fk',
+      columns: [t.businessId, t.branchId],
+      foreignColumns: [branches.businessId, branches.id],
+    }),
+    foreignKey({
+      name: 'held_bills_held_by_fk',
+      columns: [t.businessId, t.heldBy],
+      foreignColumns: [users.businessId, users.id],
+    }),
+    foreignKey({
+      name: 'held_bills_closed_by_fk',
+      columns: [t.businessId, t.closedBy],
+      foreignColumns: [users.businessId, users.id],
+    }),
+    // One open copy of a bill: holding it again (a retry) finds the first.
+    uniqueIndex('held_bills_open_bill_key_unique')
+      .on(t.businessId, t.billKey)
+      .where(sql`${t.resumedAt} is null and ${t.discardedAt} is null`),
+    // The branch's open held bills, newest first.
+    index('held_bills_open_idx')
+      .on(t.businessId, t.branchId, t.id)
+      .where(sql`${t.resumedAt} is null and ${t.discardedAt} is null`),
+    check('held_bills_label_check', sql`char_length(${t.label}) between 1 and 40`),
+    check('held_bills_numbers_check', sql`${t.totalPaise} >= 0 and ${t.lineCount} >= 1`),
+    // Closed at most one way, and closed exactly when someone closed it.
+    check(
+      'held_bills_closed_check',
+      sql`num_nonnulls(${t.resumedAt}, ${t.discardedAt}) <= 1 and (${t.closedBy} is null) = (num_nonnulls(${t.resumedAt}, ${t.discardedAt}) = 0)`,
+    ),
+  ],
+);
+
+// ---- Owner approvals (P1.13 design §6; `02` #12) ----
+// The owner's OK, given with their password at the counter, for discounts above a cashier's
+// limit on one bill. One use, 30 minutes; the save (P1.14) sets used_at.
+export const ownerApprovals = pgTable(
+  'owner_approvals',
+  {
+    id: id(),
+    businessId: ownBusinessId(),
+    branchId: uuid('branch_id').notNull(),
+    billKey: uuid('bill_key').notNull(),
+    kind: text('kind').notNull(),
+    lineBasisPoints: integer('line_basis_points').notNull(),
+    billBasisPoints: integer('bill_basis_points').notNull(),
+    requestedBy: uuid('requested_by').notNull(),
+    approvedBy: uuid('approved_by').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    unique('owner_approvals_business_id_id_unique').on(t.businessId, t.id),
+    foreignKey({
+      name: 'owner_approvals_branch_fk',
+      columns: [t.businessId, t.branchId],
+      foreignColumns: [branches.businessId, branches.id],
+    }),
+    foreignKey({
+      name: 'owner_approvals_requested_by_fk',
+      columns: [t.businessId, t.requestedBy],
+      foreignColumns: [users.businessId, users.id],
+    }),
+    foreignKey({
+      name: 'owner_approvals_approved_by_fk',
+      columns: [t.businessId, t.approvedBy],
+      foreignColumns: [users.businessId, users.id],
+    }),
+    check('owner_approvals_kind_check', sql`${t.kind} in (${literals(APPROVAL_KINDS)})`),
+    check(
+      'owner_approvals_shares_check',
+      sql`${t.lineBasisPoints} between 0 and 10000 and ${t.billBasisPoints} between 0 and 10000`,
+    ),
+    check('owner_approvals_expiry_check', sql`${t.expiresAt} > ${t.createdAt}`),
   ],
 );
 

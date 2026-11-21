@@ -444,3 +444,76 @@ export function createCatalogueSearch<T extends Searchable>(
       .map((entry) => entry.item);
   };
 }
+
+// ---- Held bills (design §9) and owner approvals (§6) ----
+
+/** `POST /api/held-bills`: hold the open bill and serve the next customer. */
+export const holdBillSchema = z.strictObject({
+  /** Something to find it by ("blue shirt uncle"). */
+  label: optionalText(40),
+  draft: billCartSchema,
+  /** For the held-bills list only; nothing is ever billed from it (the save re-prices). */
+  shownTotalPaise: amount(),
+});
+export type HoldBillInput = z.infer<typeof holdBillSchema>;
+
+/** `POST /api/billing/discard`: a full open bill cleared without saving, kept in the log. */
+export const discardBillSchema = z.strictObject({
+  draft: billCartSchema,
+  shownTotalPaise: amount(),
+});
+export type DiscardBillInput = z.infer<typeof discardBillSchema>;
+
+/** A held bill in the branch's list (`GET /api/held-bills`). */
+export interface HeldBillView {
+  id: string;
+  label: string | null;
+  lineCount: number;
+  totalPaise: Paise;
+  heldBy: { id: string; name: string };
+  heldAt: string;
+}
+
+/** What resuming a held bill answers: its cart, to be re-priced from the catalogue copy. */
+export interface ResumedBillView {
+  draft: BillCart;
+}
+
+/** `discount` today; P1.18 adds `credit_limit` (`03` #9). */
+export const APPROVAL_KINDS = ['discount'] as const;
+export type ApprovalKind = (typeof APPROVAL_KINDS)[number];
+
+/** An owner's OK lasts this long, for one bill, and is used up by its save (question 5). */
+export const APPROVAL_MINUTES = 30;
+
+const share = () =>
+  z.int({ error: 'invalid' }).min(0, { error: 'too_small' }).max(BASIS_POINTS, {
+    error: 'too_big',
+  });
+
+/**
+ * `POST /api/billing/approvals`: the owner types their password at the counter to allow the
+ * discounts shown (`discountShares`), for this bill only. The password is sent once, never kept.
+ */
+export const approvalSchema = z
+  .strictObject({
+    billKey: uuid(),
+    kind: z.enum(APPROVAL_KINDS, { error: 'invalid' }),
+    lineBasisPoints: share(),
+    billBasisPoints: share(),
+    /** Exactly as typed: never trimmed (ADR 0035). */
+    ownerPassword: z
+      .string({ error: 'required' })
+      .min(1, { error: 'required' })
+      .max(128, { error: 'too_long' }),
+  })
+  .refine((value) => value.lineBasisPoints > 0 || value.billBasisPoints > 0, {
+    path: ['billBasisPoints'],
+    error: 'too_small',
+  });
+export type ApprovalInput = z.infer<typeof approvalSchema>;
+
+export interface ApprovalView {
+  approvalId: string;
+  expiresAt: string;
+}

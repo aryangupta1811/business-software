@@ -58,6 +58,8 @@ export const PERMISSIONS = [
   'stock.adjust',
   // P1.13: the billing page, its catalogue copy and held bills (`02`).
   'billing.sell',
+  // P1.13: discounts up to the person's limit (`02` #12); P1.5 sets each staff login's limit.
+  'billing.discount',
   // P1.13: find customers at the counter; add and edit them (`02` #2, #7).
   'customers.view',
   'customers.manage',

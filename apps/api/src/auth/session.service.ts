@@ -771,6 +771,7 @@ export class SessionService {
       // Staff have no email: nothing for them to confirm (#32).
       emailConfirmed: caller.role === 'staff' || row.emailConfirmedAt !== null,
       emailLimited: this.settings.emailLimited,
+      discountLimitBasisPoints: caller.role === 'owner' ? null : 0,
     };
   }
 }

@@ -15,4 +15,6 @@ Ideas suggested by Claude in the planning chat (29 Oct 2026) that are not yet pa
 | Commission on sales | A salary type paid on sales (which sales count, net of returns and credit notes, with or without GST) | Open (moved out of `05` at sitting 2, 2026-11-19) |
 | PF and ESI deductions | Statutory deductions on salary slips | Open (out of v1, `05`, 2026-11-19) |
 | Flag rule: price changed back | Flag an item whose price is lowered and raised back within a day | Open (out of v1, `06`, 2026-11-19) |
+| Transliterated item search | Typing "aata" finds "आटा" at the billing counter | Open (out of v1, P1.13 design §4, 2026-11-21) |
+| Weighing-scale barcodes | Labels whose barcode carries the weight or price, read at the counter | Open (out of v1, P1.13 question 11, 2026-11-21) |
 | Third role (manager) | A role between owner and staff | Superseded: owner chose Owner + Staff with per-person feature switches (`00` #15–17) |

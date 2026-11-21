@@ -9,25 +9,34 @@ import {
   items,
   itemStock,
   itemUnits,
+  ownerApprovals,
+  recordEntry,
   sql,
   units,
+  users,
   type Database,
   type SQL,
   type Transaction,
 } from '@business-software/db';
-import type {
-  BuiltInUnit,
-  CatalogueBarcode,
-  CatalogueEntry,
-  CataloguePack,
-  CatalogueQuery,
-  CatalogueStock,
-  CatalogueView,
-  ItemKind,
+import {
+  APPROVAL_MINUTES,
+  type ApprovalInput,
+  type ApprovalView,
+  type BuiltInUnit,
+  type CatalogueBarcode,
+  type CatalogueEntry,
+  type CataloguePack,
+  type CatalogueQuery,
+  type CatalogueStock,
+  type CatalogueView,
+  type DiscardBillInput,
+  type ItemKind,
 } from '@business-software/shared';
 import { CLOCK, type Clock } from '../auth/clock.js';
+import { SESSION_SERVICE, type SessionService } from '../auth/session.service.js';
 import { DATABASE } from '../database.module.js';
 import { inBusiness } from '../items/conflicts.js';
+import { discardedEntry } from './held-bills.service.js';
 import type { Caller } from '../http/session.js';
 
 /** Appends `value` to the list kept for `key`. */
@@ -43,6 +52,7 @@ export class BillingService {
   constructor(
     @Inject(DATABASE) private readonly database: Database,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(SESSION_SERVICE) private readonly sessions: SessionService,
   ) {}
 
   /**
@@ -91,6 +101,71 @@ export class BillingService {
         ? await this.stock(tx, caller.branchId, since)
         : null;
       return { items: entries, stock, serverTime: serverTime.toISOString() };
+    });
+  }
+
+  /**
+   * A full open bill cleared without saving (`Alt+N`, question 7): nothing is stored but the log
+   * entry, so money taken for a bill that was then thrown away shows up in the log.
+   */
+  discard(caller: Caller, input: DiscardBillInput): Promise<{ billKey: string }> {
+    return inBusiness(this.database, caller, async (tx) => {
+      await recordEntry(tx, {
+        actorId: caller.userId,
+        action: 'bill.draft_discarded',
+        entityType: 'bill',
+        entityId: input.draft.billKey,
+        branchId: caller.branchId,
+        after: discardedEntry(input.draft, input.shownTotalPaise, null),
+      });
+      return { billKey: input.draft.billKey };
+    });
+  }
+
+  /**
+   * The owner's OK for discounts above a cashier's limit on one bill (design §6, question 5):
+   * the owner types their password at the counter. Kept for 30 minutes, used up by the save
+   * (P1.14), logged at once. The password is checked under its rate limit and never stored.
+   */
+  async approve(caller: Caller, input: ApprovalInput): Promise<ApprovalView> {
+    await this.sessions.requireOwnerPassword(caller, input.ownerPassword);
+    const now = this.clock.now();
+    const expiresAt = new Date(now.getTime() + APPROVAL_MINUTES * 60_000);
+    return inBusiness(this.database, caller, async (tx) => {
+      const [owner] = await tx.select({ id: users.id }).from(users).where(eq(users.role, 'owner'));
+      if (owner === undefined) throw new Error('Business has no owner');
+      const [row] = await tx
+        .insert(ownerApprovals)
+        .values({
+          branchId: caller.branchId,
+          billKey: input.billKey,
+          kind: input.kind,
+          lineBasisPoints: input.lineBasisPoints,
+          billBasisPoints: input.billBasisPoints,
+          requestedBy: caller.userId,
+          approvedBy: owner.id,
+          expiresAt,
+          createdAt: now,
+        })
+        .returning({ id: ownerApprovals.id });
+      if (row === undefined) throw new Error('No approval row returned');
+      const view = { approvalId: row.id, expiresAt: expiresAt.toISOString() };
+      await recordEntry(tx, {
+        actorId: caller.userId,
+        action: 'discount.approved',
+        entityType: 'owner_approval',
+        entityId: row.id,
+        branchId: caller.branchId,
+        after: {
+          billKey: input.billKey,
+          kind: input.kind,
+          lineBasisPoints: input.lineBasisPoints,
+          billBasisPoints: input.billBasisPoints,
+          approvedBy: owner.id,
+          expiresAt: view.expiresAt,
+        },
+      });
+      return view;
     });
   }
 

@@ -225,5 +225,66 @@ out=$(cat "$work/sent.json")
 expect_output "backup: --first-backup-release skips only a missing backup service" "skipped.*exit 0"
 expect 2 "backup: refuses an unknown option" backup before-deploy --yes
 
+# --- deploy/demo/mail-credentials.sh: the api's mail-only credentials (ADR 0040 note). -------
+# Linux only (CI and the server): Git Bash can't set file modes or groups in its temp folder.
+if [[ $(uname -s) != Linux ]]; then
+  echo "skipped: mail-credentials.sh tests need Linux (CI runs them)"
+else
+# A fake AWS CLI of its own: $MAIL_ROLE is what SSM holds ("" = nothing), $MAIL_ASSUME is ok
+# or fail. The real CLI shapes the JSON with --query; the fake prints that shape and records
+# the call, so the test can check what was asked for.
+mailbin=$work/mailbin
+mkdir -p "$mailbin"
+cat >"$mailbin/aws" <<'FAKE'
+#!/usr/bin/env bash
+args=" $* "
+case $args in
+  *" ssm get-parameter "*"/business-software/demo/mail/role-arn "*)
+    [[ -n $MAIL_ROLE ]] || { echo "An error occurred (ParameterNotFound)" >&2; exit 254; }
+    echo "$MAIL_ROLE"
+    ;;
+  *" sts assume-role "*)
+    echo "$*" >"$MAIL_CALLS"
+    [[ $MAIL_ASSUME == ok ]] || { echo "An error occurred (AccessDenied)" >&2; exit 254; }
+    printf '{"Version": 1, "AccessKeyId": "ASIAFAKE", "SecretAccessKey": "s3cr3t-fake", "SessionToken": "tok", "Expiration": "2030-01-01T00:00:00+00:00"}\n'
+    ;;
+  *) echo "fake aws: unexpected call: $*" >&2; exit 99 ;;
+esac
+FAKE
+chmod +x "$mailbin/aws"
+maildir=$work/mail
+mail_credentials() {
+  MAIL_AWS=$mailbin/aws MAIL_DIR=$maildir MAIL_GROUP=$(id -g) MAIL_CALLS=$work/mail-calls \
+    MAIL_ROLE=$1 MAIL_ASSUME=$2 "$here/../../deploy/demo/mail-credentials.sh"
+}
+role=arn:aws:iam::123456789012:role/business-software-demo-mail
+
+expect 0 "mail: writes the credentials" mail_credentials "$role" ok
+if grep -q '"SecretAccessKey"' <<<"$out"; then
+  not_ok "mail: never prints the credentials" "$out"
+else
+  ok "mail: never prints the credentials"
+fi
+out=$(cat "$maildir/credentials.json")
+expect_output "mail: credential_process shape, Version the number 1" '"Version": 1,.*"AccessKeyId": "ASIAFAKE"'
+out=$(cat "$work/mail-calls")
+expect_output "mail: assumes the role from SSM for 1 hour" "--role-arn $role .*--duration-seconds 3600"
+out=$(cat "$maildir/config")
+expect_output "mail: the config points the SDK at the file" '^credential_process = cat /aws/credentials.json$'
+if [[ $(uname -s) == Linux ]]; then
+  expect_equal "mail: only root and the api's group can read the credentials" \
+    "$(stat -c %a "$maildir/credentials.json") $(stat -c %a "$maildir")" "640 750"
+fi
+expect 254 "mail: a failed assume-role fails with the CLI's code" mail_credentials "$role" fail
+expect_output "mail: reports AWS's error" "AccessDenied"
+out=$(cat "$maildir/credentials.json")
+expect_output "mail: a failed refresh leaves the last good credentials" "ASIAFAKE"
+expect_equal "mail: a failed refresh leaves no temporary file" \
+  "$(find "$maildir" -name '.credentials.*' | wc -l | tr -d ' ')" 0
+expect 254 "mail: no role in SSM fails" mail_credentials "" ok
+expect 1 "mail: refuses a value that isn't a role ARN" mail_credentials None ok
+expect_output "mail: says what's missing" "no mail role in SSM"
+fi
+
 echo "$passed passed, $failed failed"
 ((failed == 0))

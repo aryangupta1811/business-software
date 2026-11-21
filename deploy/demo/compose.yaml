@@ -33,10 +33,22 @@ services:
 
   api:
     <<: *app
-    env_file: /run/business-software/runtime.env
+    env_file:
+      - /run/business-software/runtime.env
+      # MAIL_TRANSPORT, MAIL_FROM, APP_URL, EMAIL_LIMITED, written by start.sh (ADR 0040).
+      - /run/business-software/mail.env
     environment:
       # Every interface inside the container; nothing publishes port 3000 on the server.
       HOST: 0.0.0.0
+      # SES credentials: the mail-only role's, from the host (mail-credentials.sh), never the
+      # server's own role, which containers can't reach (metadata hop limit 1).
+      AWS_REGION: ap-south-1
+      AWS_CONFIG_FILE: /aws/config
+      AWS_EC2_METADATA_DISABLED: 'true'
+    volumes:
+      # Repeated from x-app: a service's own volumes replace the anchor's, they don't add to it.
+      - /opt/business-software/certs/rds-ca.pem:/certs/rds-ca.pem:ro
+      - /run/business-software-mail:/aws:ro
     healthcheck:
       test:
         - CMD

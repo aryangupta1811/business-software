@@ -89,6 +89,23 @@ variable "github_repository" {
   default     = "aryangupta1811/business-software"
 }
 
+variable "mail_from" {
+  description = "Sender address of the demo's email, verified in SES (mail.tf). Personal: only in the git-ignored terraform.tfvars."
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.mail_from))
+    error_message = "mail_from must be one email address."
+  }
+}
+
+variable "mail_recipients" {
+  description = "Extra addresses that may receive demo email while SES is in its sandbox (each gets a verification link). Not the sender's own."
+  type        = list(string)
+  default     = []
+}
+
 variable "backup_retention_days" {
   description = "Days a nightly database backup is kept in S3 before it expires (ADR 0037); 30 more as an older version."
   type        = number

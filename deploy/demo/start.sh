@@ -4,7 +4,8 @@
 #   1. Points business-software.duckdns.org at this server's new public IP.
 #   2. Writes the two connection strings from SSM into files in memory (/run), root only.
 #      (Docker also copies them into each container's config on the root-only disk.)
-#   3. Starts the containers and waits for them.
+#   3. Chooses how the api sends email: SES with mail-only credentials, or not at all.
+#   4. Starts the containers and waits for them.
 # Never prints a secret: values go from `aws ssm` straight into files or curl's stdin.
 set -euo pipefail
 
@@ -56,7 +57,23 @@ printf 'DATABASE_URL=postgresql://app_runtime:%s@%s:5432/business_software?%s\n'
   "$runtime_password" "$host" "$tls" >"$secrets/runtime.env"
 unset owner_password runtime_password
 
-# 3. Start. Pulls images it doesn't have yet; --wait returns once migrate has finished and
+# 3. Email (ADR 0040 and its 2026-11-20 note). SES when the mail role exists and its first
+# credentials are written (mail-credentials.sh); otherwise no email, and a log line. Mail never
+# stops the app from starting: the recovery key resets a password without it.
+mail_settings='MAIL_TRANSPORT=none'
+if mail_from=$(param mail/from 2>/dev/null) && "$dir/mail-credentials.sh"; then
+  mail_settings="MAIL_TRANSPORT=ses
+MAIL_FROM=$mail_from"
+  echo "mail: SES"
+else
+  echo "mail: off (MAIL_TRANSPORT=none): no mail settings in SSM, or the mail role can't be assumed" >&2
+fi
+# The api's read-only mount needs the folder even when mail is off.
+install -d -m 750 -g 1000 /run/business-software-mail
+printf '%s\nAPP_URL=https://%s.duckdns.org\nEMAIL_LIMITED=true\n' \
+  "$mail_settings" "$subdomain" >"$secrets/mail.env"
+
+# 4. Start. Pulls images it doesn't have yet; --wait returns once migrate has finished and
 # the api is healthy, and fails (so systemd retries) if RDS isn't up yet.
 docker compose -f "$dir/compose.yaml" --env-file "$dir/release.env" \
   up -d --wait --wait-timeout 300 --quiet-pull --remove-orphans

@@ -84,6 +84,15 @@ describe('nightly backup and restore drill', () => {
         insertTestBusiness(tx, businessId, name),
       );
     }
+    // The queue's scratch tables (ADR 0022) that app_backup can't read, in a schema whose owner
+    // a restored server doesn't have: the dump must leave all of it out, not fail on it.
+    const queue = new Pool({ connectionString: server.queueUrl });
+    try {
+      await queue.query('create table pgboss.job (id int primary key)');
+      await queue.query('insert into pgboss.job values (1)');
+    } finally {
+      await queue.end();
+    }
     await server.container.copyFilesToContainer([
       { source: deployFile('dump.sh'), target: '/backup/dump.sh' },
     ]);
@@ -127,6 +136,8 @@ describe('nightly backup and restore drill', () => {
     expect(counts.output).toContain('businesses\t2\n');
     expect(counts.output).toContain('branches\t2\n');
     expect(counts.output).toContain('users\t2\n');
+    // Queue rows are scratch (ADR 0022); the outbox in public keeps the permanent record.
+    expect(counts.output).not.toContain('pgboss');
     // Login by email needs these (ADR 0039): without them a restored shop's owners can't log in.
     expect(counts.output).toContain('auth.owner_logins\t2\n');
     expect(counts.output).toMatch(/^drizzle\.__drizzle_migrations\t[1-9]\d*$/m);

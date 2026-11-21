@@ -72,6 +72,7 @@ Update this as the project grows.
 | Database timeouts | lock 3 s, statement 10 s, idle in transaction 15 s; a lock timeout answers `503` with `Retry-After: 1` | ADR 0041 |
 | Email cost | Amazon SES, Mumbai: $0.10 per 1,000 emails, nothing while idle; sandbox = verified addresses only | ADR 0040 |
 | Deploy role | 3 IAM resources (OIDC provider, role, policy), $0; one GitHub environment with a required reviewer and `main` only | Stage 6, ADR 0012 note |
+| First deploy and restore drill | 2026-11-21: release `794fd1f` live after the zone move and the OIDC fix; first backup 87 KB, drill OK on 18 tables (every row count matches); the first normal deploy (backup, deploy, live check) green the same hour | ADRs 0012, 0037, 0042 |
 
 ---
 
@@ -220,6 +221,10 @@ Short answers; the Log entry has the full story.
   A: Stopping a server gives its hardware back, and `t4g.small` in my zone wasn't there for two days. The server keeps no state, so I kept the type and moved it to the zone the database is in, a one-line Terraform change; a capacity reservation would have billed while idle. → ADR 0042
 - **Q: Why did a pull request show no CI checks at all?**
   A: It had a merge conflict with `main`. GitHub runs pull-request checks on a test merge with `main`, and with a conflict there is no merge to test. Merging `main` into the branch and pushing started them.
+- **Q: Your deploy job got `Not authorized to perform sts:AssumeRoleWithWebIdentity`. How did you debug it?**
+  A: Compared the claim AWS checks with what GitHub sends. The live trust policy wanted `sub = repo:owner/name:environment:demo`; GitHub's subject setting showed the repo uses the immutable form with owner and repository IDs. One Terraform variable, one IAM update, still an exact match. → ADR 0012 note (2026-11-21)
+- **Q: How do you know your backups work?**
+  A: A drill restores the newest dump into a throwaway PostgreSQL on the server, as an admin with only the RDS master's rights, and compares every table's row count with the counts saved at backup time. First run 2026-11-21: 18 tables, all matching. → `docs/devops/backup-restore.md`
 
 ---
 
@@ -349,6 +354,8 @@ Terms I learned on this project, in one line each.
 | Optimistic locking | Each row carries a version; a save sends the version it read and is refused (`409`) if someone saved in between |
 | Git worktree | A second checkout of the same repository in another folder, on its own branch, sharing one `.git` |
 | InsufficientInstanceCapacity | AWS has no spare servers of that type in that zone right now; a stopped instance doesn't reserve its capacity |
+| Immutable OIDC subject | GitHub's token subject with numeric IDs next to the names (`repo:owner@id/name@id:…`), so a re-created repository of the same name can't match a trust policy |
+| GitHub environment variable | A variable set on one environment (`gh variable set --env demo`); it overrides a repository variable of the same name for jobs in that environment |
 | GitHub environment | A named deploy target in a repository with its own secrets, variables and protection rules (required reviewers, allowed branches); a job that names it waits for those rules |
 | Saved Terraform plan | `terraform plan -out=file`, then `terraform apply file`: applies exactly what was reviewed, and refuses if the state changed since |
 | `lock_timeout` | A PostgreSQL setting: how long a statement waits for a row or table lock before giving up with an error |

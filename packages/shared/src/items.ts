@@ -22,9 +22,9 @@ export const ITEM_KINDS = ['goods', 'service'] as const;
 export type ItemKind = (typeof ITEM_KINDS)[number];
 
 /** ₹10 crore: far above any one item's price, far below 2^53. */
-const MAX_PAISE = 10_000_000_000;
+export const MAX_PAISE = 10_000_000_000;
 /** A billion units: far above any stock, far below 2^53. */
-const MAX_THOUSANDTHS = 1_000_000_000_000;
+export const MAX_THOUSANDTHS = 1_000_000_000_000;
 
 const paise = () =>
   z.int({ error: 'invalid' }).min(0, { error: 'too_small' }).max(MAX_PAISE, { error: 'too_big' });

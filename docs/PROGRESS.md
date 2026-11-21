@@ -80,15 +80,25 @@
   - `F10` payment panel: split cash/UPI/card/cheque, change for cash, cheque reference. Shared `paymentIssues` is now the single copy of the payment rules (`billDraftSchema` uses it). A paid bill shows "Ready to save".
   - For P1.14: the save sends `bill` (with `customerId`, `placeOfSupplyStateCode`), the panel's payments, and the approval's id if any (`loadApproval(billKey)`).
 
-- **P2.7 part 1, the job queue** (a Sonnet agent): role `app_queue` owning schema `pgboss` (`packages/db/bootstrap/create-queue-role.sql`, re-runnable, like the backup role's), with boundary tests both ways; pg-boss in the worker with `createSchema: false` (ADR 0022's note), its own pool from `QUEUE_DATABASE_URL` (the api never gets it, ADR 0021), a `system.ping` queue proven end to end; the nightly dump leaves `pgboss` out (`--exclude-schema`, owner's OK 2026-11-21). **Before the next real deploy:** SSM `/business-software/demo/db/app-queue-password`, run `create-queue-role.sql` on RDS (or from `bootstrap-db.sh`/`install.sh`), `start.sh` writes `QUEUE_DATABASE_URL` into an env file only the worker reads, and `deploy/demo/compose.yaml` gives it to the worker. Without them the worker stops at start (a worker with no queue does nothing). Outbox and the worker's cross-business read still need a design (part 2).
+- **P2.7 part 1, the job queue** (a Sonnet agent): role `app_queue` owning schema `pgboss` (`packages/db/bootstrap/create-queue-role.sql`, re-runnable, like the backup role's), with boundary tests both ways; pg-boss in the worker with `createSchema: false` (ADR 0022's note), its own pool from `QUEUE_DATABASE_URL` (the api never gets it, ADR 0021), a `system.ping` queue proven end to end; the nightly dump leaves `pgboss` out (`--exclude-schema`, owner's OK 2026-11-21). **Done in #62 (2026-11-22):** SSM `/business-software/demo/db/app-queue-password`, run `create-queue-role.sql` on RDS (or from `bootstrap-db.sh`/`install.sh`), `start.sh` writes `QUEUE_DATABASE_URL` into an env file only the worker reads, and `deploy/demo/compose.yaml` gives it to the worker. Without them the worker stops at start (a worker with no queue does nothing). Outbox and the worker's cross-business read still need a design (part 2).
 
-**Half-done:** P1.13's real-app check in Chrome (three languages, light and dark, 1024 px, two counters holding and resuming, the 200 ms scan measurement with 5,000 items).
+- **Session 29, Days 5 and 6 (2026-11-22):**
+  - #60 merged (queue). #61 merged (P1.5 API, ADR 0044).
+  - #62 merged and **deployed**: the queue password in SSM by Terraform, `app_queue` created on RDS by `bootstrap-db.sh`, and `queue.env` for the worker only. The worker runs its queue on the live server.
+  - #63 merged (P1.5 screens). #64 merged (P1.6 API, ADR 0045). #65 merged (P2.7 part 2 alerts API, ADR 0046).
+  - Designs, with every recommendation taken: P1.5 (`00` #47–#53), P1.6 (`00` #54–#60), P2.7 part 2 (`07` #14–#18).
 
-EC2 and RDS stopped at the end of session 28 (2026-11-21). No deploy run is waiting.
+**Half-done:**
+- P1.6 PR 2 (branch screens) and P2.7 part 2 PR 2 (the bell).
+- The real-app check in Chrome for P1.13, P1.5 and P1.6: three languages, light and dark, 1024 px, two counters, the 200 ms scan with 5,000 items, and a live permission change.
 
-**Next step:** Day 5. P1.13 Billing code once the owner answers #40's 12 questions (`docs/plans/2026-11-20-p1.13-billing-design.md`); P1.5 Staff → P1.6 Branches; P2.7 (queue, then alerts). Every merge now really deploys after the owner's approval. The schedule has slipped by about a day.
+EC2 and RDS stopped at the end of session 29 (2026-11-22). No deploy run is waiting. The live server runs `c099acd` (#62).
 
-**Last updated:** 2026-11-21 (session 29)
+The next real deploy runs migrations 0013–0015 on RDS for the first time.
+
+**Next step:** Day 7. P1.6 PR 2 and P2.7 part 2 PR 2 (the screens), then the Chrome check, then P1.14 (saving bills). The owner has one open alerts question in `HANDOFF.md`.
+
+**Last updated:** 2026-11-22 (session 29)
 
 Each task below is sized for **one session** when worked alone. DevOps stages (from `docs/devops/DEVOPS_PLAN.md`) are woven in where they're first needed. Tasks for DRAFT modules are provisional: re-cut them after `/finalize-module NN`.
 

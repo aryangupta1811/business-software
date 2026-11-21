@@ -22,7 +22,7 @@ const headerSessions: SessionResolver = {
 
 type Body = Record<string, unknown>;
 
-const GSTIN = '27AAPFU0939F1ZV';
+const GSTIN = '27ABCDE1234F1Z0';
 const walkIn = {
   name: 'Sunita',
   phone: null,
@@ -186,7 +186,7 @@ describe('customers', () => {
       status: 409,
       body: { code: 'phone_taken' },
     });
-    const b2b = { legalName: 'X Traders', address: 'Pune', gstin: '29AAPFU0939F1ZR' };
+    const b2b = { legalName: 'X Traders', address: 'Pune', gstin: '29ABCDE1234F1ZW' };
     expect((await add(a, { name: 'X', ...b2b })).status).toBe(201);
     expect(await add(a, { name: 'Y', ...b2b })).toEqual({
       status: 409,

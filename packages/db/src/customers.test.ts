@@ -12,7 +12,7 @@ function failsWith(code: string, constraint: string) {
   return { cause: expect.objectContaining({ code, constraint }) as unknown };
 }
 
-const GSTIN = '27AAPFU0939F1ZV';
+const GSTIN = '27ABCDE1234F1Z0';
 const b2b = {
   name: 'Ravi',
   gstin: GSTIN,
@@ -76,14 +76,14 @@ describe('customers table', () => {
     const first = await add(a, {
       ...b2b,
       phone: '9820011111',
-      gstin: '29AAPFU0939F1ZR',
+      gstin: '29ABCDE1234F1ZW',
       stateCode: '29',
     });
     await expect(add(a, { phone: '9820011111' })).rejects.toMatchObject(
       failsWith('23505', 'customers_live_phone_unique'),
     );
     await expect(
-      add(a, { ...b2b, gstin: '29AAPFU0939F1ZR', stateCode: '29' }),
+      add(a, { ...b2b, gstin: '29ABCDE1234F1ZW', stateCode: '29' }),
     ).rejects.toMatchObject(failsWith('23505', 'customers_live_gstin_unique'));
     // Another business may have the same customer.
     await expect(add(b, { phone: '9820011111' })).resolves.toBeDefined();

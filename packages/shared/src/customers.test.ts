@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { customerQuerySchema, customerSchema, customerUpdateSchema } from './customers.js';
 import { fieldErrors } from './fields.js';
 
-// A valid GSTIN from Maharashtra (27), check digit included.
-const GSTIN = '27AAPFU0939F1ZV';
+// A made-up GSTIN from Maharashtra (27) with a valid check digit.
+const GSTIN = '27ABCDE1234F1Z0';
 
 const walkIn = {
   name: 'Sunita',
@@ -52,7 +52,7 @@ describe('customerSchema (02 #2, #7; design §7)', () => {
     ['a bad phone', { ...walkIn, phone: '12345' }, { phone: 'invalid' }],
     [
       'a GSTIN with a wrong check digit',
-      { ...business, gstin: '27AAPFU0939F1ZA' },
+      { ...business, gstin: '27ABCDE1234F1ZA' },
       { gstin: 'invalid' },
     ],
     ['a GSTIN with no legal name', { ...business, legalName: null }, { legalName: 'required' }],

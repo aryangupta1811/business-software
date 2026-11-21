@@ -7,6 +7,7 @@ import {
   ADJUSTMENT_REASONS,
   GST_RATES,
   GST_STATUSES,
+  INDIAN_STATES,
   ITEM_KINDS,
   NEGATIVE_STOCK_SETTINGS,
   STOCK_MOVEMENT_KINDS,
@@ -642,6 +643,55 @@ export const itemBranchLevels = pgTable(
     }),
     unique('item_branch_levels_item_branch_unique').on(t.businessId, t.itemId, t.branchId),
     check('item_branch_levels_level_check', sql`${t.lowStockLevel} >= 0`),
+  ],
+);
+
+// ---- Customers (P1.13 design §7; `02` #2, #7). P1.18 adds credit limit, due days, the ledger ----
+// Archived, never deleted. A live phone or GSTIN belongs to one customer per business.
+export const customers = pgTable(
+  'customers',
+  {
+    id: id(),
+    businessId: ownBusinessId(),
+    name: text('name').notNull(),
+    /** 10 digits (normalizePhone). */
+    phone: text('phone'),
+    gstin: text('gstin'),
+    legalName: text('legal_name'),
+    address: text('address'),
+    pinCode: text('pin_code'),
+    /** From the GSTIN's first two digits when there is one. */
+    stateCode: text('state_code'),
+    archivedAt: archivedAt(),
+    /** +1 on every save: a save made from an older copy answers 409 stale. */
+    version: integer('version').notNull().default(1),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    unique('customers_business_id_id_unique').on(t.businessId, t.id),
+    uniqueIndex('customers_live_phone_unique')
+      .on(t.businessId, t.phone)
+      .where(sql`${t.phone} is not null and ${t.archivedAt} is null`),
+    uniqueIndex('customers_live_gstin_unique')
+      .on(t.businessId, t.gstin)
+      .where(sql`${t.gstin} is not null and ${t.archivedAt} is null`),
+    check('customers_name_check', sql`char_length(${t.name}) between 1 and 100`),
+    check('customers_phone_check', sql`${t.phone} ~ '^[1-9][0-9]{9}$'`),
+    // A GSTIN brings its state, legal name and address (design §7).
+    check(
+      'customers_gstin_check',
+      sql`${t.gstin} is null or (${t.gstin} ~ '^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$' and ${t.stateCode} is not distinct from left(${t.gstin}, 2) and ${t.legalName} is not null and ${t.address} is not null)`,
+    ),
+    check('customers_legal_name_check', sql`char_length(${t.legalName}) between 1 and 100`),
+    check('customers_address_check', sql`char_length(${t.address}) between 1 and 200`),
+    check('customers_pin_code_check', sql`${t.pinCode} ~ '^[1-9][0-9]{5}$'`),
+    check(
+      'customers_state_code_check',
+      sql`${t.stateCode} in (${literals(INDIAN_STATES.map((s) => s.code))})`,
+    ),
+    check('customers_version_check', sql`${t.version} >= 1`),
   ],
 );
 

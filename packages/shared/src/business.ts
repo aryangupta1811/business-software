@@ -58,5 +58,8 @@ export const PERMISSIONS = [
   'stock.adjust',
   // P1.13: the billing page, its catalogue copy and held bills (`02`).
   'billing.sell',
+  // P1.13: find customers at the counter; add and edit them (`02` #2, #7).
+  'customers.view',
+  'customers.manage',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];

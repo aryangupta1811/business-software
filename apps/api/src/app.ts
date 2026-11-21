@@ -22,6 +22,8 @@ import { HASH_GATE, HashGate } from './auth/hash-gate.js';
 import { CookieSessionResolver, SessionController } from './auth/session.controller.js';
 import { LoginLimits, SESSION_SERVICE, SessionService } from './auth/session.service.js';
 import { DEFAULT_APP_URL, type ApiConfig } from './config.js';
+import { CustomersController } from './customers/customers.controller.js';
+import { CustomersService } from './customers/customers.service.js';
 import { DATABASE, DatabaseModule } from './database.module.js';
 import { UnhandledErrorFilter } from './error-filter.js';
 import { HealthController } from './health.controller.js';
@@ -55,6 +57,7 @@ export const API_CONTROLLERS = [
   UnitsController,
   StockController,
   BillingController,
+  CustomersController,
 ];
 
 export interface AppOptions {
@@ -100,6 +103,7 @@ class ApiModule {
         CatalogueService,
         StockService,
         BillingService,
+        CustomersService,
         // One Argon2 queue for signup and logins (ADR 0038).
         { provide: HASH_GATE, useValue: options.hashGate ?? new HashGate() },
         {

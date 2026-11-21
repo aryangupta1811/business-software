@@ -37,6 +37,9 @@ export const ENTRY_ACTIONS = {
   'unit.updated': { reasonRequired: false },
   'unit.archived': { reasonRequired: false },
   'unit.restored': { reasonRequired: false },
+  // P1.13 (`02` #2, #7): customers at the billing counter.
+  'customer.created': { reasonRequired: false },
+  'customer.updated': { reasonRequired: false },
 } as const satisfies Record<string, { reasonRequired: boolean }>;
 
 export type EntryAction = keyof typeof ENTRY_ACTIONS;

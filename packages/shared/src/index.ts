@@ -98,6 +98,15 @@ export {
   type Searchable,
 } from './billing.js';
 export {
+  customerQuerySchema,
+  customerSchema,
+  customerUpdateSchema,
+  type CustomerInput,
+  type CustomerQuery,
+  type CustomerUpdateInput,
+  type CustomerView,
+} from './customers.js';
+export {
   calculateBill,
   type Bill,
   type BillInput,

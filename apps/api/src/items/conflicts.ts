@@ -10,6 +10,8 @@ const CONFLICTS: Record<string, string> = {
   item_units_live_unit_unique: 'duplicate_pack',
   categories_live_name_unique: 'name_taken',
   units_live_name_unique: 'name_taken',
+  customers_live_phone_unique: 'phone_taken',
+  customers_live_gstin_unique: 'gstin_taken',
 };
 
 /**

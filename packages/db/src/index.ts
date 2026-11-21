@@ -15,6 +15,7 @@ export {
   branches,
   businesses,
   categories,
+  customers,
   devices,
   entryLog,
   itemBarcodes,

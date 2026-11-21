@@ -17,6 +17,11 @@ test('a letter alone is refused: it would fire while typing', () => {
   expect(() => parseKeys('H')).toThrow(/needs Ctrl or Alt/);
 });
 
+test('Delete is a command only with Ctrl or Alt: alone it deletes text in a field', () => {
+  expect(parseKeys('Ctrl+Delete')).toEqual({ ctrl: true, alt: false, shift: false, key: 'Delete' });
+  expect(() => parseKeys('Delete')).toThrow(/needs Ctrl or Alt/);
+});
+
 test("the browser's own keys are refused", () => {
   for (const keys of ['F5', 'F11', 'F12', 'Ctrl+T', 'Ctrl+W', 'Ctrl+N', 'Ctrl+R', 'Ctrl+L']) {
     expect(() => parseKeys(keys), keys).toThrow(/browser/);

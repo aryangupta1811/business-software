@@ -42,6 +42,8 @@ Modals use the native `<dialog>`.
 - Hooks live in their own files (`use-shortcut.ts`, `context.ts`) because React's fast-refresh lint rule forbids hooks and components in one file.
 - Later modals (P1.x) follow the same `<dialog>` pattern rather than Radix Dialog.
 
+**Dated note, 2026-11-21 (P1.13, PR #57 and the billing page):** rules 3–5 changed with the P0.7 review fixes (P1.13 design §12). Rule 3: `F5`, `F11` and `F12` are refused with any modifier, and `Ctrl+Shift+T/W/N/R`, `Ctrl+F4` and `Alt+F4` too. Rule 4: a clash throws only in development and tests; in production it warns and keeps the first, so a mistake never takes a counter down. Rule 5: nothing on the page fires while any modal `<dialog>` is open (not only the help panel); a dialog registers its own keys with `inDialog: true`. A key the registry owns is cancelled even when it doesn't run (held down, or a dialog is open), so Chrome never gets a held `F3` or `F10`; `Esc` is the exception, so it can close the dialog. A keydown a field already cancelled is ignored. `Delete` can be a shortcut, only with `Ctrl` or `Alt` (the billing page's `Ctrl+Delete`).
+
 ## Interview note
 
 The keyboard system is built for a barcode scanner: scanners type into the focused field, so letter shortcuts are off inside inputs but F-keys still work, and letters match the physical key so a Hindi layout doesn't break them. I wrote a small registry instead of a library because no library gave me those rules plus a live list for the help panel. For the help panel I used the native `<dialog>`, because Radix's dialog injects a style tag that my CSP blocks.

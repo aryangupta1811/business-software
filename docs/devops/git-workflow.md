@@ -9,7 +9,7 @@ One session = one task = one branch = one pull request. During the fast track (2
 ```bash
 git switch main && git pull           # start from the latest main
 git switch -c feat/p1.7-items         # one branch per task
-# ...work; commit after each working step...
+# ...work; commit at real checkpoints (a working, tested slice)...
 git push -u origin HEAD               # first push of the branch
 gh pr create --web                    # opens the PR form with the template loaded
 ```

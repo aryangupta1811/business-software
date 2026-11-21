@@ -9,7 +9,8 @@
     "label": "Mukhya",
     "home": "Home",
     "settings": "Settings",
-    "items": "Saamaan"
+    "items": "Saamaan",
+    "billing": "Billing"
   },
   "theme": {
     "toDark": "Dark mode chalu karein",
@@ -26,7 +27,13 @@
     "goHome": "Home par jaayein",
     "goItems": "Saamaan par jaayein",
     "search": "Saamaan khojein",
-    "newItem": "Naya saamaan jodein"
+    "newItem": "Naya saamaan jodein",
+    "goBilling": "Billing par jaayein",
+    "billSearch": "Item khojein ya scan karein",
+    "billQuantity": "Chuni hui line ki quantity badlein",
+    "billPriceList": "Retail aur wholesale daam ke beech badlein",
+    "billRemoveLine": "Chuni hui line hatayein",
+    "billNew": "Naya bill shuru karein"
   },
   "connection": {
     "checking": "Connection check ho raha hai…",
@@ -802,6 +809,61 @@
       "forgetOther": "Wahan jo bhi login hai, logout ho jaayega, aur jab tak aap us par phir login nahi karte, staff wahan login nahi kar sakega.",
       "confirmForget": "Computer bhool jaayein",
       "loadFailed": "Computers ki list nahi khul saki."
+    }
+  },
+  "billing": {
+    "search": "Khojein ya scan karein",
+    "searchHint": "Scan karein, ya naam ya code likhein. Aage 3* likhne par 3 bikenge.",
+    "results": "Milte-julte items",
+    "lines": "Bill",
+    "loading": "Catalogue load ho raha hai…",
+    "loadFailed": "Catalogue load nahin ho saka.",
+    "tryAgain": "Phir se koshish karein",
+    "empty": "Bill shuru karne ke liye item scan karein ya uska naam likhein.",
+    "priceLists": {
+      "retail": "Retail",
+      "wholesale": "Wholesale"
+    },
+    "columns": {
+      "item": "Item",
+      "quantity": "Quantity",
+      "price": "Daam",
+      "discount": "Chhoot",
+      "amount": "Rakam"
+    },
+    "quantityOf": "{{name}} ki quantity",
+    "onlyInStock": "Stock mein sirf {{quantity}}",
+    "priceChanged": "Daam badal gaya",
+    "problems": {
+      "gone": "Ab becha nahin ja sakta: yeh line hatayein",
+      "no_gst": "GST rate ya HSN nahin hai: yeh line hatayein"
+    },
+    "notices": {
+      "unknownCode": "Code {{code}} ka koi item nahin hai",
+      "archived": "{{name}} archive hai. Bechne ke liye Items page par use wapas laayein.",
+      "noGst": "Pehle {{name}} ka GST rate aur HSN bharein.",
+      "wholeUnits": "{{name}} sirf poori units mein bikta hai.",
+      "badQuantity": "Zero se zyada quantity likhein.",
+      "discardFailed": "Bill saaf nahin ho saka: connection nahin hai. Phir se koshish karein."
+    },
+    "totals": {
+      "label": "Kul",
+      "items": "Items",
+      "gross": "Kul rakam",
+      "discount": "Chhoot",
+      "taxable": "Taxable value",
+      "roundOff": "Round-off",
+      "total": "Kul"
+    },
+    "taxTypes": {
+      "cgst-sgst": "CGST + SGST: rajya ke andar bikri",
+      "igst": "IGST: doosre rajya mein bikri",
+      "none": "Koi GST nahin"
+    },
+    "newBill": {
+      "title": "Yeh bill saaf karein?",
+      "body": "Yeh bill save nahin hua hai. Saaf karne par iske items aur kul rakam entry log mein darj honge.",
+      "confirm": "Bill saaf karein"
     }
   }
 }

@@ -5,6 +5,7 @@ import {
   discardBillSchema,
   type ApprovalInput,
   type ApprovalView,
+  type BillingContext,
   type CatalogueQuery,
   type CatalogueView,
   type DiscardBillInput,
@@ -19,6 +20,13 @@ import { BillingService } from './billing.service.js';
 @Controller('billing')
 export class BillingController {
   constructor(@Inject(BillingService) private readonly billing: BillingService) {}
+
+  /** The tax scheme, the branch's state and what the caller may do at the counter. */
+  @Permission('billing.sell')
+  @Get('context')
+  context(@CurrentCaller() caller: Caller): Promise<BillingContext> {
+    return this.billing.context(caller);
+  }
 
   /** The counter's copy of the catalogue, whole or since a time (design §4, ADR 0043). */
   @Permission('billing.sell')

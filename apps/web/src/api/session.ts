@@ -3,12 +3,15 @@
 import type { ActiveSession, SessionView } from '@business-software/shared';
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
+import { clearOpenBills } from '../billing/open-bill';
 import { apiRequest, onAuthError, setCsrfToken } from './client';
 
 export const SESSION_KEY = ['session'];
 
 function remember(view: SessionView): SessionView {
   setCsrfToken(view.state === 'none' ? null : view.csrfToken);
+  // A session that ended (idle, logged out elsewhere) takes its unsaved bill with it.
+  if (view.state === 'none') clearOpenBills();
   return view;
 }
 
@@ -44,6 +47,8 @@ export function setSession(queryClient: QueryClient, view: SessionView): void {
 /** After a logout: forget the token and everything loaded, then read the session again. */
 export function forgetSession(queryClient: QueryClient): void {
   setCsrfToken(null);
+  // An unsaved bill never outlives the login on a shared counter (`00` #40).
+  clearOpenBills();
   queryClient.clear();
 }
 

@@ -67,7 +67,12 @@
 - **#54 merged** (PR 1c customers); its deploy run rejected.
 - **P1.13 PR 1d:** migration `0012` (`held_bills`: closed by resuming or discarding, never deleted, one open copy per bill key; `owner_approvals`: one bill, 30 minutes, `used_at` for P1.14); `GET/POST /api/held-bills`, `…/:id/resume`, `…/:id/discard`, `POST /api/billing/discard` (`Alt+N`), `POST /api/billing/approvals` (owner's password under its rate limit); `bill.draft_discarded` and `discount.approved` logged; permission `billing.discount`; the session view's `discountLimitBasisPoints` (owner null, staff 0 until P1.5). One change from the design: a held bill's list total is the total the screen showed (`shownTotalPaise`, display only), so holding never fails on pricing. **P1.13's API (PR 1) is complete.**
 
-**Half-done:** P1.13 PR 2 (the billing page).
+- **Session 29, lanes:** P2.7 part 1 (queue) and the P1.5 design ran as Sonnet agents in their own worktrees; PR 2 of P1.13 is split into 2a (shortcut fixes, an agent), 2b (the page, here) and 2c (discounts and approval, customer, payment, held bills).
+- **#56 merged:** the P1.5 staff design (`docs/plans/2026-11-21-p1.5-staff-design.md`) with 7 owner questions, each with a recommendation. P1.5 code waits for the answers.
+- **#57 merged:** the shortcut fixes (design §12); the dated note on ADR 0026 comes with PR 2b.
+- **P1.13 PR 2b, the billing page `/bill` (`Alt+B`):** `GET /api/billing/context` (scheme, branch state, features, what the caller may do); the catalogue copy in memory (`CatalogueCopy`: barcode and code lookup, search, stock) and its sync (`useCatalogue`: full, then `since` = last server time − 60 s every minute and when the tab comes back, a full reload every 30 minutes); the open bill (`open-bill.ts`: `3*` quantity prefix, whole units, stock shortfall, re-pricing after a sync or `F8`, kept in `sessionStorage` per user and cleared at logout or when the session ends); the page with `F2`, `F4`, `F8`, `Ctrl+Delete`, `Alt+N` (asks, logs the discard), ↑↓, loose items asking for their weight, and totals straight from `calculateBill`. Three languages.
+
+**Half-done:** P1.13 PR 2c (discounts with the approval dialog, the customer box, payment, held bills), then the Chrome check with the speed measurement.
 
 EC2 and RDS stopped at the end of session 28 (2026-11-21). No deploy run is waiting.
 

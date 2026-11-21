@@ -2,7 +2,7 @@
 # Starts the demo stack. Run as root by business-software.service at every boot and after
 # every deploy (install.sh restarts the service).
 #   1. Points business-software.duckdns.org at this server's new public IP.
-#   2. Writes the two connection strings from SSM into files in memory (/run), root only.
+#   2. Writes the three connection strings from SSM into files in memory (/run), root only.
 #      (Docker also copies them into each container's config on the root-only disk.)
 #   3. Chooses how the api sends email: SES with mail-only credentials, or not at all.
 #   4. Starts the containers and waits for them.
@@ -41,13 +41,14 @@ else
 fi
 
 # 2. Connection strings (ADR 0021): migrate gets only app_owner's, api and worker only
-# app_runtime's. verify-full: TLS, and the server's certificate must be RDS's own for this
+# app_runtime's, and the worker alone also app_queue's, for its job queue (ADR 0022). verify-full: TLS, and the server's certificate must be RDS's own for this
 # host name, checked against Amazon's certificate authority (sslrootcert).
 # Each value is read into a variable first: a failed read then stops the script (set -e),
 # where a $(…) inside printf's arguments would quietly write an empty password.
 host=$(param db/host)
 owner_password=$(param db/app-owner-password)
 runtime_password=$(param db/app-runtime-password)
+queue_password=$(param db/app-queue-password)
 install -d -m 700 "$secrets"
 umask 077
 readonly tls='sslmode=verify-full&sslrootcert=/certs/rds-ca.pem'
@@ -55,7 +56,9 @@ printf 'MIGRATION_DATABASE_URL=postgresql://app_owner:%s@%s:5432/business_softwa
   "$owner_password" "$host" "$tls" >"$secrets/migrate.env"
 printf 'DATABASE_URL=postgresql://app_runtime:%s@%s:5432/business_software?%s\n' \
   "$runtime_password" "$host" "$tls" >"$secrets/runtime.env"
-unset owner_password runtime_password
+printf 'QUEUE_DATABASE_URL=postgresql://app_queue:%s@%s:5432/business_software?%s
+'   "$queue_password" "$host" "$tls" >"$secrets/queue.env"
+unset owner_password runtime_password queue_password
 
 # 3. Email (ADR 0040 and its 2026-11-20 note). SES when the mail role exists and its first
 # credentials are written (mail-credentials.sh); otherwise no email, and a log line. Mail never

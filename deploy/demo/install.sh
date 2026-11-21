@@ -18,7 +18,7 @@ install -m 644 "$src/compose.yaml" "$dir/compose.yaml"
 install -m 755 "$src/start.sh" "$src/bootstrap-db.sh" "$src/backup.sh" "$src/dump.sh" \
   "$src/restore-drill.sh" "$src/restore-check.sh" "$src/mail-credentials.sh" "$dir/"
 install -m 644 "$src/../../packages/db/bootstrap/create-roles.sql" \
-  "$src/../../packages/db/bootstrap/create-backup-role.sql" "$dir/"
+  "$src/../../packages/db/bootstrap/create-backup-role.sql"   "$src/../../packages/db/bootstrap/create-queue-role.sql" "$dir/"
 install -m 644 "$src/business-software.service" "$src/business-software-backup.service" \
   "$src/business-software-backup.timer" "$src/business-software-mail-credentials.service" \
   "$src/business-software-mail-credentials.timer" /etc/systemd/system/

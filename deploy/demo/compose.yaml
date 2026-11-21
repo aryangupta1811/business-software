@@ -67,7 +67,8 @@ services:
   worker:
     <<: *app
     command: [node, dist/worker.js]
-    env_file: /run/business-software/runtime.env
+    # The queue's connection string is the worker's alone: the api never gets it (ADR 0022).
+    env_file: [/run/business-software/runtime.env, /run/business-software/queue.env]
     restart: unless-stopped
     depends_on:
       migrate:

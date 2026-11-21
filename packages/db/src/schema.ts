@@ -180,11 +180,33 @@ export const users = pgTable(
     passwordChangedAt: timestamp('password_changed_at', { withTimezone: true }),
     /** Module 00 #34: a login that left is never deleted; it can't log in and its sessions end. */
     deactivatedAt: timestamp('deactivated_at', { withTimezone: true }),
+    /** Module 00 #35: the branch a staff login belongs to; null for the owner. */
+    homeBranchId: uuid('home_branch_id'),
+    /**
+     * Staff switches the owner turned on / off from the defaults (P1.5, ADR 0044). Names aren't
+     * checked here: the list grows with every module, so the code reads them with
+     * `effectivePermissions`, which ignores any it doesn't know.
+     */
+    permissionsAdded: text('permissions_added')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    permissionsRemoved: text('permissions_removed')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    /** `02` #12: what this login may discount alone, in basis points; null: never set. */
+    discountLimitBasisPoints: integer('discount_limit_basis_points'),
     createdAt: createdAt(),
   },
   (t) => [
     ...tenantPolicies(t.businessId),
     unique('users_business_id_id_unique').on(t.businessId, t.id),
+    foreignKey({
+      name: 'users_home_branch_fk',
+      columns: [t.businessId, t.homeBranchId],
+      foreignColumns: [branches.businessId, branches.id],
+    }),
     // #27: one email, one owner account across the whole app. Unique indexes see every row,
     // whatever RLS hides, so a second signup fails here (23505) with no cross-business read.
     // The one unique key without business_id, on purpose (ADR 0027 note).
@@ -205,6 +227,25 @@ export const users = pgTable(
     unique('users_business_id_username_unique').on(t.businessId, t.username),
     check('users_username_check', sql`${t.username} ~ '^[a-z0-9._-]{3,32}$'`),
     check('users_owner_username_check', sql`${t.role} <> 'owner' or ${t.username} is null`),
+    // A login always has a username (P1.4 planned it); staff without a login come with P2.3.
+    check(
+      'users_staff_username_check',
+      sql`${t.role} <> 'staff' or ${t.passwordHash} is null or ${t.username} is not null`,
+    ),
+    check(
+      'users_staff_home_branch_check',
+      sql`${t.role} <> 'staff' or ${t.homeBranchId} is not null`,
+    ),
+    check(
+      'users_permissions_overlap_check',
+      sql`not (${t.permissionsAdded} && ${t.permissionsRemoved})`,
+    ),
+    check('users_discount_limit_check', sql`${t.discountLimitBasisPoints} between 0 and 10000`),
+    // The owner holds everything by role, so these stay empty.
+    check(
+      'users_owner_permissions_check',
+      sql`${t.role} <> 'owner' or (cardinality(${t.permissionsAdded}) = 0 and cardinality(${t.permissionsRemoved}) = 0 and ${t.discountLimitBasisPoints} is null)`,
+    ),
   ],
 );
 

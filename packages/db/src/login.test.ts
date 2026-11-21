@@ -143,7 +143,12 @@ describe('login database rules', () => {
   describe('users and sessions', () => {
     const addStaff = (shop: Shop, username: string) =>
       withBusiness(runtime.db, shop.businessId, (tx) =>
-        tx.insert(users).values({ businessId: shop.businessId, role: 'staff', username }),
+        tx.insert(users).values({
+          businessId: shop.businessId,
+          role: 'staff',
+          username,
+          homeBranchId: shop.branchId,
+        }),
       );
 
     it('keeps a username unique within its business only', async () => {
@@ -168,6 +173,98 @@ describe('login database rules', () => {
             .where(sql`${users.id} = ${a.ownerId}`),
         ),
       ).rejects.toMatchObject(failsWith('23514'));
+    });
+
+    // P1.5 (migration 0013): staff permissions and the home branch.
+    describe('staff permissions and home branch', () => {
+      const addLogin = (
+        shop: Shop,
+        username: string,
+        overrides: Partial<typeof users.$inferInsert>,
+      ) =>
+        withBusiness(runtime.db, shop.businessId, (tx) =>
+          tx.insert(users).values({
+            businessId: shop.businessId,
+            role: 'staff',
+            name: username,
+            username,
+            passwordHash: 'hash',
+            homeBranchId: shop.branchId,
+            ...overrides,
+          }),
+        );
+
+      it('gives a new staff row no changes from the defaults and no limit', async () => {
+        await addLogin(a, 'plain.staff', {});
+        const [row] = await withBusiness(runtime.db, a.businessId, (tx) =>
+          tx
+            .select()
+            .from(users)
+            .where(sql`${users.username} = 'plain.staff'`),
+        );
+        expect(row).toMatchObject({
+          permissionsAdded: [],
+          permissionsRemoved: [],
+          discountLimitBasisPoints: null,
+          homeBranchId: a.branchId,
+        });
+      });
+
+      it('refuses a name in both lists', async () => {
+        await expect(
+          addLogin(a, 'overlap', {
+            permissionsAdded: ['stock.adjust', 'items.manage'],
+            permissionsRemoved: ['items.manage'],
+          }),
+        ).rejects.toMatchObject(failsWith('23514'));
+      });
+
+      it.each([-1, 10_001])('refuses a discount limit of %j basis points', async (limit) => {
+        await expect(
+          addLogin(a, 'limit', { discountLimitBasisPoints: limit }),
+        ).rejects.toMatchObject(failsWith('23514'));
+      });
+
+      it.each([0, 10_000])('accepts a discount limit of %j basis points', async (limit) => {
+        await addLogin(a, `limit.${String(limit)}`, { discountLimitBasisPoints: limit });
+      });
+
+      it('refuses a staff row without a home branch', async () => {
+        await expect(addLogin(a, 'homeless', { homeBranchId: null })).rejects.toMatchObject(
+          failsWith('23514'),
+        );
+      });
+
+      it('refuses a staff login without a username', async () => {
+        await expect(addLogin(a, 'nameless', { username: null })).rejects.toMatchObject(
+          failsWith('23514'),
+        );
+      });
+
+      it('lets a staff row with no password and no username exist (P2.3)', async () => {
+        await addLogin(a, 'unused', { username: null, passwordHash: null });
+      });
+
+      it.each([
+        ['an added switch', { permissionsAdded: ['stock.adjust'] }],
+        ['a removed switch', { permissionsRemoved: ['items.view'] }],
+        ['a discount limit', { discountLimitBasisPoints: 500 }],
+      ])('refuses %s on the owner', async (_, change) => {
+        await expect(
+          withBusiness(runtime.db, a.businessId, (tx) =>
+            tx
+              .update(users)
+              .set(change)
+              .where(sql`${users.id} = ${a.ownerId}`),
+          ),
+        ).rejects.toMatchObject(failsWith('23514'));
+      });
+
+      it("refuses another business's branch as the home branch", async () => {
+        await expect(addLogin(a, 'elsewhere', { homeBranchId: b.branchId })).rejects.toMatchObject(
+          failsWith('23503'),
+        );
+      });
     });
 
     const openSession = (shop: Shop, overrides: Partial<typeof sessions.$inferInsert> = {}) =>

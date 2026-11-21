@@ -12,6 +12,8 @@ const CONFLICTS: Record<string, string> = {
   units_live_name_unique: 'name_taken',
   customers_live_phone_unique: 'phone_taken',
   customers_live_gstin_unique: 'gstin_taken',
+  // Staff usernames: stored lower case, deactivated logins keep theirs (Module 00 #34, #43).
+  users_business_id_username_unique: 'username_taken',
 };
 
 /**

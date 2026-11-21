@@ -21,9 +21,12 @@ import {
   type Transaction,
 } from '@business-software/db';
 import {
+  effectiveDiscountLimit,
+  effectivePermissions,
   IDLE_GRACE_MS,
   PERMISSIONS,
   type ActiveSession,
+  type PermissionDifference,
   type SessionView,
 } from '@business-software/shared';
 import type { IncomingMessage } from 'node:http';
@@ -617,15 +620,18 @@ export class SessionService {
       entityId: session.id,
       branchId: device.branchId,
     });
-    const caller = this.callerOf({
-      businessId,
-      userId,
-      sessionId: session.id,
-      branchId: device.branchId,
-      role: options.role,
-      locked: false,
-      csrfHash: hashToken(csrfToken),
-    });
+    const caller = this.callerOf(
+      {
+        businessId,
+        userId,
+        sessionId: session.id,
+        branchId: device.branchId,
+        role: options.role,
+        locked: false,
+        csrfHash: hashToken(csrfToken),
+      },
+      await this.storedPermissionsIn(tx, userId),
+    );
     const secure = this.settings.cookieSecure;
     const setCookies = [
       // No Max-Age: the session ends when Chrome closes (#40).
@@ -657,6 +663,10 @@ export class SessionService {
         endedAt: sessions.endedAt,
         role: users.role,
         deactivatedAt: users.deactivatedAt,
+        // Read on every request, so a change by the owner reaches a login that is already
+        // open with nothing to invalidate (P1.5 design, section 5; ADR 0044).
+        permissionsAdded: users.permissionsAdded,
+        permissionsRemoved: users.permissionsRemoved,
         ownerLockMinutes: businesses.ownerLockMinutes,
         staffIdleMinutes: businesses.staffIdleMinutes,
       })
@@ -680,15 +690,18 @@ export class SessionService {
       await this.end(tx, row.id, row.userId, row.branchId, 'idle');
       return 'ended';
     }
-    const caller = this.callerOf({
-      businessId: cookie.businessId,
-      userId: row.userId,
-      sessionId: row.id,
-      branchId: row.branchId,
-      role,
-      locked: row.lockedAt !== null,
-      csrfHash: row.csrfHash,
-    });
+    const caller = this.callerOf(
+      {
+        businessId: cookie.businessId,
+        userId: row.userId,
+        sessionId: row.id,
+        branchId: row.branchId,
+        role,
+        locked: row.lockedAt !== null,
+        csrfHash: row.csrfHash,
+      },
+      { added: row.permissionsAdded, removed: row.permissionsRemoved },
+    );
     if (role === 'owner' && !caller.locked && idleMs > row.ownerLockMinutes * MINUTE) {
       await this.lockIn(tx, caller, { idleSince: row.lastActiveAt.toISOString() });
       return { ...caller, locked: true };
@@ -696,9 +709,24 @@ export class SessionService {
     return caller;
   }
 
-  private callerOf(fields: Omit<Caller, 'permissions'>): Caller {
-    // The owner holds every permission; staff only their own session until P1.5.
-    return { ...fields, permissions: fields.role === 'owner' ? PERMISSIONS : ['session.own'] };
+  /** The owner holds every permission; staff what the owner switched on for them (P1.5). */
+  private callerOf(fields: Omit<Caller, 'permissions'>, stored: PermissionDifference): Caller {
+    return {
+      ...fields,
+      permissions: fields.role === 'owner' ? PERMISSIONS : effectivePermissions(stored),
+    };
+  }
+
+  private async storedPermissionsIn(
+    tx: Transaction,
+    userId: string,
+  ): Promise<PermissionDifference> {
+    const [row] = await tx
+      .select({ added: users.permissionsAdded, removed: users.permissionsRemoved })
+      .from(users)
+      .where(eq(users.id, userId));
+    if (row === undefined) throw new Error('Session user not found');
+    return row;
   }
 
   private async lockIn(tx: Transaction, caller: Caller, after: Record<string, unknown>) {
@@ -752,6 +780,7 @@ export class SessionService {
         ownerLockMinutes: businesses.ownerLockMinutes,
         staffIdleMinutes: businesses.staffIdleMinutes,
         emailConfirmedAt: users.emailConfirmedAt,
+        storedDiscountLimit: users.discountLimitBasisPoints,
       })
       .from(users)
       .innerJoin(businesses, eq(businesses.id, users.businessId))
@@ -771,7 +800,12 @@ export class SessionService {
       // Staff have no email: nothing for them to confirm (#32).
       emailConfirmed: caller.role === 'staff' || row.emailConfirmedAt !== null,
       emailLimited: this.settings.emailLimited,
-      discountLimitBasisPoints: caller.role === 'owner' ? null : 0,
+      discountLimitBasisPoints: effectiveDiscountLimit(
+        caller.role,
+        caller.permissions,
+        row.storedDiscountLimit,
+      ),
+      permissions: [...caller.permissions],
     };
   }
 }

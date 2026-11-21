@@ -1,6 +1,7 @@
 // Login, recovery and password request schemas and the session view (Module 00 #27-#33, #43,
 // #46; P1.4 design). Error messages are codes the web app translates (ADR 0036).
 import { z } from 'zod';
+import type { Permission } from './business.js';
 import { email, normalizePhone, text } from './fields.js';
 
 /** A password exactly as typed: never trimmed (ADR 0035). */
@@ -144,9 +145,12 @@ export interface ActiveSession {
   emailLimited: boolean;
   /**
    * `02` #12: the most this person may discount without the owner's OK, in basis points; null
-   * for the owner (no limit). Staff have 0 until P1.5 lets the owner set each login's limit.
+   * for the owner (no limit). For staff, the limit the owner set while the discount switch is
+   * on; otherwise 0.
    */
   discountLimitBasisPoints: number | null;
+  /** Everything this person holds right now, read on every request (P1.5, ADR 0044). */
+  permissions: Permission[];
 }
 
 /** What `GET /api/session` answers. */

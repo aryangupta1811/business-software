@@ -378,6 +378,48 @@ const paymentSchema = z.strictObject({
   reference: optionalText(40).optional(),
 });
 
+/** One payment as the rules read it: the draft's payment, or a row the payment panel builds. */
+export interface PaymentRule {
+  mode: PaymentMode;
+  amountPaise: number;
+  tenderedPaise?: number | undefined;
+  reference?: string | null | undefined;
+}
+
+export type PaymentIssue =
+  | {
+      /** The payment it's about. */
+      index: number;
+      field: 'tenderedPaise' | 'reference';
+      code: 'cash_only' | 'too_small' | 'required';
+    }
+  | { index: null; field: null; code: 'payments_mismatch' };
+
+/**
+ * The rules for the payments of a bill, in one place for the save request and the payment
+ * panel: only cash is handed over (and not less than its amount), a cheque needs its number,
+ * and the amounts add up to exactly the bill (`02` #11). Only cash can be handed over in
+ * excess, and that's `tenderedPaise`, not the amount.
+ */
+export function paymentIssues(payments: readonly PaymentRule[], totalPaise: Paise): PaymentIssue[] {
+  const issues: PaymentIssue[] = [];
+  payments.forEach((payment, index) => {
+    if (payment.tenderedPaise !== undefined) {
+      if (payment.mode !== 'cash') {
+        issues.push({ index, field: 'tenderedPaise', code: 'cash_only' });
+      } else if (payment.tenderedPaise < payment.amountPaise) {
+        issues.push({ index, field: 'tenderedPaise', code: 'too_small' });
+      }
+    }
+    if (payment.mode === 'cheque' && (payment.reference ?? null) === null) {
+      issues.push({ index, field: 'reference', code: 'required' });
+    }
+  });
+  const paid = payments.reduce((sum, payment) => sum + payment.amountPaise, 0);
+  if (paid !== totalPaise) issues.push({ index: null, field: null, code: 'payments_mismatch' });
+  return issues;
+}
+
 /** `POST /api/bills` (P1.14 implements it). The server re-prices and re-checks everything. */
 export const billDraftSchema = z
   .strictObject({
@@ -390,24 +432,12 @@ export const billDraftSchema = z
     shownGrandTotalPaise: amount(),
   })
   .superRefine((draft, context) => {
-    draft.payments.forEach((payment, index) => {
-      const at = (field: string) => ['payments', index, field];
-      if (payment.tenderedPaise !== undefined) {
-        if (payment.mode !== 'cash') {
-          context.addIssue({ code: 'custom', path: at('tenderedPaise'), message: 'cash_only' });
-        } else if (payment.tenderedPaise < payment.amountPaise) {
-          context.addIssue({ code: 'custom', path: at('tenderedPaise'), message: 'too_small' });
-        }
-      }
-      if (payment.mode === 'cheque' && (payment.reference ?? null) === null) {
-        context.addIssue({ code: 'custom', path: at('reference'), message: 'required' });
-      }
-    });
-    // `02` #11: split payments add up to exactly the bill. Only cash can be handed over in
-    // excess, and that's `tenderedPaise`, not the amount.
-    const paid = draft.payments.reduce((sum, payment) => sum + payment.amountPaise, 0);
-    if (paid !== draft.shownGrandTotalPaise) {
-      context.addIssue({ code: 'custom', path: ['payments'], message: 'payments_mismatch' });
+    for (const issue of paymentIssues(draft.payments, draft.shownGrandTotalPaise)) {
+      context.addIssue({
+        code: 'custom',
+        path: issue.index === null ? ['payments'] : ['payments', issue.index, issue.field],
+        message: issue.code,
+      });
     }
   });
 export type BillDraft = z.infer<typeof billDraftSchema>;

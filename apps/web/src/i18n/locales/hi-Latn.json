@@ -914,6 +914,40 @@
       "discard": "Phenkein",
       "confirmDiscard": "Haan, phenk dein",
       "close": "Band karein"
+    },
+    "payment": {
+      "title": "Bhugtaan",
+      "total": "Bill ka kul",
+      "paid": "Chukaya",
+      "left": "Baaki",
+      "over": "Zyada",
+      "changeToReturn": "Lautaane ki rakam",
+      "fullyPaid": "Poora bhugtaan ho gaya",
+      "rowTitle": "Bhugtaan {{n}}",
+      "payBy": "Bhugtaan ka tarika",
+      "modes": {
+        "cash": "Cash",
+        "upi": "UPI",
+        "card": "Card",
+        "cheque": "Cheque"
+      },
+      "amount": "Rakam",
+      "received": "Cash mila",
+      "change": "Lautaane ki rakam: {{amount}}",
+      "reference": "Reference (zaroori nahin)",
+      "chequeNumber": "Cheque number",
+      "referenceHint": "Aakhri ank ya UTR",
+      "add": "Bhugtaan jodein",
+      "remove": "Bhugtaan {{n}} hatayein",
+      "done": "Ho gaya",
+      "errors": {
+        "invalid": "141.50 jaisi rakam likhein",
+        "too_small": "Zero se zyada rakam likhein",
+        "too_big": "Sirf cash baaki rakam se zyada ho sakta hai",
+        "required": "Cheque number likhein",
+        "cash_only": "Sirf cash zyada diya ja sakta hai",
+        "payments_mismatch": "Bhugtaan ka jod bill ke kul ke barabar hona chahiye"
+      }
     }
   }
 }

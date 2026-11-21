@@ -11,6 +11,7 @@ import {
   discountWithinLimit,
   holdBillSchema,
   linePrice,
+  paymentIssues,
   type CartLine,
   type CatalogueItem,
 } from './billing.js';
@@ -488,6 +489,32 @@ describe('billDraftSchema (what P1.14 saves, design §10)', () => {
     ],
   ])('refuses %s', (_, change, field, code) => {
     expect(errorsOf(billDraftSchema, { ...paid, ...change })).toEqual({ [field]: code });
+  });
+});
+
+describe('paymentIssues (the payment panel and the save share them)', () => {
+  it('has nothing to say about payments that add up, with change handed over in cash', () => {
+    expect(
+      paymentIssues([{ mode: 'cash', amountPaise: 2_800, tenderedPaise: 5_000 }], 2_800),
+    ).toEqual([]);
+  });
+
+  it('lists each problem with the payment and field it belongs to', () => {
+    expect(
+      paymentIssues(
+        [
+          { mode: 'upi', amountPaise: 1_000, tenderedPaise: 1_000 },
+          { mode: 'cash', amountPaise: 1_000, tenderedPaise: 500 },
+          { mode: 'cheque', amountPaise: 500 },
+        ],
+        3_000,
+      ),
+    ).toEqual([
+      { index: 0, field: 'tenderedPaise', code: 'cash_only' },
+      { index: 1, field: 'tenderedPaise', code: 'too_small' },
+      { index: 2, field: 'reference', code: 'required' },
+      { index: null, field: null, code: 'payments_mismatch' },
+    ]);
   });
 });
 

@@ -914,6 +914,40 @@
       "discard": "Throw away",
       "confirmDiscard": "Throw it away",
       "close": "Close"
+    },
+    "payment": {
+      "title": "Payment",
+      "total": "Bill total",
+      "paid": "Paid",
+      "left": "Left to pay",
+      "over": "Over by",
+      "changeToReturn": "Change to return",
+      "fullyPaid": "Fully paid",
+      "rowTitle": "Payment {{n}}",
+      "payBy": "Pay by",
+      "modes": {
+        "cash": "Cash",
+        "upi": "UPI",
+        "card": "Card",
+        "cheque": "Cheque"
+      },
+      "amount": "Amount",
+      "received": "Cash received",
+      "change": "Change to return: {{amount}}",
+      "reference": "Reference (optional)",
+      "chequeNumber": "Cheque number",
+      "referenceHint": "Last digits or UTR",
+      "add": "Add payment",
+      "remove": "Remove payment {{n}}",
+      "done": "Done",
+      "errors": {
+        "invalid": "Enter an amount like 141.50",
+        "too_small": "Enter an amount above zero",
+        "too_big": "Only cash can be more than what’s left",
+        "required": "Enter the cheque number",
+        "cash_only": "Only cash can be handed over",
+        "payments_mismatch": "The payments must add up to the bill total"
+      }
     }
   }
 }

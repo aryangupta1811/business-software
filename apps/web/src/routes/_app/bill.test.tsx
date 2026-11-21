@@ -2,7 +2,9 @@ import {
   calculateBill,
   cartToBillInput,
   formatPaise,
+  type ActiveSession,
   type BillingContext,
+  type HeldBillView,
   type CatalogueView,
 } from '@business-software/shared';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -10,7 +12,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { CatalogueCopy } from '../../billing/catalogue-copy';
 import { catalogueItem } from '../../test/catalogue';
-import { fakeApi, OWNER_SESSION, renderAt } from '../../test/fake-api';
+import { fakeApi, OWNER_SESSION, renderAt, STAFF_SESSION } from '../../test/fake-api';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -65,13 +67,18 @@ const CATALOGUE: CatalogueView = {
   serverTime: '2026-11-21T10:00:00.000Z',
 };
 
-function counter() {
-  const api = fakeApi(OWNER_SESSION, {
+function counter(
+  session: ActiveSession = OWNER_SESSION,
+  routes: Parameters<typeof fakeApi>[1] = {},
+) {
+  const api = fakeApi(session, {
     'GET /api/billing/context': { body: CONTEXT },
     'GET /api/billing/catalogue': { body: CATALOGUE },
+    'GET /api/held-bills': { body: [] },
     'POST /api/billing/discard': (body) => ({
       body: { billKey: (body as { draft: { billKey: string } }).draft.billKey },
     }),
+    ...routes,
   });
   renderAt('/bill');
   return api;
@@ -132,7 +139,7 @@ describe('the billing counter', () => {
         { scheme: 'regular', supplierStateCode: '27', catalogue: copy.entries },
       ),
     );
-    expect(total()).toHaveTextContent(`₹${formatPaise(expected.grandTotalPaise)}`);
+    expect(total()).toHaveTextContent(formatPaise(expected.grandTotalPaise));
   });
 
   test('says why a code adds nothing', async () => {
@@ -188,5 +195,112 @@ describe('the billing counter', () => {
     counter();
     await screen.findByRole('table');
     expect(rows()[0]).toHaveTextContent('2 piece');
+  });
+
+  test("a cashier's discount above the limit asks the owner, and the OK clears it", async () => {
+    const user = userEvent.setup();
+    let attempts = 0;
+    const api = counter(
+      { ...STAFF_SESSION, discountLimitBasisPoints: 500 },
+      {
+        'POST /api/billing/approvals': () => {
+          attempts += 1;
+          return attempts === 1
+            ? { status: 401, body: { code: 'wrong_password' } }
+            : {
+                status: 201,
+                body: {
+                  approvalId: '00000000-0000-4000-8000-0000000000c1',
+                  expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
+                },
+              };
+        },
+      },
+    );
+    await user.type(await search(), '8901234567890{Enter}');
+    await user.keyboard('{F6}');
+    await user.type(await screen.findByRole('textbox', { name: 'Percent off' }), '10{Enter}');
+    const password = await screen.findByLabelText("Owner's password");
+    expect(screen.getByText(/up to 10% off a line and 10% off the whole bill/)).toBeInTheDocument();
+    await user.type(password, 'not it{Enter}');
+    expect(await screen.findByText("That isn't the owner's password")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Owner's password"), 'correct horse battery{Enter}');
+    await waitFor(() => {
+      expect(screen.queryByText("Needs the owner's OK")).not.toBeInTheDocument();
+    });
+    expect(api.sent('POST', '/api/billing/approvals')[1]?.body).toMatchObject({
+      kind: 'discount',
+      lineBasisPoints: 1_000,
+      billBasisPoints: 1_000,
+      ownerPassword: 'correct horse battery',
+    });
+    expect(rows()[0]).toHaveTextContent('−₹2.80');
+  });
+
+  test("the owner's own discount on the bill asks nobody", async () => {
+    const user = userEvent.setup();
+    counter();
+    await user.type(await search(), '8901234567890{Enter}');
+    await user.keyboard('{F7}');
+    await user.click(await screen.findByRole('radio', { name: 'Rupees (₹)' }));
+    await user.type(screen.getByRole('textbox', { name: 'Rupees off' }), '3{Enter}');
+    await waitFor(() => {
+      expect(total()).toHaveTextContent('₹25.00');
+    });
+    expect(screen.queryByText("Needs the owner's OK")).not.toBeInTheDocument();
+  });
+
+  test('F9 holds the bill; on an empty bill it lists the held ones and resumes one', async () => {
+    const user = userEvent.setup();
+    const heldLines = [
+      { itemId: salt.id, packId: null, quantityThousandths: 2_000, shownUnitPricePaise: 2_600 },
+    ];
+    const heldBill: HeldBillView = {
+      id: '00000000-0000-4000-8000-0000000000d1',
+      label: 'blue shirt',
+      lineCount: 1,
+      totalPaise: 5_200,
+      heldBy: { id: OWNER_SESSION.user.id, name: 'Ravi Sharma' },
+      heldAt: '2026-11-21T09:00:00.000Z',
+    };
+    const api = counter(OWNER_SESSION, {
+      'POST /api/held-bills': { status: 201, body: heldBill },
+      'GET /api/held-bills': { body: [heldBill] },
+      [`POST /api/held-bills/${heldBill.id}/resume`]: {
+        body: {
+          draft: {
+            billKey: '00000000-0000-4000-8000-0000000000e1',
+            priceList: 'retail',
+            customerId: null,
+            placeOfSupplyStateCode: '27',
+            lines: heldLines,
+          },
+        },
+      },
+    });
+    await user.type(await search(), '8901234567890{Enter}');
+    await user.keyboard('{F9}');
+    await user.type(
+      await screen.findByRole('textbox', { name: /A note to find it by/ }),
+      'gate{Enter}',
+    );
+    await waitFor(() => {
+      expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    });
+    expect(api.sent('POST', '/api/held-bills')[0]?.body).toMatchObject({
+      label: 'gate',
+      draft: { lines: [{ itemId: salt.id }] },
+      shownTotalPaise: 2_800,
+    });
+
+    await user.keyboard('{F9}');
+    const list = await screen.findByRole('listbox', { name: 'Held bills' });
+    expect(within(list).getByText('blue shirt')).toBeInTheDocument();
+    await user.keyboard('{Enter}');
+    await screen.findByRole('table');
+    // It was held at ₹26.00; the copy now says ₹28.00, so the line says so.
+    expect(rows()[0]).toHaveTextContent('2 piece');
+    expect(rows()[0]).toHaveTextContent('Price changed');
+    expect(rows()[0]).toHaveTextContent('28.00');
   });
 });

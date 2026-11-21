@@ -33,7 +33,10 @@
     "billQuantity": "Chuni hui line ki quantity badlein",
     "billPriceList": "Retail aur wholesale daam ke beech badlein",
     "billRemoveLine": "Chuni hui line hatayein",
-    "billNew": "Naya bill shuru karein"
+    "billNew": "Naya bill shuru karein",
+    "billLineDiscount": "Chuni hui line par chhoot",
+    "billDiscount": "Poore bill par chhoot",
+    "billHold": "Yeh bill rokein, ya roke gaye bill kholein"
   },
   "connection": {
     "checking": "Connection check ho raha hai…",
@@ -844,7 +847,9 @@
       "noGst": "Pehle {{name}} ka GST rate aur HSN bharein.",
       "wholeUnits": "{{name}} sirf poori units mein bikta hai.",
       "badQuantity": "Zero se zyada quantity likhein.",
-      "discardFailed": "Bill saaf nahin ho saka: connection nahin hai. Phir se koshish karein."
+      "discardFailed": "Bill saaf nahin ho saka: connection nahin hai. Phir se koshish karein.",
+      "holdFailed": "Yeh nahin ho saka: connection nahin hai. Phir se koshish karein.",
+      "heldGone": "Yeh roka gaya bill kisi doosre counter ne le liya ya phenk diya gaya."
     },
     "totals": {
       "label": "Kul",
@@ -864,6 +869,51 @@
       "title": "Yeh bill saaf karein?",
       "body": "Yeh bill save nahin hua hai. Saaf karne par iske items aur kul rakam entry log mein darj honge.",
       "confirm": "Bill saaf karein"
+    },
+    "discount": {
+      "lineTitle": "{{name}} par chhoot",
+      "billTitle": "Poore bill par chhoot",
+      "kind": "Chhoot kis roop mein",
+      "kinds": {
+        "percent": "Percent (%)",
+        "amount": "Rupaye (₹)"
+      },
+      "amountLabel": {
+        "percent": "Kitne percent chhoot",
+        "amount": "Kitne rupaye chhoot"
+      },
+      "invalid": {
+        "percent": "0 se 100 tak percent likhein, do decimal tak",
+        "amount": "Rupayon mein rakam likhein"
+      },
+      "hint": "Khaali ya 0 chhodne par chhoot hat jaayegi.",
+      "apply": "Lagaayein"
+    },
+    "approval": {
+      "title": "Is chhoot ke liye maalik ki manzoori",
+      "body": "Is bill mein ek line par {{line}} tak aur poore bill par {{bill}} tak chhoot hai, jo aapki seema se zyada hai. Maalik apna password likhkar is bill ke liye 30 minute tak iski anumati de sakte hain.",
+      "password": "Maalik ka password",
+      "confirm": "Anumati dein",
+      "failed": "Yeh nahin ho saka. Phir se koshish karein.",
+      "needed": "Maalik ki manzoori chahiye",
+      "ask": "Maalik se poochhein"
+    },
+    "held": {
+      "holdTitle": "Yeh bill rokein",
+      "label": "Pehchaanne ke liye note (zaroori nahin)",
+      "labelHint": "Jaise “neeli kameez”. Enter dabaane par bill ruk jaayega.",
+      "hold": "Rokein",
+      "holdButton": "Rokein",
+      "listButton": "Roke gaye bill ({{count}})",
+      "listTitle": "Roke gaye bill",
+      "loading": "Load ho raha hai…",
+      "none": "Is branch mein koi bill ruka hua nahin hai.",
+      "noLabel": "Koi note nahin",
+      "meta_one": "{{count}} item · {{name}} · {{time}}",
+      "meta_other": "{{count}} items · {{name}} · {{time}}",
+      "discard": "Phenkein",
+      "confirmDiscard": "Haan, phenk dein",
+      "close": "Band karein"
     }
   }
 }

@@ -187,7 +187,8 @@ export function loadOpenBill(userId: string): OpenBill | null {
 export function clearOpenBills(): void {
   try {
     for (const key of Object.keys(sessionStorage)) {
-      if (key.startsWith(PREFIX)) sessionStorage.removeItem(key);
+      // The open bills and their owner's OKs (`bill-approval:`).
+      if (key.startsWith('bill')) sessionStorage.removeItem(key);
     }
   } catch {
     // Nothing to clear.

@@ -51,3 +51,7 @@ It keeps the ARM64 images and the 2 GB of memory, costs nothing, and is a one-li
 ## Interview note
 
 AWS can run out of a particular instance type in one zone, and stopping a server to save money gives its capacity back. My server keeps no state, so moving it to another zone is a one-line Terraform change, not a migration. I kept the ARM type and memory, and chose the zone the database already lives in.
+
+## Dated notes
+
+- **2026-11-21, applied** with the owner's OK: 1 added, 3 changed (the deploy and nightly-stop policies, the stop schedule), 1 destroyed, $0 extra. `ap-south-1b` had capacity at the first try. The GitHub `demo` environment's `DEMO_INSTANCE_ID` was updated by hand, since Terraform doesn't manage it (`docs/devops/terraform.md`, Replacing the server).

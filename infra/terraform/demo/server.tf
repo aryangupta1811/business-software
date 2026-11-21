@@ -62,7 +62,10 @@ resource "aws_instance" "server" {
   # as associate_public_ip_address: a stopped instance has no public IP, AWS then reports
   # false, and Terraform would replace the server on every plan made while it's stopped
   # (seen 2026-11-18).
-  subnet_id              = aws_subnet.public[0].id
+  #
+  # public[1] is ap-south-1b, the zone RDS is in. 1a refused t4g.small for two days
+  # running (InsufficientInstanceCapacity), ADR 0042.
+  subnet_id              = aws_subnet.public[1].id
   vpc_security_group_ids = [aws_security_group.web.id]
   iam_instance_profile   = aws_iam_instance_profile.server.name
 

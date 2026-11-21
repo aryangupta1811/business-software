@@ -36,6 +36,11 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
   - **P1.4 Login, PR 1:** owner by email, staff by username on a remembered counter computer; sessions stored as hashes; the one cross-business lookup in a schema the app can't touch (ADRs 0038–0039); lock screen, CSRF, rate limits counted before hashing.
   - **Stage 7 backups:** the RDS master can't bypass RLS, so a read-only `app_backup` role reads every tenant table through its own policy; nightly dumps go to an S3 bucket that refuses overwrites; a restore drill compares row counts (ADR 0037).
   - Every PR got a code review (high): 39 findings across four PRs, all fixed test-first. 1,399 tests.
+- **2026-11-20 (fast track Day 4, first half: stage 6, P1.4 PR 2, P1.8 PR 1; PRs #35, #37, #38):** three lanes again, merged one at a time.
+  - **Stage 6 CD:** a merge to `main` starts a deploy that waits for the owner's approval in the GitHub `demo` environment (only `main` may use it), signs in to AWS through OIDC with no stored key, backs up first, deploys one commit over Run Command, checks health and rolls back. A repository variable, `DEPLOY_HOLD`, stops every run unless it is exactly `off`. Two reviews found 18 problems (among them a job timeout that skipped the rollback, credentials expiring before a rollback, two installs overlapping); 41 script checks with fake `aws` and `curl` now run in CI. Applied: 3 IAM resources, $0.
+  - **P1.4 PR 2:** email confirmation, password reset by link and by recovery key, a new recovery key, change password, remembered computers. Email goes through one interface: SES on the server with no password anywhere, Mailpit on the laptop (ADR 0040). The owner chose to limit recovery-key tries per IP only, so knowing an owner's email can't lock them out.
+  - **P1.8 PR 1:** the stock ledger. Every change is a row in an append-only `stock_movements` table; `item_stock` holds the current quantity and average cost per item per branch; `moveStock` is the only code that writes either. Rows are locked in item order so two counters can't sell the same last unit or deadlock; database timeouts end a stuck wait with a `503` the screen retries (ADR 0041). The owner answered seven design questions.
+  - Code reviews: 32 findings across three PRs. 1,576 tests on `main` after the three merges.
 
 ## Stack choices vs alternatives
 
@@ -66,6 +71,11 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
 | Login by email before the business is known | One `auth.owner_logins` table the app can't read, reached by two pinned `SECURITY DEFINER` functions | A `BYPASSRLS` role; a global users table | 0039 |
 | Sessions | Random token in a `__Host-` cookie carrying the business ID, stored as SHA-256 | JWTs (can't be revoked); plain tokens in the database | 0038 |
 | History can't be backdated | Column-level INSERT grants: the database sets `entry_log.id` and `created_at` | A trigger that overwrites them silently; a seed-only role | D4, 0028 note |
+| Who may deploy | GitHub environment `demo` (owner approves, `main` only) + OIDC role trusted only for that environment + `DEPLOY_HOLD` kill switch | An AWS access key in GitHub secrets; deploying every merge with no approval | 0012 note, stage 6 |
+| Sending email | One Mailer interface: SES through the server's role, Mailpit locally, `none`, a fake in tests | SMTP with a stored password; a paid email API; no email at all | 0040 |
+| Recovery-key brute force | Limit wrong keys per IP; a right key is never refused | Limit per email (anyone knowing the email can lock the owner out) | `00` #41 |
+| Stock | Append-only movements + a balance row per item per branch, written only by `moveStock` | Summing movements on every read; editing a quantity column in place | 0007, P1.8 design |
+| Two counters, one item | `SELECT … FOR UPDATE` in item-ID order, plus `lock_timeout` 3 s → `503` and one retry | SERIALIZABLE transactions and retry loops; advisory locks | 0041 |
 
 ## Mistakes and what I learned
 
@@ -90,6 +100,9 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
 - **Every one of the four Day 3 PRs had real bugs CI didn't catch.** Green checks and a lane's own tests passed, yet a review found 39 problems, among them a backup restore that would have failed on RDS, a login limit beaten by parallel guesses, and a form that could overwrite another counter's change. Lesson: a fresh-context review before every merge is part of "done", not an extra.
 - **A merge between lanes broke the backup.** Login added the `auth` schema; the backup role couldn't read it, so every nightly dump would have failed. The restore test caught it only because it runs the real `pg_dump`. Lesson: a cross-cutting rule (every table is backed up) needs a test that sees new tables automatically.
 - **I planned for four lanes and hit the usage limit three times.** Each stop cost a resume, and once an RDS start was left in flight. Lesson: size parallel work to the real budget, and check cloud state after any interruption.
+- **A merge with no conflict markers was still broken.** Two lanes each added a `CLOCK` token, and a test from one lane didn't know the other lane's new settings field. Only the type-check and full test run after merging `main` showed it. Lesson: after every merge between lanes, run every check, not just resolve the markers.
+- **My lane instructions allowed a force-push, and the permission check refused to start the lane.** The project rule is no force-push without the owner; merging `main` in was always the safe way. Lesson: when a safety rail stops you, change the approach, not the rule.
+- **The session started with two tools down:** the AWS sign-in had expired and Docker Desktop wasn't running after a restart. Lesson: check sign-ins and services before cloud or database work, not when the first command fails.
 - **A plan step trusted a sentence in my own ADR.** ADR 0027 said backups could run "as the RDS master"; AWS's docs say the master can't bypass RLS. Lesson: re-check a stored claim against the source when a design leans on it.
 
 ## Interview questions I can now answer
@@ -143,3 +156,10 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
   A: Count the attempt before the slow Argon2 check, not after, or many guesses sent at once all pass the check before any is counted. A right password takes the count back. (ADR 0038)
 - Q: How do two counters editing the same item not overwrite each other?
   A: Each item has a version; a save sends the version it loaded, and the server answers `409 stale` if it changed. The form must keep the version it loaded, not the latest one from the cache. (P1.7)
+
+- Q: How does a merge get to your server, and how do you stop a bad one?
+  A: The deploy job needs my approval in a GitHub environment that only `main` can use; AWS trusts GitHub's OIDC token only for that environment, so no key is stored. It backs up first, deploys one commit, checks health and rolls back. A repository variable stops every run unless it says `off`. (ADR 0012 note, stage 6)
+- Q: Why limit recovery-key tries by IP and not by account?
+  A: A per-account limit lets anyone who knows the owner's email lock them out of recovery for an hour: a denial of service. The key is 160 random bits, so guessing is hopeless anyway; a per-IP limit stops brute force without that side effect. (`00` #41)
+- Q: How do you keep stock right when two counters sell the same item?
+  A: Every change goes through one function that locks the item's stock row (`SELECT … FOR UPDATE`, in item-ID order to avoid deadlocks), checks the rule, writes an append-only movement and updates the balance in one transaction. A 3 s lock timeout answers `503` instead of hanging a connection. (ADR 0041)

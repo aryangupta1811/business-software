@@ -100,6 +100,14 @@ describe('item tables', () => {
       ).resolves.toBeDefined();
     });
 
+    it('allows every rate in GST_RATES, including 1.5% (migration 0010)', async () => {
+      for (const gstRate of [0, 25, 150, 300, 500, 1800, 4000]) {
+        await expect(
+          addItem(a, { gstRate, name: `Rate ${String(gstRate)}` }),
+        ).resolves.toBeDefined();
+      }
+    });
+
     it('allows a service with a SAC code and no MRP', async () => {
       await expect(
         addItem(a, { kind: 'service', mrp: null, hsn: '998719' }),

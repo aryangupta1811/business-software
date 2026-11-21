@@ -71,6 +71,13 @@
       "when": 1795157791770,
       "tag": "0009_stock_ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795273180610,
+      "tag": "0010_gst_rate_1_5",
+      "breakpoints": true
     }
   ]
 }

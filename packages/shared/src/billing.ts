@@ -86,6 +86,12 @@ export interface CatalogueView {
   serverTime: string;
 }
 
+/** `GET /api/billing/catalogue`: everything, or only what changed at or after `since`. */
+export const catalogueQuerySchema = z.strictObject({
+  since: z.iso.datetime({ offset: true, error: 'invalid' }).optional(),
+});
+export type CatalogueQuery = z.infer<typeof catalogueQuerySchema>;
+
 // ---- Pricing a cart (design §5) ----
 
 /** A line on the bill, as the screen keeps it and the save request carries it. */

@@ -16,6 +16,8 @@ import { DevicesController } from './account/devices.controller.js';
 import { DevicesService } from './account/devices.service.js';
 import { EMAIL_LINKS, EmailLinks } from './account/email-links.js';
 import { CLOCK, SYSTEM_CLOCK, type Clock } from './auth/clock.js';
+import { BillingController } from './billing/billing.controller.js';
+import { BillingService } from './billing/billing.service.js';
 import { HASH_GATE, HashGate } from './auth/hash-gate.js';
 import { CookieSessionResolver, SessionController } from './auth/session.controller.js';
 import { LoginLimits, SESSION_SERVICE, SessionService } from './auth/session.service.js';
@@ -52,6 +54,7 @@ export const API_CONTROLLERS = [
   CategoriesController,
   UnitsController,
   StockController,
+  BillingController,
 ];
 
 export interface AppOptions {
@@ -96,6 +99,7 @@ class ApiModule {
         ItemsService,
         CatalogueService,
         StockService,
+        BillingService,
         // One Argon2 queue for signup and logins (ADR 0038).
         { provide: HASH_GATE, useValue: options.hashGate ?? new HashGate() },
         {

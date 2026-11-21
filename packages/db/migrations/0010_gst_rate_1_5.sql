@@ -1,0 +1,2 @@
+ALTER TABLE "items" DROP CONSTRAINT "items_gst_rate_check";--> statement-breakpoint
+ALTER TABLE "items" ADD CONSTRAINT "items_gst_rate_check" CHECK ("items"."gst_rate" in (0, 25, 150, 300, 500, 1800, 4000));

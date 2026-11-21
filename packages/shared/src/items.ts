@@ -9,11 +9,12 @@ import { BUILT_IN_UNITS, isBuiltInUnit, packSizeFor, type BuiltInUnit } from './
 
 /**
  * Today's GST rates in basis points (owner's answer to G1, 2026-11-19): 0, 0.25 (rough
- * diamonds), 3 (gold, silver), 5, 18 and 40%. The 12% and 28% slabs ended on 22 September 2025
- * (GST 2.0). Checked against secondary sources only: confirm with CBIC's rate notifications
- * before the first real use. The engine itself accepts any rate (P1.12); items pick from here.
+ * diamonds), 1.5 (cut and polished diamonds), 3 (gold, silver), 5, 18 and 40%. The 12% and 28%
+ * slabs ended on 22 September 2025 (GST 2.0). 1.5% was checked against Notification
+ * 9/2025-Integrated Tax (Rate), Schedule VI, and added on the owner's answer to P1.13's question
+ * 12 (2026-11-21). The engine itself accepts any rate (P1.12); items pick from here.
  */
-export const GST_RATES = [0, 25, 300, 500, 1800, 4000] as const;
+export const GST_RATES = [0, 25, 150, 300, 500, 1800, 4000] as const;
 export type GstRate = (typeof GST_RATES)[number];
 
 /** A service (repair charge, delivery fee) has no stock, MRP or packs, and a SAC code. */

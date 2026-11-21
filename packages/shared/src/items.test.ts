@@ -56,9 +56,9 @@ const pack = {
   boughtAsPack: true,
 };
 
-describe('GST_RATES (G1, 2026-11-19)', () => {
-  it('are 0, 0.25, 3, 5, 18 and 40% in basis points', () => {
-    expect(GST_RATES).toEqual([0, 25, 300, 500, 1800, 4000]);
+describe('GST_RATES (G1, 2026-11-19; 1.5% added 2026-11-21, P1.13 question 12)', () => {
+  it('are 0, 0.25, 1.5, 3, 5, 18 and 40% in basis points', () => {
+    expect(GST_RATES).toEqual([0, 25, 150, 300, 500, 1800, 4000]);
   });
 });
 
@@ -112,7 +112,7 @@ describe('newItemSchema', () => {
     expect(errorsOf(newItemSchema, { ...item, ...change })).toEqual(errors);
   });
 
-  it.each([0, 25, 300, 500, 1800, 4000, null])('accepts GST rate %j', (gstRate) => {
+  it.each([0, 25, 150, 300, 500, 1800, 4000, null])('accepts GST rate %j', (gstRate) => {
     expect(errorsOf(newItemSchema, { ...item, gstRate })).toEqual({});
   });
 

@@ -61,6 +61,8 @@ describe('calculateBill: tax-exclusive prices', () => {
     ['₹1 at 3% (gold)', 100, 300, 2, 2, 3, 104], // 1.5 each rounds up; IGST is exactly 3
     ['₹1,000 at 0.25%', 100000, 25, 125, 125, 250, 100250],
     ['₹10 at 0.25%', 1000, 25, 1, 1, 3, 1002], // 1.25 each; IGST 2.5 rounds up
+    ['₹100 at 1.5% (cut diamonds)', 10000, 150, 75, 75, 150, 10150], // 0.75% each
+    ['₹1 at 1.5%', 100, 150, 1, 1, 2, 102], // 0.75 each rounds up; IGST 1.5 rounds up
     ['₹97.50 at 18%', 9750, 1800, 878, 878, 1755, 11506], // 877.5 rounds up
   ])('%s', (_name, taxable, rateBasisPoints, cgst, sgst, igst, intraTotal) => {
     const intra = only(
@@ -96,6 +98,8 @@ describe('calculateBill: tax-inclusive prices', () => {
     ['₹105 at 5%', 10500, 500, 10000, 250, 10000, 500],
     ['₹50 at 0%', 5000, 0, 5000, 0, 5000, 0],
     ['₹0.01 at 18%', 1, 1800, 1, 0, 1, 0],
+    ['₹101.50 at 1.5%', 10150, 150, 10000, 75, 10000, 150],
+    ['₹100 at 1.5%', 10000, 150, 9852, 74, 9852, 148], // 73.89 each; IGST 147.78
     ['₹1.03 at 3%', 103, 300, 99, 2, 100, 3], // 1.5 each rounds up, so the odd paisa leaves taxable
   ])('%s', (_name, paid, rateBasisPoints, intraTaxable, half, interTaxable, igst) => {
     const priced = line({ unitPricePaise: paid, rateBasisPoints, priceIncludesTax: true });

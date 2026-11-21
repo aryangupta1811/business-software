@@ -199,7 +199,7 @@ Step 4 — The rest of Phase 1 (deferred 2026-11-10; none of it blocks a first d
 
 ## Phase 2 — Running the business
 
-- [ ] Finalize Modules 04, 05, 06, 07, 08 (one session each; re-cut the tasks below afterwards). **05, 06, 07 done 2026-11-19 (sitting 2); the re-cut is in the "From sitting 2" notes below.** 04 and 08 are in sitting 3
+- [ ] Finalize Modules 04, 05, 06, 07, 08 (one session each; re-cut the tasks below afterwards). **05, 06, 07 done 2026-11-19 (sitting 2); the re-cut is in the "From sitting 2" notes below.** 04 and 08 are in sitting 3 (sheet `docs/plans/2026-11-20-sitting-3.md`, with 09, D5 and D6; waiting for the owner)
 - [ ] **P2.1 Suppliers & purchase entries** (stock in, with batch/expiry/IMEI)
 - [ ] **P2.2 Supplier ledger, payments, purchase returns**
 - [ ] **P2.3 Staff records & attendance** **From sitting 2 (`05`):** staff record fields (#1), salary history from the 1st of a month (#3), one daily branch register marked by the owner or a switched-on staff member, everyone starting present (#5–9), past-day changes with a reason in the log; adds the "absent staff" line and its test to the daily summary (`07` #13)

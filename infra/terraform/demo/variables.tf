@@ -84,9 +84,13 @@ variable "nightly_stop_timezone" {
 }
 
 variable "github_repository" {
-  description = "owner/name of the GitHub repository whose demo environment may deploy (stage 6)."
+  description = <<-EOT
+    The GitHub repository whose demo environment may deploy (stage 6), in the immutable form
+    GitHub puts in its OIDC subject: owner@ownerID/name@repoID. Read it from
+    `gh api repos/{owner}/{repo}/actions/oidc/customization/sub` (sub_claim_prefix, minus "repo:").
+  EOT
   type        = string
-  default     = "aryangupta1811/business-software"
+  default     = "aryangupta1811@144018864/business-software@1438652891"
 }
 
 variable "mail_from" {

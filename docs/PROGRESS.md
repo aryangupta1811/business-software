@@ -80,6 +80,8 @@
   - `F10` payment panel: split cash/UPI/card/cheque, change for cash, cheque reference. Shared `paymentIssues` is now the single copy of the payment rules (`billDraftSchema` uses it). A paid bill shows "Ready to save".
   - For P1.14: the save sends `bill` (with `customerId`, `placeOfSupplyStateCode`), the panel's payments, and the approval's id if any (`loadApproval(billKey)`).
 
+- **P2.7 part 1, the job queue** (a Sonnet agent): role `app_queue` owning schema `pgboss` (`packages/db/bootstrap/create-queue-role.sql`, re-runnable, like the backup role's), with boundary tests both ways; pg-boss in the worker with `createSchema: false` (ADR 0022's note), its own pool from `QUEUE_DATABASE_URL` (the api never gets it, ADR 0021), a `system.ping` queue proven end to end; the nightly dump leaves `pgboss` out (`--exclude-schema`, owner's OK 2026-11-21). **Before the next real deploy:** SSM `/business-software/demo/db/app-queue-password`, run `create-queue-role.sql` on RDS (or from `bootstrap-db.sh`/`install.sh`), `start.sh` writes `QUEUE_DATABASE_URL` into an env file only the worker reads, and `deploy/demo/compose.yaml` gives it to the worker. Without them the worker stops at start (a worker with no queue does nothing). Outbox and the worker's cross-business read still need a design (part 2).
+
 **Half-done:** P1.13's real-app check in Chrome (three languages, light and dark, 1024 px, two counters holding and resuming, the 200 ms scan measurement with 5,000 items).
 
 EC2 and RDS stopped at the end of session 28 (2026-11-21). No deploy run is waiting.

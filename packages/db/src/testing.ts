@@ -12,6 +12,7 @@ const bootstrapFile = fileURLToPath(new URL('../bootstrap/create-roles.sql', imp
 const backupRoleFile = fileURLToPath(
   new URL('../bootstrap/create-backup-role.sql', import.meta.url),
 );
+const queueRoleFile = fileURLToPath(new URL('../bootstrap/create-queue-role.sql', import.meta.url));
 
 export interface TestDatabase {
   /** The container's superuser on the app's database, for things the app roles may not do. */
@@ -22,6 +23,8 @@ export interface TestDatabase {
   runtimeUrl: string;
   /** The backup role (ADR 0037): reads every row, writes nothing. */
   backupUrl: string;
+  /** The job queue's role (ADR 0022): owns schema `pgboss` and sees nothing in `public`. */
+  queueUrl: string;
   /** For running tools inside it (psql, pg_dump), as the backup test does. */
   container: StartedPostgreSqlContainer;
   stop(): Promise<void>;
@@ -41,10 +44,12 @@ export async function startTestDatabase(): Promise<TestDatabase> {
       APP_OWNER_PASSWORD: 'owner-test',
       APP_RUNTIME_PASSWORD: 'runtime-test',
       APP_BACKUP_PASSWORD: 'backup-test',
+      APP_QUEUE_PASSWORD: 'queue-test',
     })
     .withCopyFilesToContainer([
       { source: bootstrapFile, target: '/docker-entrypoint-initdb.d/10-create-roles.sql' },
       { source: backupRoleFile, target: '/docker-entrypoint-initdb.d/20-create-backup-role.sql' },
+      { source: queueRoleFile, target: '/docker-entrypoint-initdb.d/30-create-queue-role.sql' },
     ])
     .start();
   const server = `${container.getHost()}:${String(container.getPort())}/business_software`;
@@ -59,6 +64,7 @@ export async function startTestDatabase(): Promise<TestDatabase> {
     ownerUrl,
     runtimeUrl: `postgresql://app_runtime:runtime-test@${server}`,
     backupUrl: `postgresql://app_backup:backup-test@${server}`,
+    queueUrl: `postgresql://app_queue:queue-test@${server}`,
     container,
     stop: async () => {
       await container.stop();

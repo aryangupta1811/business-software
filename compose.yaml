@@ -19,16 +19,18 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       APP_OWNER_PASSWORD: ${APP_OWNER_PASSWORD:?set APP_OWNER_PASSWORD in .env}
       APP_RUNTIME_PASSWORD: ${APP_RUNTIME_PASSWORD:?set APP_RUNTIME_PASSWORD in .env}
+      APP_QUEUE_PASSWORD: ${APP_QUEUE_PASSWORD:?set APP_QUEUE_PASSWORD in .env}
     ports:
       # This computer only, never the shop's Wi-Fi.
       - 127.0.0.1:5432:5432
     volumes:
       # PostgreSQL 18 keeps its data in /var/lib/postgresql/18/docker, so mount the parent.
       - pgdata:/var/lib/postgresql
-      # Run only when pgdata is empty, in name order. A volume made before the backup role
-      # existed needs the second file once by hand (docs/devops/local-database.md).
+      # Run only when pgdata is empty, in name order. A volume made before the backup or queue
+      # role existed needs that file once by hand (docs/devops/local-database.md).
       - ./packages/db/bootstrap/create-roles.sql:/docker-entrypoint-initdb.d/10-create-roles.sql:ro
       - ./packages/db/bootstrap/create-backup-role.sql:/docker-entrypoint-initdb.d/20-create-backup-role.sql:ro
+      - ./packages/db/bootstrap/create-queue-role.sql:/docker-entrypoint-initdb.d/30-create-queue-role.sql:ro
     healthcheck:
       # TCP, not the socket: during first-start init the server listens on the socket only,
       # so this turns healthy only once the roles and database exist.
@@ -82,6 +84,8 @@ services:
     command: [node, dist/worker.js]
     environment:
       DATABASE_URL: postgresql://app_runtime:${APP_RUNTIME_PASSWORD}@db:5432/business_software
+      # The job queue's own login (ADR 0022). Only the worker gets it, never the api (ADR 0021).
+      QUEUE_DATABASE_URL: postgresql://app_queue:${APP_QUEUE_PASSWORD}@db:5432/business_software
     restart: unless-stopped
     depends_on:
       migrate:

@@ -14,10 +14,13 @@ const backupRoleFile = fileURLToPath(
   new URL('../bootstrap/create-backup-role.sql', import.meta.url),
 );
 
+const queueRoleFile = fileURLToPath(new URL('../bootstrap/create-queue-role.sql', import.meta.url));
+
 const passwords = {
   APP_OWNER_PASSWORD: 'owner-test',
   APP_RUNTIME_PASSWORD: 'runtime-test',
   APP_BACKUP_PASSWORD: 'backup-test',
+  APP_QUEUE_PASSWORD: 'queue-test',
 };
 
 describe('the bootstrap files run by a non-superuser admin, as on RDS', () => {
@@ -31,6 +34,7 @@ describe('the bootstrap files run by a non-superuser admin, as on RDS', () => {
       .withCopyFilesToContainer([
         { source: bootstrapFile, target: '/tmp/create-roles.sql' },
         { source: backupRoleFile, target: '/tmp/create-backup-role.sql' },
+        { source: queueRoleFile, target: '/tmp/create-queue-role.sql' },
       ])
       .start();
     const admin = new URL(container.getConnectionUri());
@@ -40,10 +44,17 @@ describe('the bootstrap files run by a non-superuser admin, as on RDS', () => {
     await superuser.query('alter database postgres owner to rds_admin');
 
     // As bootstrap-db.sh runs them: the roles once, the backup role on every deploy (so twice
-    // here). The local socket trusts every user, so psql needs no password here.
+    // here), and the queue role the same way. The local socket trusts every user, so psql
+    // needs no password here.
     output = '';
     exitCode = 0;
-    for (const file of ['create-roles.sql', 'create-backup-role.sql', 'create-backup-role.sql']) {
+    for (const file of [
+      'create-roles.sql',
+      'create-backup-role.sql',
+      'create-backup-role.sql',
+      'create-queue-role.sql',
+      'create-queue-role.sql',
+    ]) {
       const result = await container.exec(
         ['psql', '-U', 'rds_admin', '-d', 'postgres', '-X', '-v', 'ON_ERROR_STOP=1'].concat([
           '-f',
@@ -77,6 +88,7 @@ describe('the bootstrap files run by a non-superuser admin, as on RDS', () => {
     expect(rows).toEqual([
       { who: 'app_backup', privileges: 'CONNECT' },
       { who: 'app_owner', privileges: 'CONNECT,CREATE,TEMPORARY' },
+      { who: 'app_queue', privileges: 'CONNECT' },
       { who: 'app_runtime', privileges: 'CONNECT' },
       // For the runbook's manual fixes and later backups.
       { who: 'rds_admin', privileges: 'CONNECT' },
@@ -112,13 +124,43 @@ describe('the bootstrap files run by a non-superuser admin, as on RDS', () => {
   it("keeps the app roles out of the admin's database", async () => {
     const { rows } = await superuser.query(
       `select r.rolname, has_database_privilege(r.rolname, 'postgres', 'CONNECT') as can_connect
-         from pg_roles r where r.rolname in ('app_backup', 'app_owner', 'app_runtime') order by 1`,
+         from pg_roles r where r.rolname in ('app_backup', 'app_owner', 'app_queue', 'app_runtime') order by 1`,
     );
     expect(rows).toEqual([
       { rolname: 'app_backup', can_connect: false },
       { rolname: 'app_owner', can_connect: false },
+      { rolname: 'app_queue', can_connect: false },
       { rolname: 'app_runtime', can_connect: false },
     ]);
+  });
+
+  // The queue role is lent to app_owner for one statement and taken back (PostgreSQL 16+
+  // lets only a role that can switch to app_queue create a schema for it). The administrator
+  // keeps only ADMIN on it, like on the backup role.
+  it('makes the pgboss schema for a queue role that nobody else can use', async () => {
+    const owner = await superuser.query(
+      `select r.rolcanlogin, r.rolbypassrls, r.rolsuper, r.rolcreaterole, r.rolcreatedb,
+              (select count(*)::int from pg_auth_members where roleid = r.oid and member <> 'rds_admin'::regrole) as lent
+         from pg_roles r where r.rolname = 'app_queue'`,
+    );
+    expect(owner.rows).toEqual([
+      {
+        rolcanlogin: true,
+        rolbypassrls: false,
+        rolsuper: false,
+        rolcreaterole: false,
+        rolcreatedb: false,
+        lent: 0,
+      },
+    ]);
+    const queue = new Pool({
+      connectionString: `postgresql://app_queue:queue-test@${container.getHost()}:${String(container.getPort())}/business_software`,
+    });
+    try {
+      await queue.query('create table pgboss.probe (id int)');
+    } finally {
+      await queue.end();
+    }
   });
 
   it('lets app_owner run the migrations', async () => {

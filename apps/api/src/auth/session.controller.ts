@@ -36,11 +36,14 @@ import {
 } from '../account/account.errors.js';
 import { BusyError } from './hash-gate.js';
 import {
+  ChooseBranchError,
+  InvalidBranchError,
   NoDeviceError,
   SESSION_SERVICE,
   SessionEndedError,
   SessionService,
   TooManyAttemptsError,
+  WrongBranchError,
   WrongLoginError,
   WrongPasswordError,
 } from './session.service.js';
@@ -49,6 +52,16 @@ import {
 export function toHttpError(error: unknown): unknown {
   if (error instanceof WrongLoginError) return new UnauthorizedException({ code: 'wrong_login' });
   if (error instanceof NoDeviceError) return new UnauthorizedException({ code: 'no_device' });
+  // P1.6: the owner's first login on a new computer in a business with several branches.
+  if (error instanceof ChooseBranchError) {
+    return new ConflictException({ code: 'choose_branch', branches: error.branches });
+  }
+  if (error instanceof InvalidBranchError) {
+    return new BadRequestException({ code: 'invalid_body', fields: { branchId: 'invalid' } });
+  }
+  if (error instanceof WrongBranchError) {
+    return new ForbiddenException({ code: 'wrong_branch', branchName: error.branchName });
+  }
   if (error instanceof SessionEndedError) {
     return new UnauthorizedException({ code: 'session_ended' });
   }
@@ -113,7 +126,12 @@ export class SessionController {
   ): Promise<SessionView> {
     return answer(async () => {
       const context = this.sessions.contextOf(request);
-      const result = await this.sessions.loginOwner(body.email, body.password, context);
+      const result = await this.sessions.loginOwner(
+        body.email,
+        body.password,
+        context,
+        body.branchId,
+      );
       response.setHeader('Set-Cookie', result.setCookies);
       return result.view;
     });

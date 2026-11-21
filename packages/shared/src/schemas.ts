@@ -13,21 +13,21 @@ const choose = (issue: { input?: unknown }) =>
   issue.input === undefined || issue.input === null || issue.input === '' ? 'choose' : 'invalid';
 
 /** Where the business's branch stands. */
-const stateCode = () =>
+export const stateCode = () =>
   z
     .string({ error: choose })
     .refine((value) => value !== '', { error: 'choose' })
     .refine(isBranchStateCode, { error: 'invalid' });
 
 /** An optional upper-case code (PAN, GSTIN): blank is null, otherwise it must pass `valid`. */
-function optionalCode(max: number, valid: (value: string) => boolean) {
+export function optionalCode(max: number, valid: (value: string) => boolean) {
   return z.preprocess(
     (value) => (typeof value === 'string' ? value.toUpperCase() : value),
     optionalText(max).refine((value) => value === null || valid(value), { error: 'invalid' }),
   );
 }
 
-const optionalPattern = (max: number, pattern: RegExp) =>
+export const optionalPattern = (max: number, pattern: RegExp) =>
   optionalText(max).refine((value) => value === null || pattern.test(value), {
     error: 'invalid',
   });

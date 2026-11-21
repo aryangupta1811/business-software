@@ -34,6 +34,8 @@ const SETTINGS: SettingsView = {
 const HERE: DeviceView = {
   id: '00000000-0000-4000-8000-0000000000d1',
   name: null,
+  branchId: '00000000-0000-4000-8000-000000000003',
+  branchCode: 'HO',
   branchName: 'Main shop',
   createdAt: '2026-11-19T04:30:00.000Z',
   lastSeenAt: '2026-11-19T04:30:00.000Z',

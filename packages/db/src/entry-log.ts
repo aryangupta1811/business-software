@@ -49,6 +49,13 @@ export const ENTRY_ACTIONS = {
   'staff.permissions_changed': { reasonRequired: false },
   'staff.deactivated': { reasonRequired: false }, // an optional reason
   'staff.reactivated': { reasonRequired: false },
+  // P1.6 (`00` #35, #54–#60): branches, which branch a computer is in, a login's extra branches.
+  'branch.created': { reasonRequired: false },
+  'branch.updated': { reasonRequired: false }, // changed fields only
+  'branch.archived': { reasonRequired: false },
+  'branch.restored': { reasonRequired: false },
+  'device.moved': { reasonRequired: false }, // before and after: the branch
+  'staff.branches_changed': { reasonRequired: false }, // before and after: the extra branches
 } as const satisfies Record<string, { reasonRequired: boolean }>;
 
 export type EntryAction = keyof typeof ENTRY_ACTIONS;

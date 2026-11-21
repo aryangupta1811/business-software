@@ -115,7 +115,7 @@ describe('nightly backup and restore drill', () => {
     // Read-only twice over: no INSERT grant, and every transaction starts READ ONLY.
     await expect(
       backup.query(
-        "insert into branches (business_id, name, state_code) values (uuidv7(), 'x', '27')",
+        "insert into branches (business_id, name, code, state_code) values (uuidv7(), 'x', 'HO', '27')",
       ),
     ).rejects.toMatchObject({ code: '25006' });
     const client = await backup.connect();

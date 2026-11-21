@@ -73,7 +73,7 @@ export class SignupService {
         // The first branch is named after the business; the owner can rename it (P1.3 spec).
         await tx
           .insert(branches)
-          .values({ businessId, name: input.businessName, stateCode: input.stateCode });
+          .values({ businessId, name: input.businessName, code: 'HO', stateCode: input.stateCode });
         const [owner] = await tx
           .insert(users)
           .values({ businessId, role: 'owner', email: input.email, passwordHash })

@@ -161,14 +161,19 @@ export class SettingsService {
   private async load(tx: Transaction, businessId: string, lock: boolean): Promise<Current> {
     const query = tx.select().from(businesses).where(eq(businesses.id, businessId));
     const [business] = lock ? await query.for('update') : await query;
-    // The first branch, until P1.6 adds a branch picker.
-    const [branch] = await tx.select().from(branches).orderBy(asc(branches.id)).limit(1);
+    // The business details are the head office's: the oldest branch (P1.6), which is never
+    // archived. Other branches are edited on their own card.
+    const [branch] = await tx
+      .select()
+      .from(branches)
+      .orderBy(asc(branches.createdAt), asc(branches.id))
+      .limit(1);
     const [owner] = await tx
       .select({ id: users.id, name: users.name })
       .from(users)
       .where(eq(users.role, 'owner'));
     if (business === undefined || branch === undefined || owner === undefined) {
-      throw new Error('Business, first branch or owner not found');
+      throw new Error('Business, head office or owner not found');
     }
     return {
       branchId: branch.id,

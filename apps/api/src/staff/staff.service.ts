@@ -7,6 +7,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  ConflictException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import {
@@ -15,9 +16,11 @@ import {
   branches,
   businesses,
   eq,
+  inArray,
   isNull,
   recordEntry,
   sessions,
+  staffBranches,
   users,
   type Database,
   type Transaction,
@@ -31,6 +34,7 @@ import {
   staffPasswordProblem,
   type NewStaffInput,
   type Permission,
+  type StaffBranchesInput,
   type StaffDeactivateInput,
   type StaffPasswordInput,
   type StaffPermissionsInput,
@@ -60,17 +64,20 @@ const COLUMNS = {
   discountLimitBasisPoints: users.discountLimitBasisPoints,
 };
 
-function toView(row: {
-  id: string;
-  name: string | null;
-  username: string | null;
-  homeBranchId: string | null;
-  homeBranchName: string;
-  deactivatedAt: Date | null;
-  permissionsAdded: string[];
-  permissionsRemoved: string[];
-  discountLimitBasisPoints: number | null;
-}): StaffView {
+function toView(
+  row: {
+    id: string;
+    name: string | null;
+    username: string | null;
+    homeBranchId: string | null;
+    homeBranchName: string;
+    deactivatedAt: Date | null;
+    permissionsAdded: string[];
+    permissionsRemoved: string[];
+    discountLimitBasisPoints: number | null;
+  },
+  extraBranchIds: string[],
+): StaffView {
   if (row.homeBranchId === null) throw new Error('Staff row has no home branch');
   return {
     id: row.id,
@@ -78,6 +85,7 @@ function toView(row: {
     username: row.username,
     homeBranchId: row.homeBranchId,
     homeBranchName: row.homeBranchName,
+    extraBranchIds,
     active: row.deactivatedAt === null,
     permissions: effectivePermissions({
       added: row.permissionsAdded,
@@ -132,7 +140,16 @@ export class StaffService {
           and(eq(users.role, 'staff'), includeInactive ? undefined : isNull(users.deactivatedAt)),
         )
         .orderBy(asc(users.name), asc(users.id));
-      return rows.map(toView);
+      const extras = await tx
+        .select({ userId: staffBranches.userId, branchId: staffBranches.branchId })
+        .from(staffBranches)
+        .orderBy(asc(staffBranches.branchId));
+      return rows.map((row) =>
+        toView(
+          row,
+          extras.filter((extra) => extra.userId === row.id).map((extra) => extra.branchId),
+        ),
+      );
     });
   }
 
@@ -149,7 +166,7 @@ export class StaffService {
     const passwordHash = await this.sessions.hashNewPassword(input.password);
     const { added, removed } = differenceFromDefaults(wanted);
     return inBusiness(this.database, caller, async (tx) => {
-      await this.requireBranch(tx, input.homeBranchId);
+      await this.requireActiveBranch(tx, input.homeBranchId);
       const [inserted] = await tx
         .insert(users)
         .values({
@@ -191,7 +208,10 @@ export class StaffService {
   update(caller: Caller, id: string, input: StaffUpdateInput): Promise<StaffView> {
     return inBusiness(this.database, caller, async (tx) => {
       const current = await this.load(tx, id, true);
-      await this.requireBranch(tx, input.homeBranchId);
+      // An unchanged home may be archived already (a deactivated login); a new one may not.
+      if (input.homeBranchId !== current.homeBranchId) {
+        await this.requireActiveBranch(tx, input.homeBranchId);
+      }
       const fields = (view: Pick<StaffView, 'name' | 'username' | 'homeBranchId'>) => ({
         name: view.name,
         username: view.username,
@@ -301,12 +321,64 @@ export class StaffService {
     });
   }
 
+  /**
+   * The extra branches a login may work at (P1.6, owner answer 4A), the whole list. Needs the
+   * owner's password: it gives access (P1.5 question 3). Only the next request of a logged-in
+   * cashier notices; the session service reads the list with the permissions.
+   */
+  async setBranches(caller: Caller, id: string, input: StaffBranchesInput): Promise<StaffView> {
+    await this.sessions.requireOwnerPassword(caller, input.ownerPassword);
+    return inBusiness(this.database, caller, async (tx) => {
+      const current = await this.load(tx, id, true);
+      const wanted = [...input.branchIds].sort();
+      const invalid = { code: 'invalid_body', fields: { branchIds: 'invalid' } };
+      // The home branch is always allowed, so it isn't kept as an extra; the rest must be live.
+      if (wanted.includes(current.homeBranchId)) throw new BadRequestException(invalid);
+      if (wanted.length > 0) {
+        const live = await tx
+          .select({ id: branches.id })
+          .from(branches)
+          .where(and(inArray(branches.id, wanted), isNull(branches.archivedAt)))
+          .for('share');
+        if (live.length !== wanted.length) throw new BadRequestException(invalid);
+      }
+      const before = current.extraBranchIds;
+      const removed = before.filter((branchId) => !wanted.includes(branchId));
+      const added = wanted.filter((branchId) => !before.includes(branchId));
+      if (removed.length === 0 && added.length === 0) return current;
+      if (removed.length > 0) {
+        await tx
+          .delete(staffBranches)
+          .where(and(eq(staffBranches.userId, id), inArray(staffBranches.branchId, removed)));
+      }
+      if (added.length > 0) {
+        await tx
+          .insert(staffBranches)
+          .values(
+            added.map((branchId) => ({ businessId: caller.businessId, userId: id, branchId })),
+          );
+      }
+      await recordEntry(tx, {
+        actorId: caller.userId,
+        action: 'staff.branches_changed',
+        entityType: 'user',
+        entityId: id,
+        branchId: current.homeBranchId,
+        before: { extraBranchIds: before },
+        after: { extraBranchIds: wanted },
+      });
+      return this.load(tx, id);
+    });
+  }
+
   /** Brings a login back with the permissions it had. Needs the owner's password. */
   async reactivate(caller: Caller, id: string, ownerPassword: string): Promise<StaffView> {
     await this.sessions.requireOwnerPassword(caller, ownerPassword);
     return inBusiness(this.database, caller, async (tx) => {
       const current = await this.load(tx, id, true);
       if (current.active) return current;
+      // Nothing may point at a closed shop: the owner moves the login to a live branch first.
+      await this.requireActiveBranch(tx, current.homeBranchId, 'home_branch_archived');
       await tx.update(users).set({ deactivatedAt: null }).where(eq(users.id, id));
       await recordEntry(tx, {
         actorId: caller.userId,
@@ -334,15 +406,37 @@ export class StaffService {
       .where(and(eq(users.id, id), eq(users.role, 'staff')));
     const [row] = await (lock ? query.for('update', { of: users }) : query);
     if (row === undefined) throw new NotFoundException({ code: 'not_found' });
-    return toView(row);
+    const extras = await tx
+      .select({ branchId: staffBranches.branchId })
+      .from(staffBranches)
+      .where(eq(staffBranches.userId, id))
+      .orderBy(asc(staffBranches.branchId));
+    return toView(
+      row,
+      extras.map((extra) => extra.branchId),
+    );
   }
 
-  private async requireBranch(tx: Transaction, branchId: string): Promise<void> {
+  /**
+   * A live branch of this business, locked FOR SHARE so it can't be archived (which locks it
+   * FOR UPDATE) between this check and the commit. With `archivedCode`, a branch that is
+   * archived answers that 409 instead of the 400 for one that isn't the business's.
+   */
+  private async requireActiveBranch(
+    tx: Transaction,
+    branchId: string,
+    archivedCode?: string,
+  ): Promise<void> {
     const [branch] = await tx
-      .select({ id: branches.id })
+      .select({ archivedAt: branches.archivedAt })
       .from(branches)
-      .where(eq(branches.id, branchId));
+      .where(eq(branches.id, branchId))
+      .for('share');
     if (branch === undefined) {
+      throw new BadRequestException({ code: 'invalid_body', fields: { homeBranchId: 'invalid' } });
+    }
+    if (branch.archivedAt !== null) {
+      if (archivedCode !== undefined) throw new ConflictException({ code: archivedCode });
       throw new BadRequestException({ code: 'invalid_body', fields: { homeBranchId: 'invalid' } });
     }
   }

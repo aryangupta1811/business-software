@@ -108,3 +108,6 @@ export function fieldErrors(error: z.ZodError): FieldErrors {
   }
   return errors;
 }
+
+/** `?branch=` on a read page: one branch's id, or `all` where the page can combine them (P1.6). */
+export const branchScope = () => z.union([z.literal('all'), uuid()], { error: 'invalid' });

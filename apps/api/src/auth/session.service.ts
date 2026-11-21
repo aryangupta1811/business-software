@@ -13,6 +13,7 @@ import {
   recordEntry,
   sessions,
   sql,
+  staffBranches,
   users,
   withBusiness,
   type Database,
@@ -26,6 +27,7 @@ import {
   IDLE_GRACE_MS,
   PERMISSIONS,
   type ActiveSession,
+  type BranchRef,
   type PermissionDifference,
   type SessionView,
 } from '@business-software/shared';
@@ -82,6 +84,27 @@ export class NoDeviceError extends Error {
 export class SessionEndedError extends Error {
   constructor() {
     super('Session ended');
+  }
+}
+
+/** The owner's first login on a new computer, with several branches: it must say which (P1.6). */
+export class ChooseBranchError extends Error {
+  constructor(readonly branches: BranchRef[]) {
+    super('Choose the computer branch');
+  }
+}
+
+/** The branch sent with a first login isn't one of the business's active branches. */
+export class InvalidBranchError extends Error {
+  constructor() {
+    super('Not an active branch');
+  }
+}
+
+/** A staff login on a computer at a branch they may not work at (Module 00 #35). */
+export class WrongBranchError extends Error {
+  constructor(readonly branchName: string) {
+    super('Wrong branch');
   }
 }
 
@@ -153,8 +176,12 @@ interface StartOptions {
   businessId: string;
   userId: string;
   role: 'owner' | 'staff';
-  /** The computer's device row, or none: an owner login registers the computer (#37). */
+  /**
+   * The computer's device row, or none: an owner login registers the computer (#37) at
+   * `newDeviceBranchId`, which `branchForNewComputer` picked.
+   */
   device: FoundDevice | null;
+  newDeviceBranchId?: string | undefined;
 }
 
 export function throwUnless(verdict: Verdict): void {
@@ -207,7 +234,12 @@ export class SessionService {
   }
 
   /** Module 00 #27: email and password. */
-  async loginOwner(email: string, password: string, context: RequestContext): Promise<LoginResult> {
+  async loginOwner(
+    email: string,
+    password: string,
+    context: RequestContext,
+    branchId?: string,
+  ): Promise<LoginResult> {
     throwUnless(this.limits.ip.hit(context.ip));
     // Counted before the password is checked, so simultaneous guesses can't pass the limit;
     // a right password takes the count back.
@@ -233,7 +265,13 @@ export class SessionService {
     return withBusiness(this.database.db, businessId, async (tx) => {
       await rehash?.(tx, found.userId);
       const device = await this.findDeviceIn(tx, businessId, context);
-      return this.startIn(tx, { businessId, userId: found.userId, role: 'owner', device }, context);
+      const newDeviceBranchId =
+        device === null ? await this.branchForNewComputer(tx, branchId) : undefined;
+      return this.startIn(
+        tx,
+        { businessId, userId: found.userId, role: 'owner', device, newDeviceBranchId },
+        context,
+      );
     });
   }
 
@@ -279,9 +317,10 @@ export class SessionService {
     userId: string,
     context: RequestContext,
   ): Promise<string[]> {
+    const newDeviceBranchId = await this.branchForNewComputer(tx);
     const { setCookies } = await this.startIn(
       tx,
-      { businessId, userId, role: 'owner', device: null },
+      { businessId, userId, role: 'owner', device: null, newDeviceBranchId },
       context,
     );
     return setCookies;
@@ -567,36 +606,41 @@ export class SessionService {
     const now = this.clock.now();
     let device = options.device;
     if (device === null) {
-      // #37, #44: the owner's login registers this computer, on the first branch until P1.6.
-      const [branch] = await tx
-        .select({ id: branches.id })
-        .from(branches)
-        .orderBy(asc(branches.createdAt), asc(branches.id))
-        .limit(1);
-      if (branch === undefined) throw new Error('Business has no branch');
+      // #37, #44: the owner's login registers this computer at the branch it is in (P1.6).
+      const branchId = options.newDeviceBranchId;
+      if (branchId === undefined) throw new Error('A new computer needs its branch');
       const token = newToken();
       const [row] = await tx
         .insert(devices)
         .values({
           businessId,
-          branchId: branch.id,
+          branchId,
           tokenHash: hashToken(token),
           registeredBy: userId,
           lastSeenAt: now,
         })
         .returning({ id: devices.id });
       if (row === undefined) throw new Error('No device row returned');
-      device = { id: row.id, branchId: branch.id, cookie: { businessId, token } };
+      device = { id: row.id, branchId, cookie: { businessId, token } };
       await recordEntry(tx, {
         actorId: userId,
         action: 'device.registered',
         entityType: 'device',
         entityId: row.id,
-        branchId: branch.id,
+        branchId,
       });
     } else {
-      await tx.update(devices).set({ lastSeenAt: now }).where(eq(devices.id, device.id));
+      // Read back from the update: a computer moved at this very moment (a lock wait) answers
+      // with its new branch, so this session starts where the computer now is.
+      const [current] = await tx
+        .update(devices)
+        .set({ lastSeenAt: now })
+        .where(eq(devices.id, device.id))
+        .returning({ branchId: devices.branchId });
+      if (current === undefined) throw new Error('Device not found');
+      device = { ...device, branchId: current.branchId };
     }
+    await this.requireUsableBranch(tx, userId, options.role, device.branchId);
     const token = newToken();
     const csrfToken = csrfTokenFor(token);
     const [session] = await tx
@@ -650,6 +694,71 @@ export class SessionService {
     return { setCookies, view: { ...view, state: 'active' } };
   }
 
+  /**
+   * Where a new computer goes (P1.6, `00` #54–#60): the business's only active branch, else
+   * the one the owner chose. With several and no choice yet the login answers
+   * `choose_branch`, and the owner sends it again with `branchId`.
+   */
+  private async branchForNewComputer(tx: Transaction, chosen?: string): Promise<string> {
+    const active = await tx
+      .select({ id: branches.id, code: branches.code, name: branches.name })
+      .from(branches)
+      .where(isNull(branches.archivedAt))
+      .orderBy(asc(branches.createdAt), asc(branches.id));
+    const first = active[0];
+    if (first === undefined) throw new Error('Business has no active branch');
+    if (chosen !== undefined) {
+      if (!active.some((branch) => branch.id === chosen)) throw new InvalidBranchError();
+      return chosen;
+    }
+    if (active.length > 1) throw new ChooseBranchError(active);
+    return first.id;
+  }
+
+  /**
+   * A session starts only at a live branch, and staff only where they may work (their home or
+   * a branch the owner ticked). The branch row is locked FOR SHARE, so archiving it (which locks
+   * it FOR UPDATE) and this login can't both slip past each other.
+   */
+  private async requireUsableBranch(
+    tx: Transaction,
+    userId: string,
+    role: 'owner' | 'staff',
+    branchId: string,
+  ): Promise<void> {
+    const [branch] = await tx
+      .select({ name: branches.name, archivedAt: branches.archivedAt })
+      .from(branches)
+      .where(eq(branches.id, branchId))
+      .for('share');
+    if (branch === undefined) throw new Error('Branch not found');
+    if (branch.archivedAt !== null) throw new NoDeviceError();
+    if (role === 'staff') {
+      const [user] = await tx
+        .select({ homeBranchId: users.homeBranchId })
+        .from(users)
+        .where(eq(users.id, userId));
+      if (!(await this.mayWorkAt(tx, userId, user?.homeBranchId ?? null, branchId))) {
+        throw new WrongBranchError(branch.name);
+      }
+    }
+  }
+
+  /** A staff login works at its home branch and at the branches the owner ticked (#35). */
+  private async mayWorkAt(
+    tx: Transaction,
+    userId: string,
+    homeBranchId: string | null,
+    branchId: string,
+  ): Promise<boolean> {
+    if (homeBranchId === branchId) return true;
+    const [extra] = await tx
+      .select({ id: staffBranches.id })
+      .from(staffBranches)
+      .where(and(eq(staffBranches.userId, userId), eq(staffBranches.branchId, branchId)));
+    return extra !== undefined;
+  }
+
   /** The lock and idle rules, applied to the session a cookie names. */
   private async applyRules(tx: Transaction, cookie: CookieToken): Promise<Caller | 'ended' | null> {
     const [row] = await tx
@@ -663,6 +772,7 @@ export class SessionService {
         endedAt: sessions.endedAt,
         role: users.role,
         deactivatedAt: users.deactivatedAt,
+        homeBranchId: users.homeBranchId,
         // Read on every request, so a change by the owner reaches a login that is already
         // open with nothing to invalidate (P1.5 design, section 5; ADR 0044).
         permissionsAdded: users.permissionsAdded,
@@ -682,6 +792,15 @@ export class SessionService {
     // #34: a deactivated login's sessions end at once.
     if (row.deactivatedAt !== null) {
       await this.end(tx, row.id, row.userId, row.branchId, 'deactivated');
+      return 'ended';
+    }
+    // Read on every request, like the permissions: unticking a branch, or moving the login's
+    // home, ends the session at the next click (P1.6, ADR 0044's pattern).
+    if (
+      role === 'staff' &&
+      !(await this.mayWorkAt(tx, row.userId, row.homeBranchId, row.branchId))
+    ) {
+      await this.end(tx, row.id, row.userId, row.branchId, 'branch_removed');
       return 'ended';
     }
     // The grace covers key presses since the web app's last "still here" (IDLE_GRACE_MS).
@@ -727,6 +846,14 @@ export class SessionService {
       .where(eq(users.id, userId));
     if (row === undefined) throw new Error('Session user not found');
     return row;
+  }
+
+  private async activeBranchCountIn(tx: Transaction): Promise<number> {
+    const [row] = await tx
+      .select({ count: sql<number>`count(*)::int` })
+      .from(branches)
+      .where(isNull(branches.archivedAt));
+    return row?.count ?? 0;
   }
 
   private async lockIn(tx: Transaction, caller: Caller, after: Record<string, unknown>) {
@@ -776,6 +903,7 @@ export class SessionService {
       .select({
         name: sql<string>`coalesce(${users.name}, ${users.email}, ${users.username})`,
         businessName: businesses.name,
+        branchCode: branches.code,
         branchName: branches.name,
         ownerLockMinutes: businesses.ownerLockMinutes,
         staffIdleMinutes: businesses.staffIdleMinutes,
@@ -794,7 +922,8 @@ export class SessionService {
       state: caller.locked ? 'locked' : 'active',
       user: { id: caller.userId, role: caller.role, name: row.name },
       business: { id: caller.businessId, name: row.businessName },
-      branch: { id: caller.branchId, name: row.branchName },
+      branch: { id: caller.branchId, code: row.branchCode, name: row.branchName },
+      ...(caller.role === 'owner' && { branchCount: await this.activeBranchCountIn(tx) }),
       csrfToken,
       idleMinutes: caller.role === 'owner' ? row.ownerLockMinutes : row.staffIdleMinutes,
       // Staff have no email: nothing for them to confirm (#32).

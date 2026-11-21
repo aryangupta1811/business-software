@@ -28,7 +28,6 @@ import {
   type Transaction,
 } from '@business-software/db';
 import {
-  isLow,
   inStoreBarcode,
   inStoreSerial,
   text,
@@ -49,6 +48,7 @@ import {
   type PackInput,
 } from '@business-software/shared';
 import { z } from 'zod';
+import { branchScope } from '../branches/scope.js';
 import { DATABASE } from '../database.module.js';
 import type { Caller } from '../http/session.js';
 import { changes, inBusiness } from './conflicts.js';
@@ -137,6 +137,7 @@ export class ItemsService {
       const branchRows = await tx
         .select({ id: branches.id, name: branches.name })
         .from(branches)
+        .where(isNull(branches.archivedAt))
         .orderBy(sql`${branches.name} collate item_name`, asc(branches.id));
       return {
         canViewCost: seesCost(caller),
@@ -171,16 +172,29 @@ export class ItemsService {
           ? sql<number>`0::int` // a bare 0 in ORDER BY would mean "column 0"
           : sql<number>`case when ${exactCode} or ${exactBarcode} then 0
               when ${items.name} ilike ${`${escapeLike(term)}%`} then 1 else 2 end`;
+      // The stock column shows the computer's branch, one branch the owner picked, or all of
+      // them added up (P1.6, ADR 0045); staff always get the branch they are logged in at.
+      const scope = branchScope(caller, query.branch, 'caller');
+      const one = scope === 'all' ? null : scope;
+      const stockOf =
+        one === null
+          ? sql<number>`(select coalesce(sum(s.quantity), 0) from item_stock s
+              where s.item_id = ${items.id})`.mapWith(Number)
+          : itemStock.quantity;
+      // At or below the level, with a level above 0; over all branches, any branch counts.
+      const lowOf =
+        one === null
+          ? sql<boolean>`exists (select 1 from item_branch_levels l
+              left join item_stock s on s.branch_id = l.branch_id and s.item_id = l.item_id
+              where l.item_id = ${items.id} and l.low_stock_level > 0
+                and coalesce(s.quantity, 0) <= l.low_stock_level)`
+          : sql<boolean>`(coalesce(${itemBranchLevels.lowStockLevel}, 0) > 0
+              and coalesce(${itemStock.quantity}, 0) <= ${itemBranchLevels.lowStockLevel})`;
       const conditions = [
         query.archived === 'true' ? isNotNull(items.archivedAt) : isNull(items.archivedAt),
       ];
       if (query.category !== undefined) conditions.push(eq(items.categoryId, query.category));
-      if (query.low === 'true') {
-        conditions.push(
-          sql`coalesce(${itemBranchLevels.lowStockLevel}, 0) > 0
-            and coalesce(${itemStock.quantity}, 0) <= ${itemBranchLevels.lowStockLevel}`,
-        );
-      }
+      if (query.low === 'true') conditions.push(lowOf);
       if (term !== null) {
         const like = `%${escapeLike(term)}%`;
         conditions.push(
@@ -195,24 +209,23 @@ export class ItemsService {
             > (${cursor.rank}::int, ${cursor.name}::text collate item_name, ${cursor.id}::uuid)`,
         );
       }
-      // Stock and the low-stock level at the caller's branch (P1.8); none yet means 0 and no level.
+      // Stock and the low-stock level at that branch (P1.8); none yet means 0 and no level. For
+      // all branches the joins match nothing and the two subqueries above answer instead.
       const rows = await tx
-        .select({
-          item: items,
-          rank,
-          stock: itemStock.quantity,
-          level: itemBranchLevels.lowStockLevel,
-        })
+        .select({ item: items, rank, stock: stockOf, low: lowOf })
         .from(items)
         .leftJoin(
           itemStock,
-          and(eq(itemStock.itemId, items.id), eq(itemStock.branchId, caller.branchId)),
+          and(
+            eq(itemStock.itemId, items.id),
+            one === null ? sql`false` : eq(itemStock.branchId, one),
+          ),
         )
         .leftJoin(
           itemBranchLevels,
           and(
             eq(itemBranchLevels.itemId, items.id),
-            eq(itemBranchLevels.branchId, caller.branchId),
+            one === null ? sql`false` : eq(itemBranchLevels.branchId, one),
           ),
         )
         .where(and(...conditions))
@@ -221,11 +234,10 @@ export class ItemsService {
       const page = rows.slice(0, PAGE_SIZE);
       const last = page.at(-1);
       return {
-        items: page.map(({ item, stock, level }) => {
+        items: page.map(({ item, stock, low }) => {
           const row = forCaller(toRow(item), caller);
           if (!seesStock(caller) || item.kind !== 'goods') return row;
-          const quantity = stock ?? 0;
-          return { ...row, stock: quantity, low: isLow(quantity, level) };
+          return { ...row, stock: stock ?? 0, low };
         }),
         next:
           rows.length > PAGE_SIZE && last !== undefined

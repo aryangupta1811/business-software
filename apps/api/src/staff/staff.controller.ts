@@ -5,6 +5,7 @@ import { Body, Controller, Get, HttpCode, Inject, Param, Post, Put, Query } from
 import {
   newStaffSchema,
   ownerPasswordSchema,
+  staffBranchesSchema,
   staffDeactivateSchema,
   staffPasswordSchema,
   staffPermissionsSchema,
@@ -12,6 +13,7 @@ import {
   staffUpdateSchema,
   type NewStaffInput,
   type OwnerPasswordInput,
+  type StaffBranchesInput,
   type StaffDeactivateInput,
   type StaffPasswordInput,
   type StaffPermissionsInput,
@@ -68,6 +70,17 @@ export class StaffController {
     @Body(new ZodBodyPipe(staffPermissionsSchema)) body: StaffPermissionsInput,
   ): Promise<StaffView> {
     return answer(() => this.staff.setPermissions(caller, id, body));
+  }
+
+  /** Needs the owner's password (it gives access). Takes effect at the login's next request. */
+  @Permission('staff.manage')
+  @Put(':id/branches')
+  setBranches(
+    @CurrentCaller() caller: Caller,
+    @Param('id', UuidPipe) id: string,
+    @Body(new ZodBodyPipe(staffBranchesSchema)) body: StaffBranchesInput,
+  ): Promise<StaffView> {
+    return answer(() => this.staff.setBranches(caller, id, body));
   }
 
   /** Needs the owner's password. Ends every session of that login. */

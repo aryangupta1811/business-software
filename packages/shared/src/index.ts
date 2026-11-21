@@ -1,4 +1,18 @@
 export {
+  BRANCH_CODE_PATTERN,
+  branchesQuerySchema,
+  branchSchema,
+  deviceBranchSchema,
+  staffBranchesSchema,
+  type BranchesQuery,
+  type BranchInput,
+  type BranchRef,
+  type BranchView,
+  type ChooseBranch,
+  type DeviceBranchInput,
+  type StaffBranchesInput,
+} from './branches.js';
+export {
   ACTIVE_PING_MS,
   changePasswordSchema,
   confirmEmailSchema,
@@ -42,6 +56,7 @@ export {
   type Permission,
 } from './business.js';
 export {
+  branchScope,
   email,
   fieldErrors,
   isUuid,
@@ -222,6 +237,7 @@ export {
   REASON_DIRECTIONS,
   STOCK_MOVEMENT_KINDS,
   stockQuantityProblem,
+  stockQuerySchema,
   type AdjustmentInput,
   type AdjustmentReason,
   type BranchStockView,
@@ -232,6 +248,7 @@ export {
   type NegativeStockSetting,
   type OpeningStockInput,
   type StockMovementKind,
+  type StockQuery,
 } from './stock.js';
 export {
   BUILT_IN_UNITS,

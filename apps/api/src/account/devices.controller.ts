@@ -12,8 +12,10 @@ import {
   Res,
 } from '@nestjs/common';
 import {
+  deviceBranchSchema,
   deviceNameSchema,
   ownerPasswordSchema,
+  type DeviceBranchInput,
   type DeviceNameInput,
   type DeviceView,
   type OwnerPasswordInput,
@@ -49,6 +51,32 @@ export class DevicesController {
     @Req() request: IncomingMessage,
   ): Promise<DeviceView> {
     return this.devices.rename(caller, id, body.name, this.sessions.contextOf(request));
+  }
+
+  /**
+   * Needs the owner's password. Ends the sessions on that computer, yours too when it is this
+   * one (P1.6).
+   */
+  @Permission('settings.manage')
+  @Put(':id/branch')
+  async move(
+    @CurrentCaller() caller: Caller,
+    @Param('id', UuidPipe) id: string,
+    @Body(new ZodBodyPipe(deviceBranchSchema)) body: DeviceBranchInput,
+    @Req() request: IncomingMessage,
+    @Res({ passthrough: true }) response: ServerResponse,
+  ): Promise<DeviceView> {
+    const { device, endedOwnSession } = await answer(() =>
+      this.devices.move(
+        caller,
+        id,
+        body.branchId,
+        body.ownerPassword,
+        this.sessions.contextOf(request),
+      ),
+    );
+    if (endedOwnSession) response.setHeader('Set-Cookie', [this.sessions.clearSessionCookie()]);
+    return device;
   }
 
   /** Needs the owner's password. Forgetting this computer logs you out here. */

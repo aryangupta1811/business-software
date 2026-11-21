@@ -20,6 +20,7 @@ export const CASHIER: StaffView = {
   active: true,
   permissions: effectivePermissions({ added: [], removed: [] }),
   discountLimitBasisPoints: null,
+  extraBranchIds: [],
 };
 
 export const FORMER: StaffView = {
@@ -88,6 +89,7 @@ export function staffRoutes(
         active: true,
         permissions: input.permissions ?? CASHIER.permissions,
         discountLimitBasisPoints: input.discountLimitBasisPoints ?? null,
+        extraBranchIds: [],
       };
       state.staff.push(person);
       return { status: 201, body: person };

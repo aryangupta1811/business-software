@@ -33,16 +33,19 @@
 - **P1.8 PR 1** (#38, ADR 0041): the stock ledger, `moveStock`, the API and database timeouts; migration `0009`. Owner answered the seven design questions (all as recommended).
 - `pnpm check` on `main` after all three merges: 1,576 tests pass.
 
-**Half-done:** the first deploy (stage 6 is merged, nothing deployed); P1.8 PR 2 (the page); the SES Terraform follow-up for #37. Details in `docs/HANDOFF.md`.
+**Day 4, second half** (session 26, 2026-11-20; three lanes; the usage limit stopped it, closed 2026-11-21 to save tokens):
+- **SES follow-up** (#42, open): the api couldn't have used the instance role from its container (metadata hop limit 1), so the owner chose a mail-only role, assumed by the host every 20 minutes and handed to the api read-only (ADR 0040 dated note). Waits for the sender address, then plan and apply.
+- **P1.13 design** (#40, open, 12 owner questions) and the **sitting 3 sheet** (#41, open). The 1.5% GST rate is real (IGST notification 9/2025).
+- **P1.8 PR 2** (branch `feat/p1.8-stock-page`): built and reviewed; the Chrome check and the PR are left.
+- AWS capacity: RDS started after 2 refusals; **EC2 refused for an hour** (`t4g.small`, second day running), so still no first deploy.
 
-EC2 and RDS are stopped. EC2 couldn't start on 2026-11-19 (`InsufficientInstanceCapacity` for `t4g.small` in `ap-south-1a`); the owner chose to keep the type and retry.
+**Half-done:** P1.8 PR 2 (Chrome check, PR); #40, #41, #42 to merge; the first deploy (blocked by EC2 capacity). Details in `docs/HANDOFF.md`.
 
-**Next step:** `/start-session`, one OK for the plans (two or three lanes, not four, because of the usage limit):
-- the first deploy with the owner (details in `docs/HANDOFF.md`), then the whole-day review of #35, #37 and #38 together (the evening check not yet run);
-- P1.8 PR 2, the SES Terraform follow-up;
-- the rest of Day 4: P1.13 Billing screen, P1.5 Staff → P1.6 Branches, P2.7 (queue, then alerts); the sitting 3 sheet (04, 08, 09; D5, D6).
+EC2 is stopped. RDS should have been stopped by the 23:30 IST schedule; not checked yet (sign-in expired).
 
-**Last updated:** 2026-11-20
+**Next step:** `/start-session`, one lane at a time to save tokens: merge #40 and #41 → finish P1.8 PR 2 → #42 (sender address, plan, apply) → decide with the owner about EC2 capacity → Day 5 (P1.13 code once #40's questions are answered; P1.5 → P1.6; P2.7). Day 4 slipped by about a day.
+
+**Last updated:** 2026-11-21
 
 Each task below is sized for **one session** when worked alone. DevOps stages (from `docs/devops/DEVOPS_PLAN.md`) are woven in where they're first needed. Tasks for DRAFT modules are provisional: re-cut them after `/finalize-module NN`.
 

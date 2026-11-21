@@ -33,16 +33,19 @@
 - **P1.8 PR 1** (#38, ADR 0041): the stock ledger, `moveStock`, the API and database timeouts; migration `0009`. Owner answered the seven design questions (all as recommended).
 - `pnpm check` on `main` after all three merges: 1,576 tests pass.
 
-**Half-done:** the first deploy (stage 6 is merged, nothing deployed); P1.8 PR 2 (the page); the SES Terraform follow-up for #37. Details in `docs/HANDOFF.md`.
+**Day 4, second half** (session 26, 2026-11-20; three lanes; the usage limit stopped it, closed 2026-11-21 to save tokens):
+- **SES follow-up** (#42, open): the api couldn't have used the instance role from its container (metadata hop limit 1), so the owner chose a mail-only role, assumed by the host every 20 minutes and handed to the api read-only (ADR 0040 dated note). Waits for the sender address, then plan and apply.
+- **P1.13 design** (#40, open, 12 owner questions) and the **sitting 3 sheet** (#41, open). The 1.5% GST rate is real (IGST notification 9/2025).
+- **P1.8 PR 2** (branch `feat/p1.8-stock-page`): built and reviewed; the Chrome check and the PR are left.
+- AWS capacity: RDS started after 2 refusals; **EC2 refused for an hour** (`t4g.small`, second day running), so still no first deploy.
 
-EC2 and RDS are stopped. EC2 couldn't start on 2026-11-19 (`InsufficientInstanceCapacity` for `t4g.small` in `ap-south-1a`); the owner chose to keep the type and retry.
+**Half-done:** P1.8 PR 2 (Chrome check, PR); #40, #41, #42 to merge; the first deploy (blocked by EC2 capacity). Details in `docs/HANDOFF.md`.
 
-**Next step:** `/start-session`, one OK for the plans (two or three lanes, not four, because of the usage limit):
-- the first deploy with the owner (details in `docs/HANDOFF.md`), then the whole-day review of #35, #37 and #38 together (the evening check not yet run);
-- P1.8 PR 2, the SES Terraform follow-up;
-- the rest of Day 4: P1.13 Billing screen, P1.5 Staff → P1.6 Branches, P2.7 (queue, then alerts); the sitting 3 sheet (04, 08, 09; D5, D6).
+EC2 is stopped. RDS should have been stopped by the 23:30 IST schedule; not checked yet (sign-in expired).
 
-**Last updated:** 2026-11-20
+**Next step:** `/start-session`, one lane at a time to save tokens: merge #40 and #41 → finish P1.8 PR 2 → #42 (sender address, plan, apply) → decide with the owner about EC2 capacity → Day 5 (P1.13 code once #40's questions are answered; P1.5 → P1.6; P2.7). Day 4 slipped by about a day.
+
+**Last updated:** 2026-11-21
 
 Each task below is sized for **one session** when worked alone. DevOps stages (from `docs/devops/DEVOPS_PLAN.md`) are woven in where they're first needed. Tasks for DRAFT modules are provisional: re-cut them after `/finalize-module NN`.
 
@@ -168,7 +171,7 @@ Step 2 — The shortest path to a printed bill:
   - P1.17: quotations (#9) and the GST summary export (#18).
   - E-invoicing and e-way bills are out of v1 (#19).
 - [x] **P1.12 GST engine** (done 2026-11-18, PR #25; open questions G1–G5 in the sitting 2 sheet) in `packages/shared`: tax-inclusive/exclusive, CGST+SGST/IGST, composition, rounding; exhaustive tests, no UI
-- [ ] **P1.13 Billing screen:** keyboard and scanner flow, cart, customer capture, payment modes. **From stage 5 (ADR 0032):** Sydney adds ~0.2 s per round trip from India, so a scan can't wait for the server and still meet NFR 5's 200 ms: look items up in a copy of the catalogue kept in the browser; the server re-checks prices and stock when the bill is saved. **From P0.7 (shortcut review minors):** `preventDefault` a matching key even when it's suppressed for auto-repeat or an open dialog (except `Escape`), or held `F1`/`F3`/`F6`/`F7`/`F10` reach Chrome; reserve `F5`/`F11`/`F12` with any modifier and `Ctrl+T/W/N/R` with Shift, plus `Ctrl+F4`/`Alt+F4`; a shortcut clash should throw only in development (`import.meta.env.DEV`) and log in production; pause shortcuts whenever any `dialog:modal` is open, not only the help panel; decide on `event.defaultPrevented`; handle scanner input that arrives with no field focused. Billing F-keys use `useShortcut` (ADR 0026).
+- [ ] **P1.13 Billing screen:** (design 2026-11-20: `docs/plans/2026-11-20-p1.13-billing-design.md`, waiting for the owner's answers to its 12 questions; it also settles the 1.5% GST rate: real, Schedule VI of Notification 9/2025-IT(Rate)) keyboard and scanner flow, cart, customer capture, payment modes. **From stage 5 (ADR 0032):** Sydney adds ~0.2 s per round trip from India, so a scan can't wait for the server and still meet NFR 5's 200 ms: look items up in a copy of the catalogue kept in the browser; the server re-checks prices and stock when the bill is saved. **From P0.7 (shortcut review minors):** `preventDefault` a matching key even when it's suppressed for auto-repeat or an open dialog (except `Escape`), or held `F1`/`F3`/`F6`/`F7`/`F10` reach Chrome; reserve `F5`/`F11`/`F12` with any modifier and `Ctrl+T/W/N/R` with Shift, plus `Ctrl+F4`/`Alt+F4`; a shortcut clash should throw only in development (`import.meta.env.DEV`) and log in production; pause shortcuts whenever any `dialog:modal` is open, not only the help panel; decide on `event.defaultPrevented`; handle scanner input that arrives with no field focused. Billing F-keys use `useShortcut` (ADR 0026).
 - [ ] **P1.14 Saving a bill:** the atomic transaction, invoice numbering per branch per financial year, idempotency keys; concurrency tests
 - [ ] **P1.15 Printing:** 80/58 mm receipt and A4 invoice, PDFs via headless Chromium [ADR 0014]. **From the 2026-11-10 plan review:** ADR 0014 puts Chromium in the worker while ADR 0020 has one image for api, worker and migrate: decide whether the worker gets its own build target, so the api image stays small. Measure memory on the 2 GB server with a PDF rendering while a bill saves; add swap if needed. Chromium must be the ARM64 build
 
@@ -196,7 +199,7 @@ Step 4 — The rest of Phase 1 (deferred 2026-11-10; none of it blocks a first d
 
 ## Phase 2 — Running the business
 
-- [ ] Finalize Modules 04, 05, 06, 07, 08 (one session each; re-cut the tasks below afterwards). **05, 06, 07 done 2026-11-19 (sitting 2); the re-cut is in the "From sitting 2" notes below.** 04 and 08 are in sitting 3
+- [ ] Finalize Modules 04, 05, 06, 07, 08 (one session each; re-cut the tasks below afterwards). **05, 06, 07 done 2026-11-19 (sitting 2); the re-cut is in the "From sitting 2" notes below.** 04 and 08 are in sitting 3 (sheet `docs/plans/2026-11-20-sitting-3.md`, with 09, D5 and D6; waiting for the owner)
 - [ ] **P2.1 Suppliers & purchase entries** (stock in, with batch/expiry/IMEI)
 - [ ] **P2.2 Supplier ledger, payments, purchase returns**
 - [ ] **P2.3 Staff records & attendance** **From sitting 2 (`05`):** staff record fields (#1), salary history from the 1st of a month (#3), one daily branch register marked by the owner or a switched-on staff member, everyone starting present (#5–9), past-day changes with a reason in the log; adds the "absent staff" line and its test to the daily summary (`07` #13)

@@ -20,6 +20,9 @@ const PACK = '0b6f6f3e-3a3b-4c4d-8e8f-000000000002';
 const context: ItemsContext = {
   canViewCost: true,
   canManage: true,
+  canViewStock: true,
+  canAdjustStock: true,
+  branchId: BRANCH,
   needsGst: true,
   features: ['multiple_units'],
   branches: [{ id: BRANCH, name: 'Main' }],

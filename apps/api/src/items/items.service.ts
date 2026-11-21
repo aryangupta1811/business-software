@@ -125,7 +125,10 @@ export class ItemsService {
 
   // ---- Reading ----
 
-  /** What the page needs before it shows a form: the caller's item permissions, G5, features, branches. */
+  /**
+   * What the page needs before it shows a form: the caller's item and stock permissions, their
+   * branch, G5, features, branches.
+   */
   context(caller: Caller): Promise<ItemsContext> {
     return this.inBusiness(caller, async (tx) => {
       const [business] = await tx
@@ -138,6 +141,9 @@ export class ItemsService {
       return {
         canViewCost: seesCost(caller),
         canManage: caller.permissions.includes('items.manage'),
+        canViewStock: seesStock(caller),
+        canAdjustStock: caller.permissions.includes('stock.adjust'),
+        branchId: caller.branchId,
         needsGst: business?.gstStatus === 'regular',
         features: (business?.features ?? []) as Feature[],
         branches: branchRows,

@@ -242,6 +242,16 @@
       },
       "ownerPassword": {
         "wrong": "That isn't the owner's password"
+      },
+      "quantity": {
+        "invalid": "Enter a number like 5 or 2.5",
+        "too_small": "Enter more than 0",
+        "too_big": "This is too big",
+        "whole_units_only": "This unit is counted in whole numbers",
+        "wrong_direction": "Only a count mismatch can add stock"
+      },
+      "unitCost": {
+        "invalid": "Enter an amount like 45.00"
       }
     },
     "too_small": "This is too small",
@@ -361,6 +371,15 @@
       "ownerLockHint": "Minutes without use before the owner's login locks.",
       "staffIdle": "Staff logout after",
       "staffIdleHint": "Minutes without use before a staff login is logged out."
+    },
+    "stock": {
+      "title": "Stock",
+      "lead": "What billing does when an item runs out.",
+      "negative": "When a bill would take stock below zero",
+      "warn": "Warn",
+      "warnHint": "The bill is saved; the counter sees a warning.",
+      "block": "Block",
+      "blockHint": "The bill waits until the stock is entered."
     }
   },
   "features": {
@@ -428,7 +447,8 @@
       "price": "Price",
       "mrp": "MRP",
       "cost": "Cost",
-      "gst": "GST"
+      "gst": "GST",
+      "stock": "Stock"
     },
     "archived": "Archived",
     "service": "Service",
@@ -556,6 +576,87 @@
       "unknown": "No item has the barcode {{code}}.",
       "loggedOut": "Log in again to look up the barcode {{code}}.",
       "failed": "Couldn't look up the barcode {{code}}. Check the connection and scan again."
+    },
+    "lowOnly": "Low stock only",
+    "stock": {
+      "title": "Stock",
+      "lead": "How much is at each branch. Every change saves at once and stays in the history.",
+      "branch": "Branch",
+      "quantity": "In stock",
+      "level": "Warn at",
+      "noLevel": "Not set",
+      "averageCost": "Average cost",
+      "value": "Value at cost",
+      "yourBranch": "Your branch",
+      "badges": {
+        "low": "Low",
+        "out": "Out of stock",
+        "negative": "Below zero"
+      },
+      "open": "Set opening stock",
+      "adjust": "Adjust stock",
+      "loadFailed": "Couldn't load the stock.",
+      "history": "History",
+      "historyBranch": "Branch",
+      "noHistory": "Nothing has moved at this branch yet.",
+      "historyColumns": {
+        "date": "Date",
+        "what": "What",
+        "change": "Change",
+        "balance": "Stock after",
+        "who": "By",
+        "value": "Value"
+      },
+      "kinds": {
+        "opening": "Opening stock",
+        "adjustment": "Adjustment"
+      },
+      "reasons": {
+        "damaged": "Damaged",
+        "expired": "Expired",
+        "theft": "Theft or lost",
+        "own_use": "Own use",
+        "count_mismatch": "Count mismatch",
+        "other": "Other"
+      },
+      "more": "Show more",
+      "saving": "Saving…",
+      "openingDialog": {
+        "title": "Opening stock: {{name}}",
+        "lead": "What is on the shelf at {{branch}} now. It is set once; later changes are adjustments.",
+        "quantity": "Quantity ({{unit}})",
+        "unitCost": "Cost per {{unit}} (₹)",
+        "unitCostHint": "Filled in from the purchase price.",
+        "save": "Save opening stock"
+      },
+      "adjustDialog": {
+        "title": "Adjust stock: {{name}}",
+        "lead": "At {{branch}}. In stock now: {{quantity}}.",
+        "direction": "Change",
+        "remove": "Remove stock",
+        "removeHint": "Damaged, expired, lost or taken for use.",
+        "add": "Add stock",
+        "addHint": "Only after a count. Goods bought come in as purchases.",
+        "reason": "Reason",
+        "choose": "Choose…",
+        "quantity": "Quantity ({{unit}})",
+        "note": "Note",
+        "noteHint": "Needed for “Other”.",
+        "save": "Save adjustment"
+      },
+      "errors": {
+        "below_zero": "You can't remove more than the stock at this branch.",
+        "opening_exists": "Stock has already moved at this branch, so the opening stock is set. Use Adjust stock instead.",
+        "cost_required": "This item has no purchase price. Someone who can see costs must set its opening stock.",
+        "archived": "This item is archived. Restore it first.",
+        "service_has_no_stock": "A service has no stock.",
+        "busy": "Another counter is changing this item right now. Try again.",
+        "key_reused": "This change was already saved. Check the history before trying again.",
+        "forbidden": "You aren't allowed to change stock.",
+        "failed": "Couldn't save. Check the connection and try again."
+      },
+      "archiveLeft": "Stock left: {{list}}. The stock and its history stay with the item.",
+      "archiveUnknown": "The stock left couldn't be checked. Whatever there is stays with the item."
     }
   },
   "password": {

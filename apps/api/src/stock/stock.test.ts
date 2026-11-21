@@ -246,6 +246,7 @@ describe('stock', () => {
         businessDate: TODAY,
         actorId: a.userId,
         actorName: 'Ramesh',
+        actorRole: 'owner',
         createdAt: expect.any(String) as unknown,
       });
       expect((await stock(a, atta.id)).branches[0]).toMatchObject({
@@ -494,6 +495,18 @@ describe('stock', () => {
   });
 
   describe('the history', () => {
+    it('sends the role, so an owner who never set a name is still shown', async () => {
+      const atta = await item(a);
+      await open(a, atta.id, { quantity: 1_000 });
+      await admin.pool.query('update users set name = null where id = $1', [a.userId]);
+      try {
+        const page = await call<MovementPage>('GET', `/items/${atta.id}/stock/movements`, a);
+        expect(page.body.movements[0]).toMatchObject({ actorName: null, actorRole: 'owner' });
+      } finally {
+        await admin.pool.query('update users set name = $2 where id = $1', [a.userId, 'Ramesh']);
+      }
+    });
+
     it('lists the branch’s movements newest first, 50 at a time, without costs for staff', async () => {
       const atta = await item(a);
       await open(a, atta.id, { quantity: 60_000 });

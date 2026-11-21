@@ -8,12 +8,15 @@ import {
   users,
   withBusiness,
   type Database,
+  type EntryAction,
   type Transaction,
 } from '@business-software/db';
 import type {
+  AlertType,
   BusinessType,
   Feature,
   GstStatus,
+  SettingsAlertsInput,
   SettingsBusinessInput,
   SettingsFeaturesInput,
   SettingsSecurityInput,
@@ -135,12 +138,31 @@ export class SettingsService {
     );
   }
 
-  /** Locks, compares, writes and logs `business.updated` with only the changed fields. */
+  /**
+   * Module 07 #3: the types the bell shows. A type switched off still records its alerts;
+   * only what the app shows changes, so nothing is lost by switching one off.
+   */
+  saveAlerts(caller: Caller, input: SettingsAlertsInput): Promise<SettingsView> {
+    return this.save(
+      caller,
+      (current) => current.view.alerts,
+      input,
+      (tx) =>
+        tx
+          .update(businesses)
+          .set({ alertTypes: input.types, updatedAt: new Date() })
+          .where(eq(businesses.id, caller.businessId)),
+      'settings.alerts_changed',
+    );
+  }
+
+  /** Locks, compares, writes and logs `action` with only the changed fields. */
   private save(
     caller: Caller,
     section: (current: Current) => Section,
     input: Section,
     write: (tx: Transaction, current: Current) => Promise<unknown>,
+    action: EntryAction = 'business.updated',
   ): Promise<SettingsView> {
     return withBusiness(this.database.db, caller.businessId, async (tx) => {
       const current = await this.load(tx, caller.businessId, true);
@@ -149,7 +171,7 @@ export class SettingsService {
       await write(tx, current);
       await recordEntry(tx, {
         actorId: caller.userId,
-        action: 'business.updated',
+        action,
         entityType: 'business',
         entityId: caller.businessId,
         ...changed,
@@ -200,6 +222,7 @@ export class SettingsService {
           staffIdleMinutes: business.staffIdleMinutes,
         },
         stock: { negativeStock: business.negativeStock as NegativeStockSetting },
+        alerts: { types: business.alertTypes as AlertType[] },
       },
     };
   }

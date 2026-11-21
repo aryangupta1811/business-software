@@ -9,7 +9,12 @@ import {
   withNewBusiness,
   type Database,
 } from '@business-software/db';
-import { FEATURE_PRESETS, type SignupInput, type SignupResult } from '@business-software/shared';
+import {
+  ALERT_PRESETS,
+  FEATURE_PRESETS,
+  type SignupInput,
+  type SignupResult,
+} from '@business-software/shared';
 import { HASH_GATE, type HashGate } from '../auth/hash-gate.js';
 import { hashPassword } from '../auth/password.js';
 import {
@@ -69,6 +74,7 @@ export class SignupService {
           phone: input.phone,
           gstStatus: input.gstStatus,
           features,
+          alertTypes: [...ALERT_PRESETS[input.businessType]],
         });
         // The first branch is named after the business; the owner can rename it (P1.3 spec).
         await tx

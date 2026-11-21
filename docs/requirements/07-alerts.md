@@ -44,6 +44,14 @@
 
 13. **Alerts before their data exists:** P2.7 part 2 builds the alert machinery (alerts table, bell, settings, a test alert type). The low-stock rule lands with P1.8 or right after it merges; expiry with P1.10. The summary is built in P2.8 with pluggable sections; P1.14, P2.3, P1.18 and P1.10 each add their own line and its test.
 
+## Details from the P2.7 design (2026-11-22)
+
+14. **Staff who may not see stock** (`stock.view` off) get no stock alerts.
+15. **Dismissing** hides an alert for that person until it clears; if the item runs low again later, the new alert shows again.
+16. **Low and out of stock** for one item at one branch are one alert that changes between the two, never two at once.
+17. **Items with no low-stock level** still get an out-of-stock alert when they reach 0.
+18. **On the billing page** the bell shows its count like everywhere else and opens only when clicked.
+
 ## Open questions
 
 None. To check in P2.8 (not owner decisions): the dashboard's temporary WhatsApp token likely expires after about 24 hours, so the worker needs a long-lived system user token; a template variable probably can't hold line breaks and a body is capped at 1,024 characters.
@@ -52,3 +60,4 @@ None. To check in P2.8 (not owner decisions): the dashboard's temporary WhatsApp
 
 - 2026-10-29 — Draft created from the planning chat on claude.ai.
 - 2026-11-19 — Finalized in fast-track sitting 2 (`docs/plans/2026-11-18-sitting-2.md`, items 2–6): the owner took every recommendation. WhatsApp question closed as already answered; bills and statements go through the outbox with a document template (option a).
+- 2026-11-22 — P2.7 part 2 design answers: the owner took all 5 recommendations in `docs/plans/2026-11-22-p2.7-alerts-design.md` (section 9). Added #14–#18. #13's test alert type is replaced by low stock, which now has its data (P1.8). No decided point changed.

@@ -23,6 +23,8 @@ export {
 export { runMigrations } from './migrate.js';
 export { ENTRY_ACTIONS, recordEntry, type EntryAction, type EntryInput } from './entry-log.js';
 export {
+  alertDismissals,
+  alerts,
   AUTH_TOKEN_KINDS,
   authTokens,
   branches,
@@ -58,4 +60,5 @@ export {
   type StockMismatch,
   type StockRuleCode,
 } from './stock.js';
+export { syncStockAlerts, type SyncScope } from './alerts.js';
 export { alsoInBusiness, withBusiness, withNewBusiness, type Transaction } from './tenancy.js';

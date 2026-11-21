@@ -1,9 +1,11 @@
 import { Body, Controller, Get, Inject, Put } from '@nestjs/common';
 import {
+  settingsAlertsSchema,
   settingsBusinessSchema,
   settingsFeaturesSchema,
   settingsSecuritySchema,
   settingsStockSchema,
+  type SettingsAlertsInput,
   type SettingsBusinessInput,
   type SettingsFeaturesInput,
   type SettingsSecurityInput,
@@ -15,7 +17,7 @@ import type { Caller } from '../http/session.js';
 import { ZodBodyPipe } from '../http/zod-body.pipe.js';
 import { SettingsService } from './settings.service.js';
 
-/** Four cards on the settings page, each saved whole (PUT), each answering the full view. */
+/** Five cards on the settings page, each saved whole (PUT), each answering the full view. */
 @Controller('settings')
 export class SettingsController {
   constructor(@Inject(SettingsService) private readonly settings: SettingsService) {}
@@ -60,5 +62,20 @@ export class SettingsController {
     @Body(new ZodBodyPipe(settingsStockSchema)) body: SettingsStockInput,
   ): Promise<SettingsView> {
     return this.settings.saveStock(caller, body);
+  }
+
+  @Permission('settings.view')
+  @Get('alerts')
+  async readAlerts(@CurrentCaller() caller: Caller): Promise<SettingsAlertsInput> {
+    return (await this.settings.read(caller)).alerts;
+  }
+
+  @Permission('settings.manage')
+  @Put('alerts')
+  saveAlerts(
+    @CurrentCaller() caller: Caller,
+    @Body(new ZodBodyPipe(settingsAlertsSchema)) body: SettingsAlertsInput,
+  ): Promise<SettingsView> {
+    return this.settings.saveAlerts(caller, body);
   }
 }

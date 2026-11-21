@@ -10,7 +10,8 @@
     "home": "Home",
     "settings": "Settings",
     "items": "Saamaan",
-    "billing": "Billing"
+    "billing": "Billing",
+    "staff": "Staff"
   },
   "theme": {
     "toDark": "Dark mode chalu karein",
@@ -264,6 +265,9 @@
       },
       "unitCost": {
         "invalid": "45.00 jaisi rakam likhein"
+      },
+      "discountLimit": {
+        "invalid": "0 se 100 ke beech likhein, do dashmlav tak"
       }
     },
     "too_small": "Yeh bahut kam hai",
@@ -285,7 +289,9 @@
     "archived": "Yeh archived hai",
     "server": "Save nahi ho saka. Phir koshish karein",
     "network": "Server se jud nahi pa rahe",
-    "forbidden": "Aapko iski anumati nahi hai"
+    "forbidden": "Aapko iski anumati nahi hai",
+    "username_taken": "Yeh username kisi aur ka hai. Doosra chunein",
+    "same_as_username": "Password mein username na rakhein"
   },
   "recoveryKey": {
     "title": "Apni recovery key sambhaal kar rakhein",
@@ -713,7 +719,8 @@
       "staff": "Staff"
     },
     "lockNow": "Abhi lock karein",
-    "logout": "Logout"
+    "logout": "Logout",
+    "myPassword": "Mera password"
   },
   "forgot": {
     "title": "Password bhool gaye?",
@@ -894,7 +901,6 @@
     "approval": {
       "title": "Is chhoot ke liye maalik ki manzoori",
       "body": "Is bill mein ek line par {{line}} tak aur poore bill par {{bill}} tak chhoot hai, jo aapki seema se zyada hai. Maalik apna password likhkar is bill ke liye 30 minute tak iski anumati de sakte hain.",
-      "password": "Maalik ka password",
       "confirm": "Anumati dein",
       "failed": "Yeh nahin ho saka. Phir se koshish karein.",
       "needed": "Maalik ki manzoori chahiye",
@@ -1000,5 +1006,164 @@
     "pay": "Payment",
     "readyToSave": "Payment ho gaya. Save karne ke liye taiyaar.",
     "saveComesNext": "Bill save karna (invoice number, stock) agle update mein aayega."
+  },
+  "notAllowed": {
+    "title": "Aap yeh page nahi khol sakte",
+    "body": "Aapke login mein yeh page shaamil nahi hai. Zaroorat ho to maalik se poochhein.",
+    "home": "Home par jaayein"
+  },
+  "me": {
+    "title": "Mera password",
+    "who": "Aapka login",
+    "lead": "Aapka naam, bhoomika aur shaakha. Inhein maalik badal sakte hain.",
+    "name": "Naam",
+    "role": "Bhoomika",
+    "branch": "Shaakha"
+  },
+  "staff": {
+    "lead": "Har vyakti ko uska apna login dein aur chunein ki woh kya kar sakta hai.",
+    "newTitle": "Staff jodein",
+    "editTitle": "Staff login",
+    "back": "Saara staff",
+    "add": "Staff jodein",
+    "showFormer": "Purana staff dikhayein",
+    "loading": "Staff load ho raha hai…",
+    "loadFailed": "Staff load nahi ho saka.",
+    "retry": "Phir se koshish karein",
+    "empty": "Abhi koi staff nahi. Ek login jodein taaki cashier khud bill bana sake.",
+    "nothing": "Kuch nahi",
+    "columns": {
+      "name": "Naam",
+      "username": "Username",
+      "branch": "Mukhya shaakha",
+      "access": "Kya kar sakte hain",
+      "status": "Sthiti",
+      "actions": "Karrawai"
+    },
+    "status": {
+      "active": "Chalu",
+      "inactive": "Band"
+    },
+    "actions": {
+      "edit": "Badlein",
+      "editNamed": "{{name}} ko badlein",
+      "reset": "Password reset karein",
+      "resetNamed": "{{name}} ka password reset karein",
+      "deactivate": "Band karein",
+      "deactivateNamed": "{{name}} ka login band karein",
+      "reactivate": "Phir chalu karein",
+      "reactivateNamed": "{{name}} ka login phir chalu karein"
+    },
+    "groups": {
+      "billing": "Billing",
+      "customers": "Grahak",
+      "items": "Saamaan",
+      "stock": "Stock"
+    },
+    "person": {
+      "title": "Vyakti",
+      "lead": "Yeh login kiska hai.",
+      "name": "Naam",
+      "username": "Username",
+      "usernameHint": "Login karte samay yahi likhna hoga: 3 se 32 akshar, ank, dot, dash ya underscore.",
+      "password": "Password",
+      "branch": "Mukhya shaakha"
+    },
+    "access": {
+      "title": "Anumatiyaan",
+      "lead": "Chunein ki yeh vyakti kya kar sakta hai. Jo band rakhenge, woh yeh nahi khol payenge.",
+      "reset": "Default par lautein",
+      "limit": "Akele adhiktam chhoot",
+      "limitHint": "0 se 100 tak, do dashmlav tak. Isse upar ki chhoot ke liye aapka password chahiye.",
+      "noMoney": "Staff ko salary ya munaafa tab tak nahi dikhta, jab tak aap use chalu na karein.",
+      "save": "Anumatiyaan save karein",
+      "saved": "Anumatiyaan save ho gayin",
+      "confirmTitle": "{{name}} ki anumatiyaan save karein",
+      "confirmBody": "Koi kya kar sakta hai, yeh badalne ke liye aapka password chahiye.",
+      "confirm": "Anumatiyaan save karein"
+    },
+    "switches": {
+      "billing": {
+        "sell": {
+          "label": "Grahakon ka bill banana",
+          "hint": "Billing screen chalana, bill hold karna aur phir kholna."
+        },
+        "discount": {
+          "label": "Chhoot dena",
+          "hint": "Neeche ki seema tak. Usse upar bill ke liye aapka password chahiye."
+        }
+      },
+      "customers": {
+        "view": {
+          "label": "Grahak khojna",
+          "hint": "Counter par grahak dhoondhna."
+        },
+        "manage": {
+          "label": "Grahak jodna aur badalna",
+          "hint": "Billing ke samay naya grahak jodna."
+        }
+      },
+      "items": {
+        "view": {
+          "label": "Saamaan dekhna",
+          "hint": "Saamaan aur daam dekhna, kharid ka daam kabhi nahi."
+        },
+        "manage": {
+          "label": "Saamaan jodna aur badalna",
+          "hint": "Saamaan, categories aur units jodna, badalna aur archive karna."
+        },
+        "view_cost": {
+          "label": "Kharid ka daam dekhna",
+          "hint": "Aapne jis daam par kharida, aur margin."
+        }
+      },
+      "stock": {
+        "view": {
+          "label": "Stock dekhna",
+          "hint": "Kitna stock hai aur uska itihaas."
+        },
+        "adjust": {
+          "label": "Stock badalna",
+          "hint": "Shuruaati stock daalna aur ginti sudhaarna."
+        }
+      }
+    },
+    "new": {
+      "submit": "Staff login jodein",
+      "confirmTitle": "Yeh login jodein",
+      "confirmBody": "Naya login turant istemaal ho sakta hai, isliye jodne ke liye aapka password chahiye.",
+      "confirm": "Login jodein"
+    },
+    "reset": {
+      "title": "{{name}} ka password reset karein",
+      "body": "Naya password chunkar unhein bata dein. Woh har computer se turant logout ho jaayenge aur 'Mera password' mein khud ise badal sakte hain.",
+      "newPassword": "Naya password",
+      "confirm": "Naya password lagayein",
+      "done": "{{name}} ka naya password lag gaya. Woh har jagah se logout ho gaye."
+    },
+    "deactivate": {
+      "title": "{{name}} ko band karein?",
+      "loggedOut": "Woh turant logout ho jaayenge.",
+      "noLogin": "Woh login nahi kar payenge.",
+      "history": "Unka purana record bana rahega.",
+      "undo": "Aap jab chahein login phir chalu kar sakte hain.",
+      "reason": "Kaaran (chahein to)",
+      "confirm": "Band karein",
+      "done": "{{name}} ka login band ho gaya."
+    },
+    "reactivate": {
+      "title": "{{name}} ko phir chalu karein?",
+      "body": "Woh usi password aur unhi anumatiyon se phir login kar payenge. Iske liye aapka password chahiye.",
+      "confirm": "Phir chalu karein",
+      "done": "{{name}} phir login kar sakte hain."
+    },
+    "notFound": {
+      "title": "Aisa koi staff login nahi",
+      "body": "Shayad galat likha gaya. Ise staff ki list se kholein."
+    },
+    "errors": {
+      "invalid_permissions": "Yeh switch aapas mein mel nahi khaate. Page phir se kholkar koshish karein.",
+      "not_found": "Yeh login ab nahi hai. List par wapas jaayein."
+    }
   }
 }

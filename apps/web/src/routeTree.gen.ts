@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as PublicRouteImport } from './routes/_public'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as AppAccountRouteImport } from './routes/_app/account'
 import { Route as AppBillRouteImport } from './routes/_app/bill'
 import { Route as AppDesignRouteImport } from './routes/_app/design'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
@@ -21,6 +22,9 @@ import { Route as PublicSignupRouteImport } from './routes/_public/signup'
 import { Route as AppItemsIndexRouteImport } from './routes/_app/items.index'
 import { Route as AppItemsIdRouteImport } from './routes/_app/items.$id'
 import { Route as AppItemsNewRouteImport } from './routes/_app/items.new'
+import { Route as AppStaffIndexRouteImport } from './routes/_app/staff.index'
+import { Route as AppStaffIdRouteImport } from './routes/_app/staff.$id'
+import { Route as AppStaffNewRouteImport } from './routes/_app/staff.new'
 import { Route as PublicSignupRecoveryKeyRouteImport } from './routes/_public/signup_.recovery-key'
 import { Route as PublicConfirmEmailBusinessIdTokenRouteImport } from './routes/_public/confirm-email.$businessId.$token'
 import { Route as PublicResetBusinessIdTokenRouteImport } from './routes/_public/reset.$businessId.$token'
@@ -36,6 +40,11 @@ const PublicRoute = PublicRouteImport.update({
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAccountRoute = AppAccountRouteImport.update({
+  id: '/account',
+  path: '/account',
   getParentRoute: () => AppRoute,
 } as any)
 const AppBillRoute = AppBillRouteImport.update({
@@ -83,6 +92,21 @@ const AppItemsNewRoute = AppItemsNewRouteImport.update({
   path: '/items/new',
   getParentRoute: () => AppRoute,
 } as any)
+const AppStaffIndexRoute = AppStaffIndexRouteImport.update({
+  id: '/staff/',
+  path: '/staff/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppStaffIdRoute = AppStaffIdRouteImport.update({
+  id: '/staff/$id',
+  path: '/staff/$id',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppStaffNewRoute = AppStaffNewRouteImport.update({
+  id: '/staff/new',
+  path: '/staff/new',
+  getParentRoute: () => AppRoute,
+} as any)
 const PublicSignupRecoveryKeyRoute = PublicSignupRecoveryKeyRouteImport.update({
   id: '/signup_/recovery-key',
   path: '/signup/recovery-key',
@@ -103,6 +127,7 @@ const PublicResetBusinessIdTokenRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
+  '/account': typeof AppAccountRoute
   '/bill': typeof AppBillRoute
   '/design': typeof AppDesignRoute
   '/settings': typeof AppSettingsRoute
@@ -111,13 +136,17 @@ export interface FileRoutesByFullPath {
   '/signup': typeof PublicSignupRoute
   '/items/$id': typeof AppItemsIdRoute
   '/items/new': typeof AppItemsNewRoute
+  '/staff/$id': typeof AppStaffIdRoute
+  '/staff/new': typeof AppStaffNewRoute
   '/signup/recovery-key': typeof PublicSignupRecoveryKeyRoute
   '/items/': typeof AppItemsIndexRoute
+  '/staff/': typeof AppStaffIndexRoute
   '/confirm-email/$businessId/$token': typeof PublicConfirmEmailBusinessIdTokenRoute
   '/reset/$businessId/$token': typeof PublicResetBusinessIdTokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
+  '/account': typeof AppAccountRoute
   '/bill': typeof AppBillRoute
   '/design': typeof AppDesignRoute
   '/settings': typeof AppSettingsRoute
@@ -126,8 +155,11 @@ export interface FileRoutesByTo {
   '/signup': typeof PublicSignupRoute
   '/items/$id': typeof AppItemsIdRoute
   '/items/new': typeof AppItemsNewRoute
+  '/staff/$id': typeof AppStaffIdRoute
+  '/staff/new': typeof AppStaffNewRoute
   '/signup/recovery-key': typeof PublicSignupRecoveryKeyRoute
   '/items': typeof AppItemsIndexRoute
+  '/staff': typeof AppStaffIndexRoute
   '/confirm-email/$businessId/$token': typeof PublicConfirmEmailBusinessIdTokenRoute
   '/reset/$businessId/$token': typeof PublicResetBusinessIdTokenRoute
 }
@@ -135,6 +167,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/_public': typeof PublicRouteWithChildren
+  '/_app/account': typeof AppAccountRoute
   '/_app/bill': typeof AppBillRoute
   '/_app/design': typeof AppDesignRoute
   '/_app/settings': typeof AppSettingsRoute
@@ -144,8 +177,11 @@ export interface FileRoutesById {
   '/_app/': typeof AppIndexRoute
   '/_app/items/$id': typeof AppItemsIdRoute
   '/_app/items/new': typeof AppItemsNewRoute
+  '/_app/staff/$id': typeof AppStaffIdRoute
+  '/_app/staff/new': typeof AppStaffNewRoute
   '/_public/signup_/recovery-key': typeof PublicSignupRecoveryKeyRoute
   '/_app/items/': typeof AppItemsIndexRoute
+  '/_app/staff/': typeof AppStaffIndexRoute
   '/_public/confirm-email/$businessId/$token': typeof PublicConfirmEmailBusinessIdTokenRoute
   '/_public/reset/$businessId/$token': typeof PublicResetBusinessIdTokenRoute
 }
@@ -153,6 +189,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/account'
     | '/bill'
     | '/design'
     | '/settings'
@@ -161,13 +198,17 @@ export interface FileRouteTypes {
     | '/signup'
     | '/items/$id'
     | '/items/new'
+    | '/staff/$id'
+    | '/staff/new'
     | '/signup/recovery-key'
     | '/items/'
+    | '/staff/'
     | '/confirm-email/$businessId/$token'
     | '/reset/$businessId/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/account'
     | '/bill'
     | '/design'
     | '/settings'
@@ -176,14 +217,18 @@ export interface FileRouteTypes {
     | '/signup'
     | '/items/$id'
     | '/items/new'
+    | '/staff/$id'
+    | '/staff/new'
     | '/signup/recovery-key'
     | '/items'
+    | '/staff'
     | '/confirm-email/$businessId/$token'
     | '/reset/$businessId/$token'
   id:
     | '__root__'
     | '/_app'
     | '/_public'
+    | '/_app/account'
     | '/_app/bill'
     | '/_app/design'
     | '/_app/settings'
@@ -193,8 +238,11 @@ export interface FileRouteTypes {
     | '/_app/'
     | '/_app/items/$id'
     | '/_app/items/new'
+    | '/_app/staff/$id'
+    | '/_app/staff/new'
     | '/_public/signup_/recovery-key'
     | '/_app/items/'
+    | '/_app/staff/'
     | '/_public/confirm-email/$businessId/$token'
     | '/_public/reset/$businessId/$token'
   fileRoutesById: FileRoutesById
@@ -225,6 +273,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/account': {
+      id: '/_app/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AppAccountRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/bill': {
@@ -290,6 +345,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppItemsNewRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/staff/': {
+      id: '/_app/staff/'
+      path: '/staff'
+      fullPath: '/staff/'
+      preLoaderRoute: typeof AppStaffIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/staff/$id': {
+      id: '/_app/staff/$id'
+      path: '/staff/$id'
+      fullPath: '/staff/$id'
+      preLoaderRoute: typeof AppStaffIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/staff/new': {
+      id: '/_app/staff/new'
+      path: '/staff/new'
+      fullPath: '/staff/new'
+      preLoaderRoute: typeof AppStaffNewRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_public/signup_/recovery-key': {
       id: '/_public/signup_/recovery-key'
       path: '/signup/recovery-key'
@@ -315,23 +391,31 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppRouteChildren {
+  AppAccountRoute: typeof AppAccountRoute
   AppBillRoute: typeof AppBillRoute
   AppDesignRoute: typeof AppDesignRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppIndexRoute: typeof AppIndexRoute
   AppItemsIdRoute: typeof AppItemsIdRoute
   AppItemsNewRoute: typeof AppItemsNewRoute
+  AppStaffIdRoute: typeof AppStaffIdRoute
+  AppStaffNewRoute: typeof AppStaffNewRoute
   AppItemsIndexRoute: typeof AppItemsIndexRoute
+  AppStaffIndexRoute: typeof AppStaffIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAccountRoute: AppAccountRoute,
   AppBillRoute: AppBillRoute,
   AppDesignRoute: AppDesignRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppIndexRoute: AppIndexRoute,
   AppItemsIdRoute: AppItemsIdRoute,
   AppItemsNewRoute: AppItemsNewRoute,
+  AppStaffIdRoute: AppStaffIdRoute,
+  AppStaffNewRoute: AppStaffNewRoute,
   AppItemsIndexRoute: AppItemsIndexRoute,
+  AppStaffIndexRoute: AppStaffIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

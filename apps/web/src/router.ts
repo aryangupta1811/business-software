@@ -1,3 +1,4 @@
+import type { Permission } from '@business-software/shared';
 import { createRouter, type RouterHistory } from '@tanstack/react-router';
 import type { ParseKeys } from 'i18next';
 import { RouteError } from './components/route-error';
@@ -19,5 +20,8 @@ declare module '@tanstack/react-router' {
   // A page names its title here; the top bar shows it as the page's <h1>.
   interface StaticDataRouteOption {
     titleKey?: ParseKeys;
+    // What a login must hold to open the page; without it the page says "You can't open this
+    // page". The server checks the same permission on every request (P1.5 design §6).
+    permission?: Permission;
   }
 }

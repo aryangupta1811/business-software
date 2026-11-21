@@ -1,6 +1,6 @@
-import type { ActiveSession } from '@business-software/shared';
+import type { ActiveSession, Permission } from '@business-software/shared';
 import { Link, useMatches, useNavigate } from '@tanstack/react-router';
-import { House, IndianRupee, Keyboard, Package, Settings } from 'lucide-react';
+import { House, IndianRupee, Keyboard, Package, Settings, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keyLabels } from '../shortcuts/keys';
@@ -34,6 +34,11 @@ export function AppShell({
   const navigate = useNavigate();
   const titleKey = useMatches().at(-1)?.staticData.titleKey;
   const openShortcutHelp = useOpenShortcutHelp();
+  // Each entry shows only if this login holds its permission. With no session read (the server
+  // is down) nothing is known, so every entry shows and the server decides on each request.
+  // Hiding is only help for the person; the server is the lock.
+  const may = (permission: Permission) =>
+    session === null || session.permissions.includes(permission);
 
   useShortcut({
     keys: HOME_KEYS,
@@ -49,7 +54,7 @@ export function AppShell({
     description: 'shortcuts.goBilling',
     group: 'navigation',
     action: () => {
-      void navigate({ to: '/bill' });
+      if (may('billing.sell')) void navigate({ to: '/bill' });
     },
   });
 
@@ -58,7 +63,7 @@ export function AppShell({
     description: 'shortcuts.goItems',
     group: 'navigation',
     action: () => {
-      void navigate({ to: '/items' });
+      if (may('items.view')) void navigate({ to: '/items' });
     },
   });
 
@@ -84,28 +89,40 @@ export function AppShell({
               ))}
             </KbdGroup>
           </Link>
-          <Link to="/bill" aria-keyshortcuts={BILLING_KEYS} className={NAV_LINK}>
-            <IndianRupee aria-hidden="true" className="size-4" />
-            <span className="flex-1">{t('nav.billing')}</span>
-            <KbdGroup aria-hidden="true">
-              {keyLabels(BILLING_KEYS).map((label) => (
-                <Kbd key={label}>{label}</Kbd>
-              ))}
-            </KbdGroup>
-          </Link>
-          <Link to="/items" aria-keyshortcuts={ITEMS_KEYS} className={NAV_LINK}>
-            <Package aria-hidden="true" className="size-4" />
-            <span className="flex-1">{t('nav.items')}</span>
-            <KbdGroup aria-hidden="true">
-              {keyLabels(ITEMS_KEYS).map((label) => (
-                <Kbd key={label}>{label}</Kbd>
-              ))}
-            </KbdGroup>
-          </Link>
-          <Link to="/settings" className={NAV_LINK}>
-            <Settings aria-hidden="true" className="size-4" />
-            {t('nav.settings')}
-          </Link>
+          {may('billing.sell') && (
+            <Link to="/bill" aria-keyshortcuts={BILLING_KEYS} className={NAV_LINK}>
+              <IndianRupee aria-hidden="true" className="size-4" />
+              <span className="flex-1">{t('nav.billing')}</span>
+              <KbdGroup aria-hidden="true">
+                {keyLabels(BILLING_KEYS).map((label) => (
+                  <Kbd key={label}>{label}</Kbd>
+                ))}
+              </KbdGroup>
+            </Link>
+          )}
+          {may('items.view') && (
+            <Link to="/items" aria-keyshortcuts={ITEMS_KEYS} className={NAV_LINK}>
+              <Package aria-hidden="true" className="size-4" />
+              <span className="flex-1">{t('nav.items')}</span>
+              <KbdGroup aria-hidden="true">
+                {keyLabels(ITEMS_KEYS).map((label) => (
+                  <Kbd key={label}>{label}</Kbd>
+                ))}
+              </KbdGroup>
+            </Link>
+          )}
+          {may('staff.manage') && (
+            <Link to="/staff" className={NAV_LINK}>
+              <Users aria-hidden="true" className="size-4" />
+              {t('nav.staff')}
+            </Link>
+          )}
+          {may('settings.view') && (
+            <Link to="/settings" className={NAV_LINK}>
+              <Settings aria-hidden="true" className="size-4" />
+              {t('nav.settings')}
+            </Link>
+          )}
         </nav>
         <div className="mt-auto flex flex-col gap-3">
           {/* The ? key alone is invisible to mouse users, so the list has a button too. */}

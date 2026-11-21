@@ -6,7 +6,7 @@ import { QueryGate } from '../../items/query-gate';
 /** One item: its basics, price and tax, packs, barcodes and levels (design §7). */
 export const Route = createFileRoute('/_app/items/$id')({
   component: EditItem,
-  staticData: { titleKey: 'items.editTitle' },
+  staticData: { titleKey: 'items.editTitle', permission: 'items.view' },
 });
 
 function EditItem() {

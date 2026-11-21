@@ -9,7 +9,7 @@ import { QueryGate } from '../../items/query-gate';
 /** The billing counter (P1.13): Module 02 #1–#8, design `2026-11-20-p1.13-billing-design.md`. */
 export const Route = createFileRoute('/_app/bill')({
   component: Billing,
-  staticData: { titleKey: 'nav.billing' },
+  staticData: { titleKey: 'nav.billing', permission: 'billing.sell' },
 });
 
 function Billing() {

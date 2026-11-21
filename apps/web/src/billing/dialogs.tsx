@@ -5,70 +5,15 @@ import {
   type DiscountLimits,
   type HeldBillView,
 } from '@business-software/shared';
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ApiError, apiRequest } from '../api/client';
+import { apiRequest } from '../api/client';
+import { OwnerPasswordDialog } from '../components/owner-password-dialog';
 import { Button } from '../components/ui/button';
+import { Dialog, DialogActions } from '../components/ui/dialog';
 import { Field } from '../components/ui/field';
 import { Input } from '../components/ui/input';
-import { useRetryTime } from '../lib/retry-time';
 import { discountText, parseDiscount, type Approval } from './discounts';
-
-/**
- * A native `<dialog>` for the counter (ADR 0026): shown with `showModal()` while `open`, and Esc
- * or Cancel calls `onClose`. While it's open the page's shortcuts are off.
- */
-function CounterDialog({
-  open,
-  title,
-  onClose,
-  children,
-  wide = false,
-}: {
-  open: boolean;
-  title: string;
-  onClose: () => void;
-  children: ReactNode;
-  wide?: boolean;
-}) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
-  useEffect(() => {
-    const element = dialog.current;
-    if (!element) return;
-    if (open && !element.open) element.showModal();
-    if (!open && element.open) element.close();
-  }, [open]);
-  return (
-    <dialog
-      ref={dialog}
-      aria-labelledby={titleId}
-      onClose={onClose}
-      className={`m-auto w-full ${wide ? 'max-w-xl' : 'max-w-md'} rounded-lg bg-surface p-6 text-foreground shadow-card`}
-    >
-      {open && (
-        <>
-          <h2 id={titleId} className="text-section font-semibold">
-            {title}
-          </h2>
-          <div className="mt-4">{children}</div>
-        </>
-      )}
-    </dialog>
-  );
-}
-
-function Actions({ onClose, confirm }: { onClose: () => void; confirm: string }) {
-  const { t } = useTranslation();
-  return (
-    <div className="mt-6 flex justify-end gap-3">
-      <Button variant="secondary" onClick={onClose}>
-        {t('dialog.cancel')}
-      </Button>
-      <Button type="submit">{confirm}</Button>
-    </div>
-  );
-}
 
 const percentText = (basisPoints: number) => `${String(basisPoints / 100)}%`;
 
@@ -102,7 +47,7 @@ export function DiscountDialog({
     }
   }
   return (
-    <CounterDialog
+    <Dialog
       open={open}
       title={
         target === null
@@ -167,16 +112,16 @@ export function DiscountDialog({
             />
           )}
         </Field>
-        <Actions onClose={onClose} confirm={t('billing.discount.apply')} />
+        <DialogActions onClose={onClose} confirm={t('billing.discount.apply')} />
       </form>
-    </CounterDialog>
+    </Dialog>
   );
 }
 
 /**
  * Above the cashier's limit (design §6): the owner types their password at the counter. The OK
  * covers this bill, up to the shares shown, for 30 minutes. The password is sent once and
- * dropped.
+ * dropped (the shared owner's-password dialog never keeps it).
  */
 export function ApprovalDialog({
   open,
@@ -192,76 +137,35 @@ export function ApprovalDialog({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const retryTime = useRetryTime();
-  const [password, setPassword] = useState('');
-  const [failure, setFailure] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
-  const [wasOpen, setWasOpen] = useState(open);
-  if (open !== wasOpen) {
-    setWasOpen(open);
-    setPassword('');
-    setFailure(null);
-  }
-  const ask = async () => {
-    if (shares === null || password === '' || sending) return;
-    setSending(true);
-    setFailure(null);
-    try {
-      const answer = await apiRequest<ApprovalView>('POST', '/api/billing/approvals', {
-        billKey,
-        kind: 'discount',
-        lineBasisPoints: shares.lineBasisPoints,
-        billBasisPoints: shares.billBasisPoints,
-        ownerPassword: password,
-      });
-      onApproved({ ...answer, ...shares, billKey });
-    } catch (error) {
-      setPassword('');
-      if (error instanceof ApiError && error.code === 'wrong_password') {
-        setFailure(t('errors.fields.ownerPassword.wrong'));
-      } else if (error instanceof ApiError && error.code === 'too_many_attempts') {
-        setFailure(t('login.tooMany', { time: retryTime(error) }));
-      } else {
-        setFailure(t('billing.approval.failed'));
-      }
-    } finally {
-      setSending(false);
-    }
+  const ask = async (ownerPassword: string) => {
+    if (shares === null) return;
+    const answer = await apiRequest<ApprovalView>('POST', '/api/billing/approvals', {
+      billKey,
+      kind: 'discount',
+      lineBasisPoints: shares.lineBasisPoints,
+      billBasisPoints: shares.billBasisPoints,
+      ownerPassword,
+    });
+    onApproved({ ...answer, ...shares, billKey });
   };
   return (
-    <CounterDialog open={open} title={t('billing.approval.title')} onClose={onClose}>
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          void ask();
-        }}
-      >
-        {shares !== null && (
-          <p className="mb-4 text-muted">
-            {t('billing.approval.body', {
-              line: percentText(shares.lineBasisPoints),
-              bill: percentText(shares.billBasisPoints),
-            })}
-          </p>
-        )}
-        <Field label={t('billing.approval.password')} error={failure ?? undefined}>
-          {(props) => (
-            <Input
-              {...props}
-              // eslint-disable-next-line jsx-a11y/no-autofocus -- the owner types at once
-              autoFocus
-              type="password"
-              autoComplete="off"
-              value={password}
-              onChange={(event) => {
-                setPassword(event.target.value);
-              }}
-            />
-          )}
-        </Field>
-        <Actions onClose={onClose} confirm={t('billing.approval.confirm')} />
-      </form>
-    </CounterDialog>
+    <OwnerPasswordDialog
+      open={open}
+      title={t('billing.approval.title')}
+      confirm={t('billing.approval.confirm')}
+      failedText={t('billing.approval.failed')}
+      onSubmit={ask}
+      onClose={onClose}
+    >
+      {shares !== null && (
+        <p className="text-muted">
+          {t('billing.approval.body', {
+            line: percentText(shares.lineBasisPoints),
+            bill: percentText(shares.billBasisPoints),
+          })}
+        </p>
+      )}
+    </OwnerPasswordDialog>
   );
 }
 
@@ -283,7 +187,7 @@ export function HoldDialog({
     setLabel('');
   }
   return (
-    <CounterDialog open={open} title={t('billing.held.holdTitle')} onClose={onClose}>
+    <Dialog open={open} title={t('billing.held.holdTitle')} onClose={onClose}>
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -305,9 +209,9 @@ export function HoldDialog({
             />
           )}
         </Field>
-        <Actions onClose={onClose} confirm={t('billing.held.hold')} />
+        <DialogActions onClose={onClose} confirm={t('billing.held.hold')} />
       </form>
-    </CounterDialog>
+    </Dialog>
   );
 }
 
@@ -345,7 +249,7 @@ export function HeldBillsDialog({
   const time = (iso: string) =>
     new Date(iso).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' });
   return (
-    <CounterDialog open={open} title={t('billing.held.listTitle')} onClose={onClose} wide>
+    <Dialog open={open} title={t('billing.held.listTitle')} onClose={onClose} wide>
       {bills === undefined ? (
         <p className="text-muted">{t('billing.held.loading')}</p>
       ) : list.length === 0 ? (
@@ -428,6 +332,6 @@ export function HeldBillsDialog({
           {t('billing.held.close')}
         </Button>
       </div>
-    </CounterDialog>
+    </Dialog>
   );
 }

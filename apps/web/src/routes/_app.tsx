@@ -1,9 +1,11 @@
 import type { ActiveSession } from '@business-software/shared';
-import { createFileRoute, Navigate, Outlet } from '@tanstack/react-router';
+import { createFileRoute, Navigate, Outlet, useMatches } from '@tanstack/react-router';
+import type { ReactNode } from 'react';
 import { markActive, useSession } from '../api/session';
 import { useSessionActions } from '../api/session-actions';
 import { AppShell } from '../components/app-shell';
 import { LockScreen } from '../components/lock-screen';
+import { NotAllowed } from '../components/not-allowed';
 import { useIdle } from '../lib/use-idle';
 
 /** Pages for a logged-in business: the sidebar and the top bar around each one. */
@@ -29,6 +31,16 @@ function AppLayout() {
   );
 }
 
+/** The page, or "You can't open this page" if its route names a permission this login lacks. */
+function PermissionGate({ session, children }: { session: ActiveSession; children: ReactNode }) {
+  const needed = useMatches().flatMap((match) => match.staticData.permission ?? []);
+  return needed.every((permission) => session.permissions.includes(permission)) ? (
+    children
+  ) : (
+    <NotAllowed />
+  );
+}
+
 function LoggedIn({ session }: { session: ActiveSession }) {
   const actions = useSessionActions();
   const locked = session.state === 'locked';
@@ -43,7 +55,9 @@ function LoggedIn({ session }: { session: ActiveSession }) {
     <>
       <div inert={locked} className={locked ? 'blur-sm select-none' : undefined}>
         <AppShell session={session}>
-          <Outlet />
+          <PermissionGate session={session}>
+            <Outlet />
+          </PermissionGate>
         </AppShell>
       </div>
       {locked && <LockScreen session={session} />}

@@ -43,9 +43,9 @@ Update this as the project grows.
 | Largest exact amount in JavaScript | ≈ ₹90 lakh crore in paise (2^53) | ADR 0008 |
 | Business types in v1 | 5 | Module 00 |
 | Modules | 10 (00–09) | `docs/requirements/` |
-| ADRs | 41 (16 at kickoff) | `docs/decisions/` |
+| ADRs | 42 (16 at kickoff) | `docs/decisions/` |
 | Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
-| Automated tests | 1,576 (2026-11-20, after Day 4 first half): 876 shared, 208 db (roles, tenancy, entry log, guard, backups and restore, items, sessions, auth tokens, stock ledger and two-counter tests), 254 api (signup, login, resets, sessions, settings, items, stock, routes), 238 web (signup, login, resets, lock screen, items page, settings, three languages, contrast); plus 41 deploy-script checks | `pnpm test` |
+| Automated tests | 1,610 (2026-11-21, after Day 4): 876 shared, 208 db (roles, tenancy, entry log, guard, backups and restore, items, sessions, auth tokens, stock ledger and two-counter tests), 255 api (signup, login, resets, sessions, settings, items, stock, routes), 271 web (signup, login, resets, lock screen, items page, settings, three languages, contrast, stock screens); plus 41 deploy-script checks | `pnpm test` |
 | Interface languages | 3: English, Hindi, Hinglish (`en`, `hi`, `hi-Latn`) | Module 00 #25, ADR 0023 |
 | Web app download | ~160 KB gzipped JavaScript; fonts 307 KB (woff2, six files, cached for a year); web image 95 MB (Caddy) | P0.7, `vite build` |
 | Readability floor | text ≥ 4.5:1 contrast (main text ≥ 7:1), input edges and focus ring ≥ 3:1, both modes; body text 15 px, nothing under 13 px | ADR 0025 |
@@ -216,6 +216,10 @@ Short answers; the Log entry has the full story.
   A: A merge to `main` builds and tests ARM64 images, then a deploy job names a GitHub environment that only accepts `main` and needs my approval. It signs in to AWS through OIDC (no stored key), sends one Run Command naming the commit, checks health and rolls back if it fails. A repository variable is a kill switch: anything but `off` stops it before AWS. → ADR 0012, stage 6
 - **Q: Two counters sell the last unit at the same moment. What happens?**
   A: Each sale locks the item's stock row with `SELECT … FOR UPDATE`, always in item-ID order so two bills can't deadlock. The second waits, then sees the new quantity and is warned or blocked by the business's rule. A lock wait over 3 s answers `503` and the screen retries once with the same idempotency key. → ADR 0041, P1.8
+- **Q: Your server couldn't start because AWS had no capacity. What did you do?**
+  A: Stopping a server gives its hardware back, and `t4g.small` in my zone wasn't there for two days. The server keeps no state, so I kept the type and moved it to the zone the database is in, a one-line Terraform change; a capacity reservation would have billed while idle. → ADR 0042
+- **Q: Why did a pull request show no CI checks at all?**
+  A: It had a merge conflict with `main`. GitHub runs pull-request checks on a test merge with `main`, and with a conflict there is no merge to test. Merging `main` into the branch and pushing started them.
 
 ---
 
@@ -1870,3 +1874,19 @@ Entry format:
 - **Say it in an interview:** "My tests built a user the app itself never creates, an owner with a name, so a blank column only showed up when I signed up fresh in the browser. Now the API sends the role as a code and the page translates it, and a test covers the nameless owner."
 - **Follow-ups to expect:** why send a role code and not the word "Owner"? (the API sends codes and the page picks the language, ADR 0036) Why not use the email? (staff would see the owner's personal email in the history)
 
+### 2026-11-21 — A PR with a merge conflict gets no checks, and deploy runs wait in line `#cicd` `#github` `#gotcha`
+- **What happened:** #40 showed "no checks reported" for a day. It conflicted with `main` in two docs files, and GitHub had never started its checks. Merging `main` in and pushing started them, and they went green. Later, #44 had all five checks green but couldn't merge: `mergeStateStatus` was `BEHIND`, because another PR had merged first and `main` must be included before a merge. And when I rejected a waiting deploy run, the next one appeared at once: the deploy workflow lets only one run at a time through the `demo` environment, so later runs queue behind the first.
+- **Why / what I learned:** pull-request checks run on a test merge of the branch with `main`. A conflict means there's nothing to test, so "no checks" can mean "conflict", not "no CI". Requiring up-to-date branches means merging PRs one at a time, each bringing `main` in first. A queue of deploy runs is cleared one by one.
+- **Say it in an interview:** "No checks on a PR was a merge conflict in disguise: GitHub tests the merge result, and there wasn't one. I merge `main` in rather than rebasing, so nobody's pushed history is rewritten."
+- **Follow-ups to expect:** why merge `main` in instead of rebasing? (rebasing rewrites pushed commits; the PR is squashed on merge anyway) What does `BEHIND` mean? (branch protection requires the branch to contain the latest `main`)
+
+### 2026-11-21 — Keep the instance type, move the zone `#aws` `#devops` `#decision` → ADR 0042
+- **What happened:** the owner asked me to decide what to do about `t4g.small` capacity in `ap-south-1a`. I listed the free-plan types (`describe-instance-types --filters free-tier-eligible=true`) and where `t4g.small` is offered (`describe-instance-type-offerings`: all three Mumbai zones). The only other ARM size on the free plan is `t4g.micro` (1 GB, too small once Chromium arrives), and x86 would need images for two architectures. So: keep `t4g.small` and move it to `ap-south-1b`, where the database already is, by switching the server to the other public subnet. A one-off start attempt to test `1a` once more was blocked by the tool's permission check; I didn't route around it, and decided from the facts already gathered.
+- **Why / what I learned:** capacity is per type and per zone. A stateless server makes moving cheap: the change replaces the instance, and nothing on it needs saving. Being in the database's zone also removes a hop between zones.
+- **Say it in an interview:** "When AWS ran out of my instance type in one zone, I moved the server to the database's zone with a one-line Terraform change. It's stateless, so a replacement costs nothing. I kept the ARM type so CI still builds one architecture."
+- **Follow-ups to expect:** what would you do in production? (an Auto Scaling group across zones and several instance types) What if `1b` fails too? (retry at a quieter hour, then add a subnet in `1c`, or build multi-architecture images)
+
+### 2026-11-21 — SES sends only from a verified address `#aws` `#email`
+- **What happened:** `terraform apply` created the SES identity for the demo sender along with the mail-only role (6 resources, $0). Until the owner clicked AWS's verification link, `aws sesv2 get-email-identity --query VerifiedForSendingStatus` said `False` (`PENDING`). After the click it said `True` (`SUCCESS`). The address lives only in the git-ignored `terraform.tfvars` and is marked sensitive, so the plan printed it hidden.
+- **Why / what I learned:** SES proves you own an address before it lets you send from it, and in the sandbox it also checks that you own every recipient. A personal address in a public repo's infrastructure goes in an ignored variables file, marked sensitive.
+- **Say it in an interview:** "The sender is a Terraform variable from an ignored file, marked sensitive so plans hide it. SES won't send until the address is verified, and I check that with one CLI call before relying on email."

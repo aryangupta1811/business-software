@@ -39,6 +39,22 @@ resource "aws_ssm_parameter" "app_owner_password" {
   value_wo_version = var.app_password_version
 }
 
+# Password of app_queue, the role the worker's job queue (pg-boss) logs in as (ADR 0022). Made
+# like the others: never in state. bootstrap-db.sh creates the role on RDS with it at the next
+# deploy; the server's read-own-parameters policy already covers it.
+ephemeral "random_password" "app_queue" {
+  length  = 40
+  special = false
+}
+
+resource "aws_ssm_parameter" "app_queue_password" {
+  name             = "${local.parameter_prefix}/db/app-queue-password"
+  description      = "Password of app_queue, used only by the worker's job queue"
+  type             = "SecureString"
+  value_wo         = ephemeral.random_password.app_queue.result
+  value_wo_version = var.app_password_version
+}
+
 resource "aws_ssm_parameter" "app_runtime_password" {
   name             = "${local.parameter_prefix}/db/app-runtime-password"
   description      = "Password of app_runtime, used by api and worker"

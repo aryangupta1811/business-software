@@ -72,7 +72,15 @@
 - **#57 merged:** the shortcut fixes (design §12); the dated note on ADR 0026 comes with PR 2b.
 - **P1.13 PR 2b, the billing page `/bill` (`Alt+B`):** `GET /api/billing/context` (scheme, branch state, features, what the caller may do); the catalogue copy in memory (`CatalogueCopy`: barcode and code lookup, search, stock) and its sync (`useCatalogue`: full, then `since` = last server time − 60 s every minute and when the tab comes back, a full reload every 30 minutes); the open bill (`open-bill.ts`: `3*` quantity prefix, whole units, stock shortfall, re-pricing after a sync or `F8`, kept in `sessionStorage` per user and cleared at logout or when the session ends); the page with `F2`, `F4`, `F8`, `Ctrl+Delete`, `Alt+N` (asks, logs the discard), ↑↓, loose items asking for their weight, and totals straight from `calculateBill`. Three languages.
 
-**Half-done:** P1.13 PR 2c (discounts with the approval dialog, the customer box, payment, held bills), then the Chrome check with the speed measurement.
+- **#58 merged** (PR 2b, the billing page).
+- **P1.13 PR 2c** (the payment panel and the customer box were built by Sonnet agents in their own worktrees, then brought onto this branch):
+  - `F6`/`F7` discounts in % or ₹. Above the cashier's limit (the owner has none; staff get their session limit, or 0 without `billing.discount`), the bill says "Needs the owner's OK" and the owner's password dialog asks for the shares `discountShares` measures. The OK is kept per bill key in this tab and checked against its 30-minute expiry.
+  - `F9` holds a bill with an optional note. On an empty bill it lists the branch's held bills: resume (re-priced, changes marked) or throw away.
+  - `F3` customer box: find by phone or name, add one, B2B with GSTIN and the IGST/counter switch, "sent to" another state.
+  - `F10` payment panel: split cash/UPI/card/cheque, change for cash, cheque reference. Shared `paymentIssues` is now the single copy of the payment rules (`billDraftSchema` uses it). A paid bill shows "Ready to save".
+  - For P1.14: the save sends `bill` (with `customerId`, `placeOfSupplyStateCode`), the panel's payments, and the approval's id if any (`loadApproval(billKey)`).
+
+**Half-done:** P1.13's real-app check in Chrome (three languages, light and dark, 1024 px, two counters holding and resuming, the 200 ms scan measurement with 5,000 items).
 
 EC2 and RDS stopped at the end of session 28 (2026-11-21). No deploy run is waiting.
 

@@ -2,7 +2,9 @@ import {
   calculateBill,
   cartToBillInput,
   formatPaise,
+  type ActiveSession,
   type BillingContext,
+  type HeldBillView,
   type CatalogueView,
 } from '@business-software/shared';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -10,7 +12,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { CatalogueCopy } from '../../billing/catalogue-copy';
 import { catalogueItem } from '../../test/catalogue';
-import { fakeApi, OWNER_SESSION, renderAt } from '../../test/fake-api';
+import { fakeApi, OWNER_SESSION, renderAt, STAFF_SESSION } from '../../test/fake-api';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -65,13 +67,18 @@ const CATALOGUE: CatalogueView = {
   serverTime: '2026-11-21T10:00:00.000Z',
 };
 
-function counter() {
-  const api = fakeApi(OWNER_SESSION, {
+function counter(
+  session: ActiveSession = OWNER_SESSION,
+  routes: Parameters<typeof fakeApi>[1] = {},
+) {
+  const api = fakeApi(session, {
     'GET /api/billing/context': { body: CONTEXT },
     'GET /api/billing/catalogue': { body: CATALOGUE },
+    'GET /api/held-bills': { body: [] },
     'POST /api/billing/discard': (body) => ({
       body: { billKey: (body as { draft: { billKey: string } }).draft.billKey },
     }),
+    ...routes,
   });
   renderAt('/bill');
   return api;
@@ -132,7 +139,7 @@ describe('the billing counter', () => {
         { scheme: 'regular', supplierStateCode: '27', catalogue: copy.entries },
       ),
     );
-    expect(total()).toHaveTextContent(`₹${formatPaise(expected.grandTotalPaise)}`);
+    expect(total()).toHaveTextContent(formatPaise(expected.grandTotalPaise));
   });
 
   test('says why a code adds nothing', async () => {
@@ -188,5 +195,167 @@ describe('the billing counter', () => {
     counter();
     await screen.findByRole('table');
     expect(rows()[0]).toHaveTextContent('2 piece');
+  });
+
+  test("a cashier's discount above the limit asks the owner, and the OK clears it", async () => {
+    const user = userEvent.setup();
+    let attempts = 0;
+    const api = counter(
+      { ...STAFF_SESSION, discountLimitBasisPoints: 500 },
+      {
+        'POST /api/billing/approvals': () => {
+          attempts += 1;
+          return attempts === 1
+            ? { status: 401, body: { code: 'wrong_password' } }
+            : {
+                status: 201,
+                body: {
+                  approvalId: '00000000-0000-4000-8000-0000000000c1',
+                  expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
+                },
+              };
+        },
+      },
+    );
+    await user.type(await search(), '8901234567890{Enter}');
+    await user.keyboard('{F6}');
+    await user.type(await screen.findByRole('textbox', { name: 'Percent off' }), '10{Enter}');
+    const password = await screen.findByLabelText("Owner's password");
+    expect(screen.getByText(/up to 10% off a line and 10% off the whole bill/)).toBeInTheDocument();
+    await user.type(password, 'not it{Enter}');
+    expect(await screen.findByText("That isn't the owner's password")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Owner's password"), 'correct horse battery{Enter}');
+    await waitFor(() => {
+      expect(screen.queryByText("Needs the owner's OK")).not.toBeInTheDocument();
+    });
+    expect(api.sent('POST', '/api/billing/approvals')[1]?.body).toMatchObject({
+      kind: 'discount',
+      lineBasisPoints: 1_000,
+      billBasisPoints: 1_000,
+      ownerPassword: 'correct horse battery',
+    });
+    expect(rows()[0]).toHaveTextContent('−₹2.80');
+  });
+
+  test("the owner's own discount on the bill asks nobody", async () => {
+    const user = userEvent.setup();
+    counter();
+    await user.type(await search(), '8901234567890{Enter}');
+    await user.keyboard('{F7}');
+    await user.click(await screen.findByRole('radio', { name: 'Rupees (₹)' }));
+    await user.type(screen.getByRole('textbox', { name: 'Rupees off' }), '3{Enter}');
+    await waitFor(() => {
+      expect(total()).toHaveTextContent('₹25.00');
+    });
+    expect(screen.queryByText("Needs the owner's OK")).not.toBeInTheDocument();
+  });
+
+  test('F9 holds the bill; on an empty bill it lists the held ones and resumes one', async () => {
+    const user = userEvent.setup();
+    const heldLines = [
+      { itemId: salt.id, packId: null, quantityThousandths: 2_000, shownUnitPricePaise: 2_600 },
+    ];
+    const heldBill: HeldBillView = {
+      id: '00000000-0000-4000-8000-0000000000d1',
+      label: 'blue shirt',
+      lineCount: 1,
+      totalPaise: 5_200,
+      heldBy: { id: OWNER_SESSION.user.id, name: 'Ravi Sharma' },
+      heldAt: '2026-11-21T09:00:00.000Z',
+    };
+    const api = counter(OWNER_SESSION, {
+      'POST /api/held-bills': { status: 201, body: heldBill },
+      'GET /api/held-bills': { body: [heldBill] },
+      [`POST /api/held-bills/${heldBill.id}/resume`]: {
+        body: {
+          draft: {
+            billKey: '00000000-0000-4000-8000-0000000000e1',
+            priceList: 'retail',
+            customerId: null,
+            placeOfSupplyStateCode: '27',
+            lines: heldLines,
+          },
+        },
+      },
+    });
+    await user.type(await search(), '8901234567890{Enter}');
+    await user.keyboard('{F9}');
+    await user.type(
+      await screen.findByRole('textbox', { name: /A note to find it by/ }),
+      'gate{Enter}',
+    );
+    await waitFor(() => {
+      expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    });
+    expect(api.sent('POST', '/api/held-bills')[0]?.body).toMatchObject({
+      label: 'gate',
+      draft: { lines: [{ itemId: salt.id }] },
+      shownTotalPaise: 2_800,
+    });
+
+    await user.keyboard('{F9}');
+    const list = await screen.findByRole('listbox', { name: 'Held bills' });
+    expect(within(list).getByText('blue shirt')).toBeInTheDocument();
+    await user.keyboard('{Enter}');
+    await screen.findByRole('table');
+    // It was held at ₹26.00; the copy now says ₹28.00, so the line says so.
+    expect(rows()[0]).toHaveTextContent('2 piece');
+    expect(rows()[0]).toHaveTextContent('Price changed');
+    expect(rows()[0]).toHaveTextContent('28.00');
+  });
+
+  test('the whole bill by keyboard: scan, F3 customer, F10 payment, ready to save', async () => {
+    const user = userEvent.setup();
+    const api = counter(OWNER_SESSION, {
+      'GET /api/customers?phone=9876500001': {
+        body: [
+          {
+            id: '00000000-0000-4000-8000-0000000000c1',
+            name: 'Meena Stores',
+            phone: '9876500001',
+            gstin: null,
+            legalName: null,
+            address: null,
+            pinCode: null,
+            stateCode: null,
+            version: 1,
+          },
+        ],
+      },
+    });
+    await user.type(await search(), '8901234567890{Enter}');
+    await user.keyboard('{F3}');
+    await user.type(
+      await screen.findByRole('combobox', { name: 'Phone number or name' }),
+      '9876500001',
+    );
+    await screen.findByRole('option', { name: /Meena Stores/ });
+    await user.keyboard('{Enter}');
+    await waitFor(() => {
+      expect(screen.getByText('Meena Stores')).toBeInTheDocument();
+    });
+
+    await user.keyboard('{F10}');
+    await screen.findByRole('textbox', { name: 'Cash received' });
+    await user.keyboard('{Enter}');
+    expect(await screen.findByText('Paid. Ready to save.')).toBeInTheDocument();
+    expect(api.sent('GET', '/api/customers?phone=9876500001')).toHaveLength(1);
+    // The customer is on the bill the save (P1.14) will send.
+    const stored = JSON.parse(sessionStorage.getItem(`bill:${OWNER_SESSION.user.id}`) ?? '{}') as {
+      customerId?: string;
+    };
+    expect(stored.customerId).toBe('00000000-0000-4000-8000-0000000000c1');
+  });
+
+  test('F10 asks the owner first when a discount is above the limit', async () => {
+    const user = userEvent.setup();
+    counter({ ...STAFF_SESSION, discountLimitBasisPoints: 0 });
+    await user.type(await search(), '8901234567890{Enter}');
+    await user.keyboard('{F6}');
+    await user.type(await screen.findByRole('textbox', { name: 'Percent off' }), '5{Enter}');
+    await user.click(await screen.findByRole('button', { name: 'Cancel' }));
+    await user.keyboard('{F10}');
+    expect(await screen.findByLabelText("Owner's password")).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Cash received' })).not.toBeInTheDocument();
   });
 });

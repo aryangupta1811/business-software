@@ -14,6 +14,7 @@ import {
   type TaxScheme,
 } from '@business-software/shared';
 import type { CatalogueCopy } from './catalogue-copy';
+import type { BillCustomer } from './customer-box';
 
 /** The bill on the screen: a held bill's cart, but possibly still empty. */
 export interface OpenBill extends CartPricing {
@@ -184,10 +185,36 @@ export function loadOpenBill(userId: string): OpenBill | null {
   }
 }
 
+// The bill's customer as the screen shows it, kept with the bill in this tab.
+const CUSTOMER_PREFIX = 'bill-customer:';
+
+export function saveCustomer(billKey: string, customer: BillCustomer | null): void {
+  try {
+    if (customer === null) sessionStorage.removeItem(CUSTOMER_PREFIX + billKey);
+    else sessionStorage.setItem(CUSTOMER_PREFIX + billKey, JSON.stringify(customer));
+  } catch {
+    // Storage blocked: the name shows until the page closes.
+  }
+}
+
+export function loadCustomer(billKey: string, customerId: string | null): BillCustomer | null {
+  if (customerId === null) return null;
+  try {
+    const stored = sessionStorage.getItem(CUSTOMER_PREFIX + billKey);
+    const value = stored === null ? null : (JSON.parse(stored) as Partial<BillCustomer>);
+    if (value?.id === customerId && typeof value.name === 'string') return value as BillCustomer;
+  } catch {
+    // Unreadable: treated as unknown below.
+  }
+  // A held bill from another counter: the customer is on it, but this tab never saw their name.
+  return { id: customerId, name: '', phone: null, gstin: null, stateCode: null };
+}
+
 export function clearOpenBills(): void {
   try {
     for (const key of Object.keys(sessionStorage)) {
-      if (key.startsWith(PREFIX)) sessionStorage.removeItem(key);
+      // The open bills and their owner's OKs (`bill-approval:`).
+      if (key.startsWith('bill')) sessionStorage.removeItem(key);
     }
   } catch {
     // Nothing to clear.

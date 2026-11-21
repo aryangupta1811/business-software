@@ -30,10 +30,15 @@
     "newItem": "Add an item",
     "goBilling": "Go to Billing",
     "billSearch": "Search or scan an item",
-    "billQuantity": "Change the selected line’s quantity",
+    "billQuantity": "Change the selected line's quantity",
     "billPriceList": "Switch between retail and wholesale prices",
     "billRemoveLine": "Remove the selected line",
-    "billNew": "Start a new bill"
+    "billNew": "Start a new bill",
+    "billLineDiscount": "Discount on the selected line",
+    "billDiscount": "Discount on the whole bill",
+    "billHold": "Hold this bill, or open the held bills",
+    "billCustomer": "Find or add the customer",
+    "billPay": "Take payment"
   },
   "connection": {
     "checking": "Checking connection…",
@@ -817,7 +822,7 @@
     "results": "Matching items",
     "lines": "The bill",
     "loading": "Loading the catalogue…",
-    "loadFailed": "The catalogue couldn’t be loaded.",
+    "loadFailed": "The catalogue couldn't be loaded.",
     "tryAgain": "Try again",
     "empty": "Scan an item or type its name to start the bill.",
     "priceLists": {
@@ -835,7 +840,7 @@
     "onlyInStock": "Only {{quantity}} in stock",
     "priceChanged": "Price changed",
     "problems": {
-      "gone": "Can’t be sold any more: remove this line",
+      "gone": "Can't be sold any more: remove this line",
       "no_gst": "No GST rate or HSN: remove this line"
     },
     "notices": {
@@ -844,7 +849,9 @@
       "noGst": "Set the GST rate and HSN for {{name}} first.",
       "wholeUnits": "{{name}} is sold in whole units only.",
       "badQuantity": "Type a quantity above zero.",
-      "discardFailed": "The bill couldn’t be cleared: no connection. Try again."
+      "discardFailed": "The bill couldn't be cleared: no connection. Try again.",
+      "holdFailed": "That didn't go through: no connection. Try again.",
+      "heldGone": "That held bill was already taken by another counter or thrown away."
     },
     "totals": {
       "label": "Totals",
@@ -862,8 +869,136 @@
     },
     "newBill": {
       "title": "Clear this bill?",
-      "body": "This bill isn’t saved. Clearing it is recorded in the entry log with its items and total.",
+      "body": "This bill isn't saved. Clearing it is recorded in the entry log with its items and total.",
       "confirm": "Clear the bill"
-    }
+    },
+    "discount": {
+      "lineTitle": "Discount on {{name}}",
+      "billTitle": "Discount on the whole bill",
+      "kind": "Discount as",
+      "kinds": {
+        "percent": "Percent (%)",
+        "amount": "Rupees (₹)"
+      },
+      "amountLabel": {
+        "percent": "Percent off",
+        "amount": "Rupees off"
+      },
+      "invalid": {
+        "percent": "Type a percent from 0 to 100, up to two decimals",
+        "amount": "Type an amount in rupees"
+      },
+      "hint": "Empty or 0 takes the discount away.",
+      "apply": "Apply"
+    },
+    "approval": {
+      "title": "Owner's OK for this discount",
+      "body": "This bill gives up to {{line}} off a line and {{bill}} off the whole bill, above your limit. The owner types their password to allow it for this bill, for 30 minutes.",
+      "password": "Owner's password",
+      "confirm": "Allow",
+      "failed": "That didn't go through. Try again.",
+      "needed": "Needs the owner's OK",
+      "ask": "Ask the owner"
+    },
+    "held": {
+      "holdTitle": "Hold this bill",
+      "label": "A note to find it by (optional)",
+      "labelHint": "For example “blue shirt”. Enter holds it.",
+      "hold": "Hold",
+      "holdButton": "Hold",
+      "listButton": "Held bills ({{count}})",
+      "listTitle": "Held bills",
+      "loading": "Loading…",
+      "none": "No bills are held at this branch.",
+      "noLabel": "No note",
+      "meta_one": "{{count}} item · {{name}} · {{time}}",
+      "meta_other": "{{count}} items · {{name}} · {{time}}",
+      "discard": "Throw away",
+      "confirmDiscard": "Throw it away",
+      "close": "Close"
+    },
+    "payment": {
+      "title": "Payment",
+      "total": "Bill total",
+      "paid": "Paid",
+      "left": "Left to pay",
+      "over": "Over by",
+      "changeToReturn": "Change to return",
+      "fullyPaid": "Fully paid",
+      "rowTitle": "Payment {{n}}",
+      "payBy": "Pay by",
+      "modes": {
+        "cash": "Cash",
+        "upi": "UPI",
+        "card": "Card",
+        "cheque": "Cheque"
+      },
+      "amount": "Amount",
+      "received": "Cash received",
+      "change": "Change to return: {{amount}}",
+      "reference": "Reference (optional)",
+      "chequeNumber": "Cheque number",
+      "referenceHint": "Last digits or UTR",
+      "add": "Add payment",
+      "remove": "Remove payment {{n}}",
+      "done": "Done",
+      "errors": {
+        "invalid": "Enter an amount like 141.50",
+        "too_small": "Enter an amount above zero",
+        "too_big": "Only cash can be more than what’s left",
+        "required": "Enter the cheque number",
+        "cash_only": "Only cash can be handed over",
+        "payments_mismatch": "The payments must add up to the bill total"
+      }
+    },
+    "customer": {
+      "title": "Customer",
+      "label": "Customer",
+      "walkIn": "walk-in",
+      "walkInButton": "Walk-in",
+      "done": "Done",
+      "onThisBill": "On this bill",
+      "search": "Phone number or name",
+      "searchHint": "Type a 10-digit phone number, or part of a name.",
+      "results": "Matching customers",
+      "searching": "Looking…",
+      "searchFailed": "Couldn’t look customers up. Check the connection and try again.",
+      "none": "No customer found.",
+      "add": "Add customer",
+      "noAccess": "You can’t look customers up. This bill stays a walk-in bill.",
+      "business": "Business",
+      "gstin": "GSTIN {{gstin}}",
+      "form": {
+        "title": "New customer",
+        "name": "Name",
+        "phone": "Phone",
+        "business": "Business customer",
+        "gstin": "GSTIN",
+        "legalName": "Legal name",
+        "address": "Address",
+        "save": "Save customer",
+        "saving": "Saving…",
+        "back": "Back to search"
+      },
+      "tax": {
+        "cgstSgst": "CGST + SGST",
+        "igst": "IGST, supplied to {{state}}",
+        "counter": "Delivered at the counter",
+        "counterHint": "Goods handed over at the shop are taxed as CGST + SGST, not IGST.",
+        "sentTo": "Sent to",
+        "sentToHint": "Pick another state only if the goods are sent there. The bill then uses IGST.",
+        "thisShop": "{{state}} (this shop)"
+      },
+      "errors": {
+        "phone_taken": "A customer with this phone number already exists. Search for them instead.",
+        "gstin_taken": "A customer with this GSTIN already exists. Search for them instead.",
+        "gstin_state": "The GSTIN’s first two digits give the state",
+        "failed": "Couldn’t save the customer. Check the connection and try again."
+      },
+      "onHeldBill": "Customer saved with the bill"
+    },
+    "pay": "Pay",
+    "readyToSave": "Paid. Ready to save.",
+    "saveComesNext": "Saving the bill (invoice number, stock) comes in the next update."
   }
 }

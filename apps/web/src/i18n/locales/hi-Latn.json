@@ -33,7 +33,12 @@
     "billQuantity": "Chuni hui line ki quantity badlein",
     "billPriceList": "Retail aur wholesale daam ke beech badlein",
     "billRemoveLine": "Chuni hui line hatayein",
-    "billNew": "Naya bill shuru karein"
+    "billNew": "Naya bill shuru karein",
+    "billLineDiscount": "Chuni hui line par chhoot",
+    "billDiscount": "Poore bill par chhoot",
+    "billHold": "Yeh bill rokein, ya roke gaye bill kholein",
+    "billCustomer": "Customer khojein ya jodein",
+    "billPay": "Payment lein"
   },
   "connection": {
     "checking": "Connection check ho raha hai…",
@@ -844,7 +849,9 @@
       "noGst": "Pehle {{name}} ka GST rate aur HSN bharein.",
       "wholeUnits": "{{name}} sirf poori units mein bikta hai.",
       "badQuantity": "Zero se zyada quantity likhein.",
-      "discardFailed": "Bill saaf nahin ho saka: connection nahin hai. Phir se koshish karein."
+      "discardFailed": "Bill saaf nahin ho saka: connection nahin hai. Phir se koshish karein.",
+      "holdFailed": "Yeh nahin ho saka: connection nahin hai. Phir se koshish karein.",
+      "heldGone": "Yeh roka gaya bill kisi doosre counter ne le liya ya phenk diya gaya."
     },
     "totals": {
       "label": "Kul",
@@ -864,6 +871,134 @@
       "title": "Yeh bill saaf karein?",
       "body": "Yeh bill save nahin hua hai. Saaf karne par iske items aur kul rakam entry log mein darj honge.",
       "confirm": "Bill saaf karein"
-    }
+    },
+    "discount": {
+      "lineTitle": "{{name}} par chhoot",
+      "billTitle": "Poore bill par chhoot",
+      "kind": "Chhoot kis roop mein",
+      "kinds": {
+        "percent": "Percent (%)",
+        "amount": "Rupaye (₹)"
+      },
+      "amountLabel": {
+        "percent": "Kitne percent chhoot",
+        "amount": "Kitne rupaye chhoot"
+      },
+      "invalid": {
+        "percent": "0 se 100 tak percent likhein, do decimal tak",
+        "amount": "Rupayon mein rakam likhein"
+      },
+      "hint": "Khaali ya 0 chhodne par chhoot hat jaayegi.",
+      "apply": "Lagaayein"
+    },
+    "approval": {
+      "title": "Is chhoot ke liye maalik ki manzoori",
+      "body": "Is bill mein ek line par {{line}} tak aur poore bill par {{bill}} tak chhoot hai, jo aapki seema se zyada hai. Maalik apna password likhkar is bill ke liye 30 minute tak iski anumati de sakte hain.",
+      "password": "Maalik ka password",
+      "confirm": "Anumati dein",
+      "failed": "Yeh nahin ho saka. Phir se koshish karein.",
+      "needed": "Maalik ki manzoori chahiye",
+      "ask": "Maalik se poochhein"
+    },
+    "held": {
+      "holdTitle": "Yeh bill rokein",
+      "label": "Pehchaanne ke liye note (zaroori nahin)",
+      "labelHint": "Jaise “neeli kameez”. Enter dabaane par bill ruk jaayega.",
+      "hold": "Rokein",
+      "holdButton": "Rokein",
+      "listButton": "Roke gaye bill ({{count}})",
+      "listTitle": "Roke gaye bill",
+      "loading": "Load ho raha hai…",
+      "none": "Is branch mein koi bill ruka hua nahin hai.",
+      "noLabel": "Koi note nahin",
+      "meta_one": "{{count}} item · {{name}} · {{time}}",
+      "meta_other": "{{count}} items · {{name}} · {{time}}",
+      "discard": "Phenkein",
+      "confirmDiscard": "Haan, phenk dein",
+      "close": "Band karein"
+    },
+    "payment": {
+      "title": "Bhugtaan",
+      "total": "Bill ka kul",
+      "paid": "Chukaya",
+      "left": "Baaki",
+      "over": "Zyada",
+      "changeToReturn": "Lautaane ki rakam",
+      "fullyPaid": "Poora bhugtaan ho gaya",
+      "rowTitle": "Bhugtaan {{n}}",
+      "payBy": "Bhugtaan ka tarika",
+      "modes": {
+        "cash": "Cash",
+        "upi": "UPI",
+        "card": "Card",
+        "cheque": "Cheque"
+      },
+      "amount": "Rakam",
+      "received": "Cash mila",
+      "change": "Lautaane ki rakam: {{amount}}",
+      "reference": "Reference (zaroori nahin)",
+      "chequeNumber": "Cheque number",
+      "referenceHint": "Aakhri ank ya UTR",
+      "add": "Bhugtaan jodein",
+      "remove": "Bhugtaan {{n}} hatayein",
+      "done": "Ho gaya",
+      "errors": {
+        "invalid": "141.50 jaisi rakam likhein",
+        "too_small": "Zero se zyada rakam likhein",
+        "too_big": "Sirf cash baaki rakam se zyada ho sakta hai",
+        "required": "Cheque number likhein",
+        "cash_only": "Sirf cash zyada diya ja sakta hai",
+        "payments_mismatch": "Bhugtaan ka jod bill ke kul ke barabar hona chahiye"
+      }
+    },
+    "customer": {
+      "title": "Customer",
+      "label": "Customer",
+      "walkIn": "walk-in",
+      "walkInButton": "Walk-in",
+      "done": "Ho gaya",
+      "onThisBill": "Is bill par",
+      "search": "Phone number ya naam",
+      "searchHint": "10 ank ka phone number likhein, ya naam ka kuch hissa.",
+      "results": "Milte customer",
+      "searching": "Dhoondh rahe hain…",
+      "searchFailed": "Customer dhoondhe nahin ja sake. Connection dekhein aur phir koshish karein.",
+      "none": "Koi customer nahin mila.",
+      "add": "Customer jodein",
+      "noAccess": "Aap customer nahin dhoondh sakte. Yeh bill walk-in bill hi rahega.",
+      "business": "Vyapari",
+      "gstin": "GSTIN {{gstin}}",
+      "form": {
+        "title": "Naya customer",
+        "name": "Naam",
+        "phone": "Phone",
+        "business": "Vyapari customer",
+        "gstin": "GSTIN",
+        "legalName": "Kanooni naam",
+        "address": "Pata",
+        "save": "Customer save karein",
+        "saving": "Save ho raha hai…",
+        "back": "Search par wapas"
+      },
+      "tax": {
+        "cgstSgst": "CGST + SGST",
+        "igst": "IGST, {{state}} ko supply",
+        "counter": "Counter par diya gaya",
+        "counterHint": "Dukaan par diye gaye maal par IGST nahin, CGST + SGST lagta hai.",
+        "sentTo": "Bheja gaya",
+        "sentToHint": "Doosra rajya tabhi chunein jab maal wahan bheja ja raha ho. Tab bill mein IGST lagega.",
+        "thisShop": "{{state}} (yeh dukaan)"
+      },
+      "errors": {
+        "phone_taken": "Is phone number ka customer pehle se hai. Use dhoondhein.",
+        "gstin_taken": "Is GSTIN ka customer pehle se hai. Use dhoondhein.",
+        "gstin_state": "GSTIN ke pehle do ank rajya batate hain",
+        "failed": "Customer save nahin ho saka. Connection dekhein aur phir koshish karein."
+      },
+      "onHeldBill": "Bill ke saath save kiya gaya customer"
+    },
+    "pay": "Payment",
+    "readyToSave": "Payment ho gaya. Save karne ke liye taiyaar.",
+    "saveComesNext": "Bill save karna (invoice number, stock) agle update mein aayega."
   }
 }

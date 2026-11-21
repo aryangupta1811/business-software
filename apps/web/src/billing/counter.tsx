@@ -6,9 +6,13 @@ import {
   type BillingContext,
   type CartLine,
   type CatalogueItem,
+  type Discount,
+  type HeldBillView,
   type PriceList,
+  type ResumedBillView,
 } from '@business-software/shared';
-import { Search } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Search, ShieldAlert } from 'lucide-react';
 import {
   useDeferredValue,
   useEffect,
@@ -19,7 +23,8 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { apiRequest } from '../api/client';
+import { ApiError, apiRequest } from '../api/client';
+import { Button } from '../components/ui/button';
 import { ConfirmDialog } from '../components/ui/confirm-dialog';
 import { Input } from '../components/ui/input';
 import { Kbd } from '../components/ui/kbd';
@@ -29,9 +34,24 @@ import { unitName } from '../items/labels';
 import { useScanner } from '../items/scan';
 import { stockText } from '../items/stock-form';
 import { useShortcut } from '../shortcuts/use-shortcut';
+import { PaymentPanel, type PaymentRow } from './payment-panel';
 import type { CatalogueCopy } from './catalogue-copy';
+import { CustomerBox, CustomerSummary, type BillCustomer } from './customer-box';
+import { ApprovalDialog, DiscountDialog, HeldBillsDialog, HoldDialog } from './dialogs';
 import {
+  approvalNeeded,
+  discountLimit,
+  loadApproval,
+  saveApproval,
+  withBillDiscount,
+  withLineDiscount,
+  type Approval,
+} from './discounts';
+import {
+  fromCart,
   isLoose,
+  loadCustomer,
+  saveCustomer,
   lineProblem,
   loadOpenBill,
   parseEntry,
@@ -53,7 +73,25 @@ type Notice =
   | { kind: 'noGst'; name: string }
   | { kind: 'wholeUnits'; name: string }
   | { kind: 'badQuantity' }
-  | { kind: 'discardFailed' };
+  | { kind: 'discardFailed' }
+  | { kind: 'holdFailed' }
+  | { kind: 'heldGone' };
+
+const HELD_KEY = ['billing', 'held'] as const;
+
+/** The clock, for an owner's OK running out while the bill is on screen. */
+function useNow(everyMs: number): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, everyMs);
+    return () => {
+      clearInterval(timer);
+    };
+  }, [everyMs]);
+  return now;
+}
 
 /**
  * The billing counter (P1.13 design §3, §5): scan or search, quantities, retail or wholesale,
@@ -88,6 +126,30 @@ export function Counter({
   const [notice, setNotice] = useState<Notice | null>(null);
   const [changed, setChanged] = useState<ReadonlySet<number>>(new Set());
   const [confirmNew, setConfirmNew] = useState(false);
+  const [discountFor, setDiscountFor] = useState<'line' | 'bill' | null>(null);
+  const [approval, setApproval] = useState<Approval | null>(() => loadApproval(bill.billKey));
+  const [asking, setAsking] = useState(false);
+  const [holding, setHolding] = useState(false);
+  const [listing, setListing] = useState(false);
+  const [choosingCustomer, setChoosingCustomer] = useState(false);
+  const [customer, setCustomer] = useState<BillCustomer | null>(() =>
+    loadCustomer(bill.billKey, bill.customerId),
+  );
+  const [paying, setPaying] = useState(false);
+  /** The payments of a fully paid bill, for the total they were taken against. */
+  const [ready, setReady] = useState<{
+    billKey: string;
+    totalPaise: number;
+    payments: PaymentRow[];
+  } | null>(null);
+  const queryClient = useQueryClient();
+  const now = useNow(30_000);
+  const held = useQuery({
+    queryKey: HELD_KEY,
+    queryFn: () => apiRequest<HeldBillView[]>('GET', '/api/held-bills'),
+    refetchInterval: 60_000,
+    retry: false,
+  });
 
   useEffect(() => {
     saveOpenBill(session.user.id, bill);
@@ -120,6 +182,13 @@ export function Counter({
     return context.canViewStock ? shortOfStock(bill.lines, copy) : new Map<string, number>();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the copy changes in place; `version` says when
   }, [bill.lines, context.canViewStock, copy, version]);
+
+  const limit = discountLimit(session, context);
+  const needed = useMemo(
+    () => approvalNeeded(bill, context, copy, limit, approval, now),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the copy changes in place; `version` says when
+    [bill, context, copy, limit, approval, now, version],
+  );
 
   const focusSearch = () => {
     setEditing(null);
@@ -236,6 +305,9 @@ export function Counter({
 
   function startNew() {
     setBill(startBill(context.branchStateCode));
+    setApproval(null);
+    setCustomer(null);
+    setReady(null);
     setSelected(-1);
     setChanged(new Set());
     setNotice(null);
@@ -256,13 +328,133 @@ export function Counter({
     }
   }
 
+  /** A discount given (or taken away); above the limit, the owner is asked at once (design §6). */
+  function applyDiscount(discount: Discount | null) {
+    const next =
+      discountFor === 'bill'
+        ? withBillDiscount(bill, discount)
+        : withLineDiscount(bill, selected, discount);
+    setBill(next);
+    setDiscountFor(null);
+    if (approvalNeeded(next, context, copy, limit, approval, Date.now()) !== null) {
+      setAsking(true);
+    } else {
+      focusSearch();
+    }
+  }
+
+  function approved(given: Approval) {
+    saveApproval(given);
+    setApproval(given);
+    setAsking(false);
+    focusSearch();
+  }
+
+  /** F9: hold a bill with lines; on an empty one, show the branch's held bills. */
+  function holdOrList() {
+    if (bill.lines.length > 0) setHolding(true);
+    else {
+      void held.refetch();
+      setListing(true);
+    }
+  }
+
+  async function hold(label: string | null) {
+    setHolding(false);
+    try {
+      await apiRequest('POST', '/api/held-bills', {
+        label,
+        draft: bill,
+        shownTotalPaise: priced?.grandTotalPaise ?? 0,
+      });
+      void queryClient.invalidateQueries({ queryKey: HELD_KEY });
+      startNew();
+    } catch {
+      setNotice({ kind: 'holdFailed' });
+      focusSearch();
+    }
+  }
+
+  /** A held bill comes back at today's prices; any that changed are marked (design §9). */
+  async function resume(id: string) {
+    setListing(false);
+    try {
+      const { draft } = await apiRequest<ResumedBillView>(
+        'POST',
+        `/api/held-bills/${encodeURIComponent(id)}/resume`,
+      );
+      const repriced = repriceBill(fromCart(draft), copy);
+      setBill(repriced.bill);
+      setChanged(new Set(repriced.changed));
+      setApproval(loadApproval(draft.billKey));
+      setCustomer(loadCustomer(draft.billKey, draft.customerId));
+      setReady(null);
+      setSelected(repriced.bill.lines.length - 1);
+      setNotice(null);
+    } catch (error) {
+      setNotice(
+        error instanceof ApiError && (error.status === 409 || error.status === 404)
+          ? { kind: 'heldGone' }
+          : { kind: 'holdFailed' },
+      );
+    }
+    void queryClient.invalidateQueries({ queryKey: HELD_KEY });
+    focusSearch();
+  }
+
+  async function discardHeld(id: string) {
+    try {
+      await apiRequest('POST', `/api/held-bills/${encodeURIComponent(id)}/discard`);
+    } catch {
+      // Already resumed or thrown away elsewhere: the list below shows what's left.
+    }
+    void queryClient.invalidateQueries({ queryKey: HELD_KEY });
+  }
+
+  function chooseCustomer(chosen: BillCustomer | null, placeOfSupplyStateCode: string) {
+    saveCustomer(bill.billKey, chosen);
+    setCustomer(chosen);
+    setBill({ ...bill, customerId: chosen?.id ?? null, placeOfSupplyStateCode });
+  }
+
+  /** F10: payment, once the owner has OK'd any discount above the limit (design §6, §8). */
+  function pay() {
+    if (priced === null) return;
+    if (needed !== null) setAsking(true);
+    else setPaying(true);
+  }
+
+  const paid =
+    ready !== null &&
+    priced !== null &&
+    ready.billKey === bill.billKey &&
+    ready.totalPaise === priced.grandTotalPaise
+      ? ready.payments
+      : null;
+
   const wholesale = context.features.includes('wholesale_price');
+  const selectedLine = bill.lines[selected];
+  const selectedEntry = selectedLine === undefined ? undefined : copy.get(selectedLine.itemId);
 
   useShortcut({
     keys: 'F2',
     description: 'shortcuts.billSearch',
     group: 'general',
     action: focusSearch,
+  });
+  useShortcut({
+    keys: 'F3',
+    description: 'shortcuts.billCustomer',
+    group: 'general',
+    action: () => {
+      setChoosingCustomer(true);
+    },
+  });
+  useShortcut({
+    keys: 'F10',
+    description: 'shortcuts.billPay',
+    group: 'general',
+    action: pay,
   });
   useShortcut({
     keys: 'F4',
@@ -282,6 +474,28 @@ export function Counter({
     action: () => {
       if (wholesale) setPriceList(bill.priceList === 'retail' ? 'wholesale' : 'retail');
     },
+  });
+  useShortcut({
+    keys: 'F6',
+    description: 'shortcuts.billLineDiscount',
+    group: 'general',
+    action: () => {
+      if (selectedLine !== undefined) setDiscountFor('line');
+    },
+  });
+  useShortcut({
+    keys: 'F7',
+    description: 'shortcuts.billDiscount',
+    group: 'general',
+    action: () => {
+      if (bill.lines.length > 0) setDiscountFor('bill');
+    },
+  });
+  useShortcut({
+    keys: 'F9',
+    description: 'shortcuts.billHold',
+    group: 'general',
+    action: holdOrList,
   });
   useShortcut({
     keys: 'Ctrl+Delete',
@@ -386,7 +600,7 @@ export function Counter({
                       )}
                     </span>
                     <span className="shrink-0 tabular-nums text-muted">
-                      {item.code !== null && <span className="mr-3">{item.code}</span>}₹
+                      {item.code !== null && <span className="mr-3">{item.code}</span>}
                       {formatPaise(item.sellingPrice)}
                     </span>
                   </li>
@@ -408,6 +622,17 @@ export function Counter({
               <Kbd aria-hidden="true">F8</Kbd>
             </button>
           )}
+          <button
+            type="button"
+            aria-keyshortcuts="F9"
+            onClick={holdOrList}
+            className="flex h-12 items-center gap-2 rounded-lg border border-border px-3 whitespace-nowrap"
+          >
+            {bill.lines.length > 0
+              ? t('billing.held.holdButton')
+              : t('billing.held.listButton', { count: held.data?.length ?? 0 })}
+            <Kbd aria-hidden="true">F9</Kbd>
+          </button>
         </div>
         <p id={noticeId} role="status" className="min-h-6 text-danger">
           {notice !== null && t(`billing.notices.${notice.kind}`, notice)}
@@ -429,8 +654,127 @@ export function Counter({
           onSaveQuantity={saveQuantity}
           onCancelQuantity={focusSearch}
         />
+        <CustomerSummary
+          customer={
+            customer !== null && customer.name === ''
+              ? { ...customer, name: t('billing.customer.onHeldBill') }
+              : customer
+          }
+          placeOfSupplyStateCode={bill.placeOfSupplyStateCode}
+          branchStateCode={context.branchStateCode}
+          onOpen={() => {
+            setChoosingCustomer(true);
+          }}
+        />
       </section>
-      <Totals bill={bill} priced={priced} />
+      <div className="flex flex-col gap-4">
+        <Totals bill={bill} priced={priced} />
+        {paid !== null ? (
+          <div
+            role="status"
+            className="flex flex-col gap-1 rounded-lg border border-border bg-surface p-4"
+          >
+            <p className="font-semibold">{t('billing.readyToSave')}</p>
+            <p className="text-label text-muted">
+              {paid
+                .map(
+                  (row) =>
+                    `${t(`billing.payment.modes.${row.mode}`)} ${formatPaise(row.amountPaise)}`,
+                )
+                .join(' · ')}
+            </p>
+            <p className="text-label text-muted">{t('billing.saveComesNext')}</p>
+          </div>
+        ) : (
+          <Button size="default" disabled={priced === null} aria-keyshortcuts="F10" onClick={pay}>
+            {t('billing.pay')}
+            <Kbd aria-hidden="true" className="ml-2">
+              F10
+            </Kbd>
+          </Button>
+        )}
+        {needed !== null && (
+          <div
+            role="alert"
+            className="flex flex-col gap-3 rounded-lg border border-warning bg-warning-soft p-4"
+          >
+            <p className="flex items-center gap-2 font-semibold">
+              <ShieldAlert aria-hidden="true" className="size-4 text-warning" />
+              {t('billing.approval.needed')}
+            </p>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setAsking(true);
+              }}
+            >
+              {t('billing.approval.ask')}
+            </Button>
+          </div>
+        )}
+      </div>
+      <DiscountDialog
+        open={discountFor !== null}
+        target={discountFor === 'line' && selectedEntry !== undefined ? selectedEntry.name : null}
+        current={discountFor === 'bill' ? bill.billDiscount : selectedLine?.discount}
+        onApply={applyDiscount}
+        onClose={() => {
+          setDiscountFor(null);
+          searchRef.current?.focus();
+        }}
+      />
+      <ApprovalDialog
+        open={asking}
+        billKey={bill.billKey}
+        shares={needed}
+        onApproved={approved}
+        onClose={() => {
+          setAsking(false);
+          searchRef.current?.focus();
+        }}
+      />
+      <CustomerBox
+        open={choosingCustomer}
+        context={context}
+        customer={customer}
+        placeOfSupplyStateCode={bill.placeOfSupplyStateCode}
+        onChange={chooseCustomer}
+        onClose={() => {
+          setChoosingCustomer(false);
+          searchRef.current?.focus();
+        }}
+      />
+      <PaymentPanel
+        open={paying}
+        totalPaise={priced?.grandTotalPaise ?? 0}
+        onReady={(payments) => {
+          setReady({ billKey: bill.billKey, totalPaise: priced?.grandTotalPaise ?? 0, payments });
+          setPaying(false);
+          searchRef.current?.focus();
+        }}
+        onClose={() => {
+          setPaying(false);
+          searchRef.current?.focus();
+        }}
+      />
+      <HoldDialog
+        open={holding}
+        onHold={(label) => void hold(label)}
+        onClose={() => {
+          setHolding(false);
+          searchRef.current?.focus();
+        }}
+      />
+      <HeldBillsDialog
+        open={listing}
+        bills={held.data}
+        onResume={(id) => void resume(id)}
+        onDiscard={(id) => void discardHeld(id)}
+        onClose={() => {
+          setListing(false);
+          searchRef.current?.focus();
+        }}
+      />
       <ConfirmDialog
         open={confirmNew}
         title={t('billing.newBill.title')}
@@ -640,7 +984,7 @@ function Totals({ bill, priced }: { bill: OpenBill; priced: Bill | null }) {
           aria-label={t('billing.totals.total')}
           className="text-figure font-semibold tabular-nums"
         >
-          ₹{priced === null ? '0.00' : formatPaise(priced.grandTotalPaise)}
+          {formatPaise(priced?.grandTotalPaise ?? 0)}
         </output>
       </div>
       {priced !== null && (

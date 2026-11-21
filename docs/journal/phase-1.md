@@ -41,6 +41,11 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
   - **P1.4 PR 2:** email confirmation, password reset by link and by recovery key, a new recovery key, change password, remembered computers. Email goes through one interface: SES on the server with no password anywhere, Mailpit on the laptop (ADR 0040). The owner chose to limit recovery-key tries per IP only, so knowing an owner's email can't lock them out.
   - **P1.8 PR 1:** the stock ledger. Every change is a row in an append-only `stock_movements` table; `item_stock` holds the current quantity and average cost per item per branch; `moveStock` is the only code that writes either. Rows are locked in item order so two counters can't sell the same last unit or deadlock; database timeouts end a stuck wait with a `503` the screen retries (ADR 0041). The owner answered seven design questions.
   - Code reviews: 32 findings across three PRs. 1,576 tests on `main` after the three merges.
+- **2026-11-20 to 11-21 (fast track Day 4, second half and finish: PRs #40, #41, #42, #44):** the usage limit stopped Day 4's second half, and it was finished one lane at a time.
+  - **P1.8 PR 2, the stock screens (#44):** a Stock column with Low / Out of stock / Below zero badges and a low-stock filter, a Stock card per branch on the item page (opening stock, adjust, history), and a Settings switch to warn or block below zero. Checked in Chrome on a fresh business, and the audit query matched (stock equals the sum of its movements).
+  - **Email (#42):** the api in its container can't reach the server's role, so a mail-only role is assumed on the host and handed to the api read-only. Applied ($0); the sender is verified.
+  - **P1.13 design (#40) and the sitting 3 sheet (#41)** merged; billing code waits for the owner's 12 answers.
+  - **EC2 capacity:** keep `t4g.small`, move to `ap-south-1b` (ADR 0042). 1,610 tests.
 
 ## Stack choices vs alternatives
 
@@ -105,6 +110,9 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
 - **The session started with two tools down:** the AWS sign-in had expired and Docker Desktop wasn't running after a restart. Lesson: check sign-ins and services before cloud or database work, not when the first command fails.
 - **A plan step trusted a sentence in my own ADR.** ADR 0027 said backups could run "as the RDS master"; AWS's docs say the master can't bypass RLS. Lesson: re-check a stored claim against the source when a design leans on it.
 
+- **A test fixture nicer than real data hid a bug.** The API tests' owner had a name, which the real signup never sets, so the history's "By" column was blank for every real owner. Only signing up fresh in Chrome showed it. Lesson: build test users the way the app builds them, then add only what a test needs.
+- **A PR title over 72 characters failed CI twice this week.** Lesson: count before `gh pr create` (`echo ${#T}`).
+
 ## Interview questions I can now answer
 
 - Q: Why is your server in Sydney when your users are in India?
@@ -163,3 +171,5 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
   A: A per-account limit lets anyone who knows the owner's email lock them out of recovery for an hour: a denial of service. The key is 160 random bits, so guessing is hopeless anyway; a per-IP limit stops brute force without that side effect. (`00` #41)
 - Q: How do you keep stock right when two counters sell the same item?
   A: Every change goes through one function that locks the item's stock row (`SELECT … FOR UPDATE`, in item-ID order to avoid deadlocks), checks the rule, writes an append-only movement and updates the balance in one transaction. A 3 s lock timeout answers `503` instead of hanging a connection. (ADR 0041)
+- Q: How did you check the stock screens beyond unit tests?
+  A: A fresh signup in the real app, then opening stock, removals down to the low badge, a removal past zero refused, Hindi and dark mode, and in the database the audit query (stock equals the sum of movements) and the entry log. That found a blank "By" column the tests had hidden.

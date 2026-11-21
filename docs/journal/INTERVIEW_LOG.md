@@ -20,9 +20,9 @@ Update this as the project grows.
 
 - **The problem:** a small Indian shop runs on a billing app, a paper udhaar register and a staff notebook. I'm building one web app that does all of it, for many shops at once, each seeing only its own data, in English, Hindi and Hinglish.
 - **What makes it hard:** correctness, not the feature list. A bill must save the invoice, the stock change and the udhaar entry together or not at all. Two counters can sell the last unit at the same moment. GST maths must be exact to the paisa. And the owner can't lose a single record.
-- **My architecture:** a TypeScript monorepo with a React single-page app, a NestJS modular monolith (so a bill is one database transaction, not a saga across services) and PostgreSQL. The safety rules live in the database, not only in my code: money is stored as whole paise, the app's database user has no DELETE permission, and Row-Level Security keeps businesses apart. Every choice has a written decision record with the alternatives I rejected; there are 39 so far.
+- **My architecture:** a TypeScript monorepo with a React single-page app, a NestJS modular monolith (so a bill is one database transaction, not a saga across services) and PostgreSQL. The safety rules live in the database, not only in my code: money is stored as whole paise, the app's database user has no DELETE permission, and Row-Level Security keeps businesses apart. Every choice has a written decision record with the alternatives I rejected; there are 41 so far.
 - **One hard bug:** my background worker kept dying after exactly 10 seconds. That was the database driver's idle timeout. Waiting for the shutdown signal doesn't keep Node's event loop alive, so when the pool's last idle connection closed, the process simply ended. I reproduced it in a test, held the process open until SIGTERM, and confirmed it in Docker with zero restarts.
-- **How it's shipped:** the same Docker Compose stack runs on my laptop and in CI. Every pull request must pass five required checks: lint, types and 1,399 tests against a real PostgreSQL; a secret scan of the whole history; a migration-order check; the PR title; and a smoke test that starts the real images. The cloud is Terraform on AWS in Mumbai: one ARM64 EC2 server plus RDS PostgreSQL with point-in-time restore, no SSH (Systems Manager only), priced at about 4 cents per running hour and run only for sessions and demos, because my budget is ₹0. CI also checks the Terraform on every PR. Every commit on `main` gets ARM64 images on GHCR, tagged by its hash, and the demo at https://business-software.duckdns.org deploys one commit at a time over Systems Manager.
+- **How it's shipped:** the same Docker Compose stack runs on my laptop and in CI. Every pull request must pass five required checks: lint, types and 1,576 tests against a real PostgreSQL; a secret scan of the whole history; a migration-order check; the PR title; and a smoke test that starts the real images. The cloud is Terraform on AWS in Mumbai: one ARM64 EC2 server plus RDS PostgreSQL with point-in-time restore, no SSH (Systems Manager only), priced at about 4 cents per running hour and run only for sessions and demos, because my budget is ₹0. CI also checks the Terraform on every PR. Every commit on `main` gets ARM64 images on GHCR, tagged by its hash, and the demo at https://business-software.duckdns.org deploys one commit at a time over Systems Manager. A merge to `main` starts a deploy that waits for my approval in a GitHub environment, signs in to AWS through OIDC with no stored key, takes a backup first and rolls back on a failed health check.
 - **Where it stands:** the foundations are done (Phase 0). In Phase 1 the database already keeps businesses apart (forced Row-Level Security, with a test that scans every table), and an append-only audit log records every change in the same transaction. The GST engine computes every number on a bill; a shop can sign up, owners and staff log in (hashed sessions, a lock screen, CSRF, rate limits), and the owner manages items with barcodes. The database is backed up nightly to S3 by a read-only role, into a bucket that refuses overwrites, with a restore drill. Billing comes next.
 - **What I'd do differently:** pin down the real constraints first. I designed hosting for a budget I didn't have and had to redesign it. And test what you ship: the production CSS minifier broke a page my unit tests said was fine.
 
@@ -43,9 +43,9 @@ Update this as the project grows.
 | Largest exact amount in JavaScript | ≈ ₹90 lakh crore in paise (2^53) | ADR 0008 |
 | Business types in v1 | 5 | Module 00 |
 | Modules | 10 (00–09) | `docs/requirements/` |
-| ADRs | 39 (16 at kickoff) | `docs/decisions/` |
+| ADRs | 41 (16 at kickoff) | `docs/decisions/` |
 | Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
-| Automated tests | 1,399 (2026-11-20): 831 shared, 165 db (roles, tenancy, entry log, guard, backups and restore, items, sessions), 183 api (signup, login, sessions, settings, items, routes), 220 web (signup, login, lock screen, items page, settings, three languages, contrast) | `pnpm test` |
+| Automated tests | 1,576 (2026-11-20, after Day 4 first half): 876 shared, 208 db (roles, tenancy, entry log, guard, backups and restore, items, sessions, auth tokens, stock ledger and two-counter tests), 254 api (signup, login, resets, sessions, settings, items, stock, routes), 238 web (signup, login, resets, lock screen, items page, settings, three languages, contrast); plus 41 deploy-script checks | `pnpm test` |
 | Interface languages | 3: English, Hindi, Hinglish (`en`, `hi`, `hi-Latn`) | Module 00 #25, ADR 0023 |
 | Web app download | ~160 KB gzipped JavaScript; fonts 307 KB (woff2, six files, cached for a year); web image 95 MB (Caddy) | P0.7, `vite build` |
 | Readability floor | text ≥ 4.5:1 contrast (main text ≥ 7:1), input edges and focus ring ≥ 3:1, both modes; body text 15 px, nothing under 13 px | ADR 0025 |
@@ -68,6 +68,10 @@ Update this as the project grows.
 | Backups | nightly at 22:45 IST (or at the next boot), kept 90 days + 30 days as old versions; can't be overwritten; under $0.10 a month | Stage 7, ADR 0037 |
 | Wrong-password limit | 10 per login per 15 minutes, 30 per computer; at most 2 Argon2 hashes at once | P1.4, ADR 0038 |
 | Review findings before merge, Day 3 | 39 across 4 PRs (10 + 9 + 10 + 10), all fixed test-first; CI was green on every one | Fast track Day 3 |
+| Review findings before merge, Day 4 (first half) | 32 across 3 PRs (stage 6: 10 + 8 over two reviews; P1.4 PR 2: 10; P1.8 PR 1: 4); fixed test-first or answered with reasons | Fast track Day 4 |
+| Database timeouts | lock 3 s, statement 10 s, idle in transaction 15 s; a lock timeout answers `503` with `Retry-After: 1` | ADR 0041 |
+| Email cost | Amazon SES, Mumbai: $0.10 per 1,000 emails, nothing while idle; sandbox = verified addresses only | ADR 0040 |
+| Deploy role | 3 IAM resources (OIDC provider, role, policy), $0; one GitHub environment with a required reviewer and `main` only | Stage 6, ADR 0012 note |
 
 ---
 
@@ -208,6 +212,10 @@ Short answers; the Log entry has the full story.
   A: A read-only `app_backup` role with its own policy on every tenant table; CI fails if a table lacks it, and the dump script refuses to run if the live database does. The RDS master can't bypass RLS, so it can't do it. → ADR 0037
 - **Q: How did you run several tasks at once on your own?**
   A: One git worktree, branch and PR per task, each worked by a background agent; one merge queue where the second PR to merge updates from `main`, renumbers its migration and re-runs CI; a code review on every PR before merge. → `docs/plans/2026-11-17-fast-track.md`
+- **Q: How does a merge reach your server, and who can stop it?**
+  A: A merge to `main` builds and tests ARM64 images, then a deploy job names a GitHub environment that only accepts `main` and needs my approval. It signs in to AWS through OIDC (no stored key), sends one Run Command naming the commit, checks health and rolls back if it fails. A repository variable is a kill switch: anything but `off` stops it before AWS. → ADR 0012, stage 6
+- **Q: Two counters sell the last unit at the same moment. What happens?**
+  A: Each sale locks the item's stock row with `SELECT … FOR UPDATE`, always in item-ID order so two bills can't deadlock. The second waits, then sees the new quantity and is warned or blocked by the business's rule. A lock wait over 3 s answers `503` and the screen retries once with the same idempotency key. → ADR 0041, P1.8
 
 ---
 
@@ -337,6 +345,10 @@ Terms I learned on this project, in one line each.
 | Optimistic locking | Each row carries a version; a save sends the version it read and is refused (`409`) if someone saved in between |
 | Git worktree | A second checkout of the same repository in another folder, on its own branch, sharing one `.git` |
 | InsufficientInstanceCapacity | AWS has no spare servers of that type in that zone right now; a stopped instance doesn't reserve its capacity |
+| GitHub environment | A named deploy target in a repository with its own secrets, variables and protection rules (required reviewers, allowed branches); a job that names it waits for those rules |
+| Saved Terraform plan | `terraform plan -out=file`, then `terraform apply file`: applies exactly what was reviewed, and refuses if the state changed since |
+| `lock_timeout` | A PostgreSQL setting: how long a statement waits for a row or table lock before giving up with an error |
+| Weighted average cost | Stock value divided by quantity, recomputed on every stock-in; used to value write-offs and profit |
 
 ---
 
@@ -1805,3 +1817,43 @@ Entry format:
 - **What happened:** the test "forgetting this computer goes to the login page" passed locally and failed in CI with "expected '/' to be '/login'". After forgetting, the app clears its cache and opens `/login`; the login page then re-reads the session and sends anyone still logged in to `/`. The test's fake API kept answering "logged in", so the result depended on timing. On my laptop the check ran before the re-read came back; on the slower CI runner it ran after. The app was right; the fake wasn't. Now the fake does what the real server does: after `POST .../forget` the session answers `none` and Settings answers `401`. The test waits for the "Log in" heading.
 - **Why / what I learned:** a fake must change state the way the real server does. If a test only passes because it checks before a background request returns, it's a race, and CI's slower machines are where races show up.
 - **Say it in an interview:** "A green test on my machine and a red one in CI usually means a race. Mine was in the test's fake server, which never ended the session, so I made the fake follow the real server's rules instead of adding waits."
+
+### 2026-11-20 — 1.5% is a real GST rate, not half of 3% `#gst` `#research`
+- **What happened:** before the billing screen, I checked the open question from P1.7 against the notification itself. Notification 9/2025-Integrated Tax (Rate) (in force 22 Sept 2025) charges IGST at 1.50% on its Schedule VI, which holds HSN 7102 diamonds other than rough ones (cut and polished); rough diamonds are Schedule V at 0.25%. The Central Tax version of the same notification lists 0.75% for Schedule VI, which is why some blogs called "1.5%" a half rate. The full rate is 1.5% (CGST 0.75% + SGST 0.75%). The P1.13 design recommends adding it to `GST_RATES`.
+- **Why / what I learned:** a CGST notification shows half the rate and the IGST notification shows the whole rate, so a number in a secondary source can be either. Read the IGST notification for the total. The engine already handles odd halves (it divides by twice the base), so 1.5% needs one constant and a regenerated check constraint, not new maths.
+- **Say it in an interview:** "I checked my GST rate list against the government notification, not tax blogs. The blogs disagreed because the central-tax version shows half the rate; the integrated-tax version showed 1.5% was a full rate I'd left out."
+
+### 2026-11-20 — Syncing "what changed since" misses late commits; ask with an overlap `#database` `#frontend` `#gotcha` → P1.13 design
+- **What happened:** the billing screen keeps a copy of the catalogue in the browser so a scan never waits for the network (NFR 5, under 200 ms). It refreshes by asking the server for items changed since its last sync time. But `updated_at` is stamped when a change is made, and other counters only see it when its transaction commits. A change made at 10:00:00.9 and committed at 10:00:01.2 is invisible to a sync at 10:00:01.0, and the next sync, asking for "after 10:00:01.0", skips it for good.
+- **Why / what I learned:** a timestamp cursor over rows written by concurrent transactions isn't exact. The fix is an overlap longer than any transaction can stay open (the database ends idle transactions after 15 s and slow statements after 10 s, ADR 0041), so each sync asks for "changed since 60 s before my last sync", replaces duplicates by ID, and a full reload every 30 minutes heals anything missed. The server also re-prices every line when the bill is saved, so a stale copy can only cause a "prices changed" prompt, never a wrong bill.
+- **Say it in an interview:** "Incremental sync by `updated_at` loses rows whose transaction commits after the cursor moves past them. I sync with a 60-second overlap that's longer than my database's transaction timeouts, dedupe by ID, and the server stays the source of truth at save."
+
+### 2026-11-20 — Three tasks in parallel, merged in order, migrations regenerated `#process` `#git` `#database`
+- **What happened:** stage 6, P1.4 PR 2 and P1.8 PR 1 ran as three lanes, each in its own worktree. Two lanes each made a new migration on top of 0007. #37 merged first as 0008; #38 then merged `main` in, deleted its migration and regenerated it, so it came out as 0009 chained from 0008. The SQL was byte-identical; only the snapshot chain changed. Merging `main` also needed two fixes no conflict marker showed: two lanes had each added a `CLOCK` token, and a new test from one lane built a settings object without the other lane's new field.
+- **Why / what I learned:** a merge with no conflicts can still be broken. The type-check and the full test run after the merge, not the merge itself, are what prove two branches fit together.
+- **Say it in an interview:** "I merge one PR at a time. The next one brings `main` in, regenerates its migration so the numbers stay in order, and re-runs every check, because two changes that each pass can still clash."
+- **Follow-ups to expect:** why not rebase? (rebasing pushed commits rewrites history; a merge commit is safe and the PR is squashed anyway) How do you know the migration didn't change? (diff the old and new SQL)
+
+### 2026-11-20 — Safety rails that stopped me, on purpose `#process` `#git` `#devops` `#gotcha`
+- **What happened:** my instructions for a lane allowed a force-push to its own branch, and the tool's permission check refused to start it; I rewrote them to merge `main` in instead. Later, cancelling a deploy run waiting for approval was refused too, so the owner rejects it in GitHub. The AWS sign-in had also expired (12 hours), and Docker Desktop hadn't started after the laptop restarted, which every database test needs.
+- **Why / what I learned:** a refusal is information, not an obstacle to route around. The safe alternative (merge, not force-push; reject in the UI) was always available. Before a session's cloud work: check the sign-in and the tools it relies on.
+- **Say it in an interview:** "Our rule is no force-push and no history rewrite. When automation tried one, it was blocked, and the right fix was to change the approach, not the rule."
+- **Follow-ups to expect:** when is a force-push acceptable? (your own unshared branch, with `--force-with-lease`, and only with agreement)
+
+### 2026-11-20 — Setting up a deploy gate from the command line, without showing the account ID `#devops` `#github` `#security`
+- **What happened:** after `terraform apply` (from a saved plan file, so exactly what was reviewed) created the GitHub OIDC provider and the deploy role, I created the `demo` environment with `gh api`: the owner as required reviewer, `main` as the only deployment branch. The role's ARN contains the account ID, so it went straight from `terraform output -raw deploy_role_arn` into `gh secret set` through a pipe and never appeared on screen or in a log. Then I read the settings back through the API to check them.
+- **Why / what I learned:** the deploy role really amounts to root on the server, so the real control is the environment: who approves and which branch may deploy. A workflow that names an environment that doesn't exist makes GitHub create it with no rules, so the environment has to exist before the workflow reaches `main`.
+- **Say it in an interview:** "AWS trusts GitHub's OIDC token only for my repo; GitHub only lets `main` use that environment and only after I approve. A kill-switch variable stops any run before it touches AWS."
+- **Follow-ups to expect:** what's in the OIDC trust policy? (the token's audience and the `repo:…:environment:demo` subject) Why not store an access key? (keys leak and don't expire)
+
+### 2026-11-20 — "Insufficient capacity": the cloud can run out of a server size `#aws` `#gotcha` `#devops`
+- **What happened:** starting the stopped demo database failed twice with `InsufficientDBInstanceCapacity` (no free `db.t4g.micro` in `ap-south-1b`) and worked on the third try, 6 minutes later. The server failed for a whole hour with `InsufficientInstanceCapacity` (`t4g.small` in `ap-south-1a`), the second day running, so the first deploy couldn't happen. I retried in a background loop every 3 minutes, which stopped on any other error, so an auth failure wouldn't be retried blindly.
+- **Why / what I learned:** a stopped instance gives its hardware back, and starting it again needs free capacity of that exact type in that exact Availability Zone. "Stop it when idle to save money" has a cost: it may not come back when you need it. The fixes are a retry, a different instance type, or a different zone. A single-AZ setup can't simply move, so changing zone means replacing the server (fine here, because the server keeps no data).
+- **Say it in an interview:** "Stopping instances saves money but gives up the capacity. When AWS had no t4g.small in our zone, the app's design helped: the server is stateless, so moving it to another type or zone is a Terraform change, not a data migration."
+- **Follow-ups to expect:** how do big systems avoid this? (Auto Scaling groups across several zones and instance types, capacity reservations, On-Demand Capacity Reservations) Is RDS different? (same idea; Multi-AZ adds a standby but costs double)
+
+### 2026-11-21 — Parallel AI lanes cost tokens: copy less context `#process`
+- **What happened:** three background lanes each started as a copy of the whole conversation, and the usage limit stopped one of them mid-check. The owner asked to keep token use down.
+- **Why / what I learned:** a parallel worker that inherits the whole history pays for that history on every step. A fresh worker with a short, focused brief and the file paths it needs is far cheaper, and the files (`HANDOFF.md`, plans) already carry the context. Short sessions, closed with the docs updated, also avoid paying for a huge context again and again.
+- **Say it in an interview:** "Context is a cost, like memory in a program. I keep the project's state in files, so any session or worker can start small instead of carrying the whole history."
+- **Follow-ups to expect:** how do you keep work from being lost when a session stops? (commit and push after every step; the handoff file says exactly where to resume)

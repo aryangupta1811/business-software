@@ -2,32 +2,42 @@
 
 Overwritten at the end of every session. Older handoffs are in git history: `git log -p docs/HANDOFF.md`.
 
-**Session:** 24 — fast track Day 3 (2026-11-19, ran into 11-20): sitting 2, P1.7 Items, P1.4 login PR 1, stage 7 backups; three lanes run as background forks
+**Session:** 26 — fast track Day 4, second half (2026-11-20, closed 2026-11-21): three lanes; the usage limit stopped lane 2 and the session. Closed early on the owner's request to save tokens.
 
 **Done:**
-- **Sitting 2** (PR #30). The owner took every recommendation except: commission on sales and flag rule 4 moved to the backlog; bills and statements go through the outbox with a document template (07 A1 option a). Modules 05, 06, 07 DECIDED; G1–G6 into `02` #20–25 and `00` #36; `01`'s summary line says one price list per business. Answers table in `docs/plans/2026-11-18-sitting-2.md`.
-- **P1.7 Items** (PR #31 data/API/guard, PR #34 page). 8 design questions answered by the owner. Both PRs reviewed (code-review high, 10 findings each, all fixed test-first). Page checked in Chrome. 1,399 tests after #34.
-- **P1.4 Login PR 1** (PR #33, ADRs 0038–0039, owner OK'd both). 11 design questions answered (`00` Change log). Review: 9 findings fixed, among them a crash on a login burst and the failure limit beaten by parallel guesses. New tenancy helper `alsoInBusiness` (ADR 0039, 0027 note): checked by me, it only ends a session whose token the browser holds.
-- **Stage 7** (PR #32, ADR 0037). The RDS master can't bypass RLS (AWS docs; not yet confirmed on our instance), so backups run as the read-only `app_backup` with a `backup_read` policy on every tenant table and read access to `auth`. Review: 10 findings fixed (restore as `--role=app_owner`, idempotent role script, drill on disk not RAM, no world-readable dump…). **Applied with the owner's OK:** 10 resources, then the S3 `DenyOverwrites` policy (uploads need `If-None-Match: *`). Cost under $0.10 a month.
-- Owner's choices: keep `t4g.small` and retry after `InsufficientInstanceCapacity`; delete the `bs-lane3_pgdata` volume (done); worktree `Business-software-lane2` and branches `feat/p1.3-signup`, `backup/p1.12-rebased` removed.
+- **#39 merged:** session 25's close-out docs.
+- **SES follow-up, PR #42** (`feat/ses-mail-role`, open, not merged). Found before writing it: ADR 0040 had the api sign SES with the instance role, but the api is in a container and the metadata hop limit of 1 blocks that, so email would have failed on the server. **Owner chose a mail-only role:**
+  - `infra/terraform/demo/mail.tf` (SES identities, role `business-software-demo-mail` that may only send as `mail_from`, the server may assume only it, two SSM parameters);
+  - `deploy/demo/mail-credentials.sh` + a 20-minute systemd timer (1-hour credentials in `/run/business-software-mail`, read-only in the api, `credential_process`);
+  - `start.sh` falls back to `MAIL_TRANSPORT=none`.
+  - Tests: 54/54 `scripts/deploy/test.sh` on Linux (the mail checks skip in Git Bash). The SDK refresh was checked in the app image (it re-runs `credential_process` only once the held credentials expire). shellcheck clean.
+  - ADR 0040 dated note, runbook section in `terraform.md`, interview log entry — all in #42.
+  - CI: four checks green; `pr-title` failed (76 > 72 characters). Renamed on 2026-11-21, so it re-runs by itself.
+- **Lane 3 (done):** **#40** P1.13 billing design, ending in 12 owner questions with recommendations (`docs/plans/2026-11-20-p1.13-billing-design.md`); **#41** sitting 3 sheet (`docs/plans/2026-11-20-sitting-3.md`: 04, 08, 09, D5, D6). Both open. **1.5% GST checked:** a real rate (IGST notification 9/2025, cut and polished diamonds); the amendments 19/2025 and 1/2026 were not read.
+- **RDS started** 2026-11-20 12:51 IST, after two `InsufficientDBInstanceCapacity` errors (`ap-south-1b`). **EC2 never started:** 20 tries over an hour, all `InsufficientInstanceCapacity` for `t4g.small`. So no first deploy.
 
 **Half-done:**
-- **Stage 6, PR #35** (`feat/stage-6-cd`, worktree `../Business-software-lane1-cd`, plan `docs/plans/2026-11-19-stage-6-cd.md`). Built, CI green, **not applied**. Ten review findings are in the PR description, items 1–7 first: job-level concurrency; never deploy an older commit; a timeout that can't cut a rollback; no rollback to the same sha; `previous-release.env` after a rollback; the role can reach secrets through `AWS-RunShellScript` (say so in the ADR; the real boundary is the `demo` environment); drop `ssm:ListCommandInvocations`. Then: re-plan (3 to add, $0), owner's OK, apply; owner sets up the `demo` environment (reviewer, `main` only, `AWS_DEPLOY_ROLE_ARN`, `DEMO_INSTANCE_ID`, `DEPLOY_HOLD=off`).
-- **First deploy** (lifts the deploy hold; both conditions are met). Start RDS, then EC2 (may hit the capacity error again). Then: `select rolbypassrls from pg_roles where rolname = current_user` as the master (records the result in ADR 0037/0027), deploy `main`, `scripts/deploy/backup.sh now`, `list`, `drill`, log the drill in the runbook. Stop both.
-- **P1.4 PR 2** (`feat/p1.4-email-reset`, worktree `../Business-software-lane3-login`, last commit 717ae5a): code for email (Mailpit locally, SES on the server), confirmation, reset by link and by recovery key, new recovery key, change own password, remembered computers. **Its migration says 0007 and must become 0008** (stage 7 took 0007). Left: email ADR 0040, docs, SES price via the Pricing API, one full `pnpm check`, Chrome check, PR, review. SES Terraform is a separate small PR after it.
-- **P2.7 part 1** (job queue), Day 3's lane 4 second half, not started.
+- **Lane 2, P1.8 PR 2** (branch `feat/p1.8-stock-page`, worktree `../Business-software-lane2-stockui`, pushed, clean): plan `docs/plans/2026-11-20-p1.8-stock-page.md`, the stock screens, review fixes (commit `d3643ab`). **Left:** the Chrome check (it had just run migrations and was starting `pnpm dev`), then `gh pr create`. No PR yet.
+- **#42:** `terraform plan` needs `mail_from` (and optional `mail_recipients`) in the git-ignored `infra/terraform/demo/terraform.tfvars`. **Waiting on the owner for the sender address.** Then plan (≈ $0) → owner's OK → apply → owner clicks AWS's verification emails → merge → one real email on the server.
+- **First deploy:** blocked by EC2 capacity (steps in the 2026-11-20 handoff, `git show c263c75:docs/HANDOFF.md`).
 
 **Next step:**
-1. `/start-session`: finish stage 6 (#35 findings → apply → `demo` environment → first deploy) and P1.4 PR 2 as two lanes.
-2. Day 4 lanes as capacity allows: P1.8 Stock ledger, P1.13 Billing screen, P1.5 Staff → P1.6 Branches, P2.7. Sitting 3 (04, 08, 09; D5, D6) needs its sheet first.
+1. Owner: `aws login --profile business-software`, start Docker Desktop, reject the waiting deploy runs (Actions → deploy → Review deployments), and **check RDS is stopped** (`aws rds describe-db-instances --profile business-software --region ap-south-1 --db-instance-identifier business-software-demo --query "DBInstances[0].DBInstanceStatus"`); the 23:30 IST schedule should have stopped it, and it couldn't be checked because the sign-in had expired.
+2. `/start-session`. One lane at a time, in this order:
+   1. Merge #40, #41 (docs).
+   2. Lane 2: Chrome check of the stock screens, open its PR, merge.
+   3. #42: owner gives the sender address, plan, apply, merge.
+   4. **Decide with the owner what to do about EC2 capacity.** The owner chose on 11-19 to keep `t4g.small` and retry, and it has now failed two days running. Options to put to them: retry at another hour; another Free-plan instance type; another subnet or zone (replaces the server). That decision gates the first deploy, its live check and the backup drill.
+   5. Then Day 5 per the schedule (P1.13 code after the owner answers #40's questions).
 
 **Watch out for:**
-- **Usage limit:** three lanes plus `code-review high` on every PR hit the 5-hour limit three times. Use two or three lanes. A lane stopped by the limit resumes where it was (its work is saved); check AWS state first (an RDS start was in flight once).
-- **The permission check blocks `terraform apply` inside a fork** even with the owner's OK; the main session ran both applies itself. Plan in the lane, apply from the main session.
-- **AWS sign-in lasts 12 hours:** run `aws login --profile business-software` before AWS work. Terraform on this laptop needs `TF_CLI_CONFIG_FILE` pointing at the provider-mirror config (IPv6 problem; `docs/devops/terraform.md`).
-- **Migration numbers collide across lanes:** each lane checks `origin/main` before numbering; the second to merge renumbers and regenerates (also the `backup_read` policies for any new tenant table, and the `app_backup` grants for any new schema: a new schema broke the backup once).
-- **Flaky under load:** P1.3/P1.4 web tests (signup, login by email) time out at 5 s locally when several lanes' containers run; CI is green. Consider a longer timeout.
-- **Unverified:** the 1.5% GST rate (polished diamonds) vs CBIC's notification, before P1.13; the `item_name` collation on RDS.
-- Local leftovers: worktrees `../Business-software-lane1` (stage 7, merged) and `../Business-software-lane2-items` (P1.7, merged) can go; Docker volume of lane 2's `p17-items` database; branch `backup/p1.3-before-rewrite` (unpushed, differs from #27; owner to look).
-- EC2 and RDS are **stopped**.
-- **gitleaks and P1.4 PR 2's tests:** the fake recovery key `ABCD-EFGH-…-6789` trips `generic-api-key`, and CI's `secrets` job scans every pushed branch, so it failed PR #36. Its three fingerprints are in `.gitleaksignore`. Any new commit on that branch with the same value gets a new fingerprint: build the test key at runtime (e.g. from a helper) instead, so it doesn't look like a literal key.
+- **Tokens (owner, 2026-11-21):** keep sessions short and lanes few.
+  - A `fork` lane copies this whole conversation, so it's expensive. Prefer a fresh `general-purpose` agent with a focused prompt, or work inline.
+  - Run `/compact` when the context gets large, and `/end-session` once a task is done.
+- **Usage limit:** it stopped lane 2 at 16:50 IST on 11-20. A stopped lane resumes only within its own session; this session is closing, so the next one continues lane 2 inline from its pushed branch.
+- **PR titles max 72 characters** (`scripts/ci/check-pr-title.sh`).
+- **PowerShell 5.1 breaks `gh … --body "…"` and `--jq` with quotes:** use `--body-file` or Git Bash.
+- **Mail tests in `scripts/deploy/test.sh` run only on Linux.** Locally, use a Debian container that mounts only `scripts/` and `deploy/`; copying the whole repo, `node_modules` included, takes minutes.
+- **AWS capacity in Mumbai:** `t4g.small` (EC2, `ap-south-1a`) and `db.t4g.micro` (RDS, `ap-south-1b`) both refused to start on 11-19/11-20. RDS came up after about 6 minutes of retries; EC2 not in an hour.
+- `aws-mcp` failed to connect again; the AWS CLI works.
+- Still true from session 25: every merge to `main` starts a deploy run that waits for approval and stops at `DEPLOY_HOLD`; flaky web form tests under load; `#37` leftovers; local leftovers to OK deleting (old worktrees and branches, now also `../Business-software-lane3-billing`, `-lane3-sitting3` once #40/#41 merge).

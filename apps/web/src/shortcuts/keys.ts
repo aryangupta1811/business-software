@@ -43,7 +43,10 @@ function parse(keys: string): KeyCombo {
   if (/^[A-Z]$/i.test(name)) combo.key = `Key${name.toUpperCase()}`;
   else if (/^[0-9]$/.test(name)) combo.key = `Digit${name}`;
   else if (name === '/') combo.key = 'Slash';
-  else if (!isFunctionOrEscape(name) && name !== '?') {
+  else if (name === 'Delete') {
+    // Delete alone deletes text in a field, so only Ctrl+Delete or Alt+Delete can be a command.
+    if (!combo.ctrl && !combo.alt) throw new Error(`Shortcut "${keys}" needs Ctrl or Alt`);
+  } else if (!isFunctionOrEscape(name) && name !== '?') {
     throw new Error(`Unknown key "${name}" in "${keys}"`);
   }
   // A plain letter or digit would fire while someone types a name or a quantity.
@@ -65,7 +68,7 @@ function isReserved(combo: KeyCombo): boolean {
   );
 }
 
-/** Parses `F2`, `Escape`, `?`, `/`, `Alt+H`, `Ctrl+Shift+K`, refusing the browser's own keys. */
+/** Parses `F2`, `Escape`, `?`, `/`, `Alt+H`, `Ctrl+Delete`, `Ctrl+Shift+K`, refusing the browser's own keys. */
 export function parseKeys(keys: string): KeyCombo {
   const combo = parse(keys);
   if (isReserved(combo)) {

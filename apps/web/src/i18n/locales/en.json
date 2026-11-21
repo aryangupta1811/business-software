@@ -9,7 +9,8 @@
     "label": "Main",
     "home": "Home",
     "settings": "Settings",
-    "items": "Items"
+    "items": "Items",
+    "billing": "Billing"
   },
   "theme": {
     "toDark": "Switch to dark mode",
@@ -26,7 +27,13 @@
     "goHome": "Go to Home",
     "goItems": "Go to Items",
     "search": "Search items",
-    "newItem": "Add an item"
+    "newItem": "Add an item",
+    "goBilling": "Go to Billing",
+    "billSearch": "Search or scan an item",
+    "billQuantity": "Change the selected line’s quantity",
+    "billPriceList": "Switch between retail and wholesale prices",
+    "billRemoveLine": "Remove the selected line",
+    "billNew": "Start a new bill"
   },
   "connection": {
     "checking": "Checking connection…",
@@ -802,6 +809,61 @@
       "forgetOther": "Anyone logged in there is logged out, and staff can't log in there until you log in on it again.",
       "confirmForget": "Forget computer",
       "loadFailed": "Couldn't load the computers."
+    }
+  },
+  "billing": {
+    "search": "Search or scan",
+    "searchHint": "Scan, or type a name or code. 3* before it sells 3.",
+    "results": "Matching items",
+    "lines": "The bill",
+    "loading": "Loading the catalogue…",
+    "loadFailed": "The catalogue couldn’t be loaded.",
+    "tryAgain": "Try again",
+    "empty": "Scan an item or type its name to start the bill.",
+    "priceLists": {
+      "retail": "Retail",
+      "wholesale": "Wholesale"
+    },
+    "columns": {
+      "item": "Item",
+      "quantity": "Qty",
+      "price": "Price",
+      "discount": "Disc.",
+      "amount": "Amount"
+    },
+    "quantityOf": "Quantity of {{name}}",
+    "onlyInStock": "Only {{quantity}} in stock",
+    "priceChanged": "Price changed",
+    "problems": {
+      "gone": "Can’t be sold any more: remove this line",
+      "no_gst": "No GST rate or HSN: remove this line"
+    },
+    "notices": {
+      "unknownCode": "No item with code {{code}}",
+      "archived": "{{name}} is archived. Restore it on the Items page to sell it.",
+      "noGst": "Set the GST rate and HSN for {{name}} first.",
+      "wholeUnits": "{{name}} is sold in whole units only.",
+      "badQuantity": "Type a quantity above zero.",
+      "discardFailed": "The bill couldn’t be cleared: no connection. Try again."
+    },
+    "totals": {
+      "label": "Totals",
+      "items": "Items",
+      "gross": "Gross",
+      "discount": "Discount",
+      "taxable": "Taxable value",
+      "roundOff": "Round-off",
+      "total": "Total"
+    },
+    "taxTypes": {
+      "cgst-sgst": "CGST + SGST: sold within the state",
+      "igst": "IGST: sold to another state",
+      "none": "No GST charged"
+    },
+    "newBill": {
+      "title": "Clear this bill?",
+      "body": "This bill isn’t saved. Clearing it is recorded in the entry log with its items and total.",
+      "confirm": "Clear the bill"
     }
   }
 }

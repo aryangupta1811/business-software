@@ -2,10 +2,19 @@ import { renderHook } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 import { useScanner } from './scan';
 
-/** Types `code` and Enter into `target` in one go, as a scanner does. */
+let clock = 1000;
+
+/**
+ * Types `code` and Enter into `target`, 5 ms per key, as a scanner does. The time is set on each
+ * event, so a slow test machine can't stretch the gaps.
+ */
 function scan(code: string, target: HTMLElement = document.body) {
+  clock += 1000;
   for (const key of [...Array.from(code), 'Enter']) {
-    target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+    clock += 5;
+    const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'timeStamp', { value: clock });
+    target.dispatchEvent(event);
   }
 }
 

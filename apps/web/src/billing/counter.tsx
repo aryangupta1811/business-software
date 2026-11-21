@@ -34,7 +34,9 @@ import { unitName } from '../items/labels';
 import { useScanner } from '../items/scan';
 import { stockText } from '../items/stock-form';
 import { useShortcut } from '../shortcuts/use-shortcut';
+import { PaymentPanel, type PaymentRow } from './payment-panel';
 import type { CatalogueCopy } from './catalogue-copy';
+import { CustomerBox, CustomerSummary, type BillCustomer } from './customer-box';
 import { ApprovalDialog, DiscountDialog, HeldBillsDialog, HoldDialog } from './dialogs';
 import {
   approvalNeeded,
@@ -48,6 +50,8 @@ import {
 import {
   fromCart,
   isLoose,
+  loadCustomer,
+  saveCustomer,
   lineProblem,
   loadOpenBill,
   parseEntry,
@@ -127,6 +131,17 @@ export function Counter({
   const [asking, setAsking] = useState(false);
   const [holding, setHolding] = useState(false);
   const [listing, setListing] = useState(false);
+  const [choosingCustomer, setChoosingCustomer] = useState(false);
+  const [customer, setCustomer] = useState<BillCustomer | null>(() =>
+    loadCustomer(bill.billKey, bill.customerId),
+  );
+  const [paying, setPaying] = useState(false);
+  /** The payments of a fully paid bill, for the total they were taken against. */
+  const [ready, setReady] = useState<{
+    billKey: string;
+    totalPaise: number;
+    payments: PaymentRow[];
+  } | null>(null);
   const queryClient = useQueryClient();
   const now = useNow(30_000);
   const held = useQuery({
@@ -291,6 +306,8 @@ export function Counter({
   function startNew() {
     setBill(startBill(context.branchStateCode));
     setApproval(null);
+    setCustomer(null);
+    setReady(null);
     setSelected(-1);
     setChanged(new Set());
     setNotice(null);
@@ -370,6 +387,8 @@ export function Counter({
       setBill(repriced.bill);
       setChanged(new Set(repriced.changed));
       setApproval(loadApproval(draft.billKey));
+      setCustomer(loadCustomer(draft.billKey, draft.customerId));
+      setReady(null);
       setSelected(repriced.bill.lines.length - 1);
       setNotice(null);
     } catch (error) {
@@ -392,6 +411,27 @@ export function Counter({
     void queryClient.invalidateQueries({ queryKey: HELD_KEY });
   }
 
+  function chooseCustomer(chosen: BillCustomer | null, placeOfSupplyStateCode: string) {
+    saveCustomer(bill.billKey, chosen);
+    setCustomer(chosen);
+    setBill({ ...bill, customerId: chosen?.id ?? null, placeOfSupplyStateCode });
+  }
+
+  /** F10: payment, once the owner has OK'd any discount above the limit (design §6, §8). */
+  function pay() {
+    if (priced === null) return;
+    if (needed !== null) setAsking(true);
+    else setPaying(true);
+  }
+
+  const paid =
+    ready !== null &&
+    priced !== null &&
+    ready.billKey === bill.billKey &&
+    ready.totalPaise === priced.grandTotalPaise
+      ? ready.payments
+      : null;
+
   const wholesale = context.features.includes('wholesale_price');
   const selectedLine = bill.lines[selected];
   const selectedEntry = selectedLine === undefined ? undefined : copy.get(selectedLine.itemId);
@@ -401,6 +441,20 @@ export function Counter({
     description: 'shortcuts.billSearch',
     group: 'general',
     action: focusSearch,
+  });
+  useShortcut({
+    keys: 'F3',
+    description: 'shortcuts.billCustomer',
+    group: 'general',
+    action: () => {
+      setChoosingCustomer(true);
+    },
+  });
+  useShortcut({
+    keys: 'F10',
+    description: 'shortcuts.billPay',
+    group: 'general',
+    action: pay,
   });
   useShortcut({
     keys: 'F4',
@@ -600,9 +654,45 @@ export function Counter({
           onSaveQuantity={saveQuantity}
           onCancelQuantity={focusSearch}
         />
+        <CustomerSummary
+          customer={
+            customer !== null && customer.name === ''
+              ? { ...customer, name: t('billing.customer.onHeldBill') }
+              : customer
+          }
+          placeOfSupplyStateCode={bill.placeOfSupplyStateCode}
+          branchStateCode={context.branchStateCode}
+          onOpen={() => {
+            setChoosingCustomer(true);
+          }}
+        />
       </section>
       <div className="flex flex-col gap-4">
         <Totals bill={bill} priced={priced} />
+        {paid !== null ? (
+          <div
+            role="status"
+            className="flex flex-col gap-1 rounded-lg border border-border bg-surface p-4"
+          >
+            <p className="font-semibold">{t('billing.readyToSave')}</p>
+            <p className="text-label text-muted">
+              {paid
+                .map(
+                  (row) =>
+                    `${t(`billing.payment.modes.${row.mode}`)} ${formatPaise(row.amountPaise)}`,
+                )
+                .join(' · ')}
+            </p>
+            <p className="text-label text-muted">{t('billing.saveComesNext')}</p>
+          </div>
+        ) : (
+          <Button size="default" disabled={priced === null} aria-keyshortcuts="F10" onClick={pay}>
+            {t('billing.pay')}
+            <Kbd aria-hidden="true" className="ml-2">
+              F10
+            </Kbd>
+          </Button>
+        )}
         {needed !== null && (
           <div
             role="alert"
@@ -640,6 +730,30 @@ export function Counter({
         onApproved={approved}
         onClose={() => {
           setAsking(false);
+          searchRef.current?.focus();
+        }}
+      />
+      <CustomerBox
+        open={choosingCustomer}
+        context={context}
+        customer={customer}
+        placeOfSupplyStateCode={bill.placeOfSupplyStateCode}
+        onChange={chooseCustomer}
+        onClose={() => {
+          setChoosingCustomer(false);
+          searchRef.current?.focus();
+        }}
+      />
+      <PaymentPanel
+        open={paying}
+        totalPaise={priced?.grandTotalPaise ?? 0}
+        onReady={(payments) => {
+          setReady({ billKey: bill.billKey, totalPaise: priced?.grandTotalPaise ?? 0, payments });
+          setPaying(false);
+          searchRef.current?.focus();
+        }}
+        onClose={() => {
+          setPaying(false);
           searchRef.current?.focus();
         }}
       />

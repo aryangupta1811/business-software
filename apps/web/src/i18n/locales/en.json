@@ -36,7 +36,9 @@
     "billNew": "Start a new bill",
     "billLineDiscount": "Discount on the selected line",
     "billDiscount": "Discount on the whole bill",
-    "billHold": "Hold this bill, or open the held bills"
+    "billHold": "Hold this bill, or open the held bills",
+    "billCustomer": "Find or add the customer",
+    "billPay": "Take payment"
   },
   "connection": {
     "checking": "Checking connection…",
@@ -992,7 +994,11 @@
         "gstin_taken": "A customer with this GSTIN already exists. Search for them instead.",
         "gstin_state": "The GSTIN’s first two digits give the state",
         "failed": "Couldn’t save the customer. Check the connection and try again."
-      }
-    }
+      },
+      "onHeldBill": "Customer saved with the bill"
+    },
+    "pay": "Pay",
+    "readyToSave": "Paid. Ready to save.",
+    "saveComesNext": "Saving the bill (invoice number, stock) comes in the next update."
   }
 }

@@ -36,7 +36,9 @@
     "billNew": "Naya bill shuru karein",
     "billLineDiscount": "Chuni hui line par chhoot",
     "billDiscount": "Poore bill par chhoot",
-    "billHold": "Yeh bill rokein, ya roke gaye bill kholein"
+    "billHold": "Yeh bill rokein, ya roke gaye bill kholein",
+    "billCustomer": "Customer khojein ya jodein",
+    "billPay": "Payment lein"
   },
   "connection": {
     "checking": "Connection check ho raha hai…",
@@ -992,7 +994,11 @@
         "gstin_taken": "Is GSTIN ka customer pehle se hai. Use dhoondhein.",
         "gstin_state": "GSTIN ke pehle do ank rajya batate hain",
         "failed": "Customer save nahin ho saka. Connection dekhein aur phir koshish karein."
-      }
-    }
+      },
+      "onHeldBill": "Bill ke saath save kiya gaya customer"
+    },
+    "pay": "Payment",
+    "readyToSave": "Payment ho gaya. Save karne ke liye taiyaar.",
+    "saveComesNext": "Bill save karna (invoice number, stock) agle update mein aayega."
   }
 }

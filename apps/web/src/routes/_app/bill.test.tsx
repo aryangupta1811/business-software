@@ -303,4 +303,59 @@ describe('the billing counter', () => {
     expect(rows()[0]).toHaveTextContent('Price changed');
     expect(rows()[0]).toHaveTextContent('28.00');
   });
+
+  test('the whole bill by keyboard: scan, F3 customer, F10 payment, ready to save', async () => {
+    const user = userEvent.setup();
+    const api = counter(OWNER_SESSION, {
+      'GET /api/customers?phone=9876500001': {
+        body: [
+          {
+            id: '00000000-0000-4000-8000-0000000000c1',
+            name: 'Meena Stores',
+            phone: '9876500001',
+            gstin: null,
+            legalName: null,
+            address: null,
+            pinCode: null,
+            stateCode: null,
+            version: 1,
+          },
+        ],
+      },
+    });
+    await user.type(await search(), '8901234567890{Enter}');
+    await user.keyboard('{F3}');
+    await user.type(
+      await screen.findByRole('combobox', { name: 'Phone number or name' }),
+      '9876500001',
+    );
+    await screen.findByRole('option', { name: /Meena Stores/ });
+    await user.keyboard('{Enter}');
+    await waitFor(() => {
+      expect(screen.getByText('Meena Stores')).toBeInTheDocument();
+    });
+
+    await user.keyboard('{F10}');
+    await screen.findByRole('textbox', { name: 'Cash received' });
+    await user.keyboard('{Enter}');
+    expect(await screen.findByText('Paid. Ready to save.')).toBeInTheDocument();
+    expect(api.sent('GET', '/api/customers?phone=9876500001')).toHaveLength(1);
+    // The customer is on the bill the save (P1.14) will send.
+    const stored = JSON.parse(sessionStorage.getItem(`bill:${OWNER_SESSION.user.id}`) ?? '{}') as {
+      customerId?: string;
+    };
+    expect(stored.customerId).toBe('00000000-0000-4000-8000-0000000000c1');
+  });
+
+  test('F10 asks the owner first when a discount is above the limit', async () => {
+    const user = userEvent.setup();
+    counter({ ...STAFF_SESSION, discountLimitBasisPoints: 0 });
+    await user.type(await search(), '8901234567890{Enter}');
+    await user.keyboard('{F6}');
+    await user.type(await screen.findByRole('textbox', { name: 'Percent off' }), '5{Enter}');
+    await user.click(await screen.findByRole('button', { name: 'Cancel' }));
+    await user.keyboard('{F10}');
+    expect(await screen.findByLabelText("Owner's password")).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Cash received' })).not.toBeInTheDocument();
+  });
 });

@@ -19,7 +19,7 @@ export function ShortcutProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (registry.handle(event)) event.preventDefault();
+      registry.handle(event);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => {
@@ -37,10 +37,6 @@ export function ShortcutProvider({ children }: { children: ReactNode }) {
       }),
     [registry, context],
   );
-
-  useEffect(() => {
-    registry.setPaused(helpOpen);
-  }, [registry, helpOpen]);
 
   return (
     <ShortcutContext value={context}>

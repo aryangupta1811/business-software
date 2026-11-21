@@ -2,8 +2,12 @@ import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { useShortcutContext } from './context';
 import type { Shortcut } from './registry';
 
-/** Makes a shortcut work while the calling component is on screen. */
-export function useShortcut({ keys, description, group, action }: Shortcut): void {
+/**
+ * Makes a shortcut work while the calling component is on screen. With `inDialog: true`, call it
+ * from a component inside a modal `<dialog>`: the keys work while a dialog is open, and the
+ * page's own shortcuts are off.
+ */
+export function useShortcut({ keys, description, group, action, inDialog }: Shortcut): void {
   const { registry } = useShortcutContext();
   // The latest action, so a re-render with a new function doesn't re-register.
   const actionRef = useRef(action);
@@ -16,11 +20,12 @@ export function useShortcut({ keys, description, group, action }: Shortcut): voi
         keys,
         description,
         group,
+        inDialog,
         action: () => {
           actionRef.current();
         },
       }),
-    [registry, keys, description, group],
+    [registry, keys, description, group, inDialog],
   );
 }
 

@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { StrictMode } from 'react';
+import { StrictMode, useEffect, useRef } from 'react';
 import { expect, test, vi } from 'vitest';
 import { changeLanguage } from '../i18n';
 import { ShortcutProvider } from './shortcut-provider';
@@ -84,4 +84,50 @@ test('the help panel speaks the current language', async () => {
   renderWith();
   await openHelp();
   expect(screen.getByRole('dialog', { name: 'कीबोर्ड शॉर्टकट' })).toBeInTheDocument();
+});
+
+/** A modal dialog (the browser's, as ADR 0026) with a key of its own, like a billing dialog. */
+function PayDialog({ onPay }: { onPay: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    dialog.current?.showModal();
+  }, []);
+  useShortcut({
+    keys: 'F10',
+    description: 'shortcuts.goHome',
+    group: 'general',
+    action: onPay,
+    inDialog: true,
+  });
+  return (
+    <dialog ref={dialog} aria-label="Pay">
+      <button>Cash</button>
+    </dialog>
+  );
+}
+
+test('any open dialog pauses the page’s shortcuts, and its own keys work', async () => {
+  const home = vi.fn();
+  const pay = vi.fn();
+  render(
+    <ShortcutProvider>
+      <GoHome action={home} />
+      <PayDialog onPay={pay} />
+    </ShortcutProvider>,
+  );
+  await pressAltH();
+  await userEvent.keyboard('{F10}');
+  expect(home).not.toHaveBeenCalled();
+  expect(pay).toHaveBeenCalledOnce();
+});
+
+test('? does not open the help panel on top of another dialog', async () => {
+  render(
+    <ShortcutProvider>
+      <PayDialog onPay={vi.fn()} />
+    </ShortcutProvider>,
+  );
+  await openHelp();
+  expect(screen.getAllByRole('dialog')).toHaveLength(1);
+  expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).not.toBeInTheDocument();
 });

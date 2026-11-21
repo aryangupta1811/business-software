@@ -293,6 +293,21 @@ describe('stock', () => {
       );
     });
 
+    it('treats a null cost like no cost: the purchase price, and a retry answers the same', async () => {
+      // Found in P1.13: the schema allows null, the database then used the known cost, and the
+      // retry check compared that cost with the null sent, refusing a first try as key_reused.
+      const atta = await item(a, { purchasePrice: 3_900 });
+      const requestKey = key();
+      const first = await open(a, atta.id, { quantity: 1_000, unitCost: null, requestKey });
+      expect(first).toMatchObject({ status: 201, body: { unitCost: 3_900, value: 3_900 } });
+      const retry = await open(a, atta.id, { quantity: 1_000, unitCost: null, requestKey });
+      expect(retry).toMatchObject({ status: 201, body: { id: first.body.id } });
+      // A null cost sets nothing, so it needs no permission to see costs.
+      const plain = await item(a, { purchasePrice: 3_900 });
+      const cashier = staff(a, ['stock.adjust']);
+      expect((await open(cashier, plain.id, { quantity: 1_000, unitCost: null })).status).toBe(201);
+    });
+
     it('takes a cost only from a caller who may see costs', async () => {
       const atta = await item(a);
       expect(

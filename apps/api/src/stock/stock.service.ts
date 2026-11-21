@@ -184,14 +184,17 @@ export class StockService {
 
   /** Opening stock (#9, owner answer 4A): only while nothing has moved the item at the branch. */
   open(caller: Caller, itemId: string, input: OpeningStockInput): Promise<MovementView> {
-    if (input.unitCost !== undefined && !seesCost(caller)) {
+    // A null cost means "not sent": moveStock then uses the known cost, and the retry check
+    // mustn't compare that cost with null (it answered a first try `422 key_reused`).
+    const unitCost = input.unitCost ?? undefined;
+    if (unitCost !== undefined && !seesCost(caller)) {
       throw new ForbiddenException({ code: 'forbidden' });
     }
     const line: StockLine = {
       itemId,
       kind: 'opening',
       quantity: input.quantity,
-      ...(input.unitCost !== undefined && { unitCost: input.unitCost }),
+      ...(unitCost !== undefined && { unitCost }),
     };
     const expected: Expected = {
       itemId,
@@ -199,7 +202,7 @@ export class StockService {
       quantity: input.quantity,
       reason: null,
       note: null,
-      ...(input.unitCost !== undefined && { unitCost: input.unitCost }),
+      ...(unitCost !== undefined && { unitCost }),
     };
     return this.change(caller, input.requestKey, line, expected, (moved) => ({
       action: 'stock.opening_set',

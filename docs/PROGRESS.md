@@ -58,9 +58,10 @@
 
 - **#51 merged** (PR 1a). Its deploy run was approved and stopped at "Is the server running" (EC2 stopped): nothing deployed.
 - **P1.13 PR 1b:** `GET /api/billing/catalogue[?since=]` (permission `billing.sell`): live items with packs and barcodes, archived items slim, stock at the caller's branch only with `stock.view`, never the purchase price; ADR 0043 (the copy, the 60-second overlap, re-pricing at save), with a test that holds a transaction open across a sync.
-- **Bug found (P1.8, not yet fixed):** opening stock sent with `unitCost: null` for an item with a purchase price always answers `422 key_reused` (the database uses the known cost, then the retry check compares it with `null`). The Stock page never sends `null`. Fix test-first in its own PR.
+- **#52 merged** (PR 1b); its deploy run rejected (EC2 stopped).
+- **Bug fixed (P1.8):** opening stock sent with `unitCost: null` for an item with a purchase price always answered `422 key_reused` (the database used the known cost, then the retry check compared it with `null`). `null` now means "not sent" everywhere, test-first. The Stock page never sent `null`.
 
-**Half-done:** P1.13 PR 1c (customers, held bills and approvals: tables, routes, permissions `billing.discount`, `customers.*`, entry actions, the session's discount limit), then PR 2 (the page); the P1.8 `unitCost: null` fix.
+**Half-done:** P1.13 PR 1c (customers, held bills and approvals: tables, routes, permissions `billing.discount`, `customers.*`, entry actions, the session's discount limit), then PR 2 (the page).
 
 EC2 and RDS stopped at the end of session 28 (2026-11-21). No deploy run is waiting.
 

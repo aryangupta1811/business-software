@@ -44,6 +44,13 @@
 12. One owner can run multiple branches, each with its own stock.
 13. The dashboard can combine all branches.
 14. Each branch has its own name and address. A branch in another state needs its own GSTIN.
+54. **The computer decides the branch:** every counter computer belongs to one branch, and everything done on it (bills, stock, held bills, the log) belongs to that branch. The owner's branch picker only changes what pages show, including All branches.
+55. **A new computer** in a business with several branches: the owner's first login on it asks which branch it is in.
+56. **Moving a computer** to another branch is done in Settings with the owner's password, and logs out whoever is on it.
+57. **Staff in other branches** (#35): the owner ticks the extra branches per staff login. Staff log in only on computers at their home branch or a ticked one, and see only the branch they're logged in at (no picker).
+58. **Invoice numbers with several branches:** each branch has its own series, with its short code in the number (`ABC/AND/2026-27/001`). A business with one branch keeps its format unchanged (#8).
+59. **Archiving a branch:** any branch except the head office (the first branch), once no active staff have it as their home branch. Its computers are logged out and forgotten, its stock and history stay readable, and it can be brought back. Never deleted.
+60. **A business with one branch** sees nothing about branches (no picker, no branch column, no code in invoice numbers) until it adds a second.
 
 ## Users, roles & access
 
@@ -112,3 +119,4 @@ None. The five raised while importing were answered on 2026-11-02 (see the Chang
 - 2026-11-19 — P1.4 design answers: the owner took all 11 recommendations in `docs/plans/2026-11-19-p1.4-login-design.md` (section 13). Added #37–#46 (signup logs in, lock screen, several counters, closing Chrome logs out, failed-login limits, link lifetimes, staff usernames, remembered computers, email in the demo, changing your own password). The staff password-reset and deactivate buttons come with P1.5's staff page; P1.4 builds the rules. No earlier point changed meaning.
 - 2026-11-20 — Owner, after the review of P1.4 PR 2 (#37): recovery-key tries are limited per IP only (5 wrong keys an hour, counted apart from reset-link requests) and no longer per email, and a right key is never refused, so neither someone who knows the owner's email nor someone sharing the owner's IP can block the recovery key. #41 holds as written ("has its own limit and always gets the owner back in"); no decided point changed. Design section 7 updated.
 - 2026-11-21 — P1.5 design answers: the owner took all 7 recommendations in `docs/plans/2026-11-21-p1.5-staff-design.md` (section 8). Added #47–#53 (staff defaults, discounts off means limit 0, which actions ask the owner's password, Settings and Staff owner-only, My password, live permission changes, owner-set staff passwords). No decided point changed.
+- 2026-11-22 — P1.6 design answers: the owner took all 7 recommendations in `docs/plans/2026-11-22-p1.6-branches-design.md` (section 9). Added #54–#60 under Branches (the computer decides the branch, choosing a new computer's branch, moving a computer, staff's extra branches, per-branch invoice series, archiving, one-branch businesses). No decided point changed.

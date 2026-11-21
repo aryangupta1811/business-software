@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { isModalOpen } from '../shortcuts/keys';
 
 /** A scanner types a whole code in a few milliseconds; a person takes far longer per key. */
 export const SCAN_GAP_MS = 50;
@@ -61,8 +62,10 @@ export function isTextEntry(target: EventTarget | null): boolean {
 }
 
 /**
- * Calls `onScan` for a scan made while no text field has focus. A scan into a field (the search
- * box) is that field's own typing, so it's left alone.
+ * Calls `onScan` with the code of a scan made while no text field has focus, so a page can send
+ * it to its search box (or straight to the item) however the cashier's focus got lost. A scan
+ * into a field is that field's own typing, and one made while a modal dialog is open belongs to
+ * the dialog, so both are left alone. The keys of a burst never reach the page's shortcuts.
  */
 export function useScanner(onScan: (code: string) => void): void {
   const onScanRef = useRef(onScan);
@@ -73,6 +76,7 @@ export function useScanner(onScan: (code: string) => void): void {
     const buffer = new ScanBuffer();
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTextEntry(event.target) || event.ctrlKey || event.altKey || event.metaKey) return;
+      if (isModalOpen()) return;
       // A key in the middle of a burst is part of the code: `/` or `?` there must not reach
       // the shortcuts (listening on window after this) and move focus mid-scan.
       if (buffer.inBurst(event.timeStamp)) event.stopPropagation();

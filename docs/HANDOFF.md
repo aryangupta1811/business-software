@@ -32,4 +32,4 @@ Overwritten at the end of every session. Older handoffs are in git history: `git
 - **Tokens (owner):** short sessions, inline or a fresh focused agent (no `fork`), `/compact` when large, `/end-session` when done.
 - **PR titles max 72 characters:** count them first.
 - **PowerShell 5.1** breaks `gh … --body "…"`: use `--body-file` or Git Bash.
-- **Local leftovers to OK deleting** (still not answered): the worktrees `../Business-software-lane1`, `-lane1-cd`, `-lane2-items`, `-lane2-stockui`, `-lane3-billing`, `-lane3-login`, `-lane3-sitting3`, `-lane4-stock`, and their merged branches; a local test business "Stock Check Kirana" in the dev database.
+- **Local cleanup done** (owner's OK, 2026-11-21): all 8 lane worktrees, their folders and 15 merged local branches deleted (each checked: no uncommitted files, tip equal to its merged PR's head). Two orphaned dev processes from the P1.8 Chrome check (Vite, `tsc -w`) were stopped. **Kept on the owner's word:** `backup/p1.3-before-rewrite` (local only, never pushed; don't delete without asking) and the dev database's test business "Stock Check Kirana".

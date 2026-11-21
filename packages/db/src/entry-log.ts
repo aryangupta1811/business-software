@@ -40,6 +40,9 @@ export const ENTRY_ACTIONS = {
   // P1.13 (`02` #2, #7): customers at the billing counter.
   'customer.created': { reasonRequired: false },
   'customer.updated': { reasonRequired: false },
+  // P1.13 (`02` #8, #12; questions 5 and 7): an owner's OK, and a bill thrown away unsaved.
+  'discount.approved': { reasonRequired: false },
+  'bill.draft_discarded': { reasonRequired: false },
 } as const satisfies Record<string, { reasonRequired: boolean }>;
 
 export type EntryAction = keyof typeof ENTRY_ACTIONS;

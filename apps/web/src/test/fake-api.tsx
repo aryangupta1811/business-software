@@ -16,12 +16,14 @@ export const OWNER_SESSION: ActiveSession = {
   idleMinutes: 5,
   emailConfirmed: true,
   emailLimited: false,
+  discountLimitBasisPoints: null,
 };
 
 export const STAFF_SESSION: ActiveSession = {
   ...OWNER_SESSION,
   user: { id: '00000000-0000-4000-8000-000000000004', role: 'staff', name: 'Meena' },
   idleMinutes: 30,
+  discountLimitBasisPoints: 0,
 };
 
 export interface FakeAnswer {

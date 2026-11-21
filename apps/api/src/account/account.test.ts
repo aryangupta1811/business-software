@@ -132,6 +132,8 @@ describe('account recovery and remembered computers', () => {
       expect((await owner.session()).body).toMatchObject({
         emailConfirmed: false,
         emailLimited: false,
+        // `02` #12: the owner has no discount limit.
+        discountLimitBasisPoints: null,
       });
 
       const link = lastLink(email, 'confirm-email');

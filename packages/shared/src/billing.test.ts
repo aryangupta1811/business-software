@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   addToCart,
+  approvalSchema,
   billCartSchema,
   billDraftSchema,
   cartToBillInput,
   createCatalogueSearch,
+  discardBillSchema,
   discountShares,
   discountWithinLimit,
+  holdBillSchema,
   linePrice,
   type CartLine,
   type CatalogueItem,
@@ -540,5 +543,49 @@ describe('createCatalogueSearch (design §4)', () => {
     const started = Date.now();
     for (const query of ['m', 'ma', 'mas', 'masa', 'item 49']) searchMany(query);
     expect((Date.now() - started) / 5).toBeLessThan(20);
+  });
+});
+
+describe('holdBillSchema and discardBillSchema (design §9, question 7)', () => {
+  const held = { label: '  blue shirt uncle ', draft, shownTotalPaise: 2_800 };
+
+  it('takes a cart with an optional label and the total shown', () => {
+    expect(holdBillSchema.parse(held)).toEqual({ ...held, label: 'blue shirt uncle' });
+    expect(holdBillSchema.parse({ ...held, label: '' })).toMatchObject({ label: null });
+    expect(discardBillSchema.parse({ draft, shownTotalPaise: 0 })).toEqual({
+      draft,
+      shownTotalPaise: 0,
+    });
+  });
+
+  it('refuses a long label, an empty cart and a cart with payments', () => {
+    expect(holdBillSchema.safeParse({ ...held, label: 'x'.repeat(41) }).success).toBe(false);
+    expect(holdBillSchema.safeParse({ ...held, draft: { ...draft, lines: [] } }).success).toBe(
+      false,
+    );
+    expect(holdBillSchema.safeParse({ ...held, draft: paid }).success).toBe(false);
+  });
+});
+
+describe('approvalSchema (design §6, question 5)', () => {
+  const asked = {
+    billKey: KEY,
+    kind: 'discount',
+    lineBasisPoints: 1_500,
+    billBasisPoints: 500,
+    ownerPassword: ' typed as is ',
+  };
+
+  it('takes the shares to approve and the password exactly as typed', () => {
+    expect(approvalSchema.parse(asked)).toEqual(asked);
+  });
+
+  it.each([
+    ['a share over 100%', { billBasisPoints: 10_001 }],
+    ['nothing to approve', { lineBasisPoints: 0, billBasisPoints: 0 }],
+    ['an unknown kind', { kind: 'credit_limit' }],
+    ['no password', { ownerPassword: '' }],
+  ])('refuses %s', (_, change) => {
+    expect(approvalSchema.safeParse({ ...asked, ...change }).success).toBe(false);
   });
 });

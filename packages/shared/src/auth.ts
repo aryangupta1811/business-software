@@ -142,6 +142,11 @@ export interface ActiveSession {
   emailConfirmed: boolean;
   /** #45: this server sends email only to a few verified addresses (the demo). */
   emailLimited: boolean;
+  /**
+   * `02` #12: the most this person may discount without the owner's OK, in basis points; null
+   * for the owner (no limit). Staff have 0 until P1.5 lets the owner set each login's limit.
+   */
+  discountLimitBasisPoints: number | null;
 }
 
 /** What `GET /api/session` answers. */

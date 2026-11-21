@@ -26,7 +26,7 @@ type Tab = 'items' | 'catalogue';
 /** Module 01 #1–3, #8: the items list, and the owner's categories and units (design §7). */
 export const Route = createFileRoute('/_app/items/')({
   component: Items,
-  staticData: { titleKey: 'nav.items' },
+  staticData: { titleKey: 'nav.items', permission: 'items.view' },
   validateSearch: (search: Record<string, unknown>): { tab?: Tab } =>
     search.tab === 'catalogue' ? { tab: 'catalogue' } : {},
 });

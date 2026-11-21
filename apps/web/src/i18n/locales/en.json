@@ -10,7 +10,8 @@
     "home": "Home",
     "settings": "Settings",
     "items": "Items",
-    "billing": "Billing"
+    "billing": "Billing",
+    "staff": "Staff"
   },
   "theme": {
     "toDark": "Switch to dark mode",
@@ -264,6 +265,9 @@
       },
       "unitCost": {
         "invalid": "Enter an amount like 45.00"
+      },
+      "discountLimit": {
+        "invalid": "Enter 0 to 100, up to two decimals"
       }
     },
     "too_small": "This is too small",
@@ -285,7 +289,9 @@
     "archived": "This is archived",
     "server": "Couldn't save. Try again",
     "network": "Can't reach the server",
-    "forbidden": "You aren't allowed to do this"
+    "forbidden": "You aren't allowed to do this",
+    "username_taken": "This username is taken. Choose another",
+    "same_as_username": "Don't use the username as the password"
   },
   "recoveryKey": {
     "title": "Save your recovery key",
@@ -713,7 +719,8 @@
       "staff": "Staff"
     },
     "lockNow": "Lock now",
-    "logout": "Log out"
+    "logout": "Log out",
+    "myPassword": "My password"
   },
   "forgot": {
     "title": "Forgot your password?",
@@ -894,7 +901,6 @@
     "approval": {
       "title": "Owner's OK for this discount",
       "body": "This bill gives up to {{line}} off a line and {{bill}} off the whole bill, above your limit. The owner types their password to allow it for this bill, for 30 minutes.",
-      "password": "Owner's password",
       "confirm": "Allow",
       "failed": "That didn't go through. Try again.",
       "needed": "Needs the owner's OK",
@@ -1000,5 +1006,164 @@
     "pay": "Pay",
     "readyToSave": "Paid. Ready to save.",
     "saveComesNext": "Saving the bill (invoice number, stock) comes in the next update."
+  },
+  "notAllowed": {
+    "title": "You can't open this page",
+    "body": "Your login doesn't include this page. Ask the owner if you need it.",
+    "home": "Go to home"
+  },
+  "me": {
+    "title": "My password",
+    "who": "Your login",
+    "lead": "Your name, role and branch. The owner can change them.",
+    "name": "Name",
+    "role": "Role",
+    "branch": "Branch"
+  },
+  "staff": {
+    "lead": "Give each person a login of their own and choose what they can do.",
+    "newTitle": "Add staff",
+    "editTitle": "Staff login",
+    "back": "All staff",
+    "add": "Add staff",
+    "showFormer": "Show former staff",
+    "loading": "Loading staff…",
+    "loadFailed": "Couldn't load the staff.",
+    "retry": "Try again",
+    "empty": "No staff yet. Add a login so a cashier can bill on their own.",
+    "nothing": "Nothing",
+    "columns": {
+      "name": "Name",
+      "username": "Username",
+      "branch": "Home branch",
+      "access": "Can do",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Deactivated"
+    },
+    "actions": {
+      "edit": "Edit",
+      "editNamed": "Edit {{name}}",
+      "reset": "Reset password",
+      "resetNamed": "Reset password for {{name}}",
+      "deactivate": "Deactivate",
+      "deactivateNamed": "Deactivate {{name}}",
+      "reactivate": "Reactivate",
+      "reactivateNamed": "Reactivate {{name}}"
+    },
+    "groups": {
+      "billing": "Billing",
+      "customers": "Customers",
+      "items": "Items",
+      "stock": "Stock"
+    },
+    "person": {
+      "title": "Person",
+      "lead": "Who this login belongs to.",
+      "name": "Name",
+      "username": "Username",
+      "usernameHint": "They type this to log in: 3 to 32 letters, digits, dots, dashes or underscores.",
+      "password": "Password",
+      "branch": "Home branch"
+    },
+    "access": {
+      "title": "Access",
+      "lead": "Choose what this person can do. What you leave off, they can't open.",
+      "reset": "Reset to defaults",
+      "limit": "Most they can discount alone",
+      "limitHint": "From 0 to 100, up to two decimals. Above this, a discount needs your password.",
+      "noMoney": "Staff never see salaries or profit unless you switch it on.",
+      "save": "Save access",
+      "saved": "Access saved",
+      "confirmTitle": "Save access for {{name}}",
+      "confirmBody": "Changing what someone can do needs your password.",
+      "confirm": "Save access"
+    },
+    "switches": {
+      "billing": {
+        "sell": {
+          "label": "Bill customers",
+          "hint": "Use the billing screen; hold and resume bills."
+        },
+        "discount": {
+          "label": "Give discounts",
+          "hint": "Up to the limit below. Above it, the bill needs your password."
+        }
+      },
+      "customers": {
+        "view": {
+          "label": "Find customers",
+          "hint": "Look customers up at the counter."
+        },
+        "manage": {
+          "label": "Add and edit customers",
+          "hint": "Add a customer while billing."
+        }
+      },
+      "items": {
+        "view": {
+          "label": "See items",
+          "hint": "Look up items and prices, never the purchase price."
+        },
+        "manage": {
+          "label": "Add and edit items",
+          "hint": "Add, change and archive items, categories and units."
+        },
+        "view_cost": {
+          "label": "See purchase prices",
+          "hint": "The price you paid, and the margin."
+        }
+      },
+      "stock": {
+        "view": {
+          "label": "See stock",
+          "hint": "How much is in stock, and its history."
+        },
+        "adjust": {
+          "label": "Change stock",
+          "hint": "Enter opening stock and fix counts."
+        }
+      }
+    },
+    "new": {
+      "submit": "Add staff login",
+      "confirmTitle": "Add this login",
+      "confirmBody": "A new login can be used at once, so adding one needs your password.",
+      "confirm": "Add login"
+    },
+    "reset": {
+      "title": "Reset password for {{name}}",
+      "body": "Choose a new password and tell them. They are logged out on every computer at once, and can change it themselves under My password.",
+      "newPassword": "New password",
+      "confirm": "Set new password",
+      "done": "New password set for {{name}}. They are logged out everywhere."
+    },
+    "deactivate": {
+      "title": "Deactivate {{name}}?",
+      "loggedOut": "They are logged out at once.",
+      "noLogin": "They can't log in.",
+      "history": "Their history stays.",
+      "undo": "You can switch the login back on any time.",
+      "reason": "Reason (optional)",
+      "confirm": "Deactivate",
+      "done": "{{name}} is deactivated."
+    },
+    "reactivate": {
+      "title": "Reactivate {{name}}?",
+      "body": "They can log in again with the same password and the same access. This needs your password.",
+      "confirm": "Reactivate",
+      "done": "{{name}} can log in again."
+    },
+    "notFound": {
+      "title": "No such staff login",
+      "body": "It may have been typed wrong. Open it from the staff list."
+    },
+    "errors": {
+      "invalid_permissions": "Those switches don't fit together. Reload the page and try again.",
+      "not_found": "This login no longer exists. Go back to the list."
+    }
   }
 }

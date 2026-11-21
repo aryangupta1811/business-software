@@ -48,7 +48,7 @@ import { RecoveryKeyCard } from '../../settings/recovery-key-card';
  */
 export const Route = createFileRoute('/_app/settings')({
   component: Settings,
-  staticData: { titleKey: 'nav.settings' },
+  staticData: { titleKey: 'nav.settings', permission: 'settings.view' },
 });
 
 const SETTINGS_KEY = ['settings'];

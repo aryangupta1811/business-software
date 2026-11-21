@@ -6,7 +6,7 @@ import { QueryGate } from '../../items/query-gate';
 /** A new item; a scan of an unknown code arrives here with the code filled in (design §7). */
 export const Route = createFileRoute('/_app/items/new')({
   component: NewItem,
-  staticData: { titleKey: 'items.newTitle' },
+  staticData: { titleKey: 'items.newTitle', permission: 'items.view' },
   // The router reads search values as JSON, so a typed `?barcode=8901234567890` arrives as a
   // number; a barcode is text.
   validateSearch: (search: Record<string, unknown>): { barcode?: string } =>

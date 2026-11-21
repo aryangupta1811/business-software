@@ -40,19 +40,21 @@ export interface FakeAnswer {
 
 /**
  * Stands in for the API: `routes` maps "METHOD /path" to an answer (or a function making one).
- * `GET /api/session` answers `session`; anything else unlisted answers the health check.
+ * `GET /api/session` answers `session`; anything else unlisted answers the health check. A
+ * route function gets the request body and the URL.
  */
 export function fakeApi(
   session: SessionView,
-  routes: Record<string, FakeAnswer | ((body: unknown) => FakeAnswer)> = {},
+  routes: Record<string, FakeAnswer | ((body: unknown, url: string) => FakeAnswer)> = {},
 ) {
   const fetchMock = vi.fn((url: string, init?: RequestInit) => {
     const method = init?.method ?? 'GET';
     const body: unknown = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
-    const route = routes[`${method} ${url}`];
+    // A route listed without its query string answers every query (`GET /api/staff?...`).
+    const route = routes[`${method} ${url}`] ?? routes[`${method} ${url.split('?')[0] ?? url}`];
     const answer =
       typeof route === 'function'
-        ? route(body)
+        ? route(body, url)
         : (route ??
           (url === '/api/session'
             ? { body: session }

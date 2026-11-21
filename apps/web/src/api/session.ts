@@ -32,8 +32,11 @@ export function useSession() {
   return useQuery({
     queryKey: SESSION_KEY,
     queryFn: fetchSession,
-    // The server applies the lock and idle rules; a stale view is re-read on any 401.
+    // The server applies the lock and idle rules; a stale view is re-read on any 401, on a 403
+    // `forbidden` (a permission was taken away), and whenever the window gets focus, so a
+    // change the owner made shows within seconds (P1.5 design §5).
     staleTime: Infinity,
+    refetchOnWindowFocus: 'always',
     retry: false,
   });
 }

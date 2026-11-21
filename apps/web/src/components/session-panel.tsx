@@ -1,4 +1,5 @@
 import type { ActiveSession } from '@business-software/shared';
+import { Link } from '@tanstack/react-router';
 import { LockKeyhole, LogOut } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useSessionActions } from '../api/session-actions';
@@ -16,12 +17,17 @@ export function SessionPanel({ session }: { session: ActiveSession }) {
   const isOwner = session.user.role === 'owner';
   return (
     <div className="flex flex-col gap-1 border-t border-border pt-3">
-      <div className="mb-1 px-2">
-        <p className="truncate font-semibold">{session.user.name}</p>
-        <p className="truncate text-label text-muted">
+      {/* The name opens "My password", which every login can use (Module 00 #46). */}
+      <Link
+        to="/account"
+        title={t('session.myPassword')}
+        className="mb-1 block rounded-lg px-2 py-1 hover:bg-surface-muted data-[status=active]:bg-surface-muted"
+      >
+        <span className="block truncate font-semibold">{session.user.name}</span>
+        <span className="block truncate text-label text-muted">
           {t(`session.roles.${session.user.role}`)} · {session.branch.name}
-        </p>
-      </div>
+        </span>
+      </Link>
       {isOwner && <LockButton />}
       <LogoutButton />
     </div>

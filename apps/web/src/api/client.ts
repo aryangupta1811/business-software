@@ -30,7 +30,8 @@ export function setCsrfToken(token: string | null): void {
   csrfToken = token;
 }
 
-// Told when an answer says the session is locked or gone, so the screen can follow (#21, #29).
+// Told when an answer says the session is locked or gone (#21, #29), or that this login no
+// longer holds a permission (P1.5: the owner took it away), so the screen can follow.
 const authListeners = new Set<(code: string) => void>();
 
 export function onAuthError(listener: (code: string) => void): () => void {
@@ -65,7 +66,10 @@ export async function apiRequest<T>(method: string, path: string, body?: unknown
   } | null;
   if (!response.ok) {
     const code = typeof answer?.code === 'string' ? answer.code : 'server';
-    if (response.status === 401 && AUTH_CODES.has(code)) {
+    const lostAuth = response.status === 401 && AUTH_CODES.has(code);
+    // A 403 `forbidden` means what this login may do changed since the screen was drawn.
+    const lostPermission = response.status === 403 && code === 'forbidden';
+    if (lostAuth || lostPermission) {
       for (const listener of authListeners) listener(code);
     }
     const retryAfter = Number.parseInt(response.headers.get('retry-after') ?? '', 10);

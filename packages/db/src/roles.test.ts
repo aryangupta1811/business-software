@@ -41,7 +41,7 @@ describe('app database roles', () => {
   it('gives no app role superuser, BYPASSRLS, CREATEROLE or CREATEDB', async () => {
     const { rows } = await owner.query(
       `select rolname, rolsuper, rolbypassrls, rolcreaterole, rolcreatedb from pg_roles
-        where rolname in ('app_backup', 'app_owner', 'app_runtime') order by rolname`,
+        where rolname in ('app_backup', 'app_owner', 'app_queue', 'app_runtime') order by rolname`,
     );
     expect(rows).toEqual([
       {
@@ -59,6 +59,13 @@ describe('app database roles', () => {
         rolcreatedb: false,
       },
       {
+        rolname: 'app_queue',
+        rolsuper: false,
+        rolbypassrls: false,
+        rolcreaterole: false,
+        rolcreatedb: false,
+      },
+      {
         rolname: 'app_runtime',
         rolsuper: false,
         rolbypassrls: false,
@@ -70,7 +77,7 @@ describe('app database roles', () => {
 
   // The bootstrap runs in the administrator's own database (`postgres` on RDS). The app roles
   // have no business there, so they can't even connect (42501, insufficient_privilege).
-  it.each(['ownerUrl', 'runtimeUrl'] as const)(
+  it.each(['ownerUrl', 'runtimeUrl', 'queueUrl'] as const)(
     'keeps the %s role out of the administrator database',
     async (which) => {
       const url = new URL(server[which]);

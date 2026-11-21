@@ -56,5 +56,7 @@ export const PERMISSIONS = [
   // P1.8: see stock and its history; opening stock and adjustments (`01` #11).
   'stock.view',
   'stock.adjust',
+  // P1.13: the billing page, its catalogue copy and held bills (`02`).
+  'billing.sell',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];

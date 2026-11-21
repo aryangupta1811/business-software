@@ -124,6 +124,7 @@ export const openingStockSchema = z.strictObject({
     .int({ error: 'invalid' })
     .min(1, { error: 'too_small' })
     .max(MAX_THOUSANDTHS, { error: 'too_big' }),
+  /** Paise per stock unit. Null or left out: the item's known cost (its purchase price). */
   unitCost: z
     .int({ error: 'invalid' })
     .min(0, { error: 'too_small' })

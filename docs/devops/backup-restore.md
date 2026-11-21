@@ -96,6 +96,8 @@ The roles themselves aren't in the dump (RDS forbids reading role passwords): `c
 
 ## Gotchas
 
+- **The job queue's schema (`pgboss`) is not in the dump** (P2.7, 2026-11-21). It holds short-lived jobs that the worker re-creates; business records, including any outbox, live in `public` and are dumped. It is also owned by `app_queue`, a role the restore drill's empty server doesn't have, so including it would break the restore. `dump.sh` passes `--exclude-schema=pgboss` and leaves it out of the row counts.
+
 - **`--enable-row-security` is required, and dangerous.** Without it, `pg_dump` as `app_backup` fails; with it, a table missing its `backup_read` policy is dumped with no rows. The guard test (CI) and `dump.sh`'s own check stop that, so don't remove either.
 - **A new schema breaks the backup on purpose.** `app_backup` can read only what migration 0007 granted (public, drizzle and auth: `auth.owner_logins` maps an owner's email to the business, and without it no restored owner could log in). pgboss (P2.7) must be granted or excluded deliberately.
 - **Not before migration 0007 is deployed.** The backup needs `app_backup` and its grants on RDS, which arrive with the first deploy after P1.4 (deploy hold).

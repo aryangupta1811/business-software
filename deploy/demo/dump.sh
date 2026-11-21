@@ -53,7 +53,7 @@ SELECT pg_export_snapshot() AS snapshot \gset
 
 -- 3. The dump, while this transaction keeps the snapshot alive. A failed pg_dump leaves no
 -- file behind, and stops psql (SHELL_ERROR, psql 16+).
-\! pg_dump --snapshot="$DUMP_SNAPSHOT" --enable-row-security --format=custom --compress=zstd --file="$DUMP_FILE" || { rm -f "$DUMP_FILE"; exit 1; }
+\! pg_dump --snapshot="$DUMP_SNAPSHOT" --enable-row-security --exclude-schema=pgboss --format=custom --compress=zstd --file="$DUMP_FILE" || { rm -f "$DUMP_FILE"; exit 1; }
 \if :SHELL_ERROR
   DO $$ BEGIN RAISE EXCEPTION 'pg_dump failed'; END $$;
 \endif
@@ -62,7 +62,7 @@ SELECT pg_export_snapshot() AS snapshot \gset
 \o :counts
 SELECT format('SELECT %L, count(*) FROM %s', c.oid::regclass::text, c.oid::regclass)
   FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
- WHERE n.nspname <> 'information_schema' AND n.nspname NOT LIKE 'pg\_%'
+ WHERE n.nspname <> 'information_schema' AND n.nspname NOT LIKE 'pg\_%' AND n.nspname <> 'pgboss'
    AND c.relkind IN ('r', 'p')
  ORDER BY 1 \gexec
 \o

@@ -4,8 +4,8 @@ PostgreSQL 18 runs in Docker Compose (`compose.yaml`), next to the app's own con
 
 ## First time
 
-1. Copy `.env.example` to `.env` and replace every `change-me` value with a random string of letters and digits. Use the same owner password inside `MIGRATION_DATABASE_URL` and the same runtime password inside `DATABASE_URL`.
-2. `pnpm db:up` creates the volume, runs `packages/db/bootstrap/create-roles.sql` (roles + database) and waits until the database is healthy. It also starts **Mailpit**, which catches every email the app sends on this computer (ADR 0040).
+1. Copy `.env.example` to `.env` and replace every `change-me` value with a random string of letters and digits. Use the same owner password inside `MIGRATION_DATABASE_URL`, the same runtime password inside `DATABASE_URL`, and the same queue password inside `QUEUE_DATABASE_URL`.
+2. `pnpm db:up` creates the volume, runs `packages/db/bootstrap/create-roles.sql` (roles + database), then the backup role and the queue role files, and waits until the database is healthy. It also starts **Mailpit**, which catches every email the app sends on this computer (ADR 0040).
 3. `pnpm db:migrate` applies the migrations as `app_owner`.
 
 ## Running the whole app in containers
@@ -14,7 +14,7 @@ PostgreSQL 18 runs in Docker Compose (`compose.yaml`), next to the app's own con
 
 1. `db`, until it's healthy;
 2. `migrate`, a one-shot container that applies migrations as `app_owner` and exits (`Exited (0)` is correct);
-3. `api` (http://127.0.0.1:3000/api/health) and `worker`, as `app_runtime`, only if `migrate` succeeded.
+3. `api` (http://127.0.0.1:3000/api/health) as `app_runtime`, and `worker` as `app_runtime` plus `app_queue` (its job queue), only if `migrate` succeeded.
 
 `web` (http://127.0.0.1:8080) starts alongside without waiting: Caddy serves the built app and passes `/api` to `api` (ADR 0023). If the API isn't up, the page loads and its badge says it can't reach the server.
 
@@ -88,6 +88,11 @@ Order by `id`: entries written in one transaction share `created_at` (it's the t
   pnpm db:migrate
   ```
   Locally it gets no password, so it can't log in over TCP; local backups use `postgres`.
+- **A volume made before 2026-11-21 has no `app_queue` role or `pgboss` schema,** so the worker fails to start with `password authentication failed for user "app_queue"`. Create them once (the file is safe to run again; it needs `APP_QUEUE_PASSWORD` from your `.env`):
+  ```bash
+  docker compose exec -T -e APP_QUEUE_PASSWORD=<the queue password from .env> db psql -U postgres -d postgres -v ON_ERROR_STOP=1 < packages/db/bootstrap/create-queue-role.sql
+  ```
+- **The job queue (ADR 0022).** The worker runs pg-boss as `app_queue`, which owns only schema `pgboss`: it can't read a business table, and `app_runtime` can't touch `pgboss`. Only the worker has `QUEUE_DATABASE_URL`; `pnpm dev` runs the api alone, so nothing is processed there. Queue tables are scratch data: the nightly backup leaves schema `pgboss` out, and the outbox table (a later task) keeps the permanent record.
 - **The bootstrap runs only on an empty volume.** Changing a password in `.env` later does nothing by itself. Change it in the database too: `ALTER ROLE app_runtime PASSWORD '...'` as `postgres`.
 - **`docker compose down` is safe.** It removes the container, not the volume.
 - **`docker compose down -v` deletes the database** (the `pgdata` volume). Ask the owner first (`CLAUDE.md` rule 7). It's only ever needed to rerun the bootstrap from scratch.

@@ -2,6 +2,7 @@
 // use the same schemas, so the screen and the API can't disagree.
 import { z } from 'zod';
 import { newPassword, passwordProblem } from './auth.js';
+import type { SettingsAlertsInput } from './alerts.js';
 import { BUSINESS_TYPES, FEATURES, GST_STATUSES } from './business.js';
 import { email, isValidGstin, optionalText, phone, text } from './fields.js';
 import { isBranchStateCode } from './states.js';
@@ -131,4 +132,5 @@ export interface SettingsView {
   features: SettingsFeaturesInput['features'];
   security: SettingsSecurityInput;
   stock: SettingsStockInput;
+  alerts: SettingsAlertsInput;
 }

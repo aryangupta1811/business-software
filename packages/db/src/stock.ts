@@ -13,6 +13,7 @@ import {
   type StockMovementKind,
 } from '@business-software/shared';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { syncStockAlerts } from './alerts.js';
 import { items, itemStock, stockMovements } from './schema.js';
 import type { Transaction } from './tenancy.js';
 
@@ -106,7 +107,8 @@ interface Balance {
  * Applies `lines` at one branch: locks each item's stock row in item-ID order (so two calls
  * can never deadlock), checks the rules, writes one movement per line and updates the totals.
  * Throws `StockRuleError` before writing any movement if a line breaks a rule; the caller's
- * transaction should still roll back.
+ * transaction should still roll back. A line that crosses an item's low-stock level or empties
+ * it raises, changes or clears its alert here too.
  */
 export async function moveStock(tx: Transaction, input: MoveStockInput): Promise<MovedLine[]> {
   if (input.requestKey !== undefined && input.lines.length !== 1) {
@@ -248,6 +250,8 @@ export async function moveStock(tx: Transaction, input: MoveStockInput): Promise
       })
       .where(and(eq(itemStock.branchId, input.branchId), eq(itemStock.itemId, itemId)));
   }
+  // Alerts follow the new balances in this same transaction (ADR 0046).
+  await syncStockAlerts(tx, { itemIds, branchId: input.branchId });
   return results;
 }
 

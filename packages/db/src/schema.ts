@@ -1,6 +1,9 @@
 // Drizzle table definitions (ADRs 0006, 0027). Every business-owned table uses the helpers
 // below; src/tenancy-guard.test.ts fails if a table misses one.
 import {
+  ALERT_FAMILIES,
+  ALERT_SUBJECT_TYPES,
+  ALERT_TYPES,
   BUILT_IN_UNITS,
   BUSINESS_TYPES,
   FEATURES,
@@ -12,6 +15,7 @@ import {
   ITEM_KINDS,
   NEGATIVE_STOCK_SETTINGS,
   STOCK_MOVEMENT_KINDS,
+  type StockAlertDetails,
 } from '@business-software/shared';
 import { sql, type SQL } from 'drizzle-orm';
 import {
@@ -102,6 +106,11 @@ export const businesses = pgTable(
     staffIdleMinutes: smallint('staff_idle_minutes').notNull().default(30),
     /** Module 01 #12: selling past zero stock warns or is blocked (P1.14 reads it). */
     negativeStock: text('negative_stock').notNull().default('warn'),
+    /** The alert types the app shows (Module 07 #3). A type left out still records alerts. */
+    alertTypes: text('alert_types')
+      .array()
+      .notNull()
+      .default(sql`array[${literals(ALERT_TYPES)}]::text[]`),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -117,6 +126,10 @@ export const businesses = pgTable(
     check('businesses_features_check', sql`${t.features} <@ array[${literals(FEATURES)}]::text[]`),
     check('businesses_owner_lock_minutes_check', sql`${t.ownerLockMinutes} between 1 and 30`),
     check('businesses_staff_idle_minutes_check', sql`${t.staffIdleMinutes} between 5 and 120`),
+    check(
+      'businesses_alert_types_check',
+      sql`${t.alertTypes} <@ array[${literals(ALERT_TYPES)}]::text[]`,
+    ),
     check(
       'businesses_negative_stock_check',
       sql`${t.negativeStock} in (${literals(NEGATIVE_STOCK_SETTINGS)})`,
@@ -977,5 +990,86 @@ export const stockMovements = pgTable(
       sql`(${t.kind} = 'adjustment') = (${t.reason} is not null) and ${t.reason} in (${literals(ADJUSTMENT_REASONS)})`,
     ),
     check('stock_movements_note_check', sql`char_length(${t.note}) between 1 and 200`),
+  ],
+);
+
+// ---- Alerts (P2.7 design `docs/plans/2026-11-22-p2.7-alerts-design.md`; Module 07; ADR 0046) ----
+// Raised and cleared by the code that changes what they are about, in the same transaction
+// (src/alerts.ts). A cleared alert stays as history: nothing here is ever deleted.
+
+const ALERT_TYPE_FAMILY_PAIRS = sql.raw(
+  Object.entries(ALERT_FAMILIES)
+    .map(([type, family]) => `('${type}', '${family}')`)
+    .join(', '),
+);
+
+export const alerts = pgTable(
+  'alerts',
+  {
+    id: id(),
+    businessId: ownBusinessId(),
+    branchId: uuid('branch_id').notNull(),
+    type: text('type').notNull(),
+    /**
+     * The type's family (`ALERT_FAMILIES`), stored so a partial unique index can say "one open
+     * alert per subject and family": low and out of stock are one alert that changes type.
+     */
+    family: text('family').notNull(),
+    subjectType: text('subject_type').notNull(),
+    /** The item, batch, customer or entry the alert is about; no foreign key, as its table varies. */
+    subjectId: uuid('subject_id').notNull(),
+    /** What the bell shows (stock and level for stock alerts), fixed when raised or changed. */
+    details: jsonb('details').$type<StockAlertDetails>().notNull(),
+    raisedAt: timestamp('raised_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: updatedAt(),
+    /** Set when the condition ends. A cleared alert is history. */
+    clearedAt: timestamp('cleared_at', { withTimezone: true }),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    unique('alerts_business_id_id_unique').on(t.businessId, t.id),
+    foreignKey({
+      name: 'alerts_branch_fk',
+      columns: [t.businessId, t.branchId],
+      foreignColumns: [branches.businessId, branches.id],
+    }),
+    // One OPEN alert per subject per branch per family; any number of cleared ones.
+    uniqueIndex('alerts_open_unique')
+      .on(t.businessId, t.branchId, t.subjectType, t.subjectId, t.family)
+      .where(sql`${t.clearedAt} is null`),
+    check(
+      'alerts_type_family_check',
+      sql`(${t.type}, ${t.family}) in (${ALERT_TYPE_FAMILY_PAIRS})`,
+    ),
+    check('alerts_subject_type_check', sql`${t.subjectType} in (${literals(ALERT_SUBJECT_TYPES)})`),
+    check('alerts_details_check', sql`jsonb_typeof(${t.details}) = 'object'`),
+    check('alerts_cleared_check', sql`${t.clearedAt} is null or ${t.clearedAt} >= ${t.raisedAt}`),
+  ],
+);
+
+// A dismissal belongs to one alert row and one person: when the alert clears and a new one is
+// raised later, the new one shows again (question 2A). Never deleted.
+export const alertDismissals = pgTable(
+  'alert_dismissals',
+  {
+    id: id(),
+    businessId: ownBusinessId(),
+    alertId: uuid('alert_id').notNull(),
+    userId: uuid('user_id').notNull(),
+    dismissedAt: timestamp('dismissed_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    unique('alert_dismissals_alert_user_unique').on(t.businessId, t.alertId, t.userId),
+    foreignKey({
+      name: 'alert_dismissals_alert_fk',
+      columns: [t.businessId, t.alertId],
+      foreignColumns: [alerts.businessId, alerts.id],
+    }),
+    foreignKey({
+      name: 'alert_dismissals_user_fk',
+      columns: [t.businessId, t.userId],
+      foreignColumns: [users.businessId, users.id],
+    }),
   ],
 );

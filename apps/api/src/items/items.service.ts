@@ -23,6 +23,7 @@ import {
   itemUnits,
   recordEntry,
   sql,
+  syncStockAlerts,
   units,
   type Database,
   type Transaction,
@@ -317,7 +318,10 @@ export class ItemsService {
         .set({ ...columns(input), purchasePrice })
         .where(eq(items.id, id));
       const removedCodes = await this.writePacks(tx, id, input.packs, before.packs);
-      await this.writeLevels(tx, id, input.levels, before.levels);
+      // A level that moved can raise or clear the item's alert now (ADR 0046).
+      if (await this.writeLevels(tx, id, input.levels, before.levels)) {
+        await syncStockAlerts(tx, { itemIds: [id] });
+      }
 
       const after = await this.mustLoad(tx, id);
       const changed = changes(logged(before), logged(after));
@@ -454,6 +458,8 @@ export class ItemsService {
         before: { archived: !archive },
         after: { archived: archive },
       });
+      // Archiving clears the item's alerts; restoring raises what its stock says (ADR 0046).
+      await syncStockAlerts(tx, { itemIds: [id] });
       return forCaller(await this.mustLoad(tx, id), caller);
     });
   }
@@ -629,13 +635,16 @@ export class ItemsService {
     return removed.map((row) => row.code).sort();
   }
 
-  /** One level per branch sent; a branch not sent any more goes back to 0 (no alert). */
+  /**
+   * One level per branch sent; a branch not sent any more goes back to 0 (no alert). Answers
+   * whether any level was written (an unchanged one keeps its row).
+   */
   private async writeLevels(
     tx: Transaction,
     itemId: string,
     levels: NewItemInput['levels'],
     existing: ItemView['levels'],
-  ): Promise<void> {
+  ): Promise<boolean> {
     const sent = new Set(levels.map((level) => level.branchId));
     const all = [
       ...levels,
@@ -643,8 +652,8 @@ export class ItemsService {
         .filter((level) => !sent.has(level.branchId) && level.lowStockLevel !== 0)
         .map((level) => ({ branchId: level.branchId, lowStockLevel: 0 })),
     ];
-    if (all.length === 0) return;
-    await tx
+    if (all.length === 0) return false;
+    const written = await tx
       .insert(itemBranchLevels)
       .values(all.map((level) => ({ itemId, ...level })))
       .onConflictDoUpdate({
@@ -652,7 +661,9 @@ export class ItemsService {
         set: { lowStockLevel: sql`excluded.low_stock_level`, updatedAt: new Date() },
         // An unchanged level keeps its row as it was.
         setWhere: sql`${itemBranchLevels.lowStockLevel} <> excluded.low_stock_level`,
-      });
+      })
+      .returning({ id: itemBranchLevels.id });
+    return written.length > 0;
   }
 
   private async mustLoad(tx: Transaction, id: string): Promise<ItemView> {

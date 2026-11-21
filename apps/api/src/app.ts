@@ -10,6 +10,8 @@ import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Database } from '@business-software/db';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { AlertsController } from './alerts/alerts.controller.js';
+import { AlertsService } from './alerts/alerts.service.js';
 import { AccountController } from './account/account.controller.js';
 import { AccountService } from './account/account.service.js';
 import { DevicesController } from './account/devices.controller.js';
@@ -67,6 +69,7 @@ export const API_CONTROLLERS = [
   CustomersController,
   StaffController,
   BranchesController,
+  AlertsController,
 ];
 
 export interface AppOptions {
@@ -116,6 +119,7 @@ class ApiModule {
         CustomersService,
         StaffService,
         BranchesService,
+        AlertsService,
         // One Argon2 queue for signup and logins (ADR 0038).
         { provide: HASH_GATE, useValue: options.hashGate ?? new HashGate() },
         {

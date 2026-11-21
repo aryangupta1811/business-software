@@ -7,6 +7,7 @@ import type { Transaction } from './tenancy.js';
 export const ENTRY_ACTIONS = {
   'business.created': { reasonRequired: false }, // Module 00 #7, at signup
   'business.updated': { reasonRequired: false }, // Module 00 #10, settings
+  'settings.alerts_changed': { reasonRequired: false }, // Module 07 #3, the app switches
   'stock.adjusted': { reasonRequired: true }, // Module 01 #11
   'stock.opening_set': { reasonRequired: false }, // Module 01 #9, P1.8
   // Logins (sitting 2, 06 L2; Module 00 #20). Failed logins stay with the rate limit.

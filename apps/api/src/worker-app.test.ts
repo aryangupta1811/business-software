@@ -45,7 +45,7 @@ describe('createWorker', () => {
       const id = await sender.send(PING_QUEUE, { hello: 'worker' });
       expect(id).not.toBeNull();
       const job = await waitFor(async () => {
-        const found = await sender.getJobById<object>(PING_QUEUE, id ?? '');
+        const [found] = await sender.findJobs(PING_QUEUE, { id: id ?? '' });
         return found?.state === 'completed' ? found : undefined;
       });
       expect(job.output).toEqual({ pong: { hello: 'worker' } });

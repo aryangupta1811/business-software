@@ -38,9 +38,10 @@ export async function startQueue(queueDatabaseUrl: string, attempts: number): Pr
   try {
     await boss.start({ attempts });
     await boss.createQueue(PING_QUEUE);
-    await boss.work<object>(PING_QUEUE, async ([job]: Job<object>[]) => {
+    await boss.work(PING_QUEUE, (jobs: Job[]) => {
+      const [job] = jobs;
       logger.log(`Ping job ${job?.id ?? ''} handled`);
-      return { pong: job?.data ?? null };
+      return Promise.resolve({ pong: job?.data ?? null });
     });
   } catch (error) {
     // Close what start() opened (its pool), or the process would hang on it.

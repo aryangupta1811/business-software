@@ -121,6 +121,7 @@ ADR 0040 and its 2026-11-20 note; `infra/terraform/demo/mail.tf`.
 - **How the api gets credentials:** containers can't reach the server's role (metadata hop limit 1). `mail-credentials.sh` on the host assumes `business-software-demo-mail` (send only, only as `mail_from`) and writes 1-hour credentials to `/run/business-software-mail`, mounted read-only into the api at `/aws`. `business-software-mail-credentials.timer` refreshes them every 20 minutes. Check on the server: `systemctl list-timers business-software-mail-credentials.timer` and `journalctl -u business-software-mail-credentials -n 5`.
 - **Mail never stops the app from starting.** If the parameters or the role are missing, `start.sh` logs `mail: off` and runs `MAIL_TRANSPORT=none`. `journalctl -u business-software | grep mail:` shows which one is live.
 - **Price:** $0.10 per 1,000 recipients. The identities, the role and the parameters are free.
+- **Applied** on 2026-11-21 with the owner's OK (6 added, 0 changed, 0 destroyed; $0): the sender identity, the mail role and its two policies, and the two SSM parameters. The sender's verification was `PENDING` until the owner clicked AWS's link.
 
 ## The database
 

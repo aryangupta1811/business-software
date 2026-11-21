@@ -52,13 +52,17 @@
 - **One real email** delivered through SES (owner's signup on the live site). **First backup and restore drill** OK (18 tables). ADR 0037's master check: `rolbypassrls` false.
 - **First normal deploy** (#47's merge, `9f482ce`) green: pre-deploy backup, deploy, live check.
 
-**Half-done:** nothing.
+**Session 29** (2026-11-21, inline, Day 5):
+- **P1.13 questions answered:** the owner took every recommendation (`02` change log). PR 1 is split in two: **1a** shared rules (this PR), **1b** tables and API.
+- **P1.13 PR 1a:** 1.5% GST rate (migration `0010`, widens the check only); `packages/shared/src/billing.ts`: catalogue copy types, `linePrice`, `addToCart`, `cartToBillInput`, `discountWithinLimit` and `discountShares` (rounding-proof, measured against the engine itself), `billCartSchema`, `billDraftSchema`, `createCatalogueSearch`.
+
+**Half-done:** P1.13 PR 1b (customers, held bills and approvals tables; catalogue, customers, held-bill and approval routes; permissions; entry actions; the catalogue ADR), then PR 2 (the page).
 
 EC2 and RDS stopped at the end of session 28 (2026-11-21). No deploy run is waiting.
 
 **Next step:** Day 5. P1.13 Billing code once the owner answers #40's 12 questions (`docs/plans/2026-11-20-p1.13-billing-design.md`); P1.5 Staff → P1.6 Branches; P2.7 (queue, then alerts). Every merge now really deploys after the owner's approval. The schedule has slipped by about a day.
 
-**Last updated:** 2026-11-21 (session 28)
+**Last updated:** 2026-11-21 (session 29)
 
 Each task below is sized for **one session** when worked alone. DevOps stages (from `docs/devops/DEVOPS_PLAN.md`) are woven in where they're first needed. Tasks for DRAFT modules are provisional: re-cut them after `/finalize-module NN`.
 
@@ -184,7 +188,7 @@ Step 2 — The shortest path to a printed bill:
   - P1.17: quotations (#9) and the GST summary export (#18).
   - E-invoicing and e-way bills are out of v1 (#19).
 - [x] **P1.12 GST engine** (done 2026-11-18, PR #25; open questions G1–G5 in the sitting 2 sheet) in `packages/shared`: tax-inclusive/exclusive, CGST+SGST/IGST, composition, rounding; exhaustive tests, no UI
-- [ ] **P1.13 Billing screen:** (design 2026-11-20: `docs/plans/2026-11-20-p1.13-billing-design.md`, waiting for the owner's answers to its 12 questions; it also settles the 1.5% GST rate: real, Schedule VI of Notification 9/2025-IT(Rate)) keyboard and scanner flow, cart, customer capture, payment modes. **From stage 5 (ADR 0032):** Sydney adds ~0.2 s per round trip from India, so a scan can't wait for the server and still meet NFR 5's 200 ms: look items up in a copy of the catalogue kept in the browser; the server re-checks prices and stock when the bill is saved. **From P0.7 (shortcut review minors):** `preventDefault` a matching key even when it's suppressed for auto-repeat or an open dialog (except `Escape`), or held `F1`/`F3`/`F6`/`F7`/`F10` reach Chrome; reserve `F5`/`F11`/`F12` with any modifier and `Ctrl+T/W/N/R` with Shift, plus `Ctrl+F4`/`Alt+F4`; a shortcut clash should throw only in development (`import.meta.env.DEV`) and log in production; pause shortcuts whenever any `dialog:modal` is open, not only the help panel; decide on `event.defaultPrevented`; handle scanner input that arrives with no field focused. Billing F-keys use `useShortcut` (ADR 0026).
+- [ ] **P1.13 Billing screen:** (design 2026-11-20: `docs/plans/2026-11-20-p1.13-billing-design.md`, the owner's answers 2026-11-21: every recommendation; PR 1a shared rules and the 1.5% rate done in session 29, PR 1b data and API next, then PR 2 the page; it also settles the 1.5% GST rate: real, Schedule VI of Notification 9/2025-IT(Rate)) keyboard and scanner flow, cart, customer capture, payment modes. **From stage 5 (ADR 0032):** Sydney adds ~0.2 s per round trip from India, so a scan can't wait for the server and still meet NFR 5's 200 ms: look items up in a copy of the catalogue kept in the browser; the server re-checks prices and stock when the bill is saved. **From P0.7 (shortcut review minors):** `preventDefault` a matching key even when it's suppressed for auto-repeat or an open dialog (except `Escape`), or held `F1`/`F3`/`F6`/`F7`/`F10` reach Chrome; reserve `F5`/`F11`/`F12` with any modifier and `Ctrl+T/W/N/R` with Shift, plus `Ctrl+F4`/`Alt+F4`; a shortcut clash should throw only in development (`import.meta.env.DEV`) and log in production; pause shortcuts whenever any `dialog:modal` is open, not only the help panel; decide on `event.defaultPrevented`; handle scanner input that arrives with no field focused. Billing F-keys use `useShortcut` (ADR 0026).
 - [ ] **P1.14 Saving a bill:** the atomic transaction, invoice numbering per branch per financial year, idempotency keys; concurrency tests
 - [ ] **P1.15 Printing:** 80/58 mm receipt and A4 invoice, PDFs via headless Chromium [ADR 0014]. **From the 2026-11-10 plan review:** ADR 0014 puts Chromium in the worker while ADR 0020 has one image for api, worker and migrate: decide whether the worker gets its own build target, so the api image stays small. Measure memory on the 2 GB server with a PDF rendering while a bill saves; add swap if needed. Chromium must be the ARM64 build
 

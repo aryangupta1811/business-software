@@ -17,4 +17,6 @@ Ideas suggested by Claude in the planning chat (29 Oct 2026) that are not yet pa
 | Flag rule: price changed back | Flag an item whose price is lowered and raised back within a day | Open (out of v1, `06`, 2026-11-19) |
 | Transliterated item search | Typing "aata" finds "आटा" at the billing counter | Open (out of v1, P1.13 design §4, 2026-11-21) |
 | Weighing-scale barcodes | Labels whose barcode carries the weight or price, read at the counter | Open (out of v1, P1.13 question 11, 2026-11-21) |
+| Forced password change | A staff member must choose their own password at the next login after the owner sets one | Open (out of v1, P1.5 question 7, 2026-11-21) |
+| Last login on the staff list | The staff list shows when each login was last used | Open (out of v1, P1.5 design, 2026-11-21) |
 | Third role (manager) | A role between owner and staff | Superseded: owner chose Owner + Staff with per-person feature switches (`00` #15–17) |

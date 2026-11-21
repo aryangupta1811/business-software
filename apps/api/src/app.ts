@@ -43,6 +43,8 @@ import { SettingsController } from './settings/settings.controller.js';
 import { SettingsService } from './settings/settings.service.js';
 import { SignupController } from './signup/signup.controller.js';
 import { SignupService } from './signup/signup.service.js';
+import { StaffController } from './staff/staff.controller.js';
+import { StaffService } from './staff/staff.service.js';
 import { StockController } from './stock/stock.controller.js';
 import { StockService } from './stock/stock.service.js';
 
@@ -61,6 +63,7 @@ export const API_CONTROLLERS = [
   BillingController,
   HeldBillsController,
   CustomersController,
+  StaffController,
 ];
 
 export interface AppOptions {
@@ -108,6 +111,7 @@ class ApiModule {
         BillingService,
         HeldBillsService,
         CustomersService,
+        StaffService,
         // One Argon2 queue for signup and logins (ADR 0038).
         { provide: HASH_GATE, useValue: options.hashGate ?? new HashGate() },
         {

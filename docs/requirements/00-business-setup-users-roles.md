@@ -84,6 +84,13 @@ Added 2026-11-19 from the P1.4 design answers (owner took every recommendation):
 44. **Remembered computers:** a computer stays remembered for 400 days (Chrome's longest), renewed at each owner login. Settings lists them with a Forget button, which needs the owner's password.
 45. **Email in the demo** (no domain, D1): confirmation and reset emails reach only verified addresses; other visitors are told to use their recovery key (#31).
 46. **Changing your own password** in Settings needs the current password and logs you out on every other computer. Changing the owner's email is not in v1.
+47. **A new staff login starts with** billing, finding and adding customers, and looking at items and stock switched on. Everything else is off, discounts included, until the owner switches it on.
+48. **Discounts switched off** means a discount limit of 0: the staff member can still type a discount at the counter, and it needs the owner's password (`02` #12).
+49. **The owner's password is asked** for changing a login's switches or discount limit, adding a login, resetting a staff password and reactivating a login. Deactivating, renaming and changing the home branch don't ask.
+50. **Settings and the Staff page are owner-only**, with no switch for staff (they hold the recovery key, remembered computers and the staff list).
+51. **My password:** every login can change its own password from a small page opened from its name in the sidebar. The owner also keeps the same card in Settings (#46).
+52. **A permission change** reaches someone already logged in on their next click, without a new login; their screen catches up when the window gets focus or a request is refused.
+53. **A staff password the owner sets** (#33) is chosen by the owner and told to the staff member, who can change it on My password. No forced change at the next login in v1.
 
 ## Language & notifications
 
@@ -104,3 +111,4 @@ None. The five raised while importing were answered on 2026-11-02 (see the Chang
 - 2026-11-19 — Fast-track sitting 2, G6: added #36, GST status and GSTIN must agree (a GSTIN on a not-registered business is refused; a registered one needs a GSTIN before its first tax invoice, checked at bill saving). No earlier point changed.
 - 2026-11-19 — P1.4 design answers: the owner took all 11 recommendations in `docs/plans/2026-11-19-p1.4-login-design.md` (section 13). Added #37–#46 (signup logs in, lock screen, several counters, closing Chrome logs out, failed-login limits, link lifetimes, staff usernames, remembered computers, email in the demo, changing your own password). The staff password-reset and deactivate buttons come with P1.5's staff page; P1.4 builds the rules. No earlier point changed meaning.
 - 2026-11-20 — Owner, after the review of P1.4 PR 2 (#37): recovery-key tries are limited per IP only (5 wrong keys an hour, counted apart from reset-link requests) and no longer per email, and a right key is never refused, so neither someone who knows the owner's email nor someone sharing the owner's IP can block the recovery key. #41 holds as written ("has its own limit and always gets the owner back in"); no decided point changed. Design section 7 updated.
+- 2026-11-21 — P1.5 design answers: the owner took all 7 recommendations in `docs/plans/2026-11-21-p1.5-staff-design.md` (section 8). Added #47–#53 (staff defaults, discounts off means limit 0, which actions ask the owner's password, Settings and Staff owner-only, My password, live permission changes, owner-set staff passwords). No decided point changed.

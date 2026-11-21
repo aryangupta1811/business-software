@@ -125,7 +125,12 @@ describe('business setup tables', () => {
         tx.select({ email: users.email }).from(users).where(eq(users.role, 'owner')),
       );
       await withBusiness(runtime.db, b.businessId, (tx) =>
-        tx.insert(users).values({ businessId: b.businessId, role: 'staff', email: owner?.email }),
+        tx.insert(users).values({
+          businessId: b.businessId,
+          role: 'staff',
+          email: owner?.email,
+          homeBranchId: b.branchId,
+        }),
       );
     });
 
@@ -151,7 +156,16 @@ describe('business setup tables', () => {
       await expect(
         withNewBusiness(runtime.db, async (tx, id) => {
           await tx.insert(businesses).values(testBusiness('Users', id));
-          await tx.insert(users).values({ businessId: id, ...change });
+          // A staff row needs a home branch, so only the email can be what is refused.
+          const [branch] = await tx
+            .insert(branches)
+            .values(testBranch(id, 'Users main'))
+            .returning({ id: branches.id });
+          await tx.insert(users).values({
+            businessId: id,
+            ...(change.role === 'staff' && { homeBranchId: branch?.id }),
+            ...change,
+          });
         }),
       ).rejects.toMatchObject(failsWith('23514'));
     });

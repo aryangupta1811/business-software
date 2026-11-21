@@ -92,6 +92,13 @@
       "when": 1795275808058,
       "tag": "0012_held_bills_and_approvals",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1795292422359,
+      "tag": "0013_staff_permissions",
+      "breakpoints": true
     }
   ]
 }

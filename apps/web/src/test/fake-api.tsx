@@ -1,4 +1,9 @@
-import type { ActiveSession, SessionView } from '@business-software/shared';
+import {
+  effectivePermissions,
+  PERMISSIONS,
+  type ActiveSession,
+  type SessionView,
+} from '@business-software/shared';
 import { createMemoryHistory } from '@tanstack/react-router';
 import { render } from '@testing-library/react';
 import { vi } from 'vitest';
@@ -17,6 +22,7 @@ export const OWNER_SESSION: ActiveSession = {
   emailConfirmed: true,
   emailLimited: false,
   discountLimitBasisPoints: null,
+  permissions: [...PERMISSIONS],
 };
 
 export const STAFF_SESSION: ActiveSession = {
@@ -24,6 +30,7 @@ export const STAFF_SESSION: ActiveSession = {
   user: { id: '00000000-0000-4000-8000-000000000004', role: 'staff', name: 'Meena' },
   idleMinutes: 30,
   discountLimitBasisPoints: 0,
+  permissions: effectivePermissions({ added: [], removed: [] }),
 };
 
 export interface FakeAnswer {

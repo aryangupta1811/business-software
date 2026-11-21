@@ -18,7 +18,7 @@ export const ENTRY_ACTIONS = {
   // P1.4 PR 2: account recovery and remembered computers (Module 00 #30-32, #44, #46).
   'user.email_confirmed': { reasonRequired: false },
   'user.password_changed': { reasonRequired: false },
-  'user.password_reset': { reasonRequired: false }, // after.via: email, recovery_key
+  'user.password_reset': { reasonRequired: false }, // after.via: email, recovery_key, owner
   'recovery_key.replaced': { reasonRequired: false },
   'device.renamed': { reasonRequired: false },
   'device.revoked': { reasonRequired: false },
@@ -43,6 +43,12 @@ export const ENTRY_ACTIONS = {
   // P1.13 (`02` #8, #12; questions 5 and 7): an owner's OK, and a bill thrown away unsaved.
   'discount.approved': { reasonRequired: false },
   'bill.draft_discarded': { reasonRequired: false },
+  // P1.5 (`00` #17, #33–#35, #44; `06` #3): staff logins and their permissions.
+  'staff.created': { reasonRequired: false },
+  'staff.updated': { reasonRequired: false },
+  'staff.permissions_changed': { reasonRequired: false },
+  'staff.deactivated': { reasonRequired: false }, // an optional reason
+  'staff.reactivated': { reasonRequired: false },
 } as const satisfies Record<string, { reasonRequired: boolean }>;
 
 export type EntryAction = keyof typeof ENTRY_ACTIONS;

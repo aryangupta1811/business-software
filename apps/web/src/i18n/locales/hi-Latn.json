@@ -948,6 +948,51 @@
         "cash_only": "Sirf cash zyada diya ja sakta hai",
         "payments_mismatch": "Bhugtaan ka jod bill ke kul ke barabar hona chahiye"
       }
+    },
+    "customer": {
+      "title": "Customer",
+      "label": "Customer",
+      "walkIn": "walk-in",
+      "walkInButton": "Walk-in",
+      "done": "Ho gaya",
+      "onThisBill": "Is bill par",
+      "search": "Phone number ya naam",
+      "searchHint": "10 ank ka phone number likhein, ya naam ka kuch hissa.",
+      "results": "Milte customer",
+      "searching": "Dhoondh rahe hain…",
+      "searchFailed": "Customer dhoondhe nahin ja sake. Connection dekhein aur phir koshish karein.",
+      "none": "Koi customer nahin mila.",
+      "add": "Customer jodein",
+      "noAccess": "Aap customer nahin dhoondh sakte. Yeh bill walk-in bill hi rahega.",
+      "business": "Vyapari",
+      "gstin": "GSTIN {{gstin}}",
+      "form": {
+        "title": "Naya customer",
+        "name": "Naam",
+        "phone": "Phone",
+        "business": "Vyapari customer",
+        "gstin": "GSTIN",
+        "legalName": "Kanooni naam",
+        "address": "Pata",
+        "save": "Customer save karein",
+        "saving": "Save ho raha hai…",
+        "back": "Search par wapas"
+      },
+      "tax": {
+        "cgstSgst": "CGST + SGST",
+        "igst": "IGST, {{state}} ko supply",
+        "counter": "Counter par diya gaya",
+        "counterHint": "Dukaan par diye gaye maal par IGST nahin, CGST + SGST lagta hai.",
+        "sentTo": "Bheja gaya",
+        "sentToHint": "Doosra rajya tabhi chunein jab maal wahan bheja ja raha ho. Tab bill mein IGST lagega.",
+        "thisShop": "{{state}} (yeh dukaan)"
+      },
+      "errors": {
+        "phone_taken": "Is phone number ka customer pehle se hai. Use dhoondhein.",
+        "gstin_taken": "Is GSTIN ka customer pehle se hai. Use dhoondhein.",
+        "gstin_state": "GSTIN ke pehle do ank rajya batate hain",
+        "failed": "Customer save nahin ho saka. Connection dekhein aur phir koshish karein."
+      }
     }
   }
 }

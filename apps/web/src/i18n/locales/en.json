@@ -948,6 +948,51 @@
         "cash_only": "Only cash can be handed over",
         "payments_mismatch": "The payments must add up to the bill total"
       }
+    },
+    "customer": {
+      "title": "Customer",
+      "label": "Customer",
+      "walkIn": "walk-in",
+      "walkInButton": "Walk-in",
+      "done": "Done",
+      "onThisBill": "On this bill",
+      "search": "Phone number or name",
+      "searchHint": "Type a 10-digit phone number, or part of a name.",
+      "results": "Matching customers",
+      "searching": "Looking…",
+      "searchFailed": "Couldn’t look customers up. Check the connection and try again.",
+      "none": "No customer found.",
+      "add": "Add customer",
+      "noAccess": "You can’t look customers up. This bill stays a walk-in bill.",
+      "business": "Business",
+      "gstin": "GSTIN {{gstin}}",
+      "form": {
+        "title": "New customer",
+        "name": "Name",
+        "phone": "Phone",
+        "business": "Business customer",
+        "gstin": "GSTIN",
+        "legalName": "Legal name",
+        "address": "Address",
+        "save": "Save customer",
+        "saving": "Saving…",
+        "back": "Back to search"
+      },
+      "tax": {
+        "cgstSgst": "CGST + SGST",
+        "igst": "IGST, supplied to {{state}}",
+        "counter": "Delivered at the counter",
+        "counterHint": "Goods handed over at the shop are taxed as CGST + SGST, not IGST.",
+        "sentTo": "Sent to",
+        "sentToHint": "Pick another state only if the goods are sent there. The bill then uses IGST.",
+        "thisShop": "{{state}} (this shop)"
+      },
+      "errors": {
+        "phone_taken": "A customer with this phone number already exists. Search for them instead.",
+        "gstin_taken": "A customer with this GSTIN already exists. Search for them instead.",
+        "gstin_state": "The GSTIN’s first two digits give the state",
+        "failed": "Couldn’t save the customer. Check the connection and try again."
+      }
     }
   }
 }

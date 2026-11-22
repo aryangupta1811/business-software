@@ -12,7 +12,13 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { CatalogueCopy } from '../../billing/catalogue-copy';
 import { catalogueItem } from '../../test/catalogue';
-import { fakeApi, OWNER_SESSION, renderAt, STAFF_SESSION } from '../../test/fake-api';
+import {
+  fakeApi,
+  OWNER_SESSION,
+  renderAt,
+  STAFF_SESSION,
+  type FakeAnswer,
+} from '../../test/fake-api';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -357,5 +363,266 @@ describe('the billing counter', () => {
     await user.keyboard('{F10}');
     expect(await screen.findByLabelText("Owner's password")).toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: 'Cash received' })).not.toBeInTheDocument();
+  });
+});
+
+describe('saving the bill at the counter', () => {
+  const SAVED = {
+    id: '00000000-0000-4000-8000-0000000000f1',
+    number: 'ABC/26-27/42',
+    document: 'tax_invoice',
+    businessDate: '2026-11-22',
+    grandTotalPaise: 2_800,
+    changePaise: 0,
+    warnings: [],
+  };
+  const storedKey = () =>
+    (
+      JSON.parse(sessionStorage.getItem(`bill:${OWNER_SESSION.user.id}`) ?? '{}') as {
+        billKey: string;
+      }
+    ).billKey;
+  const keysSent = (api: ReturnType<typeof counter>) =>
+    api.sent('POST', '/api/bills').map((request) => (request.body as { billKey: string }).billKey);
+
+  /** Scans a salt and pays it in cash (`handed` rupees when more than the bill), up to "ready to save". */
+  async function paidBill(
+    user: ReturnType<typeof userEvent.setup>,
+    routes: Parameters<typeof fakeApi>[1] = {},
+    handed?: string,
+  ) {
+    const api = counter(OWNER_SESSION, routes);
+    await user.type(await search(), '8901234567890{Enter}');
+    await user.keyboard('{F10}');
+    const cash = await screen.findByRole('textbox', { name: 'Cash received' });
+    if (handed !== undefined) {
+      await user.clear(cash);
+      await user.type(cash, handed);
+    }
+    await user.keyboard('{Enter}');
+    await screen.findByText('Paid. Ready to save.');
+    return api;
+  }
+
+  /** A save answer that is lost on the wire `times` times, then comes through. */
+  const lostThenSaved = (times: number) => {
+    let left = times;
+    return (): FakeAnswer => (left-- > 0 ? { fail: true } : { status: 201, body: SAVED });
+  };
+
+  test('Enter saves the paid bill with its key, payments and total, then shows its number and the change', async () => {
+    const user = userEvent.setup();
+    const api = await paidBill(
+      user,
+      { 'POST /api/bills': { status: 201, body: { ...SAVED, changePaise: 2_200 } } },
+      '50',
+    );
+    const key = storedKey();
+    await user.keyboard('{Enter}');
+
+    expect(await screen.findByText('Bill saved, ABC/26-27/42')).toBeInTheDocument();
+    expect(screen.getByText('Change to give ₹22.00')).toBeInTheDocument();
+    const [sent] = api.sent('POST', '/api/bills');
+    expect(sent?.body).toEqual({
+      billKey: key,
+      priceList: 'retail',
+      customerId: null,
+      placeOfSupplyStateCode: '27',
+      lines: [
+        { itemId: salt.id, packId: null, quantityThousandths: 1_000, shownUnitPricePaise: 2_800 },
+      ],
+      payments: [{ mode: 'cash', amountPaise: 2_800, tenderedPaise: 5_000 }],
+      shownGrandTotalPaise: 2_800,
+    });
+    // The bill is done: nothing of it stays in this tab.
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(sessionStorage.getItem(`bill:${OWNER_SESSION.user.id}`)).toBeNull();
+
+    // Enter in the empty search box goes on to the next bill.
+    await user.keyboard('{Enter}');
+    expect(screen.queryByText('Bill saved, ABC/26-27/42')).not.toBeInTheDocument();
+    await user.type(await search(), '8901234567890{Enter}');
+    expect(rows()).toHaveLength(1);
+    expect(storedKey()).not.toBe(key);
+  });
+
+  test('Alt+N after a save starts the next bill', async () => {
+    const user = userEvent.setup();
+    await paidBill(user, { 'POST /api/bills': { status: 201, body: SAVED } });
+    await user.click(screen.getByRole('button', { name: /Save bill/ }));
+    await screen.findByText('Bill saved, ABC/26-27/42');
+    await user.keyboard('{Alt>}n{/Alt}');
+    expect(screen.queryByText('Bill saved, ABC/26-27/42')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Pay/ })).toBeDisabled();
+  });
+
+  test("the owner's OK for the bill goes with it and is forgotten after the save", async () => {
+    const user = userEvent.setup();
+    const approvalId = '00000000-0000-4000-8000-0000000000c9';
+    const key = '00000000-0000-4000-8000-0000000000e2';
+    // A bill left open in this tab, with the owner's OK stored beside it.
+    sessionStorage.setItem(
+      `bill:${OWNER_SESSION.user.id}`,
+      JSON.stringify({
+        billKey: key,
+        priceList: 'retail',
+        customerId: null,
+        placeOfSupplyStateCode: '27',
+        lines: [
+          { itemId: salt.id, packId: null, quantityThousandths: 1_000, shownUnitPricePaise: 2_800 },
+        ],
+      }),
+    );
+    sessionStorage.setItem(
+      `bill-approval:${key}`,
+      JSON.stringify({
+        approvalId,
+        billKey: key,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        lineBasisPoints: 500,
+        billBasisPoints: 0,
+      }),
+    );
+    const api = counter(OWNER_SESSION, { 'POST /api/bills': { status: 201, body: SAVED } });
+    await screen.findByRole('table');
+    await user.keyboard('{F10}');
+    await screen.findByRole('textbox', { name: 'Cash received' });
+    await user.keyboard('{Enter}');
+    await screen.findByText('Paid. Ready to save.');
+    await user.keyboard('{Enter}');
+    await screen.findByText('Bill saved, ABC/26-27/42');
+    expect(api.sent('POST', '/api/bills')[0]?.body).toMatchObject({ billKey: key, approvalId });
+    expect(sessionStorage.getItem(`bill-approval:${key}`)).toBeNull();
+  });
+
+  test('a second Enter while the first is still sending does not send the bill twice', async () => {
+    const user = userEvent.setup();
+    let release: () => void = () => undefined;
+    const wait = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const api = await paidBill(user, { 'POST /api/bills': { status: 201, body: SAVED, wait } });
+    await user.keyboard('{Enter}{Enter}');
+    expect(await screen.findByRole('button', { name: /Saving/ })).toBeDisabled();
+    // The bill can't change while it is on its way.
+    await user.type(await search(), '8901234567890{Enter}');
+    expect(rows()[0]).toHaveTextContent('1 piece');
+    release();
+    await screen.findByText('Bill saved, ABC/26-27/42');
+    expect(api.sent('POST', '/api/bills')).toHaveLength(1);
+  });
+
+  test('a lost answer is sent again with the same bill key, and one bill is saved', async () => {
+    const user = userEvent.setup();
+    const api = await paidBill(user, { 'POST /api/bills': lostThenSaved(1) });
+    await user.keyboard('{Enter}');
+    expect(
+      await screen.findByText('Bill saved, ABC/26-27/42', undefined, { timeout: 4_000 }),
+    ).toBeInTheDocument();
+    const keys = keysSent(api);
+    expect(keys).toHaveLength(2);
+    expect(keys[0]).toBe(keys[1]);
+  });
+
+  test('when nothing gets through it says so, and Enter tries again with the same key', async () => {
+    const user = userEvent.setup();
+    const api = await paidBill(user, { 'POST /api/bills': lostThenSaved(3) });
+    await user.keyboard('{Enter}');
+    expect(
+      await screen.findByText(/No connection\. The bill is not saved yet/, undefined, {
+        timeout: 6_000,
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Save bill/ })).toBeEnabled();
+    await user.keyboard('{Enter}');
+    await screen.findByText('Bill saved, ABC/26-27/42');
+    expect(keysSent(api)).toHaveLength(4);
+    expect(new Set(keysSent(api)).size).toBe(1);
+  }, 15_000);
+
+  test('stock the bill cannot take says which item, and the bill stays', async () => {
+    const user = userEvent.setup();
+    await paidBill(user, {
+      'POST /api/bills': { status: 409, body: { code: 'stock_short', itemId: salt.id } },
+    });
+    await user.keyboard('{Enter}');
+    expect(
+      await screen.findByText(/Tata Salt 1 kg: not enough in stock to sell this quantity/),
+    ).toBeInTheDocument();
+    expect(rows()).toHaveLength(1);
+    expect(screen.getByRole('button', { name: /Save bill/ })).toBeEnabled();
+  });
+
+  test('stock that went below zero is told after the save', async () => {
+    const user = userEvent.setup();
+    await paidBill(user, {
+      'POST /api/bills': {
+        status: 201,
+        body: { ...SAVED, warnings: [{ itemId: salt.id, balanceAfter: -2_000 }] },
+      },
+    });
+    await user.keyboard('{Enter}');
+    expect(await screen.findByText('Bill saved, ABC/26-27/42')).toBeInTheDocument();
+    expect(
+      screen.getByText('Tata Salt 1 kg is now below zero: -2 piece in stock.'),
+    ).toBeInTheDocument();
+  });
+
+  test('new prices from the server are marked, the copy is reloaded, and payment is asked again', async () => {
+    const user = userEvent.setup();
+    let price = 2_800;
+    const api = await paidBill(user, {
+      'GET /api/billing/catalogue': () => ({
+        body: {
+          ...CATALOGUE,
+          items: [
+            { ...salt, sellingPrice: price },
+            ...CATALOGUE.items.filter((item) => item.id !== salt.id),
+          ],
+        },
+      }),
+      'POST /api/bills': () => {
+        price = 3_000;
+        return {
+          status: 409,
+          body: {
+            code: 'prices_changed',
+            lines: [{ line: 1, unitPricePaise: 3_000 }],
+            grandTotalPaise: 3_000,
+          },
+        };
+      },
+    });
+    await user.keyboard('{Enter}');
+    expect(await screen.findByText(/Prices changed while you were billing/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(total()).toHaveTextContent('₹30.00');
+    });
+    expect(rows()[0]).toHaveTextContent('30.00');
+    expect(rows()[0]).toHaveTextContent('Price changed');
+    // The payment was for ₹28: the cashier pays the new total.
+    expect(screen.queryByText('Paid. Ready to save.')).not.toBeInTheDocument();
+    expect(api.sent('GET', '/api/billing/catalogue').length).toBeGreaterThan(1);
+    await user.keyboard('{F10}');
+    await screen.findByRole('textbox', { name: 'Cash received' });
+    await user.keyboard('{Enter}');
+    await screen.findByText('Paid. Ready to save.');
+  });
+
+  test.each([
+    ['approval_required', 403, {}, /above what this login may give/],
+    ['approval_invalid', 409, {}, /The owner's OK has run out or was already used/],
+    ['gstin_required', 409, {}, /This branch has no GSTIN yet/],
+    ['buyer_details_required', 422, {}, /needs the buyer's name, address and state/],
+    ['items_unavailable', 409, { lines: [1] }, /Line 1 can't be sold any more/],
+    ['customer_unavailable', 409, {}, /This customer was archived/],
+    ['wholesale_off', 422, {}, /Wholesale prices are switched off/],
+    ['payments_mismatch', 422, {}, /The payments don't match the total/],
+  ])('says in words what %s means', async (code, status, detail, message) => {
+    const user = userEvent.setup();
+    await paidBill(user, { 'POST /api/bills': { status, body: { code, ...detail } } });
+    await user.keyboard('{Enter}');
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(screen.queryByText(/Bill saved/)).not.toBeInTheDocument();
   });
 });

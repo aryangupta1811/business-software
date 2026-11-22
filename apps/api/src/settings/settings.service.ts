@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { ConflictException, Inject, Injectable } from '@nestjs/common';
 import {
   asc,
   branches,
@@ -159,18 +159,28 @@ export class SettingsService {
 
   /**
    * `00` #61: the prefix of a one-branch business's invoice numbers. Saved bills keep the
-   * numbers they were given, so changing it renumbers nothing.
+   * numbers they were given, so changing it renumbers nothing. A prefix that is a branch's code
+   * (archived ones too) is refused: once there are two branches the code starts the number, so
+   * the two would hand out the same numbers.
    */
   saveInvoices(caller: Caller, input: SettingsInvoicesInput): Promise<SettingsView> {
     return this.save(
       caller,
       (current) => current.view.invoices,
       input,
-      (tx) =>
-        tx
+      async (tx) => {
+        if (input.invoicePrefix !== null) {
+          const [clash] = await tx
+            .select({ id: branches.id })
+            .from(branches)
+            .where(eq(branches.code, input.invoicePrefix));
+          if (clash !== undefined) throw new ConflictException({ code: 'prefix_is_branch_code' });
+        }
+        await tx
           .update(businesses)
           .set({ invoicePrefix: input.invoicePrefix, updatedAt: new Date() })
-          .where(eq(businesses.id, caller.businessId)),
+          .where(eq(businesses.id, caller.businessId));
+      },
     );
   }
 

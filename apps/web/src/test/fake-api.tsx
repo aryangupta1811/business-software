@@ -36,6 +36,10 @@ export const STAFF_SESSION: ActiveSession = {
 export interface FakeAnswer {
   status?: number;
   body?: unknown;
+  /** The connection drops: `fetch` rejects, as it does with no network. */
+  fail?: boolean;
+  /** The answer comes only after this promise settles (a request still on its way). */
+  wait?: Promise<unknown>;
 }
 
 /**
@@ -60,9 +64,10 @@ export function fakeApi(
             ? { body: session }
             : { body: { status: 'ok', database: 'ok' } }));
     const status = answer.status ?? 200;
-    return Promise.resolve(
-      status === 204 ? new Response(null, { status }) : Response.json(answer.body, { status }),
-    );
+    if (answer.fail === true) return Promise.reject(new TypeError('fetch failed'));
+    const response =
+      status === 204 ? new Response(null, { status }) : Response.json(answer.body, { status });
+    return answer.wait === undefined ? Promise.resolve(response) : answer.wait.then(() => response);
   });
   vi.stubGlobal('fetch', fetchMock);
   return {

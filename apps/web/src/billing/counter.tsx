@@ -10,9 +10,10 @@ import {
   type HeldBillView,
   type PriceList,
   type ResumedBillView,
+  type SavedBillView,
 } from '@business-software/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Search, ShieldAlert } from 'lucide-react';
+import { CircleCheck, Search, ShieldAlert } from 'lucide-react';
 import {
   useDeferredValue,
   useEffect,
@@ -23,6 +24,7 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { ApiError, apiRequest } from '../api/client';
 import { Button } from '../components/ui/button';
 import { ConfirmDialog } from '../components/ui/confirm-dialog';
@@ -40,6 +42,7 @@ import { CustomerBox, CustomerSummary, type BillCustomer } from './customer-box'
 import { ApprovalDialog, DiscountDialog, HeldBillsDialog, HoldDialog } from './dialogs';
 import {
   approvalNeeded,
+  clearApproval,
   discountLimit,
   loadApproval,
   saveApproval,
@@ -63,6 +66,7 @@ import {
   startBill,
   type OpenBill,
 } from './open-bill';
+import { applyNewPrices, billDraft, saveBill, saveProblem, type SaveProblem } from './save-bill';
 
 const RESULTS = 20;
 
@@ -103,12 +107,15 @@ export function Counter({
   context,
   copy,
   version,
+  onReload,
 }: {
   session: ActiveSession;
   context: BillingContext;
   copy: CatalogueCopy;
   /** Goes up when the copy changed. */
   version: number;
+  /** Loads the whole copy again: the save said the prices changed. */
+  onReload: () => Promise<void>;
 }) {
   const { t } = useTranslation();
   const searchRef = useRef<HTMLInputElement>(null);
@@ -142,6 +149,13 @@ export function Counter({
     totalPaise: number;
     payments: PaymentRow[];
   } | null>(null);
+  /** The held bill this one was resumed from; the save links to it (design §3.9). */
+  const [heldFrom, setHeldFrom] = useState<{ id: string; billKey: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+  /** Synchronous twin of `saving`: two Enters in one tick must not send twice. */
+  const sending = useRef(false);
+  const [saved, setSaved] = useState<SavedBillView | null>(null);
+  const [problem, setProblem] = useState<SaveProblem | null>(null);
   const queryClient = useQueryClient();
   const now = useNow(30_000);
   const held = useQuery({
@@ -196,6 +210,7 @@ export function Counter({
   };
 
   function add(item: CatalogueItem, packId: string | null, quantity: number | null) {
+    if (saving) return;
     if (context.scheme === 'regular' && (item.gstRate === null || item.hsn === null)) {
       setNotice({ kind: 'noGst', name: item.name });
       return;
@@ -216,6 +231,8 @@ export function Counter({
       (line) => line.itemId === item.id && line.packId === packId && line.discount === undefined,
     );
     setBill({ ...bill, lines });
+    setSaved(null);
+    setProblem(null);
     setSelected(index);
     setNotice(null);
     setQuery('');
@@ -265,7 +282,7 @@ export function Counter({
   }, [editing?.index]); // eslint-disable-line react-hooks/exhaustive-deps -- only when it opens
 
   function saveQuantity() {
-    if (editing === null) return;
+    if (editing === null || saving) return;
     const line = bill.lines[editing.index];
     const item = line === undefined ? undefined : copy.get(line.itemId);
     const quantity = parseQuantity(editing.typed);
@@ -300,14 +317,19 @@ export function Counter({
   }
 
   function setPriceList(priceList: PriceList) {
+    if (saving) return;
     setBill(repriceBill({ ...bill, priceList }, copy).bill);
   }
 
-  function startNew() {
+  /** A fresh bill; `done` is the one just saved, shown until the next item is scanned. */
+  function startNew(done: SavedBillView | null = null) {
     setBill(startBill(context.branchStateCode));
     setApproval(null);
     setCustomer(null);
     setReady(null);
+    setHeldFrom(null);
+    setSaved(done);
+    setProblem(null);
     setSelected(-1);
     setChanged(new Set());
     setNotice(null);
@@ -352,6 +374,7 @@ export function Counter({
 
   /** F9: hold a bill with lines; on an empty one, show the branch's held bills. */
   function holdOrList() {
+    if (saving) return;
     if (bill.lines.length > 0) setHolding(true);
     else {
       void held.refetch();
@@ -388,7 +411,10 @@ export function Counter({
       setChanged(new Set(repriced.changed));
       setApproval(loadApproval(draft.billKey));
       setCustomer(loadCustomer(draft.billKey, draft.customerId));
+      setHeldFrom({ id, billKey: draft.billKey });
       setReady(null);
+      setSaved(null);
+      setProblem(null);
       setSelected(repriced.bill.lines.length - 1);
       setNotice(null);
     } catch (error) {
@@ -419,7 +445,7 @@ export function Counter({
 
   /** F10: payment, once the owner has OK'd any discount above the limit (design §6, §8). */
   function pay() {
-    if (priced === null) return;
+    if (priced === null || saving) return;
     if (needed !== null) setAsking(true);
     else setPaying(true);
   }
@@ -431,6 +457,58 @@ export function Counter({
     ready.totalPaise === priced.grandTotalPaise
       ? ready.payments
       : null;
+
+  /**
+   * Enter on a paid bill (design §6): one request with the bill's own key. A lost answer is sent
+   * again with that key, and the server answers the bill it already saved.
+   */
+  async function save() {
+    if (paid === null || priced === null || sending.current) return;
+    sending.current = true;
+    setSaving(true);
+    setProblem(null);
+    try {
+      const view = await saveBill(
+        billDraft(bill, paid, priced.grandTotalPaise, approval, heldFrom),
+      );
+      clearApproval(bill.billKey);
+      saveCustomer(bill.billKey, null);
+      startNew(view);
+    } catch (error) {
+      const found = saveProblem(error);
+      setProblem(found);
+      switch (found.kind) {
+        case 'prices_changed': {
+          // The server's prices go on the lines now; the whole copy follows, and the bill must
+          // be paid again at its new total.
+          const next = applyNewPrices(bill, found.lines);
+          setBill(next.bill);
+          setChanged(new Set(next.changed));
+          setReady(null);
+          await onReload();
+          break;
+        }
+        case 'items_unavailable':
+          await onReload();
+          break;
+        case 'approval_required':
+        case 'approval_invalid':
+          clearApproval(bill.billKey);
+          setApproval(null);
+          break;
+        case 'payments_mismatch':
+          setReady(null);
+          break;
+        case 'held_bill_invalid':
+          setHeldFrom(null);
+          break;
+        default:
+      }
+    } finally {
+      sending.current = false;
+      setSaving(false);
+    }
+  }
 
   const wholesale = context.features.includes('wholesale_price');
   const selectedLine = bill.lines[selected];
@@ -447,6 +525,7 @@ export function Counter({
     description: 'shortcuts.billCustomer',
     group: 'general',
     action: () => {
+      if (saving) return;
       setChoosingCustomer(true);
     },
   });
@@ -461,6 +540,7 @@ export function Counter({
     description: 'shortcuts.billQuantity',
     group: 'general',
     action: () => {
+      if (saving) return;
       const line = bill.lines[selected];
       if (line !== undefined) {
         setEditing({ index: selected, typed: formatQuantity(line.quantityThousandths) });
@@ -480,6 +560,7 @@ export function Counter({
     description: 'shortcuts.billLineDiscount',
     group: 'general',
     action: () => {
+      if (saving) return;
       if (selectedLine !== undefined) setDiscountFor('line');
     },
   });
@@ -488,6 +569,7 @@ export function Counter({
     description: 'shortcuts.billDiscount',
     group: 'general',
     action: () => {
+      if (saving) return;
       if (bill.lines.length > 0) setDiscountFor('bill');
     },
   });
@@ -502,6 +584,7 @@ export function Counter({
     description: 'shortcuts.billRemoveLine',
     group: 'general',
     action: () => {
+      if (saving) return;
       remove(selected);
     },
   });
@@ -510,6 +593,7 @@ export function Counter({
     description: 'shortcuts.billNew',
     group: 'general',
     action: () => {
+      if (saving) return;
       if (bill.lines.length === 0) startNew();
       else setConfirmNew(true);
     },
@@ -519,7 +603,11 @@ export function Counter({
     const typing = query.trim() !== '' && results.length > 0;
     if (event.key === 'Enter') {
       event.preventDefault();
-      enter(event.currentTarget.value);
+      const typed = event.currentTarget.value;
+      // Nothing typed: Enter saves a paid bill, or moves on from a saved one.
+      if (typed.trim() !== '') enter(typed);
+      else if (paid !== null) void save();
+      else if (saved !== null) startNew();
     } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
       const step = event.key === 'ArrowDown' ? 1 : -1;
@@ -663,27 +751,44 @@ export function Counter({
           placeOfSupplyStateCode={bill.placeOfSupplyStateCode}
           branchStateCode={context.branchStateCode}
           onOpen={() => {
-            setChoosingCustomer(true);
+            if (!saving) setChoosingCustomer(true);
           }}
         />
       </section>
       <div className="flex flex-col gap-4">
         <Totals bill={bill} priced={priced} />
-        {paid !== null ? (
+        {saved !== null ? (
+          <SavedPanel
+            saved={saved}
+            copy={copy}
+            onNext={() => {
+              startNew();
+            }}
+          />
+        ) : paid !== null ? (
           <div
             role="status"
-            className="flex flex-col gap-1 rounded-lg border border-border bg-surface p-4"
+            className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4"
           >
-            <p className="font-semibold">{t('billing.readyToSave')}</p>
-            <p className="text-label text-muted">
-              {paid
-                .map(
-                  (row) =>
-                    `${t(`billing.payment.modes.${row.mode}`)} ${formatPaise(row.amountPaise)}`,
-                )
-                .join(' · ')}
-            </p>
-            <p className="text-label text-muted">{t('billing.saveComesNext')}</p>
+            <div className="flex flex-col gap-1">
+              <p className="font-semibold">{t('billing.readyToSave')}</p>
+              <p className="text-label text-muted">
+                {paid
+                  .map(
+                    (row) =>
+                      `${t(`billing.payment.modes.${row.mode}`)} ${formatPaise(row.amountPaise)}`,
+                  )
+                  .join(' · ')}
+              </p>
+            </div>
+            <Button disabled={saving} aria-keyshortcuts="Enter" onClick={() => void save()}>
+              {t(saving ? 'billing.save.saving' : 'billing.save.button')}
+              {!saving && (
+                <Kbd aria-hidden="true" className="ml-2">
+                  Enter
+                </Kbd>
+              )}
+            </Button>
           </div>
         ) : (
           <Button size="default" disabled={priced === null} aria-keyshortcuts="F10" onClick={pay}>
@@ -692,6 +797,11 @@ export function Counter({
               F10
             </Kbd>
           </Button>
+        )}
+        {problem !== null && (
+          <p role="alert" className="rounded-lg bg-danger-soft px-4 py-3 text-danger">
+            {problemText(t, problem, copy)}
+          </p>
         )}
         {needed !== null && (
           <div
@@ -750,6 +860,7 @@ export function Counter({
         onReady={(payments) => {
           setReady({ billKey: bill.billKey, totalPaise: priced?.grandTotalPaise ?? 0, payments });
           setPaying(false);
+          setProblem(null);
           searchRef.current?.focus();
         }}
         onClose={() => {
@@ -788,6 +899,75 @@ export function Counter({
       />
     </div>
   );
+}
+
+/** What was saved: its number, the change to give and any stock that went below zero. */
+function SavedPanel({
+  saved,
+  copy,
+  onNext,
+}: {
+  saved: SavedBillView;
+  copy: CatalogueCopy;
+  onNext: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div
+      role="status"
+      className="flex flex-col gap-3 rounded-lg border border-success bg-success-soft p-4"
+    >
+      <p className="flex items-center gap-2 font-semibold">
+        <CircleCheck aria-hidden="true" className="size-5 shrink-0 text-success" />
+        {t('billing.save.saved', { number: saved.number })}
+      </p>
+      <p className="text-label text-muted">
+        {t('billing.save.total', { amount: formatPaise(saved.grandTotalPaise) })}
+      </p>
+      {saved.changePaise > 0 && (
+        <p className="text-section font-semibold tabular-nums">
+          {t('billing.save.change', { amount: formatPaise(saved.changePaise) })}
+        </p>
+      )}
+      {saved.warnings.map((warning) => {
+        const item = copy.get(warning.itemId);
+        return (
+          <p key={warning.itemId} className="text-warning">
+            {t('billing.save.below', {
+              name: item?.name ?? '',
+              quantity:
+                item === undefined || item.archived
+                  ? ''
+                  : stockText(t, warning.balanceAfter, item.stockUnit),
+            })}
+          </p>
+        );
+      })}
+      <Button variant="secondary" onClick={onNext}>
+        {t('billing.save.next')}
+        <Kbd aria-hidden="true" className="ml-2">
+          Alt+N
+        </Kbd>
+      </Button>
+    </div>
+  );
+}
+
+/** The words for a save that didn't happen, where the cashier is looking. */
+function problemText(t: TFunction, problem: SaveProblem, copy: CatalogueCopy): string {
+  switch (problem.kind) {
+    case 'stock_short':
+      return t('billing.save.problems.stock_short', {
+        name: copy.get(problem.itemId)?.name ?? '',
+      });
+    case 'items_unavailable':
+      return t('billing.save.problems.items_unavailable', {
+        count: problem.lines.length,
+        lines: problem.lines.join(', '),
+      });
+    default:
+      return t(`billing.save.problems.${problem.kind}`);
+  }
 }
 
 function Lines({

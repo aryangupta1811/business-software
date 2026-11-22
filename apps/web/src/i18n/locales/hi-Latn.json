@@ -269,6 +269,10 @@
       },
       "discountLimit": {
         "invalid": "0 se 100 ke beech likhein, do dashmlav tak"
+      },
+      "invoicePrefix": {
+        "invalid": "1 se 4 bade akshar ya ank likhein",
+        "branch_code": "Yeh kisi branch ka code hai. Doosra prefix chunein."
       }
     },
     "too_small": "Yeh bahut kam hai",
@@ -405,6 +409,14 @@
       "lead": "Upar ki patti ki ghanti kya dikhaye. Band kiya gaya prakar phir bhi darj hota rehta hai, isliye dobara chalu karne par jo khula hai woh dikhega.",
       "appLabel": "App mein dikhayein",
       "whatsapp": "WhatsApp roz ke saar ke saath baad mein aayega."
+    },
+    "invoices": {
+      "title": "Bill number",
+      "lead": "Har bill ka number kisse shuru ho. Jo bill save ho chuke hain unke number wahi rehte hain.",
+      "prefix": "Prefix (optional)",
+      "hint": "4 tak bade akshar ya ank, jaise ABC. Prefix na chahiye to khaali chhodein.",
+      "example": "Aapka agla bill: {{number}}",
+      "branches": "Do ya zyada chaalu branch hone par har bill apni branch ke code se shuru hota hai (jaise {{number}}), aur yeh prefix istemal nahin hota."
     }
   },
   "features": {
@@ -1026,7 +1038,34 @@
     },
     "pay": "Payment",
     "readyToSave": "Payment ho gaya. Save karne ke liye taiyaar.",
-    "saveComesNext": "Bill save karna (invoice number, stock) agle update mein aayega."
+    "save": {
+      "button": "Bill save karein",
+      "saving": "Save ho raha hai…",
+      "saved": "Bill save ho gaya, {{number}}",
+      "total": "Kul {{amount}}",
+      "change": "Wapas dena hai {{amount}}",
+      "below": "{{name}} ab zero se neeche hai: stock mein {{quantity}}.",
+      "next": "Agla bill",
+      "problems": {
+        "prices_changed": "Bill banate samay daam badal gaye. Naye daam chinhit hain. Kul jaanchein, phir dobara payment lein.",
+        "stock_short": "{{name}}: itni matra bechne ke liye stock kaafi nahin hai. Matra ghatayein ya line hatayein.",
+        "items_unavailable_one": "Line {{lines}} ab bechi nahin ja sakti (archive hai, ya GST dar nahin hai). Use hatakar phir save karein.",
+        "items_unavailable_other": "Lines {{lines}} ab bechi nahin ja sakti (archive hain, ya GST dar nahin hai). Unhein hatakar phir save karein.",
+        "approval_required": "Yeh chhoot is login ki seema se zyada hai. Ise hatayein, ya malik se manzoor karwayein.",
+        "approval_invalid": "Malik ki manzoori ki avadhi khatam ho gayi ya woh pehle hi istemal ho chuki hai. Malik se phir poochein.",
+        "gstin_required": "Is branch ka GSTIN abhi nahin hai. Bill save karne se pehle Settings mein Business ke neeche jodein.",
+        "buyer_details_required": "Bina GSTIN wale grahak ko GST se pehle ₹50,000 ya usse zyada ke bill par grahak ka naam, pata aur rajya chahiye. Unhein grahak mein jodein (F3).",
+        "customer_unavailable": "Yeh grahak archive ho gaya hai. Doosra grahak chunein, ya ise bill se hatayein (F3).",
+        "wholesale_off": "Settings mein thok daam band hain. Bill ko retail par karein (F8).",
+        "place_of_supply": "Vyapari grahak ka bill unke rajya mein ya counter par diya jaata hai. Bhejne ki jagah badlein (F3).",
+        "held_bill_invalid": "Jis roke gaye bill se yeh aaya tha woh ab maanya nahin hai. Uske bina aage badhne ke liye phir save karein.",
+        "invalid_quantity": "Is bill ki ek matra uski ikai se mel nahin khaati, jaise aadha piece. Matra theek karein.",
+        "payments_mismatch": "Payment kul se mel nahin khaate. Dobara payment lein (F10).",
+        "key_reused": "Yeh bill pehle hi alag saman ke saath save ho chuka hai, shayad connection tootne se pehle. Naya bill shuru karein (Alt+N) aur malik se jaanchwayein.",
+        "network": "Connection nahin hai. Bill abhi save nahin hua. Phir koshish karne ke liye Enter dabayein: bill do baar save nahin hoga.",
+        "failed": "Bill save nahin ho saka. Phir koshish karein; baar-baar ho to connection jaanchein."
+      }
+    }
   },
   "notAllowed": {
     "title": "Aap yeh page nahi khol sakte",
@@ -1214,6 +1253,7 @@
       "codeHint": "4 tak bade akshar ya ank. Yeh bill number mein jaata hai, jaise AND (AND/26-27/42).",
       "codeInvalid": "1 se 4 bade akshar ya ank likhein",
       "codeTaken": "Yeh code kisi aur branch mein hai",
+      "codePrefix": "Yeh code aapka bill prefix hai. Doosra code rakhein, ya Settings mein prefix badlein.",
       "gstinHint": "Doosre rajya ki branch ka apna GSTIN chahiye.",
       "add": "Branch jodein",
       "save": "Save karein"

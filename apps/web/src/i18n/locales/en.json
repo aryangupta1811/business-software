@@ -269,6 +269,10 @@
       },
       "discountLimit": {
         "invalid": "Enter 0 to 100, up to two decimals"
+      },
+      "invoicePrefix": {
+        "invalid": "Use 1 to 4 capital letters or digits",
+        "branch_code": "A branch already uses this as its code. Choose another prefix."
       }
     },
     "too_small": "This is too small",
@@ -405,6 +409,14 @@
       "lead": "What the bell in the top bar shows. A type you switch off is still recorded, so switching it on again shows what is open.",
       "appLabel": "Show in the app",
       "whatsapp": "WhatsApp comes with the daily summary, later."
+    },
+    "invoices": {
+      "title": "Invoice numbers",
+      "lead": "What starts the number of every bill. Bills already saved keep the numbers they have.",
+      "prefix": "Prefix (optional)",
+      "hint": "Up to 4 capital letters or digits, like ABC. Leave it empty for no prefix.",
+      "example": "Your next bill: {{number}}",
+      "branches": "With two or more active branches, every bill starts with its branch's code instead (for example {{number}}), and this prefix is not used."
     }
   },
   "features": {
@@ -1026,7 +1038,34 @@
     },
     "pay": "Pay",
     "readyToSave": "Paid. Ready to save.",
-    "saveComesNext": "Saving the bill (invoice number, stock) comes in the next update."
+    "save": {
+      "button": "Save bill",
+      "saving": "Saving…",
+      "saved": "Bill saved, {{number}}",
+      "total": "Total {{amount}}",
+      "change": "Change to give {{amount}}",
+      "below": "{{name}} is now below zero: {{quantity}} in stock.",
+      "next": "Next bill",
+      "problems": {
+        "prices_changed": "Prices changed while you were billing. The new prices are marked. Check the total, then take payment again.",
+        "stock_short": "{{name}}: not enough in stock to sell this quantity. Lower the quantity or remove the line.",
+        "items_unavailable_one": "Line {{lines}} can't be sold any more (archived, or no GST rate). Remove it and save again.",
+        "items_unavailable_other": "Lines {{lines}} can't be sold any more (archived, or no GST rate). Remove them and save again.",
+        "approval_required": "This discount is above what this login may give. Remove it, or ask the owner to approve it.",
+        "approval_invalid": "The owner's OK has run out or was already used. Ask the owner again.",
+        "gstin_required": "This branch has no GSTIN yet. Add it in Settings, under Business, before saving a bill.",
+        "buyer_details_required": "A bill of ₹50,000 or more before GST to a buyer without a GSTIN needs the buyer's name, address and state. Add them to the customer (F3).",
+        "customer_unavailable": "This customer was archived. Choose another customer, or take this one off the bill (F3).",
+        "wholesale_off": "Wholesale prices are switched off in Settings. Switch the bill to retail (F8).",
+        "place_of_supply": "A business customer's bill is supplied in their state or at the counter. Change where it is sent (F3).",
+        "held_bill_invalid": "The held bill this one came from isn't valid any more. Save again to go on without it.",
+        "invalid_quantity": "A quantity on this bill doesn't fit its unit, like half a piece. Fix the quantity.",
+        "payments_mismatch": "The payments don't match the total. Take payment again (F10).",
+        "key_reused": "This bill was already saved with different contents, probably before the connection dropped. Start a new bill (Alt+N) and ask the owner to check.",
+        "network": "No connection. The bill is not saved yet. Press Enter to try again: it will not be saved twice.",
+        "failed": "The bill couldn't be saved. Try again; if it keeps failing, check the connection."
+      }
+    }
   },
   "notAllowed": {
     "title": "You can't open this page",
@@ -1214,6 +1253,7 @@
       "codeHint": "Up to 4 capital letters or digits. It goes into invoice numbers, like AND (AND/26-27/42).",
       "codeInvalid": "Use 1 to 4 capital letters or digits",
       "codeTaken": "Another branch already uses this code",
+      "codePrefix": "This code is your invoice prefix. Use another code, or change the prefix in Settings.",
       "gstinHint": "A branch in another state needs its own GSTIN.",
       "add": "Add branch",
       "save": "Save"

@@ -30,7 +30,14 @@ interface Violation {
 }
 
 /** Tables the app may only insert into and read (ADRs 0007, 0028). */
-const APPEND_ONLY = ['entry_log', 'stock_movements', 'bills', 'bill_lines', 'bill_payments'];
+const APPEND_ONLY = [
+  'entry_log',
+  'stock_movements',
+  'bills',
+  'bill_lines',
+  'bill_payments',
+  'salary_rates',
+];
 
 /**
  * Permission data the app may DELETE from, and nothing else (ADR 0007's one exception): a

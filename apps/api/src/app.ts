@@ -45,6 +45,10 @@ import {
   UnitsController,
 } from './items/items.controller.js';
 import { ItemsService } from './items/items.service.js';
+import { AttendanceController } from './attendance/attendance.controller.js';
+import { AttendanceService } from './attendance/attendance.service.js';
+import { HolidaysController } from './attendance/holidays.controller.js';
+import { HolidaysService } from './attendance/holidays.service.js';
 import { SettingsController } from './settings/settings.controller.js';
 import { SettingsService } from './settings/settings.service.js';
 import { SignupController } from './signup/signup.controller.js';
@@ -73,6 +77,8 @@ export const API_CONTROLLERS = [
   StaffController,
   BranchesController,
   AlertsController,
+  AttendanceController,
+  HolidaysController,
 ];
 
 export interface AppOptions {
@@ -124,6 +130,8 @@ class ApiModule {
         StaffService,
         BranchesService,
         AlertsService,
+        AttendanceService,
+        HolidaysService,
         // One Argon2 queue for signup and logins (ADR 0038).
         { provide: HASH_GATE, useValue: options.hashGate ?? new HashGate() },
         {

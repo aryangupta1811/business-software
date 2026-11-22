@@ -55,6 +55,7 @@ describe('branches and staff_branches', () => {
           role: 'staff',
           username,
           homeBranchId: shop.branchId,
+          joiningDate: '2026-01-01',
         })
         .returning({ id: users.id });
       if (row === undefined) throw new Error('no row');

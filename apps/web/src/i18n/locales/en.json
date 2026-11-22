@@ -1118,7 +1118,8 @@
       "billing": "Billing",
       "customers": "Customers",
       "items": "Items",
-      "stock": "Stock"
+      "stock": "Stock",
+      "attendance": "Attendance"
     },
     "person": {
       "title": "Person",
@@ -1185,6 +1186,16 @@
         "adjust": {
           "label": "Change stock",
           "hint": "Enter opening stock and fix counts."
+        }
+      },
+      "attendance": {
+        "mark": {
+          "label": "Mark attendance",
+          "hint": "Fill in the daily register for their branch."
+        },
+        "view_all": {
+          "label": "See everyone's attendance",
+          "hint": "Other people's days and months. They always see their own."
         }
       }
     },

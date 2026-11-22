@@ -16,6 +16,9 @@ const CONFLICTS: Record<string, string> = {
   customers_live_gstin_unique: 'gstin_taken',
   // Staff usernames: stored lower case, deactivated logins keep theirs (Module 00 #34, #43).
   users_business_id_username_unique: 'username_taken',
+  // Shop holidays: one live holiday per branch (or for every branch) per date (P2.3).
+  shop_holidays_live_all_unique: 'holiday_exists',
+  shop_holidays_live_branch_unique: 'holiday_exists',
 };
 
 /**

@@ -65,6 +65,18 @@ export const phone = () =>
     return normalized;
   });
 
+/** An optional phone number: blank or null is null, anything else is read as `normalizePhone` does. */
+export const optionalPhone = () =>
+  optionalText(20).transform((value, context) => {
+    if (value === null) return null;
+    const normalized = normalizePhone(value);
+    if (normalized === null) {
+      context.addIssue({ code: 'custom', message: 'invalid' });
+      return z.NEVER;
+    }
+    return normalized;
+  });
+
 export const email = () =>
   z
     .string({ error: 'required' })

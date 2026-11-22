@@ -130,6 +130,7 @@ describe('business setup tables', () => {
           role: 'staff',
           email: owner?.email,
           homeBranchId: b.branchId,
+          joiningDate: '2026-01-01',
         }),
       );
     });
@@ -163,7 +164,10 @@ describe('business setup tables', () => {
             .returning({ id: branches.id });
           await tx.insert(users).values({
             businessId: id,
-            ...(change.role === 'staff' && { homeBranchId: branch?.id }),
+            ...(change.role === 'staff' && {
+              homeBranchId: branch?.id,
+              joiningDate: '2026-01-01',
+            }),
             ...change,
           });
         }),

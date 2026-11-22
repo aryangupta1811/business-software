@@ -3,12 +3,19 @@
 // adds takes its default for every login that never had a choice about it (ADR 0044).
 // Error messages are codes the web app translates (ADR 0036).
 import { z } from 'zod';
+import { recordFieldsShape, salaryInputSchema, type SalaryRate } from './attendance.js';
 import { ownerPasswordSchema, newPassword, username } from './auth.js';
 import { PERMISSIONS, type Permission } from './business.js';
-import { normalizePhone, text, uuid } from './fields.js';
+import { normalizePhone, optionalPhone, text, uuid } from './fields.js';
 
 /** The groups on the switch screen, in the order shown. */
-export const STAFF_SWITCH_GROUPS = ['billing', 'customers', 'items', 'stock'] as const;
+export const STAFF_SWITCH_GROUPS = [
+  'billing',
+  'customers',
+  'items',
+  'stock',
+  'attendance',
+] as const;
 export type StaffSwitchGroup = (typeof STAFF_SWITCH_GROUPS)[number];
 
 export interface StaffSwitch {
@@ -35,6 +42,8 @@ export const STAFF_SWITCHES: readonly StaffSwitch[] = [
   { permission: 'items.view_cost', group: 'items', default: false, parent: 'items.view' },
   { permission: 'stock.view', group: 'stock', default: true, parent: null },
   { permission: 'stock.adjust', group: 'stock', default: false, parent: 'stock.view' },
+  { permission: 'attendance.mark', group: 'attendance', default: false, parent: null },
+  { permission: 'attendance.view_all', group: 'attendance', default: false, parent: null },
 ];
 
 const SWITCH_BY_NAME = new Map<string, StaffSwitch>(
@@ -183,24 +192,82 @@ export function staffPasswordProblem(
 const limit = () =>
   z.int({ error: 'invalid' }).min(0, { error: 'too_small' }).max(10_000, { error: 'too_big' });
 
-/** `POST /api/staff`: a new login. Omitted switches take the defaults. */
-export const newStaffSchema = ownerPasswordSchema.extend({
+/** The record fields (`05` #1) as a request takes them: one left out takes its default, or stays as it was. */
+const recordFields = {
+  phone: optionalPhone().optional(),
+  weeklyOffDay: recordFieldsShape.weeklyOffDay.optional(),
+  paidLeavesPerMonth: recordFieldsShape.paidLeavesPerMonth.optional(),
+  overtimeRatePaise: recordFieldsShape.overtimeRatePaise.optional(),
+  joiningDate: recordFieldsShape.joiningDate.optional(),
+};
+
+const ownerPassword = () => ownerPasswordSchema.shape.ownerPassword;
+
+/**
+ * `POST /api/staff`: a new person. With `username` and `password` (and the owner's password) they
+ * get a login at once; without them it is a record only (`00` #19). Omitted switches take the
+ * defaults; the joining date takes today's.
+ */
+export const newStaffSchema = z
+  .strictObject({
+    name: text(100),
+    homeBranchId: uuid(),
+    ...recordFields,
+    /** Their first rate, from the current month or their joining month if that is later. */
+    salary: salaryInputSchema.optional(),
+    username: username().optional(),
+    password: newPassword().optional(),
+    ownerPassword: ownerPassword().optional(),
+    permissions: z.array(z.string().max(64), { error: 'invalid' }).max(64).optional(),
+    discountLimitBasisPoints: limit().nullable().optional(),
+  })
+  .superRefine((value, context) => {
+    const wantsLogin = value.username !== undefined || value.password !== undefined;
+    const missing = (field: 'username' | 'password' | 'ownerPassword') => {
+      context.addIssue({ code: 'custom', path: [field], message: 'required' });
+    };
+    if (wantsLogin) {
+      if (value.username === undefined) missing('username');
+      if (value.password === undefined) missing('password');
+      if (value.ownerPassword === undefined) missing('ownerPassword');
+      return;
+    }
+    // Without a login there is nothing to switch on.
+    if (value.permissions !== undefined) {
+      context.addIssue({ code: 'custom', path: ['permissions'], message: 'invalid' });
+    }
+    if (value.discountLimitBasisPoints !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['discountLimitBasisPoints'],
+        message: 'invalid',
+      });
+    }
+  });
+export type NewStaffInput = z.infer<typeof newStaffSchema>;
+
+/**
+ * `PUT /api/staff/:id`: the person's details; no permission change here. A field left out stays as
+ * it was. `version` (the person's, from the list) is checked when sent: `409 stale` if someone
+ * saved first.
+ */
+export const staffUpdateSchema = z.strictObject({
   name: text(100),
+  username: username().optional(),
+  homeBranchId: uuid(),
+  ...recordFields,
+  version: z.int({ error: 'invalid' }).min(1, { error: 'invalid' }).optional(),
+});
+export type StaffUpdateInput = z.infer<typeof staffUpdateSchema>;
+
+/** `POST /api/staff/:id/login`: gives a record without a login its username and password. */
+export const staffAddLoginSchema = ownerPasswordSchema.extend({
   username: username(),
   password: newPassword(),
-  homeBranchId: uuid(),
   permissions: z.array(z.string().max(64), { error: 'invalid' }).max(64).optional(),
   discountLimitBasisPoints: limit().nullable().optional(),
 });
-export type NewStaffInput = z.infer<typeof newStaffSchema>;
-
-/** `PUT /api/staff/:id`: the person's details; no permission change here. */
-export const staffUpdateSchema = z.strictObject({
-  name: text(100),
-  username: username(),
-  homeBranchId: uuid(),
-});
-export type StaffUpdateInput = z.infer<typeof staffUpdateSchema>;
+export type StaffAddLoginInput = z.infer<typeof staffAddLoginSchema>;
 
 /**
  * `PUT /api/staff/:id/permissions`: the whole switch set. The limit is stored while the discount
@@ -234,11 +301,25 @@ export const staffQuerySchema = z.strictObject({
 });
 export type StaffQuery = z.infer<typeof staffQuerySchema>;
 
-/** One staff login on the Staff page. */
+/** One staff member on the Staff page: with a login, or a record only (`username` null). */
 export interface StaffView {
   id: string;
   name: string;
+  /** Null for a person without a login (`00` #19). */
   username: string | null;
+  /** 10 digits, or null. */
+  phone: string | null;
+  /** `YYYY-MM-DD`. */
+  joiningDate: string;
+  /** 0 = Sunday ... 6 = Saturday; null = none. */
+  weeklyOffDay: number | null;
+  paidLeavesPerMonth: number;
+  /** Paise per hour; null = overtime is off (`05` #15). */
+  overtimeRatePaise: number | null;
+  /** The rate in force this month; null shows "Salary not set". */
+  salary: SalaryRate | null;
+  /** Sent back with an edit, so a stale copy is refused. */
+  version: number;
   homeBranchId: string;
   homeBranchName: string;
   /** The extra branches the owner allowed (P1.6); the home branch is always allowed and not in it. */

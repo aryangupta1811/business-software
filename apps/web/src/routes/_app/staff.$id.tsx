@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { staffUpdateSchema, type StaffView } from '@business-software/shared';
+import { staffUpdateSchema, username, type StaffView } from '@business-software/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { ArrowLeft } from 'lucide-react';
@@ -32,7 +32,9 @@ export const Route = createFileRoute('/_app/staff/$id')({
 
 // The same checks as the server's, with a password box the page doesn't use (it is only for
 // adding), so one form type serves both pages.
-const personSchema = staffUpdateSchema.extend({ password: z.string() });
+const personSchema = staffUpdateSchema
+  .pick({ name: true, homeBranchId: true })
+  .extend({ username: username(), password: z.string() });
 
 function EditStaff() {
   const { id } = Route.useParams();

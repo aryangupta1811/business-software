@@ -8,6 +8,7 @@ import {
   effectiveDiscountLimit,
   effectivePermissions,
   newStaffSchema,
+  staffAddLoginSchema,
   normalisePermissions,
   percentToBasisPoints,
   permissionsProblem,
@@ -314,6 +315,105 @@ describe('staff bodies', () => {
     expect(fieldCodes(staffPasswordSchema, { newPassword: 'short', ownerPassword: 'x' })).toEqual({
       newPassword: 'too_short',
     });
+  });
+});
+
+describe('staff records without a login (P2.3, 00 #19)', () => {
+  const BRANCH = '0190f0f0-0000-7000-8000-0000000000b1';
+
+  it('takes a name and a home branch alone', () => {
+    expect(newStaffSchema.parse({ name: ' Geeta ', homeBranchId: BRANCH })).toEqual({
+      name: 'Geeta',
+      homeBranchId: BRANCH,
+    });
+  });
+
+  it('reads the record fields, and a phone number the way customers do', () => {
+    const parsed = newStaffSchema.parse({
+      name: 'Geeta',
+      homeBranchId: BRANCH,
+      phone: '+91 98765-43210',
+      joiningDate: '2026-11-01',
+      weeklyOffDay: 0,
+      paidLeavesPerMonth: 2,
+      overtimeRatePaise: 15_000,
+      salary: { kind: 'monthly', amountPaise: 1_200_000 },
+    });
+    expect(parsed).toMatchObject({
+      phone: '9876543210',
+      weeklyOffDay: 0,
+      paidLeavesPerMonth: 2,
+      overtimeRatePaise: 15_000,
+      salary: { kind: 'monthly', amountPaise: 1_200_000 },
+    });
+    expect(fieldCodes(newStaffSchema, { name: 'G', homeBranchId: BRANCH, phone: '123' })).toEqual({
+      phone: 'invalid',
+    });
+  });
+
+  it.each([
+    [{ weeklyOffDay: 7 }, { weeklyOffDay: 'invalid' }],
+    [{ paidLeavesPerMonth: 32 }, { paidLeavesPerMonth: 'too_big' }],
+    [{ paidLeavesPerMonth: -1 }, { paidLeavesPerMonth: 'too_small' }],
+    [{ overtimeRatePaise: 0 }, { overtimeRatePaise: 'too_small' }],
+    [{ joiningDate: '2026-02-30' }, { joiningDate: 'invalid' }],
+  ])('refuses %j', (change, codes) => {
+    expect(fieldCodes(newStaffSchema, { name: 'G', homeBranchId: BRANCH, ...change })).toEqual(
+      codes,
+    );
+  });
+
+  it('needs the whole login or none of it, and the owner password only for a login', () => {
+    const base = { name: 'G', homeBranchId: BRANCH };
+    expect(fieldCodes(newStaffSchema, { ...base, username: 'geeta' })).toEqual({
+      password: 'required',
+      ownerPassword: 'required',
+    });
+    expect(fieldCodes(newStaffSchema, { ...base, password: 'a long password' })).toEqual({
+      username: 'required',
+      ownerPassword: 'required',
+    });
+    // Switches and a discount limit mean nothing without a login.
+    expect(fieldCodes(newStaffSchema, { ...base, permissions: [] })).toEqual({
+      permissions: 'invalid',
+    });
+  });
+
+  it('gives a record a login with a username, a password and the owner password', () => {
+    const body = { username: 'Geeta', password: 'a long password', ownerPassword: 'x' };
+    expect(staffAddLoginSchema.parse(body)).toEqual({ ...body, username: 'geeta' });
+    expect(fieldCodes(staffAddLoginSchema, { ...body, ownerPassword: undefined })).toEqual({
+      ownerPassword: 'required',
+    });
+  });
+
+  it('leaves out of an edit what was not sent', () => {
+    expect(staffUpdateSchema.parse({ name: 'G', homeBranchId: BRANCH, version: 2 })).toEqual({
+      name: 'G',
+      homeBranchId: BRANCH,
+      version: 2,
+    });
+    expect(
+      staffUpdateSchema.parse({ name: 'G', homeBranchId: BRANCH, phone: '', weeklyOffDay: null }),
+    ).toEqual({ name: 'G', homeBranchId: BRANCH, phone: null, weeklyOffDay: null });
+  });
+});
+
+describe('the attendance switches (05 #25, #26)', () => {
+  it('start off, are not tied to another switch and form their own group', () => {
+    const attendance = STAFF_SWITCHES.filter((entry) => entry.group === 'attendance');
+    expect(attendance.map((entry) => entry.permission)).toEqual([
+      'attendance.mark',
+      'attendance.view_all',
+    ]);
+    for (const entry of attendance) {
+      expect(entry.default).toBe(false);
+      expect(entry.parent).toBeNull();
+    }
+    expect(effectivePermissions(NONE)).not.toContain('attendance.mark');
+    expect(effectivePermissions({ added: ['attendance.mark'], removed: [] })).toContain(
+      'attendance.mark',
+    );
   });
 });
 

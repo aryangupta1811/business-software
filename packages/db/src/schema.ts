@@ -1048,7 +1048,9 @@ export const alerts = pgTable(
 );
 
 // A dismissal belongs to one alert row and one person: when the alert clears and a new one is
-// raised later, the new one shows again (question 2A). Never deleted.
+// raised later, the new one shows again (question 2A). It remembers the type the alert had
+// when dismissed, so an alert that gets worse (low to out of stock) shows again but one that
+// gets better doesn't (`07` #19). Never deleted; dismissing again updates it.
 export const alertDismissals = pgTable(
   'alert_dismissals',
   {
@@ -1056,11 +1058,14 @@ export const alertDismissals = pgTable(
     businessId: ownBusinessId(),
     alertId: uuid('alert_id').notNull(),
     userId: uuid('user_id').notNull(),
+    /** The alert's type when it was dismissed (`ALERT_SEVERITY` says what is worse than it). */
+    dismissedType: text('dismissed_type').notNull(),
     dismissedAt: timestamp('dismissed_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     ...tenantPolicies(t.businessId),
     unique('alert_dismissals_alert_user_unique').on(t.businessId, t.alertId, t.userId),
+    check('alert_dismissals_type_check', sql`${t.dismissedType} in (${literals(ALERT_TYPES)})`),
     foreignKey({
       name: 'alert_dismissals_alert_fk',
       columns: [t.businessId, t.alertId],

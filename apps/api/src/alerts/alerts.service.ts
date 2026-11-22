@@ -19,6 +19,7 @@ import {
 import {
   ALERT_LIST_LIMIT,
   ALERT_PERMISSIONS,
+  ALERT_SEVERITY,
   ALERT_TYPES,
   type AlertList,
   type AlertType,
@@ -84,11 +85,14 @@ export class AlertsService {
     });
   }
 
-  /** Hides one alert for the caller only (`07` #6). A second dismissal changes nothing. */
+  /**
+   * Hides one alert for the caller only (`07` #6), at the type it has now: it shows again if
+   * it gets worse (`07` #19). Dismissing again only moves that type, never makes a row.
+   */
   dismiss(caller: Caller, id: string): Promise<void> {
     return withBusiness(this.database.db, caller.businessId, async (tx) => {
       const [alert] = await tx
-        .select({ id: alerts.id })
+        .select({ id: alerts.id, type: alerts.type })
         .from(alerts)
         .where(
           and(
@@ -102,8 +106,11 @@ export class AlertsService {
       if (alert === undefined) throw new NotFoundException({ code: 'not_found' });
       await tx
         .insert(alertDismissals)
-        .values({ alertId: alert.id, userId: caller.userId })
-        .onConflictDoNothing();
+        .values({ alertId: alert.id, userId: caller.userId, dismissedType: alert.type })
+        .onConflictDoUpdate({
+          target: [alertDismissals.businessId, alertDismissals.alertId, alertDismissals.userId],
+          set: { dismissedType: alert.type, dismissedAt: sql`now()` },
+        });
     });
   }
 
@@ -125,8 +132,16 @@ export class AlertsService {
     );
   }
 
+  /** Not dismissed by the caller, or worse now than when they dismissed it (`07` #19). */
   private notDismissed(caller: Caller): SQL {
     return sql`not exists (select 1 from ${alertDismissals}
-      where ${alertDismissals.alertId} = ${alerts.id} and ${alertDismissals.userId} = ${caller.userId})`;
+      where ${alertDismissals.alertId} = ${alerts.id} and ${alertDismissals.userId} = ${caller.userId}
+        and ${severity(alerts.type)} <= ${severity(alertDismissals.dismissedType)})`;
   }
+}
+
+/** SQL for `ALERT_SEVERITY` of a type column, so "worse than dismissed" is one comparison. */
+function severity(column: typeof alerts.type | typeof alertDismissals.dismissedType): SQL {
+  const cases = ALERT_TYPES.map((type) => sql`when ${type} then ${ALERT_SEVERITY[type]}`);
+  return sql`(case ${column} ${sql.join(cases, sql` `)} end)`;
 }

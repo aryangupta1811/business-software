@@ -39,7 +39,8 @@
     "billDiscount": "Discount on the whole bill",
     "billHold": "Hold this bill, or open the held bills",
     "billCustomer": "Find or add the customer",
-    "billPay": "Take payment"
+    "billPay": "Take payment",
+    "openAlerts": "Open the alerts"
   },
   "connection": {
     "checking": "Checking connection…",
@@ -398,6 +399,12 @@
       "warnHint": "The bill is saved; the counter sees a warning.",
       "block": "Block",
       "blockHint": "The bill waits until the stock is entered."
+    },
+    "alerts": {
+      "title": "Alerts",
+      "lead": "What the bell in the top bar shows. A type you switch off is still recorded, so switching it on again shows what is open.",
+      "appLabel": "Show in the app",
+      "whatsapp": "WhatsApp comes with the daily summary, later."
     }
   },
   "features": {
@@ -1203,8 +1210,8 @@
       "editTitle": "Edit branch",
       "name": "Branch name",
       "code": "Short code",
-      "codeHint": "Up to 6 capital letters or digits. It goes into invoice numbers, like AND.",
-      "codeInvalid": "Use 1 to 6 capital letters or digits",
+      "codeHint": "Up to 4 capital letters or digits. It goes into invoice numbers, like AND (AND/26-27/42).",
+      "codeInvalid": "Use 1 to 4 capital letters or digits",
       "codeTaken": "Another branch already uses this code",
       "gstinHint": "A branch in another state needs its own GSTIN.",
       "add": "Add branch",
@@ -1231,6 +1238,31 @@
       "confirmBody": "This decides which counters this login works on, so it needs your password.",
       "save": "Save branches",
       "saved": "Saved"
+    }
+  },
+  "alerts": {
+    "title": "Alerts",
+    "bell": "Alerts, {{count}} to look at",
+    "close": "Close",
+    "loading": "Loading alerts…",
+    "loadFailed": "Couldn't load the alerts. Check the connection.",
+    "empty": "Nothing needs your attention.",
+    "truncated": "Showing the newest {{shown}}.",
+    "dismiss": "Dismiss",
+    "dismissItem": "Dismiss the alert for {{name}}",
+    "stockLine": "Stock {{stock}} · level {{level}}",
+    "noLevel": "none set",
+    "groups": {
+      "out_of_stock": "Out of stock ({{count}})",
+      "low_stock": "Low on stock ({{count}})"
+    },
+    "types": {
+      "out_of_stock": "Out of stock",
+      "low_stock": "Low on stock"
+    },
+    "typeHints": {
+      "out_of_stock": "An item has run out at a branch.",
+      "low_stock": "An item is at or under its low-stock level."
     }
   }
 }

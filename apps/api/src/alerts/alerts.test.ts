@@ -337,6 +337,47 @@ describe('alerts', () => {
       expect((await call('POST', `/alerts/${id ?? ''}/dismiss`, a)).status).toBe(404);
     });
 
+    it('shows a dismissed low-stock alert again when the item runs out (#19)', async () => {
+      const worse = await item(a, 5_000, 'Dismiss then run out');
+      await open(a, worse.id, 10_000);
+      await adjust(a, worse.id, -6_000);
+      const low = (await bell(a)).alerts.find((row) => row.itemName === 'Dismiss then run out');
+      expect(low?.type).toBe('low_stock');
+      await call('POST', `/alerts/${low?.id ?? ''}/dismiss`, a);
+      // The cashier never dismissed it, and the owner's own dismissal is theirs alone.
+      expect(await names(a)).not.toContain('Dismiss then run out');
+      expect(await names(cashier)).toContain('Dismiss then run out');
+
+      await adjust(a, worse.id, -4_000);
+      const out = (await bell(a)).alerts.find((row) => row.itemName === 'Dismiss then run out');
+      expect(out).toMatchObject({ id: low?.id, type: 'out_of_stock' });
+
+      // Dismissing the worse state hides it again, and it stays one alert row.
+      expect((await call('POST', `/alerts/${out?.id ?? ''}/dismiss`, a)).status).toBe(204);
+      expect(await names(a)).not.toContain('Dismiss then run out');
+      expect(await recorded(worse.id)).toHaveLength(1);
+    });
+
+    it('keeps a dismissed alert hidden when the item gets better, not worse', async () => {
+      const better = await item(a, 5_000, 'Dismiss out then restock a bit');
+      await open(a, better.id, 3_000);
+      await adjust(a, better.id, -3_000);
+      const id = (await bell(a)).alerts.find(
+        (row) => row.itemName === 'Dismiss out then restock a bit',
+      )?.id;
+      await call('POST', `/alerts/${id ?? ''}/dismiss`, a);
+      expect(await names(a)).not.toContain('Dismiss out then restock a bit');
+
+      // Out of stock to low is better, so it stays hidden; out again is no worse than what
+      // was dismissed.
+      await adjust(a, better.id, 2_000);
+      expect((await recorded(better.id))[0]?.type).toBe('low_stock');
+      expect(await names(a)).not.toContain('Dismiss out then restock a bit');
+      await adjust(a, better.id, -2_000);
+      expect((await recorded(better.id))[0]?.type).toBe('out_of_stock');
+      expect(await names(a)).not.toContain('Dismiss out then restock a bit');
+    });
+
     it('refuses to dismiss what the caller cannot see, or what is not there', async () => {
       const mine = await item(a, 5_000, 'Only A');
       await open(a, mine.id, 1_000);

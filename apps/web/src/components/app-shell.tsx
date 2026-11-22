@@ -3,6 +3,7 @@ import { Link, useMatches, useNavigate } from '@tanstack/react-router';
 import { House, IndianRupee, Keyboard, MapPin, Package, Settings, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AlertsBell } from '../alerts/alerts-bell';
 import { BranchPicker } from '../branches/branch-picker';
 import { BranchScopeProvider } from '../branches/branch-scope';
 import { hasPicker } from '../branches/branch-scope-context';
@@ -162,6 +163,7 @@ export function AppShell({
                 <BranchPicker session={session} />
               )}
               <ConnectionBadge />
+              {session !== null && <AlertsBell session={session} />}
               <LanguageSwitcher />
               <ThemeToggle />
             </div>

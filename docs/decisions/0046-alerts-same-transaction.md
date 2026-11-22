@@ -39,7 +39,7 @@ P2.7 part 2 adds the bell: the owner and the staff see which items are low or ou
 
 - Any new code that changes an item's stock or level must go through `moveStock` or call `syncStockAlerts`; the tenancy of the table is checked by the existing guard test.
 - Alerts that already should exist when this migration runs (stock already under its level) are raised by the next stock change or level save of that item, not by the migration.
-- Low becoming out of stock is the same row, so someone who dismissed the low alert does not see it again as an out-of-stock alert. A later change can make a worsening alert show again; the schema allows it (it is a rule in `syncStockAlerts`).
+- Low becoming out of stock is the same row. ~~So someone who dismissed the low alert does not see it again as an out-of-stock alert.~~ **Changed 2026-11-22 (owner, `07` #19):** a dismissal now remembers the type the alert had (`alert_dismissals.dismissed_type`, migration 0016), and the bell hides the alert only while it is no worse than that (`ALERT_SEVERITY`: out of stock is worse than low). So a dismissed low alert shows again when the item runs out, and an alert dismissed at out of stock stays hidden when the item is back to low. It is a read rule in the list query, not something `syncStockAlerts` writes, so the app's no-delete rule still holds: dismissing again updates the one row.
 - Counting and listing read open rows through the same index that enforces uniqueness.
 
 ## Interview note

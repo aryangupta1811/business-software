@@ -1,15 +1,18 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   BUSINESS_TYPES,
+  ALERT_TYPES,
   FEATURE_PRESETS,
   FEATURES,
   BRANCH_STATES,
   GST_STATUSES,
+  settingsAlertsSchema,
   settingsBusinessSchema,
   settingsFeaturesSchema,
   settingsSecuritySchema,
   settingsStockSchema,
   type BusinessType,
+  type SettingsAlertsInput,
   type SettingsBusinessInput,
   type SettingsFeaturesInput,
   type SettingsSecurityInput,
@@ -93,6 +96,7 @@ function Settings() {
         <FeaturesCard saved={view.features} businessType={view.business.businessType} />
         <SecurityCard saved={view.security} />
         <StockCard saved={view.stock} />
+        <AlertsCard saved={view.alerts} />
         <PasswordCard />
       </div>
       <RecoveryKeyCard businessName={view.business.businessName} />
@@ -108,7 +112,7 @@ function Settings() {
  * case) and updates the page's copy, so the other cards see the new business type.
  */
 function useSave<Form extends FieldValues>(
-  card: 'business' | 'features' | 'security' | 'stock',
+  card: 'business' | 'features' | 'security' | 'stock' | 'alerts',
   setError: UseFormSetError<Form>,
   onSaved: (view: SettingsView) => void,
 ) {
@@ -439,6 +443,43 @@ function StockCard({ saved }: { saved: SettingsStockInput }) {
         ]}
         inputProps={form.register('negativeStock')}
       />
+    </SettingsCard>
+  );
+}
+
+/** Module 07 #3: which alerts the bell shows. A type switched off still records its alerts. */
+function AlertsCard({ saved }: { saved: SettingsAlertsInput }) {
+  const { t } = useTranslation();
+  const errorText = useFieldError();
+  const form = useForm<SettingsAlertsInput>({
+    resolver: zodResolver(settingsAlertsSchema),
+    defaultValues: { types: [...saved.types] },
+  });
+  const { save, state } = useSave<SettingsAlertsInput>('alerts', form.setError, (view) => {
+    form.reset({ types: [...view.alerts.types] });
+  });
+
+  return (
+    <SettingsCard
+      title={t('settings.alerts.title')}
+      lead={t('settings.alerts.lead')}
+      state={state}
+      dirty={form.formState.isDirty}
+      submitting={form.formState.isSubmitting}
+      onSubmit={() => void form.handleSubmit(save)()}
+    >
+      <ChoiceCards
+        type="checkbox"
+        label={t('settings.alerts.appLabel')}
+        error={errorText('types', form.formState.errors.types?.message)}
+        choices={ALERT_TYPES.map((type) => ({
+          value: type,
+          title: t(`alerts.types.${type}`),
+          hint: t(`alerts.typeHints.${type}`),
+        }))}
+        inputProps={form.register('types')}
+      />
+      <p className="text-label text-muted">{t('settings.alerts.whatsapp')}</p>
     </SettingsCard>
   );
 }

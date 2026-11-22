@@ -190,7 +190,9 @@ describe('alerts', () => {
         tx.insert(alerts).values(raw(a, itemId)).returning({ id: alerts.id }),
       );
       await inShop(a, (tx) =>
-        tx.insert(alertDismissals).values({ alertId: alert?.id ?? '', userId: a.ownerId }),
+        tx
+          .insert(alertDismissals)
+          .values({ alertId: alert?.id ?? '', userId: a.ownerId, dismissedType: 'low_stock' }),
       );
       await expect(inShop(a, (tx) => tx.delete(alerts))).rejects.toMatchObject(failsWith('42501'));
       await expect(inShop(a, (tx) => tx.delete(alertDismissals))).rejects.toMatchObject(
@@ -204,16 +206,46 @@ describe('alerts', () => {
         tx.insert(alerts).values(raw(a, itemId)).returning({ id: alerts.id }),
       );
       const alertId = alert?.id ?? '';
-      await inShop(a, (tx) => tx.insert(alertDismissals).values({ alertId, userId: a.ownerId }));
+      await inShop(a, (tx) =>
+        tx
+          .insert(alertDismissals)
+          .values({ alertId, userId: a.ownerId, dismissedType: 'low_stock' }),
+      );
       await expect(
-        inShop(a, (tx) => tx.insert(alertDismissals).values({ alertId, userId: a.ownerId })),
+        inShop(a, (tx) =>
+          tx
+            .insert(alertDismissals)
+            .values({ alertId, userId: a.ownerId, dismissedType: 'low_stock' }),
+        ),
       ).rejects.toMatchObject(failsWith('23505', 'alert_dismissals_alert_user_unique'));
       await expect(
-        inShop(a, (tx) => tx.insert(alertDismissals).values({ alertId, userId: b.ownerId })),
+        inShop(a, (tx) =>
+          tx
+            .insert(alertDismissals)
+            .values({ alertId, userId: b.ownerId, dismissedType: 'low_stock' }),
+        ),
       ).rejects.toMatchObject(failsWith('23503', 'alert_dismissals_user_fk'));
       await expect(
-        inShop(b, (tx) => tx.insert(alertDismissals).values({ alertId, userId: b.ownerId })),
+        inShop(b, (tx) =>
+          tx
+            .insert(alertDismissals)
+            .values({ alertId, userId: b.ownerId, dismissedType: 'low_stock' }),
+        ),
       ).rejects.toMatchObject(failsWith('23503', 'alert_dismissals_alert_fk'));
+    });
+
+    it('keeps only a known alert type on a dismissal', async () => {
+      const itemId = await addItem(a);
+      const [alert] = await inShop(a, (tx) =>
+        tx.insert(alerts).values(raw(a, itemId)).returning({ id: alerts.id }),
+      );
+      await expect(
+        inShop(a, (tx) =>
+          tx
+            .insert(alertDismissals)
+            .values({ alertId: alert?.id ?? '', userId: a.ownerId, dismissedType: 'nope' }),
+        ),
+      ).rejects.toMatchObject(failsWith('23514', 'alert_dismissals_type_check'));
     });
 
     it('shows a business only its own alerts', async () => {

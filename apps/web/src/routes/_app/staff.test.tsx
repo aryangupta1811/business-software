@@ -57,10 +57,11 @@ test.each(['/staff', '/staff/new', '/settings'])(
     const api = fakeApi(STAFF_SESSION);
     const history = renderAt(path);
     expect(await screen.findByText("You can't open this page")).toBeInTheDocument();
-    // The page itself never loaded, so it asked the server for nothing.
+    // The page itself never loaded, so it asked the server for nothing (the top bar's bell
+    // reads its own count on every page).
     const asked = api.fetchMock.mock.calls
       .map(([url]) => url)
-      .filter((url) => !url.includes('/health'));
+      .filter((url) => !url.includes('/health') && url !== '/api/alerts');
     expect(asked).toEqual(['/api/session']);
     await userEvent.click(screen.getByRole('link', { name: 'Go to home' }));
     expect(history.location.pathname).toBe('/');

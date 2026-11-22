@@ -21,6 +21,16 @@ export const ALERT_FAMILIES = {
   out_of_stock: 'stock',
 } as const satisfies Record<AlertType, string>;
 
+/**
+ * How bad a type is, within its family (`07` #19). A dismissal hides an alert until it gets
+ * worse, so only a higher number than the dismissed type shows it again; the same or lower
+ * stays hidden. Types of other families are one step each: they never change type.
+ */
+export const ALERT_SEVERITY = {
+  low_stock: 1,
+  out_of_stock: 2,
+} as const satisfies Record<AlertType, number>;
+
 /** Who may see a type (question 1A: stock alerts need `stock.view`). */
 export const ALERT_PERMISSIONS = {
   low_stock: 'stock.view',

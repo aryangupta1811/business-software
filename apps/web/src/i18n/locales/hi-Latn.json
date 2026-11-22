@@ -634,7 +634,8 @@
       },
       "kinds": {
         "opening": "Shuruaati stock",
-        "adjustment": "Sudhaar"
+        "adjustment": "Sudhaar",
+        "sale": "Bikri"
       },
       "reasons": {
         "damaged": "Kharaab",

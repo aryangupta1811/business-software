@@ -62,7 +62,8 @@
 22. **Exempt and 0% items** both show under rate 0 in the tax summary; split only if a CA asks. (G3)
 23. **Round-off is always on** (#6); there is no setting to turn it off. (G4)
 24. **HSN on every line** of a regular business's bill, stricter than the law for small shops' B2C bills; it comes from the item, so the cashier never types it. (G5)
-25. **GSTIN before the first tax invoice:** a registered business (regular or composition) must have a GSTIN on its head office before saving its first tax invoice or bill of supply; checked when a bill is saved (P1.14), not at signup. See `00` #36. (G6)
+25. **GSTIN before the first tax invoice:** a registered business (regular or composition) must have a GSTIN on the selling branch (for one branch, the head office) before saving its first tax invoice or bill of supply; checked when a bill is saved (P1.14), not at signup. See `00` #36. (G6)
+26. **Rule 46's buyer details** (P1.14, owner 2026-11-22): on a tax invoice to a buyer without a GSTIN, name, address and state are required when the **taxable value** (before GST) is ₹50,000 or more, as CGST Rule 46(e) words it; the counter asks at the same number.
 
 ## Open questions
 
@@ -75,3 +76,4 @@ None.
 - 2026-11-18 — #5: a bill discount in rupees means the customer pays exactly ₹X less (owner, 2026-11-18, while reviewing the P1.12 GST engine). Added to #5's text.
 - 2026-11-19 — Fast-track sitting 2, GST questions G1–G6: the owner took every recommendation, G1 in the version revised by the P1.7 design (rate and HSN format checked, not the HSN-to-rate match). Added #20–25. No earlier point changed.
 - 2026-11-21 — The owner answered the P1.13 design's 12 questions (`docs/plans/2026-11-20-p1.13-billing-design.md` §16), taking every recommendation: the billing key table; the same item scanned again adds to its line; no typed prices (a lower price is a discount); the staff limit applies per line and to the bill total; the owner's OK is given with the discount and lasts 30 minutes for that bill; held bills on the server per branch; discarding an unsaved bill is logged; an unknown code offers a quick "Add item"; a B2B buyer from another state gets IGST by default with a "delivered at the counter" switch; wholesale is one switch per bill; no scale barcodes in v1; 1.5% joins the GST rates. They fill in #5, #8, #11 and #12; no earlier point changed.
+- 2026-11-22 — P1.14 design answers (`docs/plans/2026-11-22-p1.14-save-bill-design.md` §9). **#25 changed:** the GSTIN checked before a tax invoice is the selling branch's, the one printed on the bill (ADR 0045); for a one-branch business that is still the head office. Added #26 (Rule 46's ₹50,000 is the taxable value).

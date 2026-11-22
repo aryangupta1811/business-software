@@ -6,8 +6,11 @@ import { isValidGstin, optionalText, text, uuid } from './fields.js';
 import { optionalCode, optionalPattern, stateCode } from './schemas.js';
 import { isBranchStateCode } from './states.js';
 
-/** 1 to 6 capital letters or digits: short enough for an invoice number (`ABC/AND/2026-27/001`). */
-export const BRANCH_CODE_PATTERN = /^[A-Z0-9]{1,6}$/;
+/**
+ * 1 to 4 capital letters or digits: with two or more branches the code starts each branch's
+ * invoice numbers (`AND/26-27/42`, `00` #61), which the law caps at 16 characters.
+ */
+export const BRANCH_CODE_PATTERN = /^[A-Z0-9]{1,4}$/;
 
 const branchCode = () =>
   z.preprocess(

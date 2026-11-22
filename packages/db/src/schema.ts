@@ -9,11 +9,14 @@ import {
   FEATURES,
   ADJUSTMENT_REASONS,
   APPROVAL_KINDS,
+  BILL_DOCUMENTS,
   GST_RATES,
   GST_STATUSES,
   INDIAN_STATES,
   ITEM_KINDS,
   NEGATIVE_STOCK_SETTINGS,
+  PAYMENT_MODES,
+  PRICE_LISTS,
   STOCK_MOVEMENT_KINDS,
   type StockAlertDetails,
 } from '@business-software/shared';
@@ -106,6 +109,8 @@ export const businesses = pgTable(
     staffIdleMinutes: smallint('staff_idle_minutes').notNull().default(30),
     /** Module 01 #12: selling past zero stock warns or is blocked (P1.14 reads it). */
     negativeStock: text('negative_stock').notNull().default('warn'),
+    /** `00` #61: starts a one-branch business's invoice numbers; null for none (`26-27/42`). */
+    invoicePrefix: text('invoice_prefix'),
     /** The alert types the app shows (Module 07 #3). A type left out still records alerts. */
     alertTypes: text('alert_types')
       .array()
@@ -130,6 +135,7 @@ export const businesses = pgTable(
       'businesses_alert_types_check',
       sql`${t.alertTypes} <@ array[${literals(ALERT_TYPES)}]::text[]`,
     ),
+    check('businesses_invoice_prefix_check', sql`${t.invoicePrefix} ~ '^[A-Z0-9]{1,4}$'`),
     check(
       'businesses_negative_stock_check',
       sql`${t.negativeStock} in (${literals(NEGATIVE_STOCK_SETTINGS)})`,
@@ -145,7 +151,7 @@ export const branches = pgTable(
     id: id(),
     businessId: businessId(),
     name: text('name').notNull(),
-    /** Short code for invoice numbers and lists: 1 to 6 capital letters or digits (P1.6). */
+    /** Short code for invoice numbers and lists: 1 to 4 capital letters or digits (P1.6, `00` #61). */
     code: text('code').notNull(),
     stateCode: text('state_code').notNull(),
     address: text('address'),
@@ -164,7 +170,7 @@ export const branches = pgTable(
     ...tenantPolicies(t.businessId),
     unique('branches_business_id_id_unique').on(t.businessId, t.id),
     unique('branches_business_id_code_unique').on(t.businessId, t.code),
-    check('branches_code_check', sql`${t.code} ~ '^[A-Z0-9]{1,6}$'`),
+    check('branches_code_check', sql`${t.code} ~ '^[A-Z0-9]{1,4}$'`),
     // Not 97 (Other Territory): a place of supply outside any state, never a shop's address.
     check(
       'branches_state_code_check',
@@ -896,6 +902,241 @@ export const ownerApprovals = pgTable(
   ],
 );
 
+// ---- Bills (P1.14, design `docs/plans/2026-11-22-p1.14-save-bill-design.md`; ADR 0047) ----
+// A saved bill is never edited (`02` #14): bills, their lines and payments are append-only (the
+// migration revokes UPDATE; DELETE was never granted). Cancelling (P1.16) adds its own rows.
+
+// The last invoice number per branch per financial year (ADR 0007 rule 5): a row locked by the
+// bill's own transaction, so a rolled-back save gives its number back and there are no gaps.
+export const invoiceCounters = pgTable(
+  'invoice_counters',
+  {
+    id: id(),
+    businessId: ownBusinessId(),
+    branchId: uuid('branch_id').notNull(),
+    /** `2026-27`. */
+    financialYear: text('financial_year').notNull(),
+    lastNumber: integer('last_number').notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    unique('invoice_counters_business_id_id_unique').on(t.businessId, t.id),
+    unique('invoice_counters_branch_year_unique').on(t.businessId, t.branchId, t.financialYear),
+    foreignKey({
+      name: 'invoice_counters_branch_fk',
+      columns: [t.businessId, t.branchId],
+      foreignColumns: [branches.businessId, branches.id],
+    }),
+    check('invoice_counters_year_check', sql`${t.financialYear} ~ '^[0-9]{4}-[0-9]{2}$'`),
+    check('invoice_counters_last_number_check', sql`${t.lastNumber} >= 1`),
+  ],
+);
+
+export const bills = pgTable(
+  'bills',
+  {
+    id: id(),
+    businessId: ownBusinessId(),
+    branchId: uuid('branch_id').notNull(),
+    /** The idempotency key made when the bill was started (ADR 0007 rule 7). */
+    billKey: uuid('bill_key').notNull(),
+    /** A hash of the request: a retry must be the same request to get this bill back. */
+    requestHash: text('request_hash').notNull(),
+    financialYear: text('financial_year').notNull(),
+    sequence: integer('sequence').notNull(),
+    /** As printed, built at saving (`00` #61); never changes. */
+    number: text('number').notNull(),
+    document: text('document').notNull(),
+    /** The IST day the bill belongs to (`06` #7). */
+    businessDate: date('business_date', { mode: 'string' }).notNull(),
+    priceList: text('price_list').notNull(),
+    supplierStateCode: text('supplier_state_code').notNull(),
+    placeOfSupplyStateCode: text('place_of_supply_state_code').notNull(),
+    tax: text('tax').notNull(),
+    customerId: uuid('customer_id'),
+    /** The customer's details at saving: a bill never changes with its customer. */
+    buyer: jsonb('buyer'),
+    /** The branch's name, address, GSTIN and licences at saving, for printing (P1.15). */
+    seller: jsonb('seller').notNull(),
+    grossPaise: money('gross_paise').notNull(),
+    subtotalPaise: money('subtotal_paise').notNull(),
+    billDiscountPaise: money('bill_discount_paise').notNull(),
+    taxablePaise: money('taxable_paise').notNull(),
+    cgstPaise: money('cgst_paise').notNull(),
+    sgstPaise: money('sgst_paise').notNull(),
+    igstPaise: money('igst_paise').notNull(),
+    totalPaise: money('total_paise').notNull(),
+    roundOffPaise: money('round_off_paise').notNull(),
+    grandTotalPaise: money('grand_total_paise').notNull(),
+    billDiscount: jsonb('bill_discount'),
+    approvalId: uuid('approval_id'),
+    heldBillId: uuid('held_bill_id'),
+    createdBy: uuid('created_by').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    unique('bills_business_id_id_unique').on(t.businessId, t.id),
+    unique('bills_bill_key_unique').on(t.businessId, t.billKey),
+    unique('bills_sequence_unique').on(t.businessId, t.branchId, t.financialYear, t.sequence),
+    unique('bills_number_unique').on(t.businessId, t.financialYear, t.number),
+    // An owner's OK is used by one bill only (P1.13 design §6).
+    uniqueIndex('bills_approval_unique')
+      .on(t.businessId, t.approvalId)
+      .where(sql`${t.approvalId} is not null`),
+    foreignKey({
+      name: 'bills_branch_fk',
+      columns: [t.businessId, t.branchId],
+      foreignColumns: [branches.businessId, branches.id],
+    }),
+    foreignKey({
+      name: 'bills_customer_fk',
+      columns: [t.businessId, t.customerId],
+      foreignColumns: [customers.businessId, customers.id],
+    }),
+    foreignKey({
+      name: 'bills_approval_fk',
+      columns: [t.businessId, t.approvalId],
+      foreignColumns: [ownerApprovals.businessId, ownerApprovals.id],
+    }),
+    foreignKey({
+      name: 'bills_held_bill_fk',
+      columns: [t.businessId, t.heldBillId],
+      foreignColumns: [heldBills.businessId, heldBills.id],
+    }),
+    foreignKey({
+      name: 'bills_created_by_fk',
+      columns: [t.businessId, t.createdBy],
+      foreignColumns: [users.businessId, users.id],
+    }),
+    // A branch's bills, newest first (P1.15's list, P2.9's dashboard).
+    index('bills_branch_idx').on(t.businessId, t.branchId, t.id),
+    check('bills_year_check', sql`${t.financialYear} ~ '^[0-9]{4}-[0-9]{2}$'`),
+    check('bills_sequence_check', sql`${t.sequence} >= 1`),
+    // CGST Rule 46(b): at most 16 characters of letters, digits, hyphen and slash.
+    check('bills_number_check', sql`${t.number} ~ '^[A-Z0-9/-]{1,16}$'`),
+    check('bills_document_check', sql`${t.document} in (${literals(BILL_DOCUMENTS)})`),
+    check('bills_price_list_check', sql`${t.priceList} in (${literals(PRICE_LISTS)})`),
+    check('bills_tax_check', sql`${t.tax} in ('cgst-sgst', 'igst', 'none')`),
+    check(
+      'bills_states_check',
+      sql`${t.supplierStateCode} ~ '^[0-9]{2}$' and ${t.placeOfSupplyStateCode} ~ '^[0-9]{2}$'`,
+    ),
+    // The engine's sums, held by the database too, so a stored bill always adds up.
+    check(
+      'bills_amounts_check',
+      sql`${t.grossPaise} >= 0 and ${t.subtotalPaise} >= 0 and ${t.billDiscountPaise} >= 0 and ${t.taxablePaise} >= 0 and ${t.cgstPaise} >= 0 and ${t.sgstPaise} >= 0 and ${t.igstPaise} >= 0`,
+    ),
+    check(
+      'bills_total_check',
+      sql`${t.totalPaise} = ${t.taxablePaise} + ${t.cgstPaise} + ${t.sgstPaise} + ${t.igstPaise}`,
+    ),
+    check(
+      'bills_grand_total_check',
+      sql`${t.roundOffPaise} between -49 and 50 and ${t.grandTotalPaise} = ${t.totalPaise} + ${t.roundOffPaise} and ${t.grandTotalPaise} % 100 = 0`,
+    ),
+  ],
+);
+
+export const billLines = pgTable(
+  'bill_lines',
+  {
+    id: id(),
+    businessId: ownBusinessId(),
+    billId: uuid('bill_id').notNull(),
+    lineNo: smallint('line_no').notNull(),
+    itemId: uuid('item_id').notNull(),
+    packId: uuid('pack_id'),
+    /** Copies at saving, so the printed bill never changes with the item. */
+    itemName: text('item_name').notNull(),
+    itemHindiName: text('item_hindi_name'),
+    /** A built-in unit's code or the owner's own unit's name: what one of the quantity is. */
+    unit: text('unit').notNull(),
+    hsn: text('hsn').notNull(),
+    rateBasisPoints: integer('rate_basis_points').notNull(),
+    priceIncludesTax: boolean('price_includes_tax').notNull(),
+    /** Of the pack, or of the stock unit. */
+    quantityThousandths: bigint('quantity_thousandths', { mode: 'number' }).notNull(),
+    /** Thousandths of the stock unit taken out; null for a service. */
+    stockQuantity: bigint('stock_quantity', { mode: 'number' }),
+    unitPricePaise: money('unit_price_paise').notNull(),
+    discount: jsonb('discount'),
+    amountPaise: money('amount_paise').notNull(),
+    itemDiscountPaise: money('item_discount_paise').notNull(),
+    grossPaise: money('gross_paise').notNull(),
+    subtotalPaise: money('subtotal_paise').notNull(),
+    billDiscountPaise: money('bill_discount_paise').notNull(),
+    taxableBeforeDiscountsPaise: money('taxable_before_discounts_paise').notNull(),
+    discountOffTaxablePaise: money('discount_off_taxable_paise').notNull(),
+    taxablePaise: money('taxable_paise').notNull(),
+    cgstPaise: money('cgst_paise').notNull(),
+    sgstPaise: money('sgst_paise').notNull(),
+    igstPaise: money('igst_paise').notNull(),
+    totalPaise: money('total_paise').notNull(),
+    /** Paise per stock unit at the sale (the branch's average cost): profit reads it. */
+    unitCost: money('unit_cost'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    unique('bill_lines_business_id_id_unique').on(t.businessId, t.id),
+    unique('bill_lines_line_unique').on(t.businessId, t.billId, t.lineNo),
+    foreignKey({
+      name: 'bill_lines_bill_fk',
+      columns: [t.businessId, t.billId],
+      foreignColumns: [bills.businessId, bills.id],
+    }),
+    foreignKey({
+      name: 'bill_lines_item_fk',
+      columns: [t.businessId, t.itemId],
+      foreignColumns: [items.businessId, items.id],
+    }),
+    index('bill_lines_item_idx').on(t.businessId, t.itemId),
+    check('bill_lines_line_no_check', sql`${t.lineNo} >= 1`),
+    check('bill_lines_quantity_check', sql`${t.quantityThousandths} > 0`),
+    check('bill_lines_stock_quantity_check', sql`${t.stockQuantity} > 0`),
+    check('bill_lines_rate_check', sql`${t.rateBasisPoints} between 0 and 10000`),
+    check(
+      'bill_lines_total_check',
+      sql`${t.totalPaise} = ${t.taxablePaise} + ${t.cgstPaise} + ${t.sgstPaise} + ${t.igstPaise}`,
+    ),
+  ],
+);
+
+export const billPayments = pgTable(
+  'bill_payments',
+  {
+    id: id(),
+    businessId: ownBusinessId(),
+    billId: uuid('bill_id').notNull(),
+    mode: text('mode').notNull(),
+    amountPaise: money('amount_paise').notNull(),
+    /** Cash only: what the customer handed over. */
+    tenderedPaise: money('tendered_paise'),
+    reference: text('reference'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    unique('bill_payments_business_id_id_unique').on(t.businessId, t.id),
+    foreignKey({
+      name: 'bill_payments_bill_fk',
+      columns: [t.businessId, t.billId],
+      foreignColumns: [bills.businessId, bills.id],
+    }),
+    index('bill_payments_bill_idx').on(t.businessId, t.billId),
+    check('bill_payments_mode_check', sql`${t.mode} in (${literals(PAYMENT_MODES)})`),
+    check('bill_payments_amount_check', sql`${t.amountPaise} > 0`),
+    check(
+      'bill_payments_tendered_check',
+      sql`${t.tenderedPaise} is null or (${t.mode} = 'cash' and ${t.tenderedPaise} >= ${t.amountPaise})`,
+    ),
+    check('bill_payments_reference_check', sql`char_length(${t.reference}) between 1 and 40`),
+  ],
+);
+
 // ---- Stock (P1.8, design `docs/plans/2026-11-20-p1.8-stock-ledger-design.md`; ADR 0007 rule 4) ----
 // Both tables are written only by moveStock (src/stock.ts), in the action's own transaction.
 
@@ -958,6 +1199,8 @@ export const stockMovements = pgTable(
     actorId: uuid('actor_id').notNull(),
     /** Idempotency (ADR 0007 rule 7): a retried request finds its first movement. */
     requestKey: uuid('request_key'),
+    /** The bill a sale belongs to (P1.14). */
+    billId: uuid('bill_id'),
     createdAt: createdAt(),
   },
   (t) => [
@@ -975,6 +1218,11 @@ export const stockMovements = pgTable(
       foreignColumns: [items.businessId, items.id],
     }),
     foreignKey({
+      name: 'stock_movements_bill_fk',
+      columns: [t.businessId, t.billId],
+      foreignColumns: [bills.businessId, bills.id],
+    }),
+    foreignKey({
       name: 'stock_movements_actor_fk',
       columns: [t.businessId, t.actorId],
       foreignColumns: [users.businessId, users.id],
@@ -983,6 +1231,11 @@ export const stockMovements = pgTable(
     index('stock_movements_item_idx').on(t.businessId, t.branchId, t.itemId, t.id),
     check('stock_movements_kind_check', sql`${t.kind} in (${literals(STOCK_MOVEMENT_KINDS)})`),
     check('stock_movements_quantity_check', sql`${t.quantity} <> 0`),
+    // Exactly the sales carry their bill, and a sale only takes stock out.
+    check(
+      'stock_movements_bill_check',
+      sql`(${t.kind} = 'sale') = (${t.billId} is not null) and (${t.kind} <> 'sale' or ${t.quantity} < 0)`,
+    ),
     check('stock_movements_unit_cost_check', sql`${t.unitCost} >= 0`),
     // Only adjustments carry a reason, and every adjustment has one (Module 01 #11).
     check(

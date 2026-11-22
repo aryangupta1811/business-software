@@ -634,7 +634,8 @@
       },
       "kinds": {
         "opening": "Opening stock",
-        "adjustment": "Adjustment"
+        "adjustment": "Adjustment",
+        "sale": "Sale"
       },
       "reasons": {
         "damaged": "Damaged",

@@ -634,7 +634,8 @@
       },
       "kinds": {
         "opening": "शुरुआती स्टॉक",
-        "adjustment": "सुधार"
+        "adjustment": "सुधार",
+        "sale": "बिक्री"
       },
       "reasons": {
         "damaged": "ख़राब",

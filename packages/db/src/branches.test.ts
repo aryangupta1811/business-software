@@ -74,11 +74,11 @@ describe('branches and staff_branches', () => {
   });
 
   describe('the branch code', () => {
-    it.each(['AND', 'T1', 'A1B2C3', '7'])('accepts %j', async (code) => {
+    it.each(['AND', 'T1', 'A1B2', '7'])('accepts %j', async (code) => {
       expect(await addBranch(a, code)).toBeTruthy();
     });
 
-    it.each(['', 'and', 'TOOLONG', 'A B', 'A-B', 'ÀB'])('refuses %j', async (code) => {
+    it.each(['', 'and', 'ABCDE', 'TOOLONG', 'A B', 'A-B', 'ÀB'])('refuses %j', async (code) => {
       await expect(addBranch(a, code)).rejects.toMatchObject(
         failsWith('23514', 'branches_code_check'),
       );

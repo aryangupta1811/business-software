@@ -129,6 +129,17 @@ export {
   type Searchable,
 } from './billing.js';
 export {
+  BILL_DOCUMENTS,
+  INVOICE_NUMBER_MAX_LENGTH,
+  INVOICE_PREFIX_PATTERN,
+  documentFor,
+  financialYear,
+  invoiceLabel,
+  invoiceNumber,
+  stockQuantity,
+  type BillDocument,
+} from './invoice.js';
+export {
   customerQuerySchema,
   customerSchema,
   customerUpdateSchema,

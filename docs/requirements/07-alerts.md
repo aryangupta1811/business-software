@@ -51,6 +51,7 @@
 16. **Low and out of stock** for one item at one branch are one alert that changes between the two, never two at once.
 17. **Items with no low-stock level** still get an out-of-stock alert when they reach 0.
 18. **On the billing page** the bell shows its count like everywhere else and opens only when clicked.
+19. **A dismissed low-stock alert shows again when the item runs out** (it got worse). The reverse doesn't: an alert dismissed at out of stock stays hidden when the item is back to low. A dismissal never makes anyone else's alert reappear.
 
 ## Open questions
 
@@ -61,3 +62,4 @@ None. To check in P2.8 (not owner decisions): the dashboard's temporary WhatsApp
 - 2026-10-29 — Draft created from the planning chat on claude.ai.
 - 2026-11-19 — Finalized in fast-track sitting 2 (`docs/plans/2026-11-18-sitting-2.md`, items 2–6): the owner took every recommendation. WhatsApp question closed as already answered; bills and statements go through the outbox with a document template (option a).
 - 2026-11-22 — P2.7 part 2 design answers: the owner took all 5 recommendations in `docs/plans/2026-11-22-p2.7-alerts-design.md` (section 9). Added #14–#18. #13's test alert type is replaced by low stock, which now has its data (P1.8). No decided point changed.
+- 2026-11-22 — Owner: a dismissed low-stock alert shows again when the item runs out (#19). No decided point changed.

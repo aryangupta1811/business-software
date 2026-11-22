@@ -2,6 +2,7 @@
 
 **Status:** approved by the owner 2026-11-17 ("the exact same output in fewer days, no drop in quality").
 **Runs:** Day 1 = Tuesday 2026-11-17 to Day 10 = Thursday 2026-11-26.
+**Updated 2026-11-22 (portfolio cut):** some decided features move to the backlog and the finish moves to **Day 14 = Sunday 2026-11-29**. Section 9 replaces the day-by-day plan in section 6 from Day 8 on.
 **Replaces:** the order in `docs/PROGRESS.md` (the 2026-11-10 demo-first order). The task texts in `PROGRESS.md` stay the source of detail for each task.
 
 ## 1. What stays the same
@@ -89,6 +90,8 @@ The 60–75 session estimate came from working one task at a time. The time save
 The open question "a thin AI slice early, or the full assistant in Phase 3?" goes away: the full assistant is built on Days 8–9.
 
 ## 6. Day by day
+
+**From Day 8 on, section 9 (the portfolio cut, 2026-11-22) replaces this plan.** Days 1–7 below are kept as written.
 
 Lanes are numbered, not named: a lane moves between areas as its work allows. "→" means one after the other in the same lane.
 
@@ -207,8 +210,35 @@ Stage 7 must come before P1.3 stores real data. So **the live server keeps runni
 
 If more than one day is lost, the finish moves to Day 11 or 12. The checks in section 3 never shrink to save time.
 
+## 9. The portfolio cut (owner, 2026-11-22)
+
+**Why.** After Day 7 (sessions 24–31) about 45% of the tasks were done at about two tasks a day, not the four a day section 6 assumed: tasks came out bigger than sized (billing took seven PRs), the usage limit cut the lanes, and sitting 3 hadn't happened, which blocked six tasks. Finishing everything would end around 2026-12-05 to 12-08. The owner chose to keep the date close and the quality bar unchanged, and to move the features that matter least for a portfolio to the backlog, with the right to bring any of them back later.
+
+**What moves to the backlog** (`docs/requirements/ideas-backlog.md`, "Deferred from v1", which says how to bring each one back): P1.9 Excel import, P1.10 business-type stock features (batches, expiry, variants, IMEI, labels), P1.11 transfers and stock count, quotations (P1.17 keeps the GST export), P2.2 supplier ledger, P2.6 entry-log viewer, P2.8 WhatsApp Cloud API, the chosen ideas (D6), and stage 11 (already a stretch). Their requirements stay DECIDED; each module says what v1 ships in its "v1 delivery" section. Their task texts stay in `PROGRESS.md`, marked "Deferred".
+
+**Two owner decisions that came with the cut:**
+- WhatsApp in v1 is click-to-chat links the owner sends (`02` #27, `03` #16, ADR 0049). The automatic daily summary waits for P2.8; alerts stay in the bell.
+- Feature switches whose features aren't built show "Coming later"; a business's choices are kept (`00` #62).
+
+**What stays the same:** the definition of done (section 3), plan before code, tests for every business rule, reviews, one PR per task.
+
+**Days 8 to 14** (up to four lanes; owner in the evening):
+
+| Day | Date | Lane 1 | Lane 2 | Lane 3 | Lane 4 | Owner, evening |
+| --- | --- | --- | --- | --- | --- | --- |
+| 8 | Mon 11-23 | P2.3 PR 2: staff and attendance screens | P1.18 Udhaar ledger | P1.15 Printing | Fixes: blank screen while the server is down, the real next invoice number in Settings, "Coming later" switches (`00` #62); then the rest of the Chrome check (two counters, live permission change, Branches, Staff) | **Sitting 3:** 04, 08, 09, D5 (D6 now picks backlog ideas for after v1) |
+| 9 | Tue 11-24 | P2.4 Salary & advances | P1.19 Udhaar views (statement PDF, click-to-chat reminders) | P1.16 Returns & credit notes | Finalize 04, 08, 09 from sitting 3 | Walkthrough |
+| 10 | Wed 11-25 | P2.5 Salary slips & payments | P1.17 GST summary export | P2.1 Suppliers & purchase entries (without batch, expiry, IMEI) | Stage 9 observability | Phase 1 journal |
+| 11 | Thu 11-26 | P2.9 Owner dashboard | P2.10 Staff dashboard & branches view | P1.20 Demo data v1 → P2.11 v2 | Stage 10 security review | Phase 2 journal |
+| 12 | Fri 11-27 | P3.1 Demo data v3 → P3.2 AI tools | P3.4 Eval set | Whole-project deep scan | — | Walkthrough |
+| 13 | Sat 11-28 | P3.3 Chat → P3.5 Guardrails | Scan fixes | Live run: start the server (owner's OK and cost), deploy, migrations 0013 on on RDS, end-to-end check | — | Final walkthrough |
+| 14 | Sun 11-29 | Buffer: slips, portfolio polish, Phase 3 journal | | | | Final review |
+
+**If a day slips:** Day 14 absorbs one day. Beyond that the finish moves, never the checks; the owner decides whether another item moves to the backlog.
+
 ## Change log
 
+- 2026-11-22 (session 31): portfolio cut (section 9), chosen by the owner from Claude's options (A full scope to about 12-05, B cut to 11-29). Finish moves to 2026-11-29. `CLAUDE.md` rule 9, `docs/devops/git-workflow.md` and the `/start-session` skill updated to the new date.
 - 2026-11-17 (Day 1, evening): sitting 1 held early and finished. Module 01's four open questions answered (#15–18); Modules 02 and 03 finalized; D1 stay free; D3 Sonnet 5.5 with a $15 cap.
 - 2026-11-17 (Day 1, later): D2 corrected. WhatsApp real-or-mock was already answered on 2026-10-29 (ADR 0010), so it is only a lead time now; D3 notes the provider is already the Claude API (ADR 0015).
 - 2026-11-17: written at the owner's request ("complete the project in 7 to 10 days, the exact same output, no drop in quality"). Rules 5 and 9 in `CLAUDE.md`, `docs/devops/git-workflow.md` and the `/start-session` skill updated to match.

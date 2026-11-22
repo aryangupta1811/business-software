@@ -41,6 +41,11 @@
 11. **Readable names:** every action has a label in English, Hindi and Hinglish; times show in IST.
 12. **Export:** the filtered log downloads as Excel, as part of "the owner can export all their data" (NFR 1).
 
+## v1 delivery (the owner's portfolio cut, 2026-11-22 (`docs/plans/2026-11-17-fast-track.md`, section 9))
+
+- **Recording (#1–#6) ships in v1 and already runs:** every action is logged from day one, so nothing is lost while the screens wait.
+- **The flags (#7, #8) and the viewer (#9–#12)** wait in `ideas-backlog.md` ("Deferred from v1") as P2.6. When P2.6 is built it shows the whole history from the first day. Module 07's "suspicious activity" alert and the dashboard's flags (#8) come with it.
+
 ## Open questions
 
 None. Moved to `ideas-backlog.md`: a fourth flag rule, "price lowered and raised back the same day".
@@ -51,3 +56,4 @@ None. Moved to `ideas-backlog.md`: a fourth flag rule, "price lowered and raised
 - 2026-10-29 — Kickoff session: noted that `00` #20 already answers the owner-logging question.
 - 2026-11-19 — Finalized in fast-track sitting 2 (`docs/plans/2026-11-18-sitting-2.md`, items 1 and 7–10): the owner took every recommendation, with flag rules 1–3 only (rule 4 to the backlog), and answered D4 "yes": only the database sets an entry's ID and time.
 - 2026-11-20 — Owner, P1.8 design (question 5, as recommended): #7's "value at purchase price" for a stock write-down is the branch's average cost of that stock (Module 01 #4), falling back to the item's purchase price when the item has no stock history. No numbered point changed.
+- 2026-11-22 — Portfolio cut (owner): the viewer and flags (P2.6) deferred to the backlog; recording continues. No decided point changed.

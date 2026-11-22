@@ -42,3 +42,7 @@ Owner alerts go out on WhatsApp (Module 00 #26, Module 07). Some work shouldn't 
 ## Interview note
 
 I used the outbox pattern: the WhatsApp alert is written to the database in the same transaction as the business action, and a worker sends it with retries, so a crash can't lose it and a rollback can't send it. The queue is pg-boss on PostgreSQL, so there's no Redis to run and the jobs are covered by the same backups. It's a real WhatsApp Cloud API integration using Meta's free test number, with a log-only sender for local development.
+
+## Dated note (2026-11-22)
+
+The Cloud API sender, the outbox table and the daily summary (P2.8) moved to the backlog in the owner's portfolio cut. v1 shares on WhatsApp with click-to-chat links the owner sends (ADR 0049). This ADR still describes how P2.8 is built when it comes back; pg-boss itself is built and running (P2.7 part 1).

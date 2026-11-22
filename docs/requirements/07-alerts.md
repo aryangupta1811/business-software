@@ -53,6 +53,11 @@
 18. **On the billing page** the bell shows its count like everywhere else and opens only when clicked.
 19. **A dismissed low-stock alert shows again when the item runs out** (it got worse). The reverse doesn't: an alert dismissed at out of stock stays hidden when the item is back to low. A dismissal never makes anyone else's alert reappear.
 
+## v1 delivery (the owner's portfolio cut, 2026-11-22 (`docs/plans/2026-11-17-fast-track.md`, section 9))
+
+- **In v1:** the bell, the panel and Settings → Alerts (built in P2.7) with low stock and out of stock, plus overdue udhaar (with P1.18–P1.19).
+- **Waiting in `ideas-backlog.md` ("Deferred from v1"):** everything WhatsApp (#8–#12: the daily summary, quiet hours, templates, the outbox; P2.8); "expiring soon" (with P1.10); "suspicious activity" (with the entry-log flags, P2.6); "supplier payments due" (with the supplier ledger, P2.2). The summary's lines already built (P2.3's absent staff, `summaryLine`) wait for P2.8.
+
 ## Open questions
 
 None. To check in P2.8 (not owner decisions): the dashboard's temporary WhatsApp token likely expires after about 24 hours, so the worker needs a long-lived system user token; a template variable probably can't hold line breaks and a body is capped at 1,024 characters.
@@ -63,3 +68,4 @@ None. To check in P2.8 (not owner decisions): the dashboard's temporary WhatsApp
 - 2026-11-19 — Finalized in fast-track sitting 2 (`docs/plans/2026-11-18-sitting-2.md`, items 2–6): the owner took every recommendation. WhatsApp question closed as already answered; bills and statements go through the outbox with a document template (option a).
 - 2026-11-22 — P2.7 part 2 design answers: the owner took all 5 recommendations in `docs/plans/2026-11-22-p2.7-alerts-design.md` (section 9). Added #14–#18. #13's test alert type is replaced by low stock, which now has its data (P1.8). No decided point changed.
 - 2026-11-22 — Owner: a dismissed low-stock alert shows again when the item runs out (#19). No decided point changed.
+- 2026-11-22 — Portfolio cut (owner): WhatsApp (#8–12), expiring soon, suspicious activity and supplier dues deferred with their tasks. No decided point changed.

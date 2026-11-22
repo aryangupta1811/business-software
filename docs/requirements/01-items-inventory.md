@@ -36,6 +36,14 @@
 17. **Excel import errors:** nothing is saved until the owner confirms. A preview lists every error by row. The owner either fixes the file, or imports only the good rows and gets the bad rows back as an Excel file to fix.
 18. **Inter-state branch transfers:** between branches with the same GSTIN, a transfer is a stock movement with a delivery challan. Between branches with different GSTINs (different states), the app makes an IGST tax invoice from the sending branch and a matching purchase entry at the receiving branch.
 
+## v1 delivery (the owner's portfolio cut, 2026-11-22 (`docs/plans/2026-11-17-fast-track.md`, section 9))
+
+The decided points stay decided; these wait in `ideas-backlog.md` ("Deferred from v1") and come back as whole tasks:
+
+- **P1.10 (business-type stock features):** #5 batch and expiry, #6 variants, #7 serial / IMEI with warranty, #15 batch-wise medical costing, and printing own barcode labels (#8, second half). Until then every business type uses average cost (#4), and the feature switches show "Coming later" (`00` #62).
+- **P1.9:** #17 Excel import of opening stock. Opening stock is entered per item (P1.8) until then.
+- **P1.11:** #18 branch transfers and the physical stock count. Counting mismatches are corrected with stock adjustments (#11) until then.
+
 ## Open questions
 
 None.
@@ -47,3 +55,4 @@ None.
 - 2026-11-17 — Fast-track sitting 1: the owner answered all four open questions with Claude's recommendations (#15–18). #15 changes how #4 applies to medical shops: batch actually sold, not oldest stock first.
 - 2026-11-19 — Fast-track sitting 2 (P1.7 design Q4): the owner confirmed one catalogue and one price list per business, with stock and the low-stock level per branch. The summary line was reworded to say so; it could be read as prices per branch. No numbered point changed.
 - 2026-11-20 — Owner, P1.8 design (`docs/plans/2026-11-20-p1.8-stock-ledger-design.md`, section 12, all as recommended). No numbered point changed; details filled in: #12's warn/block is one switch for the whole business; an adjustment (#11) never takes stock below zero; #11's reasons are Damaged, Expired, Theft or lost, Own use and Other (with a note), all reducing stock, plus Count mismatch, the only one that can add stock; opening stock (#9) can be typed only while the item has no stock movements at that branch; #4's average cost is kept per item per branch; quantities are whole for piece, pair, dozen, box, pack and bag and allow 3 decimals for kg, g, litre, ml, metre and foot; an item with stock can be archived and keeps its stock and history.
+- 2026-11-22 — Portfolio cut (owner): #5–7, #15, labels (#8), #17 and #18 deferred to the backlog with their tasks (P1.10, P1.9, P1.11). No decided point changed.

@@ -46,6 +46,7 @@ In progress. The detailed diary is `INTERVIEW_LOG.md`.
   - **Email (#42):** the api in its container can't reach the server's role, so a mail-only role is assumed on the host and handed to the api read-only. Applied ($0); the sender is verified.
   - **P1.13 design (#40) and the sitting 3 sheet (#41)** merged; billing code waits for the owner's 12 answers.
   - **EC2 capacity:** keep `t4g.small`, move to `ap-south-1b` (ADR 0042). 1,610 tests.
+- **2026-11-22 (session 30, fast track Day 7: PRs #68, #69, #70):** the alerts bell and Settings → Alerts (a dismissed low-stock alert shows again when the item runs out, by storing the type the person dismissed); the branch screens, which finish P1.6's code (ADR 0045); and P1.14's API: `POST /api/bills` re-prices and re-checks every rule in one transaction, takes a no-gap invoice number from a locked counter row, stores the bill append-only (ADR 0047) and takes the stock out. The decided invoice format broke CGST Rule 46's 16-character limit; the owner chose `label/26-27/42`. Tests written after the code were mutation-checked by switching rules off.
 
 ## Stack choices vs alternatives
 

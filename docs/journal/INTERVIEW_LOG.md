@@ -36,6 +36,7 @@ Update this as the project grows.
 | Max time to recover (RTO) | 1 hour | Restore runbook + monthly drill |
 | Scanned item appears on screen | < 200 ms | NFR 5 |
 | Bill save | < 1 second | NFR 5 |
+| Invoice number | at most 16 characters (CGST Rule 46(b)): `ABC/26-27/42`, no gaps, one series per branch per financial year | `00` #61, ADR 0047 |
 | Cloud budget | ₹0: AWS Free plan, $100 credits now + up to $100 from 5 activities, until 2027-05-17; Region Mumbai `ap-south-1` (Sydney 2026-11-12 to 11-17 in the first account) | ADRs 0011, 0033 |
 | Hosting cost (Mumbai) | $0.0372 per running hour + $4.44 a month for disks: ≈ $6.70 a month at ~60 h, ≈ $31.60 at 24/7 (Sydney was $0.0512 + $4.73) | ADRs 0011, 0032, 0033 |
 | Latency, India → the server | Mumbai ~55–80 ms per round trip (Sydney was ~270–300 ms, the reason to move) | ADRs 0032, 0033 |
@@ -43,7 +44,7 @@ Update this as the project grows.
 | Largest exact amount in JavaScript | ≈ ₹90 lakh crore in paise (2^53) | ADR 0008 |
 | Business types in v1 | 5 | Module 00 |
 | Modules | 10 (00–09) | `docs/requirements/` |
-| ADRs | 46 (16 at kickoff) | `docs/decisions/` |
+| ADRs | 47 (16 at kickoff) | `docs/decisions/` |
 | Secrets found before going public | 0, in 5 commits (gitleaks, full history) | ADR 0017 |
 | Automated tests | 1,610 (2026-11-21, after Day 4): 876 shared, 208 db (roles, tenancy, entry log, guard, backups and restore, items, sessions, auth tokens, stock ledger and two-counter tests), 255 api (signup, login, resets, sessions, settings, items, stock, routes), 271 web (signup, login, resets, lock screen, items page, settings, three languages, contrast, stock screens); plus 41 deploy-script checks | `pnpm test` |
 | Interface languages | 3: English, Hindi, Hinglish (`en`, `hi`, `hi-Latn`) | Module 00 #25, ADR 0023 |
@@ -225,6 +226,10 @@ Short answers; the Log entry has the full story.
   A: Compared the claim AWS checks with what GitHub sends. The live trust policy wanted `sub = repo:owner/name:environment:demo`; GitHub's subject setting showed the repo uses the immutable form with owner and repository IDs. One Terraform variable, one IAM update, still an exact match. → ADR 0012 note (2026-11-21)
 - **Q: How do you know your backups work?**
   A: A drill restores the newest dump into a throwaway PostgreSQL on the server, as an admin with only the RDS master's rights, and compares every table's row count with the counts saved at backup time. First run 2026-11-21: 18 tables, all matching. → `docs/devops/backup-restore.md`
+- **Q: How do you number invoices with no gaps when two counters save at once?**
+  A: One counter row per branch per financial year, incremented with an upsert inside the bill's own transaction and taken after every check that can refuse the bill. The row lock makes the second counter wait a few milliseconds; a failed bill rolls its increment back. A sequence would be faster but leaves gaps on rollback. Tested with 20 saves at once (numbers 1–20) and a rollback.
+- **Q: The network drops after the server saved a bill. What stops the cashier making a second one?**
+  A: The bill carries a key made when it was started; the database allows one bill per key. A retry finds the saved bill and gets the same answer (number, change, warnings). If the retry races the first save, its transaction fails and the service answers with the bill that won. The same key with a different bill is refused (`422 key_reused`).
 
 ---
 
@@ -234,6 +239,7 @@ Terms I learned on this project, in one line each.
 
 | Term | Meaning |
 | --- | --- |
+| Gapless numbering | Numbers with no holes even when saves fail: a locked counter row in the same transaction, instead of a database sequence (which never gives a number back) |
 | ACID | Transactions are Atomic (all or nothing), Consistent, Isolated (don't see each other's half-work), Durable (survive crashes) |
 | ADR | Architecture Decision Record: a short file explaining one technical choice and why |
 | Argon2id | A deliberately slow password-hashing algorithm, recommended by OWASP |
@@ -2110,3 +2116,9 @@ Entry format:
 - **Why / what I learned:** Windows paths are case-insensitive but string comparisons aren't, so tools that compare paths as text break on drive-letter case. Knowing what the tool does underneath (a git worktree) meant I could do the step myself.
 - **Say it in an interview:** "When a tool's automation failed on a Windows path-case bug, I did the same thing it does by hand, a git worktree per parallel task, and carried on."
 - **Follow-ups to expect:** what is a worktree? (a second working folder on the same repository, each on its own branch, sharing one `.git`).
+
+### 2026-11-22 — Three test failures that were the test's fault, not the code's `#testing` `#backend` `#gotcha`
+- **What happened:** writing P1.14's API tests, three failures pointed at the wrong place. (1) From the sixth business a test signed up, item creation answered 500: signup is rate-limited per IP, the sixth signup was refused, and the test carried on with an empty business ID. Each signup now sends its own `x-forwarded-for` (the app trusts one proxy, as behind Caddy), and the helper asserts `201`, so a refused signup fails at the signup. (2) An item with stock unit `pcs` was refused: the built-in unit is `piece`. (3) The retry test asked for a quote under a key that was already saved, so it got the saved bill instead of a price; it now quotes under a fresh key and swaps in the real one. Also learned: with Nest's `@Res({ passthrough: true })` the adapter overrides any status code you set, so a retry answers `201` like stock retries do.
+- **Why / what I learned:** a helper that ignores the status of its setup request turns a clear "429" into a confusing "500" three steps later. Assert every setup step's status. Because these tests were written after the code, I also switched off two rules (Rule 46 and the approval check) one at a time to see their tests fail, then put them back.
+- **Say it in an interview:** "When tests were written after the code, I mutation-checked them: I broke each business rule on purpose and confirmed a test went red. And test helpers assert their own setup, so a rate limit shows up as a rate limit."
+- **Follow-ups to expect:** why does the app trust the forwarded header at all? (behind Caddy every request comes from the proxy's IP; `trust proxy 1` reads the client IP from the one hop it trusts, and nothing further back).

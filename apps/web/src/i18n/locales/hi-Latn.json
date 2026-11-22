@@ -681,7 +681,8 @@
         "failed": "Save nahi ho saka. Connection check karein aur phir koshish karein."
       },
       "archiveLeft": "Bacha stock: {{list}}. Stock aur uski history saamaan ke saath rehte hain.",
-      "archiveUnknown": "Bacha stock jaancha nahi ja saka. Jo bhi hai, saamaan ke saath rehta hai."
+      "archiveUnknown": "Bacha stock jaancha nahi ja saka. Jo bhi hai, saamaan ke saath rehta hai.",
+      "elsewhere": "Stock is counter ki branch mein badla jaata hai. Badlav karne ke liye dikhai ja rahi branch usi par kar lein."
     }
   },
   "password": {
@@ -709,7 +710,12 @@
     "failed": "Login nahi ho saka. Connection check karein aur phir koshish karein.",
     "newBusiness": "Naye hain?",
     "signUp": "Account banayein",
-    "forgot": "Password bhool gaye?"
+    "forgot": "Password bhool gaye?",
+    "wrongBranch": "Yeh login {{branch}} mein kaam nahi kar sakta. Owner se ijaazat dilwayein.",
+    "chooseBranch": {
+      "lead": "Yeh naya computer hai. Yeh kis branch mein hai? Yahan jo bhi hoga, usi branch mein darj hoga. Baad mein ise Settings mein badal sakte hain.",
+      "label": "Yeh computer yahan hai"
+    }
   },
   "lock": {
     "title": "Counter lock hai",
@@ -827,7 +833,14 @@
       "forgetThis": "Isse aap yahan logout ho jaayenge, aur jab tak aap is computer par phir login nahi karte, staff yahan login nahi kar sakega.",
       "forgetOther": "Wahan jo bhi login hai, logout ho jaayega, aur jab tak aap us par phir login nahi karte, staff wahan login nahi kar sakega.",
       "confirmForget": "Computer bhool jaayein",
-      "loadFailed": "Computers ki list nahi khul saki."
+      "loadFailed": "Computers ki list nahi khul saki.",
+      "move": "Bhejein",
+      "moveNamed": "{{name}} ko doosri branch mein bhejein",
+      "moveTitle": "{{name}} ko bhejein",
+      "moveBody": "Is computer par bane bill aur stock ke badlav ab aapki chuni branch ke honge. Is par logged in har vyakti logout ho jaayega.",
+      "moveBodyThis": "Isse aap yahan bhi logout ho jaayenge, aur nayi branch mein dobara login karenge.",
+      "moveTarget": "Is branch mein bhejein",
+      "moveConfirm": "Computer bhejein"
     }
   },
   "billing": {
@@ -1171,6 +1184,60 @@
     "errors": {
       "invalid_permissions": "Yeh switch aapas mein mel nahi khaate. Page phir se kholkar koshish karein.",
       "not_found": "Yeh login ab nahi hai. List par wapas jaayein."
+    }
+  },
+  "branches": {
+    "title": "Branch",
+    "lead": "Is business ki har dukaan, apne counter, stock aur staff ke saath. Branch kabhi mitai nahi jaati: use archive karein, uski history bani rehti hai.",
+    "single": "Is business ki ek hi dukaan hai. Doosri dukaan kholein to branch jodein; tab tak kuch aur nahi badalta.",
+    "add": "Branch jodein",
+    "edit": "Badlein",
+    "editNamed": "{{name}} badlein",
+    "archiveNamed": "{{name}} archive karein",
+    "restore": "Wapas layein",
+    "restoreNamed": "{{name}} wapas layein",
+    "showArchived": "Archive ki hui dikhayein",
+    "headOffice": "Head office",
+    "archivedBadge": "Archive",
+    "counts": "Computer: {{computers}} · Staff: {{staff}}",
+    "added": "{{name}} jud gayi.",
+    "saved": "{{name}} save ho gayi.",
+    "archived": "{{name}} archive ho gayi.",
+    "restored": "{{name}} wapas aa gayi.",
+    "loadFailed": "Branch load nahi ho sakin.",
+    "form": {
+      "addTitle": "Branch jodein",
+      "editTitle": "Branch badlein",
+      "name": "Branch ka naam",
+      "code": "Chhota code",
+      "codeHint": "4 tak bade akshar ya ank. Yeh bill number mein jaata hai, jaise AND (AND/26-27/42).",
+      "codeInvalid": "1 se 4 bade akshar ya ank likhein",
+      "codeTaken": "Yeh code kisi aur branch mein hai",
+      "gstinHint": "Doosre rajya ki branch ka apna GSTIN chahiye.",
+      "add": "Branch jodein",
+      "save": "Save karein"
+    },
+    "archive": {
+      "action": "Archive",
+      "title": "{{name}} archive karein?",
+      "body": "Iske computer bhula diye jaate hain aur wahan logged in har vyakti logout ho jaata hai. Iska stock aur history bani rehti hai, aur aap ise baad mein wapas la sakte hain.",
+      "confirm": "Branch archive karein",
+      "inUse_one": "{{count}} staff login ki yeh home branch hai. Pehle use doosri branch mein bhejein.",
+      "inUse_other": "{{count}} staff login ki yeh home branch hai. Pehle unhein doosri branch mein bhejein.",
+      "headOffice": "Head office archive nahi ho sakta."
+    },
+    "picker": {
+      "label": "Dikhai ja rahi branch",
+      "thisCounter": "{{name}} (yeh counter)",
+      "all": "Saari branch"
+    },
+    "access": {
+      "title": "Yahan bhi kaam kar sakte hain",
+      "lead": "Home branch ke alawa woh branch, jahan yeh vyakti login kar sakta hai. Woh sirf usi branch ko dekhta hai jismein logged in hai.",
+      "confirmTitle": "{{name}} kahan kaam kar sakte hain, yeh badlein",
+      "confirmBody": "Isse tay hota hai ki yeh login kin counters par chalega, isliye aapka password chahiye.",
+      "save": "Branch save karein",
+      "saved": "Save ho gaya"
     }
   },
   "alerts": {

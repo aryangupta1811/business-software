@@ -681,7 +681,8 @@
         "failed": "Couldn't save. Check the connection and try again."
       },
       "archiveLeft": "Stock left: {{list}}. The stock and its history stay with the item.",
-      "archiveUnknown": "The stock left couldn't be checked. Whatever there is stays with the item."
+      "archiveUnknown": "The stock left couldn't be checked. Whatever there is stays with the item.",
+      "elsewhere": "Stock is changed at this counter's branch. Switch the branch shown to it to make a change."
     }
   },
   "password": {
@@ -709,7 +710,12 @@
     "failed": "Couldn't log in. Check the connection and try again.",
     "newBusiness": "New here?",
     "signUp": "Create an account",
-    "forgot": "Forgot password?"
+    "forgot": "Forgot password?",
+    "wrongBranch": "This login can't work at {{branch}}. Ask the owner to allow it.",
+    "chooseBranch": {
+      "lead": "This is a new computer. Which branch is it in? Everything done here is recorded at that branch. You can move it later in Settings.",
+      "label": "This computer is in"
+    }
   },
   "lock": {
     "title": "Counter locked",
@@ -827,7 +833,14 @@
       "forgetThis": "This logs you out here, and staff can't log in on this computer until you log in on it again.",
       "forgetOther": "Anyone logged in there is logged out, and staff can't log in there until you log in on it again.",
       "confirmForget": "Forget computer",
-      "loadFailed": "Couldn't load the computers."
+      "loadFailed": "Couldn't load the computers.",
+      "move": "Move",
+      "moveNamed": "Move {{name}} to another branch",
+      "moveTitle": "Move {{name}}",
+      "moveBody": "Bills and stock changes made on this computer will belong to the branch you pick. Anyone logged in on it is logged out.",
+      "moveBodyThis": "This logs you out here too, and you log in again at the new branch.",
+      "moveTarget": "Move to",
+      "moveConfirm": "Move computer"
     }
   },
   "billing": {
@@ -1171,6 +1184,60 @@
     "errors": {
       "invalid_permissions": "Those switches don't fit together. Reload the page and try again.",
       "not_found": "This login no longer exists. Go back to the list."
+    }
+  },
+  "branches": {
+    "title": "Branches",
+    "lead": "Each shop of this business, with its own counters, stock and staff. A branch is never deleted: archive it and its history stays.",
+    "single": "This business has one shop. Add a branch when you open another; nothing else changes until then.",
+    "add": "Add a branch",
+    "edit": "Edit",
+    "editNamed": "Edit {{name}}",
+    "archiveNamed": "Archive {{name}}",
+    "restore": "Bring back",
+    "restoreNamed": "Bring back {{name}}",
+    "showArchived": "Show archived",
+    "headOffice": "Head office",
+    "archivedBadge": "Archived",
+    "counts": "Computers: {{computers}} · Staff: {{staff}}",
+    "added": "{{name}} added.",
+    "saved": "{{name}} saved.",
+    "archived": "{{name}} archived.",
+    "restored": "{{name}} is back.",
+    "loadFailed": "Couldn't load the branches.",
+    "form": {
+      "addTitle": "Add a branch",
+      "editTitle": "Edit branch",
+      "name": "Branch name",
+      "code": "Short code",
+      "codeHint": "Up to 4 capital letters or digits. It goes into invoice numbers, like AND (AND/26-27/42).",
+      "codeInvalid": "Use 1 to 4 capital letters or digits",
+      "codeTaken": "Another branch already uses this code",
+      "gstinHint": "A branch in another state needs its own GSTIN.",
+      "add": "Add branch",
+      "save": "Save"
+    },
+    "archive": {
+      "action": "Archive",
+      "title": "Archive {{name}}?",
+      "body": "Its computers are forgotten and anyone logged in there is logged out. Its stock and history stay, and you can bring it back later.",
+      "confirm": "Archive branch",
+      "inUse_one": "{{count}} staff login has this as its home branch. Move them to another branch first.",
+      "inUse_other": "{{count}} staff logins have this as their home branch. Move them to another branch first.",
+      "headOffice": "The head office can’t be archived."
+    },
+    "picker": {
+      "label": "Branch shown",
+      "thisCounter": "{{name}} (this counter)",
+      "all": "All branches"
+    },
+    "access": {
+      "title": "Can also work at",
+      "lead": "The branches, besides the home branch, where this person may log in. They only ever see the branch they are logged in at.",
+      "confirmTitle": "Change where {{name}} can work",
+      "confirmBody": "This decides which counters this login works on, so it needs your password.",
+      "save": "Save branches",
+      "saved": "Saved"
     }
   },
   "alerts": {

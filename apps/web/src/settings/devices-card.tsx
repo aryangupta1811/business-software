@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import {
   deviceNameSchema,
   ownerPasswordSchema,
+  type BranchView,
   type DeviceNameInput,
   type DeviceView,
   type OwnerPasswordInput,
@@ -13,14 +14,18 @@ import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { DEVICES_KEY, forgetDevice, listDevices, renameDevice } from '../api/account';
+import { BRANCHES_KEY, liveBranches, moveDevice, useBranches } from '../api/branches';
 import { ApiError } from '../api/client';
 import { forgetSession } from '../api/session';
+import { OwnerPasswordDialog } from '../components/owner-password-dialog';
 import { PasswordInput } from '../components/password-input';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Field } from '../components/ui/field';
 import { Input } from '../components/ui/input';
+import { Select } from '../components/ui/select';
 import { useFieldError } from '../lib/field-error';
+import { formText } from '../lib/form-data';
 import { useRetryTime } from '../lib/retry-time';
 import { AccountCard } from './account-card';
 import { failureKey } from './failure-key';
@@ -32,6 +37,8 @@ import { failureKey } from './failure-key';
 export function DevicesCard() {
   const { t } = useTranslation();
   const devices = useQuery({ queryKey: DEVICES_KEY, queryFn: listDevices, retry: false });
+  // A computer can be moved only when there is another branch to move it to (P1.6).
+  const branches = liveBranches(useBranches().data ?? []);
 
   return (
     <AccountCard title={t('account.devices.title')} lead={t('account.devices.lead')}>
@@ -47,7 +54,7 @@ export function DevicesCard() {
       ) : (
         <ul className="flex flex-col divide-y divide-border">
           {devices.data.map((device) => (
-            <DeviceRow key={device.id} device={device} />
+            <DeviceRow key={device.id} device={device} branches={branches} />
           ))}
         </ul>
       )}
@@ -57,9 +64,10 @@ export function DevicesCard() {
 
 type Mode = 'view' | 'rename' | 'forget';
 
-function DeviceRow({ device }: { device: DeviceView }) {
+function DeviceRow({ device, branches }: { device: DeviceView; branches: readonly BranchView[] }) {
   const { t, i18n } = useTranslation();
   const [mode, setMode] = useState<Mode>('view');
+  const [moving, setMoving] = useState(false);
   // The button that opened a form disappears while it is open, so focus would fall to the
   // page: each form takes focus when it opens, and closing it puts focus back on its button.
   const renameButton = useRef<HTMLButtonElement>(null);
@@ -109,6 +117,18 @@ function DeviceRow({ device }: { device: DeviceView }) {
             >
               {t('account.devices.rename')}
             </Button>
+            {branches.length > 1 && (
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-label={t('account.devices.moveNamed', { name })}
+                onClick={() => {
+                  setMoving(true);
+                }}
+              >
+                {t('account.devices.move')}
+              </Button>
+            )}
             <Button
               ref={forgetButton}
               size="sm"
@@ -123,9 +143,85 @@ function DeviceRow({ device }: { device: DeviceView }) {
           </div>
         )}
       </div>
+      <MoveDialog
+        open={moving}
+        device={device}
+        branches={branches}
+        onClose={() => {
+          setMoving(false);
+        }}
+      />
       {mode === 'rename' && <RenameForm device={device} onDone={done} />}
       {mode === 'forget' && <ForgetForm device={device} onCancel={done} />}
     </li>
+  );
+}
+
+/**
+ * Moves a computer to another branch (P1.6 design §8, #56): it decides where bills and stock go,
+ * so it asks for the owner's password, and everyone logged in on it is logged out.
+ */
+function MoveDialog({
+  open,
+  device,
+  branches,
+  onClose,
+}: {
+  open: boolean;
+  device: DeviceView;
+  branches: readonly BranchView[];
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const errorText = useFieldError();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const name = device.name ?? t('account.devices.unnamed');
+  const targets = branches.filter((branch) => branch.id !== device.branchId);
+  return (
+    <OwnerPasswordDialog
+      open={open}
+      title={t('account.devices.moveTitle', { name })}
+      confirm={t('account.devices.moveConfirm')}
+      autoFocusOwner={false}
+      onSubmit={async (ownerPassword, form) => {
+        const moved = await moveDevice(device.id, formText(form, 'branchId'), ownerPassword);
+        void queryClient.invalidateQueries({ queryKey: BRANCHES_KEY });
+        if (device.thisComputer) {
+          // The server ended this computer's sessions, ours too: back to the login page.
+          forgetSession(queryClient);
+          await navigate({ to: '/login' });
+          return;
+        }
+        queryClient.setQueryData<DeviceView[]>(DEVICES_KEY, (list) =>
+          list?.map((row) => (row.id === moved.id ? moved : row)),
+        );
+        onClose();
+      }}
+      onClose={onClose}
+    >
+      {(fieldErrors) => (
+        <>
+          <p className="text-muted">
+            {t(device.thisComputer ? 'account.devices.moveBodyThis' : 'account.devices.moveBody')}
+          </p>
+          <Field
+            label={t('account.devices.moveTarget')}
+            error={errorText('branchId', fieldErrors.branchId)}
+          >
+            {(props) => (
+              <Select {...props} name="branchId" defaultValue={targets[0]?.id}>
+                {targets.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+        </>
+      )}
+    </OwnerPasswordDialog>
   );
 }
 

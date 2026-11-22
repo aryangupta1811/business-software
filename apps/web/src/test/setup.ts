@@ -34,5 +34,6 @@ afterEach(async () => {
   cleanup();
   await changeLanguage('en');
   localStorage.clear();
+  sessionStorage.clear();
   document.documentElement.classList.remove('dark');
 });

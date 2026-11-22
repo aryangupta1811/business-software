@@ -1,4 +1,4 @@
-import type { SettingsView } from '@business-software/shared';
+import type { BranchView, SettingsView } from '@business-software/shared';
 import { createMemoryHistory } from '@tanstack/react-router';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -35,6 +35,22 @@ const VIEW: SettingsView = {
   alerts: { types: ['low_stock', 'out_of_stock'] },
 };
 
+const HEAD_OFFICE: BranchView = {
+  id: OWNER_SESSION.branch.id,
+  code: 'HO',
+  name: 'Sharma Medical',
+  address: null,
+  pinCode: null,
+  stateCode: '07',
+  gstin: null,
+  drugLicence: null,
+  fssai: null,
+  headOffice: true,
+  archived: false,
+  computers: 1,
+  staff: 0,
+};
+
 /**
  * The owner is logged in; GET /api/settings answers `load`, every PUT the view it was sent
  * merged in.
@@ -44,6 +60,7 @@ function stubApi(load: { status: number; body: unknown }) {
     if (url === '/api/session') return Promise.resolve(Response.json(OWNER_SESSION));
     if (url === '/api/settings') return Promise.resolve(Response.json(load.body, load));
     if (url === '/api/devices') return Promise.resolve(Response.json([]));
+    if (url.startsWith('/api/branches')) return Promise.resolve(Response.json([HEAD_OFFICE]));
     if (url.startsWith('/api/settings/')) {
       const card = url.slice('/api/settings/'.length);
       const sent = JSON.parse(init?.body as string) as Record<string, unknown>;

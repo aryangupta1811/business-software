@@ -3,12 +3,12 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { liveBranches, useBranches } from '../../api/branches';
 import { useStaffList } from '../../api/staff';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { buttonVariants } from '../../components/ui/button-variants';
 import { Card } from '../../components/ui/card';
-import { useItemsContext } from '../../items/api';
 import { StaffDialogs } from '../../staff/dialogs';
 import { useStaffDialogs, type StaffDialogsHost } from '../../staff/use-staff-dialogs';
 import { LoadGate } from '../../staff/load-gate';
@@ -28,11 +28,11 @@ function StaffList() {
   const navigate = useNavigate();
   const [former, setFormer] = useState(false);
   const list = useStaffList(former);
-  const context = useItemsContext();
+  const branches = useBranches();
   const dialogs = useStaffDialogs();
   const { ask, notice } = dialogs;
   // One branch needs no branch column: there is nothing to tell apart (design §6).
-  const showBranch = (context.data?.branches.length ?? 0) > 1;
+  const showBranch = liveBranches(branches.data ?? []).length > 1;
 
   return (
     <div className="flex flex-col gap-4">

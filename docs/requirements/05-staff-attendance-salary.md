@@ -67,6 +67,14 @@ The AI example "How many holidays has Rahul taken this month so far?" depends on
 
 28. **"Holidays taken"** counts absent days plus leave days; weekly offs and shop holidays are not "taken".
 
+## Decided while designing P2.3 (2026-11-22)
+
+29. **A day nobody marked** counts as its default: present, or the person's weekly off, or a shop holiday. Only the marks people make are stored.
+30. **A salary change** can start from the 1st of the current month or of any later month, not an earlier one.
+31. **Shop holidays** are for every branch by default; the owner can pick one branch instead.
+32. **The register** covers today and past days only; marking days ahead is not in v1.
+33. **Adding someone** needs only name, home branch and joining date. Phone and salary can come later; "Salary not set" shows until then, and P2.4 doesn't pay without one.
+
 ## Open questions
 
 None. Out of v1, in `ideas-backlog.md`: commission on sales; PF and ESI deductions. To check when building P2.4 (not owner decisions): the current Labour Codes' caps on deductions and fines, which the warning in #18 refers to.
@@ -75,3 +83,4 @@ None. Out of v1, in `ideas-backlog.md`: commission on sales; PF and ESI deductio
 
 - 2026-10-29 — Draft created from the planning chat on claude.ai.
 - 2026-11-19 — Finalized in fast-track sitting 2 (`docs/plans/2026-11-18-sitting-2.md`, items 11–16): the owner took every recommendation. Commission on sales and PF/ESI moved to the ideas backlog; attendance states reshaped into one status per day plus late and overtime.
+- 2026-11-22 — P2.3 design (`docs/plans/2026-11-22-p2.3-staff-attendance-design.md`): the owner took every recommendation; added #29–#33.

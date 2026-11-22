@@ -6,12 +6,12 @@ import { ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { liveBranches, useBranches } from '../../api/branches';
 import { ApiError } from '../../api/client';
 import { useSession } from '../../api/session';
 import { createStaff, STAFF_KEY } from '../../api/staff';
 import { OwnerPasswordDialog } from '../../components/owner-password-dialog';
 import { Button } from '../../components/ui/button';
-import { useItemsContext } from '../../items/api';
 import { AccessCard } from '../../staff/access-card';
 import { defaultAccess, limitOf } from '../../staff/access';
 import { failureText, showFieldErrors } from '../../staff/errors';
@@ -33,10 +33,10 @@ const personSchema = newStaffSchema.pick({
 });
 
 function NewStaff() {
-  const context = useItemsContext();
+  const branches = useBranches();
   return (
-    <LoadGate queries={[context]}>
-      {() => context.data && <NewStaffForm branches={context.data.branches} />}
+    <LoadGate queries={[branches]}>
+      {() => branches.data && <NewStaffForm branches={liveBranches(branches.data)} />}
     </LoadGate>
   );
 }

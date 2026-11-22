@@ -14,6 +14,7 @@ import { App } from '../app';
 import { changeLanguage } from '../i18n';
 import { createQueryClient } from '../query-client';
 import { createAppRouter } from '../router';
+import { OWNER_SESSION } from '../test/fake-api';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -616,4 +617,47 @@ test('the archive confirm says when the stock left could not be checked', async 
   expect(screen.getByRole('dialog', { name: /Archive/ })).toHaveTextContent(
     "The stock left couldn't be checked. Whatever there is stays with the item.",
   );
+});
+
+// --- The owner's branch picker (P1.6, ADR 0045) ---------------------------------------------
+
+test("the owner's picker changes which branches the stock panel shows, never where it saves", async () => {
+  const session = {
+    ...OWNER_SESSION,
+    branch: { ...OWNER_SESSION.branch, id: MAIN },
+    branchCount: 2,
+  };
+  const fetchMock = stubApi({
+    ...base(),
+    'GET /api/session': () => ({ body: session }),
+    'GET /api/branches/picker': () => ({
+      body: [
+        { id: GODOWN, code: 'GD', name: 'Godown' },
+        { id: MAIN, code: 'HO', name: 'Main' },
+      ],
+    }),
+    [`GET /api/items/${ITEM}/stock`]: (_body, url) => ({
+      body: url.includes(`branch=${GODOWN}`)
+        ? { ...STOCK, branches: [AT_GODOWN] }
+        : { ...STOCK, branches: [AT_MAIN] },
+    }),
+  });
+  renderItem();
+  // It starts at this counter's branch: one row, and the buttons that save there.
+  const card = await stockCard();
+  await card.findByRole('row', { name: /^Main/ });
+  expect(card.queryByRole('row', { name: /^Godown/ })).toBeNull();
+  expect(urlsOf(fetchMock, `/api/items/${ITEM}/stock`)).toContain(
+    `/api/items/${ITEM}/stock?branch=${MAIN}`,
+  );
+
+  await userEvent.selectOptions(
+    await screen.findByRole('combobox', { name: 'Branch shown' }),
+    'Godown',
+  );
+  await card.findByRole('row', { name: /^Godown/ });
+  // Another branch's stock is for looking: no button to change it from here.
+  expect(card.queryByRole('button', { name: 'Adjust stock' })).toBeNull();
+  expect(card.queryByRole('button', { name: 'Set opening stock' })).toBeNull();
+  expect(card.getByText(/Stock is changed at this counter's branch/)).toBeInTheDocument();
 });

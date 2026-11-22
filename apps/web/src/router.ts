@@ -23,5 +23,7 @@ declare module '@tanstack/react-router' {
     // What a login must hold to open the page; without it the page says "You can't open this
     // page". The server checks the same permission on every request (P1.5 design §6).
     permission?: Permission;
+    // The page reads branch data, so the owner's branch picker shows in its top bar (P1.6).
+    branchPicker?: boolean;
   }
 }

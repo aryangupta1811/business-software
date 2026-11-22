@@ -157,6 +157,21 @@ test('switches negative stock at billing from warn to block', async () => {
   expect(stock.getByRole('radio', { name: /^Block/ })).toBeChecked();
 });
 
+test('switches an alert type off for the app and saves the list that is left', async () => {
+  const fetchMock = stubApi({ status: 200, body: VIEW });
+  renderSettings();
+  const user = userEvent.setup();
+  const alerts = within(await card('Alerts'));
+  expect(alerts.getByRole('checkbox', { name: /^Out of stock/ })).toBeChecked();
+  expect(alerts.getByRole('checkbox', { name: /^Low on stock/ })).toBeChecked();
+  expect(alerts.getByText(/WhatsApp comes with the daily summary/)).toBeInTheDocument();
+  await user.click(alerts.getByRole('checkbox', { name: /^Low on stock/ }));
+  await user.click(alerts.getByRole('button', { name: 'Save' }));
+  expect(await alerts.findByRole('status')).toHaveTextContent('Saved');
+  expect(putsTo(fetchMock, 'alerts')).toEqual([{ types: ['out_of_stock'] }]);
+  expect(alerts.getByRole('checkbox', { name: /^Low on stock/ })).not.toBeChecked();
+});
+
 test('keeps lock times in their range', async () => {
   const fetchMock = stubApi({ status: 200, body: VIEW });
   renderSettings();

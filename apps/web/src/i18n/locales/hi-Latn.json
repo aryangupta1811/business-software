@@ -39,7 +39,8 @@
     "billDiscount": "Poore bill par chhoot",
     "billHold": "Yeh bill rokein, ya roke gaye bill kholein",
     "billCustomer": "Customer khojein ya jodein",
-    "billPay": "Payment lein"
+    "billPay": "Payment lein",
+    "openAlerts": "Alerts kholein"
   },
   "connection": {
     "checking": "Connection check ho raha hai…",
@@ -398,6 +399,12 @@
       "warnHint": "Bill save hota hai; counter ko chetavni dikhti hai.",
       "block": "Rokein",
       "blockHint": "Stock daalne tak bill ruka rehta hai."
+    },
+    "alerts": {
+      "title": "Alerts",
+      "lead": "Upar ki patti ki ghanti kya dikhaye. Band kiya gaya prakar phir bhi darj hota rehta hai, isliye dobara chalu karne par jo khula hai woh dikhega.",
+      "appLabel": "App mein dikhayein",
+      "whatsapp": "WhatsApp roz ke saar ke saath baad mein aayega."
     }
   },
   "features": {
@@ -1164,6 +1171,31 @@
     "errors": {
       "invalid_permissions": "Yeh switch aapas mein mel nahi khaate. Page phir se kholkar koshish karein.",
       "not_found": "Yeh login ab nahi hai. List par wapas jaayein."
+    }
+  },
+  "alerts": {
+    "title": "Alerts",
+    "bell": "Alerts, dekhne ke liye {{count}}",
+    "close": "Band karein",
+    "loading": "Alerts load ho rahe hain…",
+    "loadFailed": "Alerts load nahi ho sake. Connection jaanchein.",
+    "empty": "Abhi kisi par dhyaan dene ki zaroorat nahi hai.",
+    "truncated": "Sabse naye {{shown}} dikhaye ja rahe hain.",
+    "dismiss": "Hatayein",
+    "dismissItem": "{{name}} ka alert hatayein",
+    "stockLine": "Stock {{stock}} · level {{level}}",
+    "noLevel": "tay nahi",
+    "groups": {
+      "out_of_stock": "Stock khatam ({{count}})",
+      "low_stock": "Kam stock ({{count}})"
+    },
+    "types": {
+      "out_of_stock": "Stock khatam",
+      "low_stock": "Kam stock"
+    },
+    "typeHints": {
+      "out_of_stock": "Kisi branch mein koi saamaan khatam ho gaya hai.",
+      "low_stock": "Koi saamaan apne kam-stock level par ya usse neeche hai."
     }
   }
 }

@@ -3,6 +3,7 @@ import { Link, useMatches, useNavigate } from '@tanstack/react-router';
 import { House, IndianRupee, Keyboard, Package, Settings, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AlertsBell } from '../alerts/alerts-bell';
 import { keyLabels } from '../shortcuts/keys';
 import { useOpenShortcutHelp, useShortcut } from '../shortcuts/use-shortcut';
 import { ConnectionBadge } from './connection-badge';
@@ -144,6 +145,7 @@ export function AppShell({
           {titleKey ? <h1 className="text-title font-semibold">{t(titleKey)}</h1> : <span />}
           <div className="flex items-center gap-4">
             <ConnectionBadge />
+            {session !== null && <AlertsBell session={session} />}
             <LanguageSwitcher />
             <ThemeToggle />
           </div>

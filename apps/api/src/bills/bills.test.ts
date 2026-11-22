@@ -345,6 +345,28 @@ describe('saving a bill', () => {
     expect(response.body.fields.invoicePrefix).toBeDefined();
   });
 
+  it("refuses a prefix that is any of the business's branch codes, archived ones too (409)", async () => {
+    const a = await shop();
+    await admin.pool.query(
+      `insert into branches (business_id, name, code, state_code, archived_at)
+       values ($1, 'Old', 'OLD', '27', now())`,
+      [a.businessId],
+    );
+    for (const prefix of ['HO', 'ho', 'OLD']) {
+      expect(await call('PUT', '/settings/invoices', a, { invoicePrefix: prefix })).toMatchObject({
+        status: 409,
+        body: { code: 'prefix_is_branch_code' },
+      });
+    }
+    // Nothing was stored, and a prefix that is no branch's code still saves.
+    expect((await call<SettingsView>('GET', '/settings', a)).body.invoices).toEqual({
+      invoicePrefix: null,
+    });
+    expect(await call('PUT', '/settings/invoices', a, { invoicePrefix: 'ABC' })).toMatchObject({
+      status: 200,
+    });
+  });
+
   it('answers a retry with the saved bill, and refuses the key for a different bill', async () => {
     const a = await shop();
     const rice = await item(a);

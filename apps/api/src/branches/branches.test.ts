@@ -348,6 +348,27 @@ describe('branches', () => {
       ).toMatchObject({ status: 400, body: { fields: { gstin: 'pan_mismatch' } } });
     });
 
+    it("refuses a code equal to the business's invoice prefix (409), when added or edited", async () => {
+      const shop = await signUp();
+      const added = await addBranch(shop, 'AND', { name: 'Andheri' });
+      const prefix = await shop.owner.call('PUT', '/settings/invoices', { invoicePrefix: 'ABC' });
+      expect(prefix.status).toBe(200);
+      expect(await shop.owner.call('POST', '/branches', branchBody('abc'))).toMatchObject({
+        status: 409,
+        body: { code: 'code_is_invoice_prefix' },
+      });
+      expect(
+        await shop.owner.call(
+          'PUT',
+          `/branches/${added.id}`,
+          branchBody('ABC', { name: 'Andheri' }),
+        ),
+      ).toMatchObject({ status: 409, body: { code: 'code_is_invoice_prefix' } });
+      expect(
+        as<BranchView[]>(await shop.owner.call('GET', '/branches')).map((branch) => branch.code),
+      ).toEqual(['HO', 'AND']);
+    });
+
     it('edits only the changed fields, and logs nothing when nothing changed', async () => {
       const shop = await signUp();
       const added = await addBranch(shop, 'AND', { name: 'Andheri' });

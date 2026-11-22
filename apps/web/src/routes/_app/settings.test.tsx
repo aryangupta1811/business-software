@@ -203,3 +203,76 @@ test('keeps lock times in their range', async () => {
   );
   expect(putsTo(fetchMock, 'security')).toEqual([]);
 });
+
+test('sets the invoice prefix, with an example of the next bill number', async () => {
+  const fetchMock = stubApi({ status: 200, body: VIEW });
+  renderSettings();
+  const user = userEvent.setup();
+  const invoices = within(await card('Invoice numbers'));
+  expect(invoices.getByLabelText('Prefix (optional)')).toHaveValue('');
+  expect(invoices.getByText(/^Your next bill: \d\d-\d\d\/42$/)).toBeInTheDocument();
+  await user.type(invoices.getByLabelText('Prefix (optional)'), 'abc');
+  expect(invoices.getByText(/^Your next bill: ABC\/\d\d-\d\d\/42$/)).toBeInTheDocument();
+  await user.click(invoices.getByRole('button', { name: 'Save' }));
+  expect(await invoices.findByRole('status')).toHaveTextContent('Saved');
+  expect(putsTo(fetchMock, 'invoices')).toEqual([{ invoicePrefix: 'ABC' }]);
+  expect(invoices.getByLabelText('Prefix (optional)')).toHaveValue('ABC');
+});
+
+test('sends an emptied prefix as none', async () => {
+  const fetchMock = stubApi({
+    status: 200,
+    body: { ...VIEW, invoices: { invoicePrefix: 'ABC' } },
+  });
+  renderSettings();
+  const user = userEvent.setup();
+  const invoices = within(await card('Invoice numbers'));
+  await user.clear(invoices.getByLabelText('Prefix (optional)'));
+  await user.click(invoices.getByRole('button', { name: 'Save' }));
+  expect(await invoices.findByRole('status')).toHaveTextContent('Saved');
+  expect(putsTo(fetchMock, 'invoices')).toEqual([{ invoicePrefix: null }]);
+});
+
+test("refuses a prefix that is a branch's code, on the screen, without asking the server", async () => {
+  const fetchMock = stubApi({ status: 200, body: VIEW });
+  renderSettings();
+  const user = userEvent.setup();
+  const invoices = within(await card('Invoice numbers'));
+  await user.type(invoices.getByLabelText('Prefix (optional)'), 'ho');
+  await user.click(invoices.getByRole('button', { name: 'Save' }));
+  expect(await invoices.findByLabelText('Prefix (optional)')).toHaveAccessibleDescription(
+    /A branch already uses this as its code/,
+  );
+  expect(putsTo(fetchMock, 'invoices')).toEqual([]);
+});
+
+test('shows the words for a prefix the server refuses as a branch code', async () => {
+  const fetchMock = stubApi({ status: 200, body: VIEW });
+  vi.stubGlobal('fetch', (url: string, init?: RequestInit) =>
+    url === '/api/settings/invoices'
+      ? Promise.resolve(Response.json({ code: 'prefix_is_branch_code' }, { status: 409 }))
+      : fetchMock(url, init),
+  );
+  renderSettings();
+  const user = userEvent.setup();
+  const invoices = within(await card('Invoice numbers'));
+  await user.type(invoices.getByLabelText('Prefix (optional)'), 'NEW');
+  await user.click(invoices.getByRole('button', { name: 'Save' }));
+  expect(await invoices.findByLabelText('Prefix (optional)')).toHaveAccessibleDescription(
+    /A branch already uses this as its code/,
+  );
+  expect(invoices.queryByText(/Couldn't save/)).not.toBeInTheDocument();
+});
+
+test('refuses a prefix of five letters', async () => {
+  const fetchMock = stubApi({ status: 200, body: VIEW });
+  renderSettings();
+  const user = userEvent.setup();
+  const invoices = within(await card('Invoice numbers'));
+  await user.type(invoices.getByLabelText('Prefix (optional)'), 'ABCDE');
+  await user.click(invoices.getByRole('button', { name: 'Save' }));
+  expect(await invoices.findByLabelText('Prefix (optional)')).toHaveAccessibleDescription(
+    /Use 1 to 4 capital letters or digits|This is too long/,
+  );
+  expect(putsTo(fetchMock, 'invoices')).toEqual([]);
+});

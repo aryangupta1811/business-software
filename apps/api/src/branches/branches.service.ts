@@ -85,6 +85,7 @@ export class BranchesService {
   create(caller: Caller, input: BranchInput): Promise<BranchView> {
     return inBusiness(this.database, caller, async (tx) => {
       await this.refuseGstinOutsideBusiness(tx, input);
+      await this.refuseInvoicePrefix(tx, input.code);
       const [created] = await tx
         .insert(branches)
         .values({ businessId: caller.businessId, ...fieldsOf(input) })
@@ -107,6 +108,7 @@ export class BranchesService {
     return inBusiness(this.database, caller, async (tx) => {
       const current = await this.lock(tx, id);
       await this.refuseGstinOutsideBusiness(tx, input);
+      await this.refuseInvoicePrefix(tx, input.code);
       const changed = changes(fieldsOf(current), fieldsOf(input));
       if (changed === null) return this.viewIn(tx, id);
       await tx
@@ -221,6 +223,21 @@ export class BranchesService {
           : null;
     if (problem !== null) {
       throw new BadRequestException({ code: 'invalid_body', fields: { gstin: problem } });
+    }
+  }
+
+  /**
+   * The business's invoice prefix can't be a branch's code: with two branches the code starts
+   * the number, so the branch and the old one-branch numbers would clash. Reading the business
+   * row `for share` waits for a prefix being saved, which holds it `for update`.
+   */
+  private async refuseInvoicePrefix(tx: Transaction, code: string): Promise<void> {
+    const [business] = await tx
+      .select({ invoicePrefix: businesses.invoicePrefix })
+      .from(businesses)
+      .for('share');
+    if (business?.invoicePrefix === code) {
+      throw new ConflictException({ code: 'code_is_invoice_prefix' });
     }
   }
 

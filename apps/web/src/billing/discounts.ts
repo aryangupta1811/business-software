@@ -136,3 +136,12 @@ export function loadApproval(billKey: string): Approval | null {
     return null;
   }
 }
+
+/** The OK of a bill that is finished (saved) or whose OK the server refused. */
+export function clearApproval(billKey: string): void {
+  try {
+    sessionStorage.removeItem(PREFIX + billKey);
+  } catch {
+    // Storage blocked: nothing was kept.
+  }
+}

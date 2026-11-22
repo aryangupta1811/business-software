@@ -43,6 +43,7 @@ function Billing() {
             context={context.data}
             copy={catalogue.copy}
             version={catalogue.version}
+            onReload={catalogue.reload}
           />
         );
       }}

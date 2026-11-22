@@ -115,6 +115,22 @@ test('a code another branch already uses shows under the code box', async () => 
   expect(await dialog.findByText('Another branch already uses this code')).toBeInTheDocument();
 });
 
+test("a code that is the business's invoice prefix is refused under the code box", async () => {
+  const { api } = openBranches([HEAD_OFFICE]);
+  vi.stubGlobal('fetch', (url: string, init?: RequestInit) =>
+    url === '/api/branches' && init?.method === 'POST'
+      ? Promise.resolve(Response.json({ code: 'code_is_invoice_prefix' }, { status: 409 }))
+      : api.fetchMock(url, init),
+  );
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole('button', { name: 'Add a branch' }));
+  const dialog = within(await screen.findByRole('dialog', { name: 'Add a branch' }));
+  await user.type(dialog.getByLabelText('Branch name'), 'Thane shop');
+  await user.type(dialog.getByLabelText('Short code'), 'ABC');
+  await user.click(dialog.getByRole('button', { name: 'Add branch' }));
+  expect(await dialog.findByText(/This code is your invoice prefix/)).toBeInTheDocument();
+});
+
 test('an unregistered business has no GSTIN box on the branch form', async () => {
   openBranches([HEAD_OFFICE], 'unregistered');
   const user = userEvent.setup();

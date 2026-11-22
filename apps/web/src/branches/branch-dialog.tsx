@@ -117,9 +117,11 @@ function BranchForm({
       ? undefined
       : codeProblem === 'taken'
         ? t('branches.form.codeTaken')
-        : codeProblem === 'required'
-          ? t('errors.required')
-          : t('branches.form.codeInvalid');
+        : codeProblem === 'prefix'
+          ? t('branches.form.codePrefix')
+          : codeProblem === 'required'
+            ? t('errors.required')
+            : t('branches.form.codeInvalid');
 
   // Another branch in the chosen state: its GSTIN is the likely one (the first two digits are
   // the state), unless the owner already typed their own.
@@ -135,6 +137,8 @@ function BranchForm({
     } catch (caught) {
       if (caught instanceof ApiError && caught.code === 'code_taken') {
         setError('code', { message: 'taken' });
+      } else if (caught instanceof ApiError && caught.code === 'code_is_invoice_prefix') {
+        setError('code', { message: 'prefix' });
       } else if (caught instanceof ApiError && caught.code === 'invalid_body') {
         for (const [field, code] of Object.entries(caught.fields)) {
           setError(field as keyof Form, { message: code });

@@ -1,20 +1,25 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
+  businessDate,
   BUSINESS_TYPES,
   ALERT_TYPES,
   FEATURE_PRESETS,
   FEATURES,
   BRANCH_STATES,
+  financialYear,
   GST_STATUSES,
+  invoiceNumber,
   settingsAlertsSchema,
   settingsBusinessSchema,
   settingsFeaturesSchema,
+  settingsInvoicesSchema,
   settingsSecuritySchema,
   settingsStockSchema,
   type BusinessType,
   type SettingsAlertsInput,
   type SettingsBusinessInput,
   type SettingsFeaturesInput,
+  type SettingsInvoicesInput,
   type SettingsSecurityInput,
   type SettingsStockInput,
   type SettingsView,
@@ -32,6 +37,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import type { z } from 'zod';
 import { ApiError, apiRequest } from '../../api/client';
+import { useBranches } from '../../api/branches';
 import { BranchesCard } from '../../branches/branches-card';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -98,6 +104,7 @@ function Settings() {
         <FeaturesCard saved={view.features} businessType={view.business.businessType} />
         <SecurityCard saved={view.security} />
         <StockCard saved={view.stock} />
+        <InvoicesCard saved={view.invoices} />
         <AlertsCard saved={view.alerts} />
         <PasswordCard />
       </div>
@@ -114,9 +121,11 @@ function Settings() {
  * case) and updates the page's copy, so the other cards see the new business type.
  */
 function useSave<Form extends FieldValues>(
-  card: 'business' | 'features' | 'security' | 'stock' | 'alerts',
+  card: 'business' | 'features' | 'security' | 'stock' | 'alerts' | 'invoices',
   setError: UseFormSetError<Form>,
   onSaved: (view: SettingsView) => void,
+  /** API answers that belong to one field, by code: shown on that field, not as a failed save. */
+  conflicts: Record<string, { field: Path<Form>; message: string }> = {},
 ) {
   const queryClient = useQueryClient();
   const [state, setState] = useState<'idle' | 'saved' | 'failed'>('idle');
@@ -133,6 +142,9 @@ function useSave<Form extends FieldValues>(
         for (const [field, code] of Object.entries(error.fields)) {
           setError(field as Path<Form>, { message: code });
         }
+      } else if (error instanceof ApiError && error.code in conflicts) {
+        const { field, message } = conflicts[error.code] as { field: Path<Form>; message: string };
+        setError(field, { message });
       } else {
         setState('failed');
       }
@@ -482,6 +494,84 @@ function AlertsCard({ saved }: { saved: SettingsAlertsInput }) {
         inputProps={form.register('types')}
       />
       <p className="text-label text-muted">{t('settings.alerts.whatsapp')}</p>
+    </SettingsCard>
+  );
+}
+
+type InvoicesForm = z.input<typeof settingsInvoicesSchema>;
+
+/**
+ * `00` #61: what starts every invoice number. A prefix that is a branch's code is refused here
+ * and by the server (archived branches count too): with two branches the code starts the number,
+ * and the two would hand out the same numbers.
+ */
+function InvoicesCard({ saved }: { saved: SettingsInvoicesInput }) {
+  const { t } = useTranslation();
+  const errorText = useFieldError();
+  const branches = useBranches();
+  const form = useForm<InvoicesForm, unknown, SettingsInvoicesInput>({
+    resolver: zodResolver(settingsInvoicesSchema),
+    defaultValues: { invoicePrefix: saved.invoicePrefix ?? '' },
+  });
+  const { save, state } = useSave<InvoicesForm>(
+    'invoices',
+    form.setError,
+    (view) => {
+      form.reset({ invoicePrefix: view.invoices.invoicePrefix ?? '' });
+    },
+    { prefix_is_branch_code: { field: 'invoicePrefix', message: 'branch_code' } },
+  );
+  const all = branches.data ?? [];
+  const typed = useWatch({ control: form.control, name: 'invoicePrefix' });
+  const parsed = settingsInvoicesSchema.safeParse({ invoicePrefix: typed });
+  const year = financialYear(businessDate(new Date()));
+  const example = (label: string | null) =>
+    invoiceNumber({ label, financialYear: year, sequence: 42 });
+  const several = all.filter((branch) => !branch.archived).length >= 2;
+
+  return (
+    <SettingsCard
+      title={t('settings.invoices.title')}
+      lead={t('settings.invoices.lead')}
+      state={state}
+      dirty={form.formState.isDirty}
+      submitting={form.formState.isSubmitting}
+      onSubmit={() =>
+        void form.handleSubmit((input) => {
+          if (all.some((branch) => branch.code === input.invoicePrefix)) {
+            form.setError('invoicePrefix', { message: 'branch_code' });
+            return;
+          }
+          return save(input);
+        })()
+      }
+    >
+      <Field
+        label={t('settings.invoices.prefix')}
+        hint={t('settings.invoices.hint')}
+        error={errorText('invoicePrefix', form.formState.errors.invoicePrefix?.message)}
+      >
+        {(props) => (
+          <Input
+            {...props}
+            autoComplete="off"
+            className="w-32 uppercase"
+            {...form.register('invoicePrefix')}
+          />
+        )}
+      </Field>
+      {parsed.success && (
+        <p className="text-muted">
+          {t('settings.invoices.example', { number: example(parsed.data.invoicePrefix) })}
+        </p>
+      )}
+      {several && (
+        <p className="text-label text-muted">
+          {t('settings.invoices.branches', {
+            number: example(all.find((branch) => branch.headOffice)?.code ?? null),
+          })}
+        </p>
+      )}
     </SettingsCard>
   );
 }

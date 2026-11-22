@@ -29,6 +29,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import type { z } from 'zod';
 import { ApiError, apiRequest } from '../../api/client';
+import { BranchesCard } from '../../branches/branches-card';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { ChoiceCards } from '../../components/ui/choice-cards';
@@ -90,6 +91,7 @@ function Settings() {
       {/* Printing a new recovery key prints that card alone. */}
       <div className="flex flex-col gap-6 print:hidden">
         <BusinessCard saved={view.business} />
+        <BranchesCard gstStatus={view.business.gstStatus} />
         <FeaturesCard saved={view.features} businessType={view.business.businessType} />
         <SecurityCard saved={view.security} />
         <StockCard saved={view.stock} />

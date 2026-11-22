@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import {
   ownerLoginSchema,
   type ActiveSession,
+  type BranchRef,
   staffLoginSchema,
   type OwnerLoginInput,
   type StaffLoginInput,
@@ -16,6 +17,7 @@ import { loginOwner, loginStaff, setSession, useSession } from '../../api/sessio
 import { PasswordInput } from '../../components/password-input';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
+import { ChoiceCards } from '../../components/ui/choice-cards';
 import { Field } from '../../components/ui/field';
 import { Input } from '../../components/ui/input';
 import { useFieldError } from '../../lib/field-error';
@@ -97,6 +99,11 @@ function useLoginFailure(): (error: unknown, who: Who) => string {
         return t('login.noDevice');
       case 'busy':
         return t('login.busy');
+      case 'wrong_branch':
+        // A staff login on a counter at a branch they may not work at (#35).
+        return t('login.wrongBranch', {
+          branch: typeof error.detail.branchName === 'string' ? error.detail.branchName : '',
+        });
       default:
         return t('login.failed');
     }
@@ -118,6 +125,11 @@ function OwnerForm() {
   const failureText = useLoginFailure();
   const finish = useFinishLogin();
   const [failure, setFailure] = useState<string | null>(null);
+  // A new computer in a business with several branches asks which one it is in (P1.6). The
+  // email and password stay in the form's boxes and are sent again with the choice.
+  const [branches, setBranches] = useState<BranchRef[] | null>(null);
+  const [branchId, setBranchId] = useState('');
+  const [branchMissing, setBranchMissing] = useState(false);
   const {
     register,
     handleSubmit,
@@ -129,9 +141,18 @@ function OwnerForm() {
 
   const onSubmit = async ({ email, password }: OwnerLoginInput) => {
     setFailure(null);
+    if (branches !== null && branchId === '') {
+      setBranchMissing(true);
+      return;
+    }
     try {
-      await finish(await loginOwner(email, password));
+      await finish(await loginOwner(email, password, branches === null ? undefined : branchId));
     } catch (error) {
+      if (error instanceof ApiError && error.code === 'choose_branch') {
+        setBranches(error.detail.branches as BranchRef[]);
+        setBranchId('');
+        return;
+      }
       setFailure(failureText(error, 'owner'));
     }
   };
@@ -152,6 +173,28 @@ function OwnerForm() {
           <PasswordInput {...props} autoComplete="current-password" {...register('password')} />
         )}
       </Field>
+      {branches !== null && (
+        <div className="flex flex-col gap-3 border-t border-border pt-5">
+          <p className="text-muted">{t('login.chooseBranch.lead')}</p>
+          <ChoiceCards
+            label={t('login.chooseBranch.label')}
+            columns="grid-cols-1"
+            choices={branches.map((branch) => ({
+              value: branch.id,
+              title: branch.name,
+              hint: branch.code,
+            }))}
+            error={branchMissing && branchId === '' ? t('errors.choose') : undefined}
+            inputProps={{
+              name: 'computerBranch',
+              onChange: (event) => {
+                setBranchId(event.target.value);
+                setBranchMissing(false);
+              },
+            }}
+          />
+        </div>
+      )}
       {failure !== null && (
         <p role="alert" className="text-danger">
           {failure}

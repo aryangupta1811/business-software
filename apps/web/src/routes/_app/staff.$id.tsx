@@ -7,16 +7,17 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
+import { liveBranches, useBranches } from '../../api/branches';
 import { ApiError } from '../../api/client';
 import { setStaffPermissions, STAFF_KEY, updateStaff, useStaffList } from '../../api/staff';
 import { OwnerPasswordDialog } from '../../components/owner-password-dialog';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { useItemsContext } from '../../items/api';
 import { AccountCard } from '../../settings/account-card';
 import { accessOf, limitOf, sameAccess } from '../../staff/access';
 import { AccessCard } from '../../staff/access-card';
+import { BranchAccessCard } from '../../staff/branch-access-card';
 import { StaffDialogs } from '../../staff/dialogs';
 import { useStaffDialogs } from '../../staff/use-staff-dialogs';
 import { failureText, showFieldErrors } from '../../staff/errors';
@@ -37,14 +38,18 @@ function EditStaff() {
   const { id } = Route.useParams();
   // Everyone, former staff included: the page opens a deactivated login too.
   const list = useStaffList(true);
-  const context = useItemsContext();
+  const branches = useBranches();
   return (
-    <LoadGate queries={[list, context]}>
+    <LoadGate queries={[list, branches]}>
       {() => {
         const person = list.data?.find((row) => row.id === id);
         if (person === undefined) return <NotFound />;
         return (
-          <StaffEditor key={person.id} person={person} branches={context.data?.branches ?? []} />
+          <StaffEditor
+            key={person.id}
+            person={person}
+            branches={liveBranches(branches.data ?? [])}
+          />
         );
       }}
     </LoadGate>
@@ -248,6 +253,9 @@ function StaffEditor({
           </div>
         </form>
       </AccountCard>
+
+      {/* Only with two or more branches: with one there is nowhere else to work. */}
+      {branches.length > 1 && <BranchAccessCard person={person} branches={branches} />}
 
       <AccessCard
         value={access}

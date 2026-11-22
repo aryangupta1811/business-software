@@ -678,3 +678,63 @@ test('a former login is still reachable and shows as deactivated on its page', a
   expect(screen.getByText('Deactivated')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Reactivate' })).toBeInTheDocument();
 });
+
+// --- "Can also work at" (P1.6, Module 00 #57) --------------------------------------------------
+
+const TWO = [
+  { id: BRANCH_ID, name: 'Main shop' },
+  { id: SECOND_BRANCH_ID, name: 'Market stall' },
+];
+
+test('the edit page offers extra branches only when the business has more than one', async () => {
+  ownerWithStaff();
+  renderAt(`/staff/${CASHIER.id}`);
+  await screen.findByRole('region', { name: 'Person' });
+  expect(screen.queryByRole('region', { name: 'Can also work at' })).toBeNull();
+});
+
+test("ticking another branch asks for the owner's password, then sends the branches", async () => {
+  const api = ownerWithStaff([CASHIER], TWO);
+  renderAt(`/staff/${CASHIER.id}`);
+  const user = userEvent.setup();
+  const card = within(await screen.findByRole('region', { name: 'Can also work at' }));
+  // The home branch is always allowed, so only the others are offered.
+  expect(card.queryByRole('checkbox', { name: 'Main shop' })).toBeNull();
+  const save = card.getByRole('button', { name: 'Save branches' });
+  expect(save).toBeDisabled();
+  await user.click(card.getByRole('checkbox', { name: 'Market stall' }));
+  await user.click(save);
+  await dialog('Change where Meena Devi can work');
+  await user.type(ownerBox(), `${OWNER_PASSWORD}{Enter}`);
+  expect(await card.findByRole('status')).toHaveTextContent('Saved');
+  expect(api.sent('PUT', `/api/staff/${CASHIER.id}/branches`)[0]?.body).toEqual({
+    branchIds: [SECOND_BRANCH_ID],
+    ownerPassword: OWNER_PASSWORD,
+  });
+  expect(card.getByRole('checkbox', { name: 'Market stall' })).toBeChecked();
+  expect(card.getByRole('button', { name: 'Save branches' })).toBeDisabled();
+});
+
+test('a wrong owner password changes no branches', async () => {
+  const api = ownerWithStaff([CASHIER], TWO);
+  renderAt(`/staff/${CASHIER.id}`);
+  const user = userEvent.setup();
+  const card = within(await screen.findByRole('region', { name: 'Can also work at' }));
+  await user.click(card.getByRole('checkbox', { name: 'Market stall' }));
+  await user.click(card.getByRole('button', { name: 'Save branches' }));
+  await dialog('Change where Meena Devi can work');
+  await user.type(ownerBox(), 'not the password{Enter}');
+  expect(await screen.findByText("That isn't the owner's password")).toBeInTheDocument();
+  expect(card.queryByRole('status')).toBeNull();
+  expect(api.sent('PUT', `/api/staff/${CASHIER.id}/branches`)).toHaveLength(1);
+});
+
+test('the staff screens read branches from the branches route, not the items context', async () => {
+  const api = ownerWithStaff([CASHIER], TWO);
+  renderAt('/staff');
+  await screen.findByRole('columnheader', { name: 'Home branch' });
+  expect(api.sent('GET', '/api/items/context')).toHaveLength(0);
+  expect(api.fetchMock.mock.calls.map(([url]) => url)).toContain(
+    '/api/branches?includeArchived=true',
+  );
+});

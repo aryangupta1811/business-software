@@ -4,6 +4,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 import { fakeApi, OWNER_SESSION, renderAt, type FakeAnswer } from '../test/fake-api';
+import { HEAD_OFFICE } from '../test/fake-branches';
 import { madeUpRecoveryKey } from '../test/made-up-recovery-key';
 
 afterEach(() => {
@@ -53,6 +54,8 @@ function openSettings(routes: Record<string, FakeAnswer | ((body: unknown) => Fa
   const api = fakeApi(OWNER_SESSION, {
     'GET /api/settings': { body: SETTINGS },
     'GET /api/devices': { body: [HERE, BACK] },
+    // One branch: no Move button.
+    'GET /api/branches': { body: [HEAD_OFFICE] },
     ...routes,
   });
   const history = renderAt('/settings');

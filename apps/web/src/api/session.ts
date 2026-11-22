@@ -3,6 +3,7 @@
 import type { ActiveSession, SessionView } from '@business-software/shared';
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
+import { clearBranchScope } from '../branches/branch-scope-context';
 import { clearOpenBills } from '../billing/open-bill';
 import { apiRequest, onAuthError, setCsrfToken } from './client';
 
@@ -11,7 +12,10 @@ export const SESSION_KEY = ['session'];
 function remember(view: SessionView): SessionView {
   setCsrfToken(view.state === 'none' ? null : view.csrfToken);
   // A session that ended (idle, logged out elsewhere) takes its unsaved bill with it.
-  if (view.state === 'none') clearOpenBills();
+  if (view.state === 'none') {
+    clearOpenBills();
+    clearBranchScope();
+  }
   return view;
 }
 
@@ -52,11 +56,17 @@ export function forgetSession(queryClient: QueryClient): void {
   setCsrfToken(null);
   // An unsaved bill never outlives the login on a shared counter (`00` #40).
   clearOpenBills();
+  clearBranchScope();
   queryClient.clear();
 }
 
-export function loginOwner(email: string, password: string) {
-  return apiRequest<ActiveSession>('POST', '/api/login', { email, password });
+/** `branchId` answers a `choose_branch`: the branch of a new computer (P1.6). */
+export function loginOwner(email: string, password: string, branchId?: string) {
+  return apiRequest<ActiveSession>('POST', '/api/login', {
+    email,
+    password,
+    ...(branchId !== undefined && { branchId }),
+  });
 }
 
 export function loginStaff(username: string, password: string) {

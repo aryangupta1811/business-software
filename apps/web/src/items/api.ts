@@ -53,11 +53,21 @@ export const useItem = (id: string) =>
     ...once,
   });
 
-/** Stock at each branch; off when the caller may not see it. */
-export const useItemStock = (id: string, enabled: boolean) =>
+/**
+ * Stock at each branch; off when the caller may not see it. `branch` is the owner's picker
+ * (one branch's id, or `all`); without it the API's own default applies.
+ */
+export const useItemStock = (id: string, enabled: boolean, branch?: string) =>
   useQuery({
-    queryKey: itemKeys.stock(id),
-    queryFn: () => apiRequest<ItemStockView>('GET', `/api/items/${encodeURIComponent(id)}/stock`),
+    // Under the item's stock key, so a stock change refreshes every view of it.
+    queryKey: [...itemKeys.stock(id), 'view', branch ?? 'default'],
+    queryFn: () =>
+      apiRequest<ItemStockView>(
+        'GET',
+        `/api/items/${encodeURIComponent(id)}/stock${
+          branch === undefined ? '' : `?branch=${encodeURIComponent(branch)}`
+        }`,
+      ),
     enabled,
     ...once,
   });

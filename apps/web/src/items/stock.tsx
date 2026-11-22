@@ -27,6 +27,7 @@ import { Field } from '../components/ui/field';
 import { Input } from '../components/ui/input';
 import { Select } from '../components/ui/select';
 import { Textarea } from '../components/ui/textarea';
+import { useBranchScope } from '../branches/branch-scope-context';
 import { useFieldError } from '../lib/field-error';
 import { itemKeys, useItemStock, useMovements } from './api';
 import { rupeesText } from './item-form';
@@ -63,11 +64,15 @@ type Dialog = 'opening' | 'adjust' | null;
 export function StockPanel({ item, context }: { item: ItemView; context: ItemsContext }) {
   const { t } = useTranslation();
   const titleId = useId();
-  const stock = useItemStock(item.id, true);
+  // The owner's branch picker (P1.6): it changes what is shown, never where a change is saved.
+  const scope = useBranchScope();
+  const stock = useItemStock(item.id, true, scope.param);
   const [dialog, setDialog] = useState<Dialog>(null);
   const showCost = context.canViewCost;
   const mine = stock.data?.branches.find((row) => row.branchId === context.branchId);
   const canChange = context.canAdjustStock && !item.archived && mine !== undefined;
+  const elsewhere =
+    scope.param !== undefined && scope.param !== context.branchId && mine === undefined;
 
   return (
     <Card role="region" aria-labelledby={titleId}>
@@ -123,6 +128,9 @@ export function StockPanel({ item, context }: { item: ItemView; context: ItemsCo
               ))}
             </tbody>
           </table>
+        )}
+        {elsewhere && context.canAdjustStock && (
+          <p className="text-muted">{t('items.stock.elsewhere')}</p>
         )}
         {canChange && (
           <div className="flex flex-wrap gap-3">

@@ -1,5 +1,6 @@
 import {
   effectivePermissions,
+  type BranchView,
   type ItemsContext,
   type Permission,
   type StaffView,
@@ -31,7 +32,7 @@ export const FORMER: StaffView = {
   active: false,
 };
 
-/** What `GET /api/items/context` answers the owner: the screens read the branch list from it. */
+/** What `GET /api/items/context` answers the owner. */
 export function itemsContext(branches = [{ id: BRANCH_ID, name: 'Main shop' }]): ItemsContext {
   return {
     canViewCost: true,
@@ -42,6 +43,30 @@ export function itemsContext(branches = [{ id: BRANCH_ID, name: 'Main shop' }]):
     needsGst: false,
     features: [],
     branches,
+  };
+}
+
+/** A branch as `GET /api/branches` answers it; the first one is the head office. */
+export function branchView(
+  branch: { id: string; name: string },
+  index = 0,
+  patch: Partial<BranchView> = {},
+): BranchView {
+  return {
+    id: branch.id,
+    code: index === 0 ? 'HO' : `B${String(index)}`,
+    name: branch.name,
+    address: null,
+    pinCode: null,
+    stateCode: '27',
+    gstin: null,
+    drugLicence: null,
+    fssai: null,
+    headOffice: index === 0,
+    archived: false,
+    computers: 1,
+    staff: 0,
+    ...patch,
   };
 }
 
@@ -67,7 +92,7 @@ export function staffRoutes(
   const owner = (body: unknown) => (body as { ownerPassword?: string }).ownerPassword;
 
   const routes: Record<string, FakeAnswer | ((body: unknown, url: string) => FakeAnswer)> = {
-    'GET /api/items/context': { body: itemsContext(branches) },
+    'GET /api/branches': { body: branches.map((branch, index) => branchView(branch, index)) },
     'GET /api/staff': (_body, url) => ({
       body: state.staff.filter((person) => person.active || url.includes('includeInactive=true')),
     }),
@@ -108,6 +133,12 @@ export function staffRoutes(
             discountLimitBasisPoints: input.discountLimitBasisPoints,
           }),
         }),
+      };
+    };
+    routes[`PUT ${base}/branches`] = (body) => {
+      if (owner(body) !== OWNER_PASSWORD) return wrongPassword();
+      return {
+        body: change(person.id, { extraBranchIds: (body as { branchIds: string[] }).branchIds }),
       };
     };
     routes[`POST ${base}/password`] = (body) =>

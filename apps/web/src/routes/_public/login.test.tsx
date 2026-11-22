@@ -110,3 +110,65 @@ test('sends someone already logged in to the app', async () => {
   expect(await screen.findByRole('heading', { name: 'Welcome' })).toBeInTheDocument();
   expect(history.location.pathname).toBe('/');
 });
+
+// --- A new computer in a business with several branches (P1.6, Module 00 #55) ---------------
+
+const BRANCHES = [
+  { id: '00000000-0000-4000-8000-000000000003', code: 'HO', name: 'Main shop' },
+  { id: '00000000-0000-4000-8000-000000000013', code: 'MKT', name: 'Market stall' },
+];
+
+test('a new computer with several branches asks which one it is in, then logs in there', async () => {
+  let asked = false;
+  const api = fakeApi(NO_SESSION, {
+    'POST /api/login': (body) => {
+      if ((body as { branchId?: string }).branchId === undefined) {
+        asked = true;
+        return { status: 409, body: { code: 'choose_branch', branches: BRANCHES } };
+      }
+      return { body: OWNER_SESSION };
+    },
+  });
+  renderAt('/login');
+  const user = userEvent.setup();
+  await logIn({ Email: 'owner@example.com', Password: 'correct horse battery' });
+
+  // The email and password stay in their boxes while the branch is chosen.
+  const group = await screen.findByRole('radiogroup', { name: 'This computer is in' });
+  expect(asked).toBe(true);
+  expect(screen.getByLabelText('Email')).toHaveValue('owner@example.com');
+  await user.click(within(group).getByRole('radio', { name: /Market stall/ }));
+  await user.click(screen.getByRole('button', { name: 'Log in' }));
+
+  expect(await screen.findByRole('heading', { name: 'Welcome' })).toBeInTheDocument();
+  expect(api.sent('POST', '/api/login').map(({ body }) => body)).toEqual([
+    { email: 'owner@example.com', password: 'correct horse battery' },
+    { email: 'owner@example.com', password: 'correct horse battery', branchId: BRANCHES[1]?.id },
+  ]);
+});
+
+test('the branch step will not send the login until one is chosen', async () => {
+  const api = fakeApi(NO_SESSION, {
+    'POST /api/login': { status: 409, body: { code: 'choose_branch', branches: BRANCHES } },
+  });
+  renderAt('/login');
+  await logIn({ Email: 'owner@example.com', Password: 'correct horse battery' });
+  await screen.findByRole('radiogroup', { name: 'This computer is in' });
+  await userEvent.click(screen.getByRole('button', { name: 'Log in' }));
+  expect(await screen.findByText('Choose one')).toBeInTheDocument();
+  expect(api.sent('POST', '/api/login')).toHaveLength(1);
+});
+
+test('a staff login on a counter at a branch they may not work at is told which one', async () => {
+  fakeApi(KNOWN_COUNTER, {
+    'POST /api/login/staff': {
+      status: 403,
+      body: { code: 'wrong_branch', branchName: 'Market stall' },
+    },
+  });
+  renderAt('/login');
+  await logIn({ Username: 'meena', Password: 'correct horse battery' });
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    "This login can't work at Market stall. Ask the owner to allow it.",
+  );
+});

@@ -5,6 +5,7 @@ import { Plus, Search } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError, apiRequest } from '../../api/client';
+import { useBranchScope } from '../../branches/branch-scope-context';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
@@ -26,7 +27,7 @@ type Tab = 'items' | 'catalogue';
 /** Module 01 #1–3, #8: the items list, and the owner's categories and units (design §7). */
 export const Route = createFileRoute('/_app/items/')({
   component: Items,
-  staticData: { titleKey: 'nav.items', permission: 'items.view' },
+  staticData: { titleKey: 'nav.items', permission: 'items.view', branchPicker: true },
   validateSearch: (search: Record<string, unknown>): { tab?: Tab } =>
     search.tab === 'catalogue' ? { tab: 'catalogue' } : {},
 });
@@ -101,7 +102,9 @@ function ItemList() {
   const showStock = context?.canViewStock ?? false;
   // The filter needs `stock.view` (the API refuses it otherwise, as it would show what is low).
   const lowOnly = low && showStock;
-  const filters = { q, category, archived, low: lowOnly };
+  // The owner's branch picker (P1.6): which branch's stock the column shows.
+  const branch = useBranchScope().param;
+  const filters = { q, category, archived, low: lowOnly, branch };
   const list = useInfiniteQuery({
     queryKey: itemKeys.list(filters),
     queryFn: ({ pageParam }) => {
@@ -110,6 +113,7 @@ function ItemList() {
       if (category) params.set('category', category);
       if (archived) params.set('archived', 'true');
       if (lowOnly) params.set('low', 'true');
+      if (branch !== undefined) params.set('branch', branch);
       if (pageParam) params.set('after', pageParam);
       const query = params.toString();
       return apiRequest<ItemPage>('GET', `/api/items${query ? `?${query}` : ''}`);

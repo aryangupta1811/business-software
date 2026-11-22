@@ -58,6 +58,13 @@ export const ENTRY_ACTIONS = {
   'branch.restored': { reasonRequired: false },
   'device.moved': { reasonRequired: false }, // before and after: the branch
   'staff.branches_changed': { reasonRequired: false }, // before and after: the extra branches
+  // P2.3 (`05` #3, #6-#8, #27, #31; `00` #19): attendance, salary rates, holidays, a record's login.
+  'attendance.marked': { reasonRequired: false }, // today's day, saved from the register
+  'attendance.changed': { reasonRequired: true }, // a day before today (`05` #8)
+  'staff.salary_set': { reasonRequired: false }, // after: the new rate
+  'staff.login_added': { reasonRequired: false }, // a record without a login was given one
+  'holiday.added': { reasonRequired: false },
+  'holiday.removed': { reasonRequired: false },
 } as const satisfies Record<string, { reasonRequired: boolean }>;
 
 export type EntryAction = keyof typeof ENTRY_ACTIONS;

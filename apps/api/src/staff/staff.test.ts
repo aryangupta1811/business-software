@@ -732,6 +732,11 @@ describe('staff logins and permissions', () => {
         name: 'LOGGED',
         username: 'logged',
         homeBranchId: shop.branchId,
+        phone: null,
+        joiningDate: '2026-11-19',
+        weeklyOffDay: null,
+        paidLeavesPerMonth: 0,
+        overtimeRatePaise: null,
         permissions: ['session.own', 'items.view', 'billing.sell'],
         discountLimitBasisPoints: 0,
       });

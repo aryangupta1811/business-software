@@ -2,21 +2,10 @@
 // none; a business customer brings a GSTIN, legal name and address. P1.18 adds credit limit,
 // due days and the udhaar ledger. Error messages are codes the web app translates (ADR 0036).
 import { z } from 'zod';
-import { isValidGstin, normalizePhone, optionalText, text } from './fields.js';
+import { isValidGstin, optionalPhone, optionalText, text } from './fields.js';
 import { isStateCode } from './states.js';
 
 const PIN_CODE = /^[1-9]\d{5}$/;
-
-const optionalPhone = () =>
-  optionalText(20).transform((value, context) => {
-    if (value === null) return null;
-    const normalized = normalizePhone(value);
-    if (normalized === null) {
-      context.addIssue({ code: 'custom', message: 'invalid' });
-      return z.NEVER;
-    }
-    return normalized;
-  });
 
 const customerShape = {
   name: text(100),

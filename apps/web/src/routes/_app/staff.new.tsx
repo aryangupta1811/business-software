@@ -1,10 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { newStaffSchema } from '@business-software/shared';
+import { newPassword, text, username, uuid } from '@business-software/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
 import { liveBranches, useBranches } from '../../api/branches';
 import { ApiError } from '../../api/client';
@@ -25,11 +26,13 @@ export const Route = createFileRoute('/_app/staff/new')({
   staticData: { titleKey: 'staff.newTitle', permission: 'staff.manage' },
 });
 
-const personSchema = newStaffSchema.pick({
-  name: true,
-  username: true,
-  password: true,
-  homeBranchId: true,
+// A login is always added here: the same checks as the server's for its fields (a record without
+// a login comes with the P2.3 screens).
+const personSchema = z.strictObject({
+  name: text(100),
+  username: username(),
+  password: newPassword(),
+  homeBranchId: uuid(),
 });
 
 function NewStaff() {

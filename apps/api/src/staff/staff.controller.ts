@@ -5,6 +5,8 @@ import { Body, Controller, Get, HttpCode, Inject, Param, Post, Put, Query } from
 import {
   newStaffSchema,
   ownerPasswordSchema,
+  salaryRateSchema,
+  staffAddLoginSchema,
   staffBranchesSchema,
   staffDeactivateSchema,
   staffPasswordSchema,
@@ -13,6 +15,9 @@ import {
   staffUpdateSchema,
   type NewStaffInput,
   type OwnerPasswordInput,
+  type SalaryRateInput,
+  type SalaryRateView,
+  type StaffAddLoginInput,
   type StaffBranchesInput,
   type StaffDeactivateInput,
   type StaffPasswordInput,
@@ -59,6 +64,39 @@ export class StaffController {
     @Body(new ZodBodyPipe(staffUpdateSchema)) body: StaffUpdateInput,
   ): Promise<StaffView> {
     return this.staff.update(caller, id, body);
+  }
+
+  /** Gives a record without a login its username and password; needs the owner's password. */
+  @Permission('staff.manage')
+  @Post(':id/login')
+  @HttpCode(200)
+  addLogin(
+    @CurrentCaller() caller: Caller,
+    @Param('id', UuidPipe) id: string,
+    @Body(new ZodBodyPipe(staffAddLoginSchema)) body: StaffAddLoginInput,
+  ): Promise<StaffView> {
+    return answer(() => this.staff.addLogin(caller, id, body));
+  }
+
+  /** The person's salary history (`05` #3). */
+  @Permission('staff.manage')
+  @Get(':id/salary-rates')
+  salaryRates(
+    @CurrentCaller() caller: Caller,
+    @Param('id', UuidPipe) id: string,
+  ): Promise<SalaryRateView[]> {
+    return this.staff.salaryRates(caller, id);
+  }
+
+  /** A new rate from the 1st of a month, this month or later (`05` #30). */
+  @Permission('staff.manage')
+  @Post(':id/salary-rates')
+  setSalaryRate(
+    @CurrentCaller() caller: Caller,
+    @Param('id', UuidPipe) id: string,
+    @Body(new ZodBodyPipe(salaryRateSchema)) body: SalaryRateInput,
+  ): Promise<SalaryRateView> {
+    return this.staff.setSalaryRate(caller, id, body);
   }
 
   /** Needs the owner's password (`00` #17). */

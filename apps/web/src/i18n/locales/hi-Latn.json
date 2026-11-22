@@ -1118,7 +1118,8 @@
       "billing": "Billing",
       "customers": "Grahak",
       "items": "Saamaan",
-      "stock": "Stock"
+      "stock": "Stock",
+      "attendance": "Haaziri"
     },
     "person": {
       "title": "Vyakti",
@@ -1185,6 +1186,16 @@
         "adjust": {
           "label": "Stock badalna",
           "hint": "Shuruaati stock daalna aur ginti sudhaarna."
+        }
+      },
+      "attendance": {
+        "mark": {
+          "label": "Haaziri lagaana",
+          "hint": "Apni shaakha ka roz ka register bharna."
+        },
+        "view_all": {
+          "label": "Sabki haaziri dekhna",
+          "hint": "Doosron ke din aur mahine. Apni haaziri ve hamesha dekhte hain."
         }
       }
     },

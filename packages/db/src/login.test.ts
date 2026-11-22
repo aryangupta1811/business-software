@@ -148,6 +148,7 @@ describe('login database rules', () => {
           role: 'staff',
           username,
           homeBranchId: shop.branchId,
+          joiningDate: '2026-01-01',
         }),
       );
 
@@ -190,6 +191,7 @@ describe('login database rules', () => {
             username,
             passwordHash: 'hash',
             homeBranchId: shop.branchId,
+            joiningDate: '2026-01-01',
             ...overrides,
           }),
         );

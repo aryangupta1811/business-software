@@ -26,6 +26,7 @@ export { takeInvoiceSequence } from './invoices.js';
 export {
   alertDismissals,
   alerts,
+  attendanceMarks,
   AUTH_TOKEN_KINDS,
   authTokens,
   billLines,
@@ -46,8 +47,10 @@ export {
   itemUnits,
   ownerApprovals,
   recoveryKeys,
+  salaryRates,
   SESSION_END_REASONS,
   sessions,
+  shopHolidays,
   staffBranches,
   stockMovements,
   units,

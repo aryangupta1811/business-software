@@ -9,6 +9,7 @@ import {
   FEATURES,
   ADJUSTMENT_REASONS,
   APPROVAL_KINDS,
+  ATTENDANCE_STATUSES,
   BILL_DOCUMENTS,
   GST_RATES,
   GST_STATUSES,
@@ -17,6 +18,7 @@ import {
   NEGATIVE_STOCK_SETTINGS,
   PAYMENT_MODES,
   PRICE_LISTS,
+  SALARY_KINDS,
   STOCK_MOVEMENT_KINDS,
   type StockAlertDetails,
 } from '@business-software/shared';
@@ -222,6 +224,18 @@ export const users = pgTable(
       .default(sql`'{}'::text[]`),
     /** `02` #12: what this login may discount alone, in basis points; null: never set. */
     discountLimitBasisPoints: integer('discount_limit_basis_points'),
+    // The staff record (P2.3, `05` #1; design section 3). The owner's row leaves them all empty.
+    /** 10 digits, like a customer's. */
+    phone: text('phone'),
+    /** The IST day they joined; no attendance before it. Required for staff. */
+    joiningDate: date('joining_date', { mode: 'string' }),
+    /** 0 = Sunday ... 6 = Saturday; null = no weekly off. */
+    weeklyOffDay: smallint('weekly_off_day'),
+    paidLeavesPerMonth: smallint('paid_leaves_per_month').notNull().default(0),
+    /** Paise per hour; null = overtime is off (`05` #15). */
+    overtimeRatePaise: bigint('overtime_rate_paise', { mode: 'number' }),
+    /** The edit pattern of items and customers: a stale copy is refused. */
+    version: integer('version').notNull().default(1),
     createdAt: createdAt(),
   },
   (t) => [
@@ -266,6 +280,19 @@ export const users = pgTable(
       sql`not (${t.permissionsAdded} && ${t.permissionsRemoved})`,
     ),
     check('users_discount_limit_check', sql`${t.discountLimitBasisPoints} between 0 and 10000`),
+    check('users_phone_check', sql`${t.phone} ~ '^[1-9][0-9]{9}$'`),
+    check('users_weekly_off_check', sql`${t.weeklyOffDay} between 0 and 6`),
+    check('users_paid_leaves_check', sql`${t.paidLeavesPerMonth} between 0 and 31`),
+    check('users_overtime_rate_check', sql`${t.overtimeRatePaise} > 0`),
+    check('users_version_check', sql`${t.version} >= 1`),
+    check(
+      'users_staff_joining_date_check',
+      sql`${t.role} <> 'staff' or ${t.joiningDate} is not null`,
+    ),
+    check(
+      'users_owner_record_check',
+      sql`${t.role} <> 'owner' or (${t.phone} is null and ${t.joiningDate} is null and ${t.weeklyOffDay} is null and ${t.paidLeavesPerMonth} = 0 and ${t.overtimeRatePaise} is null)`,
+    ),
     // The owner holds everything by role, so these stay empty.
     check(
       'users_owner_permissions_check',
@@ -1329,5 +1356,130 @@ export const alertDismissals = pgTable(
       columns: [t.businessId, t.userId],
       foreignColumns: [users.businessId, users.id],
     }),
+  ],
+);
+
+// ---- Staff records and attendance (P2.3, design `docs/plans/2026-11-22-p2.3-staff-attendance-
+// design.md`; ADR 0048). Only the marks people make are stored: a day with no row takes its
+// default (`dayStatus` in packages/shared). ----
+
+// A person's pay, one row per change, never edited (`05` #3): the migration revokes UPDATE, so an
+// old slip can always be worked out again. The rate for a month is the row with the latest
+// `from_month` on or before it; two rows for one month: the later wins.
+export const salaryRates = pgTable(
+  'salary_rates',
+  {
+    id: id(),
+    businessId: ownBusinessId(),
+    userId: uuid('user_id').notNull(),
+    /** Always the 1st of a month. */
+    fromMonth: date('from_month', { mode: 'string' }).notNull(),
+    kind: text('kind').notNull(),
+    amountPaise: money('amount_paise').notNull(),
+    createdBy: uuid('created_by').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    unique('salary_rates_business_id_id_unique').on(t.businessId, t.id),
+    foreignKey({
+      name: 'salary_rates_user_fk',
+      columns: [t.businessId, t.userId],
+      foreignColumns: [users.businessId, users.id],
+    }),
+    foreignKey({
+      name: 'salary_rates_created_by_fk',
+      columns: [t.businessId, t.createdBy],
+      foreignColumns: [users.businessId, users.id],
+    }),
+    index('salary_rates_user_idx').on(t.businessId, t.userId, t.fromMonth),
+    check('salary_rates_kind_check', sql`${t.kind} in (${literals(SALARY_KINDS)})`),
+    check('salary_rates_amount_check', sql`${t.amountPaise} > 0`),
+    check('salary_rates_month_check', sql`extract(day from ${t.fromMonth}) = 1`),
+  ],
+);
+
+// One row per person per day, saved in place with a version: whoever saves second sees `409`.
+// The entry log keeps every before and after (ADR 0028).
+export const attendanceMarks = pgTable(
+  'attendance_marks',
+  {
+    id: id(),
+    businessId: ownBusinessId(),
+    userId: uuid('user_id').notNull(),
+    /** The person's home branch when the day was marked. */
+    branchId: uuid('branch_id').notNull(),
+    date: date('date', { mode: 'string' }).notNull(),
+    status: text('status').notNull(),
+    late: boolean('late').notNull().default(false),
+    overtimeMinutes: integer('overtime_minutes').notNull().default(0),
+    version: integer('version').notNull().default(1),
+    updatedBy: uuid('updated_by').notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    unique('attendance_marks_business_id_id_unique').on(t.businessId, t.id),
+    unique('attendance_marks_day_unique').on(t.businessId, t.userId, t.date),
+    foreignKey({
+      name: 'attendance_marks_user_fk',
+      columns: [t.businessId, t.userId],
+      foreignColumns: [users.businessId, users.id],
+    }),
+    foreignKey({
+      name: 'attendance_marks_branch_fk',
+      columns: [t.businessId, t.branchId],
+      foreignColumns: [branches.businessId, branches.id],
+    }),
+    foreignKey({
+      name: 'attendance_marks_updated_by_fk',
+      columns: [t.businessId, t.updatedBy],
+      foreignColumns: [users.businessId, users.id],
+    }),
+    // A branch's register for a day, and a person's month, both read by date.
+    index('attendance_marks_branch_idx').on(t.businessId, t.branchId, t.date),
+    check('attendance_marks_status_check', sql`${t.status} in (${literals(ATTENDANCE_STATUSES)})`),
+    check(
+      'attendance_marks_present_check',
+      sql`${t.status} = 'present' or (not ${t.late} and ${t.overtimeMinutes} = 0)`,
+    ),
+    check(
+      'attendance_marks_overtime_check',
+      sql`${t.overtimeMinutes} between 0 and 720 and ${t.overtimeMinutes} % 30 = 0`,
+    ),
+    check('attendance_marks_version_check', sql`${t.version} >= 1`),
+  ],
+);
+
+// The shop's closed days (`05` #7, #31). Removing one archives it (ADR 0007); `branch_id` null
+// closes every branch.
+export const shopHolidays = pgTable(
+  'shop_holidays',
+  {
+    id: id(),
+    businessId: ownBusinessId(),
+    date: date('date', { mode: 'string' }).notNull(),
+    name: text('name').notNull(),
+    branchId: uuid('branch_id'),
+    archivedAt: archivedAt(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    unique('shop_holidays_business_id_id_unique').on(t.businessId, t.id),
+    foreignKey({
+      name: 'shop_holidays_branch_fk',
+      columns: [t.businessId, t.branchId],
+      foreignColumns: [branches.businessId, branches.id],
+    }),
+    // One live holiday per scope per date: every branch, or one branch.
+    uniqueIndex('shop_holidays_live_all_unique')
+      .on(t.businessId, t.date)
+      .where(sql`${t.branchId} is null and ${t.archivedAt} is null`),
+    uniqueIndex('shop_holidays_live_branch_unique')
+      .on(t.businessId, t.branchId, t.date)
+      .where(sql`${t.branchId} is not null and ${t.archivedAt} is null`),
+    check('shop_holidays_name_check', sql`char_length(${t.name}) between 1 and 100`),
   ],
 );

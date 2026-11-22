@@ -56,9 +56,10 @@ describe('logins and sessions', () => {
   async function addStaff(businessId: string, username: string) {
     const hash = await hashPassword(PASSWORD);
     await query(
-      `insert into users (business_id, role, name, username, password_hash, home_branch_id)
+      `insert into users (business_id, role, name, username, password_hash, home_branch_id, joining_date)
        values ($1, 'staff', $2, $2, $3,
-               (select id from branches where business_id = $1 order by created_at, id limit 1))`,
+               (select id from branches where business_id = $1 order by created_at, id limit 1),
+               '2026-01-01')`,
       [businessId, username, hash],
     );
   }

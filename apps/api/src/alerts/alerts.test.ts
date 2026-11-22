@@ -100,8 +100,8 @@ describe('alerts', () => {
     permissions: readonly Permission[],
   ): Promise<Caller> {
     const { rows } = await admin.pool.query<{ id: string }>(
-      `insert into users (business_id, role, name, username, home_branch_id)
-       values ($1, 'staff', $2, $2, $3) returning id`,
+      `insert into users (business_id, role, name, username, home_branch_id, joining_date)
+       values ($1, 'staff', $2, $2, $3, '2026-01-01') returning id`,
       [owner.businessId, username, branchId],
     );
     return {

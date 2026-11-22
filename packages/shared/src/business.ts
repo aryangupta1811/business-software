@@ -65,5 +65,8 @@ export const PERMISSIONS = [
   // P1.13: find customers at the counter; add and edit them (`02` #2, #7).
   'customers.view',
   'customers.manage',
+  // P2.3: mark the branch's attendance; see other people's attendance (`05` #25, #26).
+  'attendance.mark',
+  'attendance.view_all',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];

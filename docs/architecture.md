@@ -35,6 +35,8 @@ flowchart LR
   ci["GitHub Actions"] -- "test, build, deploy via SSM (OIDC)" --> ec2
 ```
 
+**v1 (portfolio cut, 2026-11-22):** the WhatsApp Cloud API arrow is built after v1 (P2.8 in the backlog); in v1 the browser opens click-to-chat links the owner sends (ADR 0049), and the worker runs the queue and, with P1.15, PDFs.
+
 App and API share one domain, so session cookies work and there's no CORS [0009, 0011]. Also in AWS, not drawn: SSM Parameter Store (secrets), Systems Manager (deploys without an SSH port), CloudWatch (logs, alarms), AWS Budgets (credit-usage alert). Container images live in GitHub Container Registry or ECR. Everything is created by Terraform [0011].
 
 ## Inside the backend

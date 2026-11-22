@@ -19,6 +19,8 @@ Imported from the planning chat on claude.ai (29 Oct 2026). **This folder is now
 | 09 | AI assistant | DRAFT | `09-ai-assistant.md` |
 | — | Ideas not yet placed | Backlog | `ideas-backlog.md` |
 
+**v1 delivery (owner's portfolio cut, 2026-11-22):** a DECIDED module can have a "v1 delivery" section saying which of its points ship in v1 and which wait in `ideas-backlog.md` ("Deferred from v1"). Deferred points stay DECIDED and come back as whole tasks.
+
 ## What the labels mean
 
 - **DECIDED** — the owner confirmed it. Change only with the owner's OK, and add a line to the file's Change log.

@@ -88,6 +88,7 @@ Order by `id`: entries written in one transaction share `created_at` (it's the t
   pnpm db:migrate
   ```
   Locally it gets no password, so it can't log in over TCP; local backups use `postgres`.
+- **An `.env` made before 2026-11-21 misses newer keys** (`APP_QUEUE_PASSWORD`, `QUEUE_DATABASE_URL`, `MAIL_TRANSPORT`, `SMTP_URL`, `MAIL_FROM`, `APP_URL`), and `pnpm db:up` stops with "required variable … is missing a value". After pulling, compare the key names: `diff <(grep -oE '^[A-Z_]+=' .env.example | sort) <(grep -oE '^[A-Z_]+=' .env | sort)`, copy the missing ones from `.env.example`, and give the passwords random values.
 - **A volume made before 2026-11-21 has no `app_queue` role or `pgboss` schema,** so the worker fails to start with `password authentication failed for user "app_queue"`. Create them once (the file is safe to run again; it needs `APP_QUEUE_PASSWORD` from your `.env`):
   ```bash
   docker compose exec -T -e APP_QUEUE_PASSWORD=<the queue password from .env> db psql -U postgres -d postgres -v ON_ERROR_STOP=1 < packages/db/bootstrap/create-queue-role.sql

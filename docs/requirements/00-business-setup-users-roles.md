@@ -105,6 +105,15 @@ Added 2026-11-19 from the P1.4 design answers (owner took every recommendation):
 25. The app runs in **English, Hindi and Hinglish** (Hindi words written in English letters, e.g. "Bill banao"), switchable at any time. Whether bills also print in Hindi is decided in Module 02.
 26. Owner alerts are sent on **WhatsApp**. Details are decided in Module 07.
 
+## v1 delivery (the owner's portfolio cut, 2026-11-22 (`docs/plans/2026-11-17-fast-track.md`, section 9))
+
+The decided points above stay decided; this says what v1 ships and what waits in `ideas-backlog.md` ("Deferred from v1").
+
+- **#26 (owner alerts on WhatsApp):** in v1 alerts show in the app's bell (Module 07). Sending them on WhatsApp waits for the WhatsApp Cloud API task (P2.8, backlog).
+- **#1 (business-type features):** batch numbers, expiry dates, expiry alerts, sizes and colours, serial numbers and warranty are built by P1.10 (backlog).
+
+62. **Features not built in v1** (owner, 2026-11-22): Settings shows each of the switches above marked "Coming later". A business's choices (including its type's preset) are kept, so they take effect by themselves when P1.10 is built; nothing has to be set again.
+
 ## Open questions
 
 None. The five raised while importing were answered on 2026-11-02 (see the Change log).
@@ -122,3 +131,4 @@ None. The five raised while importing were answered on 2026-11-02 (see the Chang
 - 2026-11-21 — P1.5 design answers: the owner took all 7 recommendations in `docs/plans/2026-11-21-p1.5-staff-design.md` (section 8). Added #47–#53 (staff defaults, discounts off means limit 0, which actions ask the owner's password, Settings and Staff owner-only, My password, live permission changes, owner-set staff passwords). No decided point changed.
 - 2026-11-22 — P1.6 design answers: the owner took all 7 recommendations in `docs/plans/2026-11-22-p1.6-branches-design.md` (section 9). Added #54–#60 under Branches (the computer decides the branch, choosing a new computer's branch, moving a computer, staff's extra branches, per-branch invoice series, archiving, one-branch businesses). No decided point changed.
 - 2026-11-22 — P1.14 design answers (`docs/plans/2026-11-22-p1.14-save-bill-design.md` §9). **#8 and #58 changed:** CGST Rule 46(b) caps an invoice number at 16 characters, and the old example `ABC/AND/2026-27/001` was 19. Owner chose option A: one label, the short year, the number (`ABC/26-27/42`; with 2+ branches the label is the branch code, `AND/26-27/42`). Added #61.
+- 2026-11-22 — Portfolio cut (owner): v1 delivery section added; #62 "Coming later" switches. No decided point changed.

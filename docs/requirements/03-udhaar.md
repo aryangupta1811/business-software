@@ -42,6 +42,10 @@
 14. **Customer statement:** all bills and payments with the running balance, for any date range, as a PDF to print or send on WhatsApp.
 15. **Reminders on WhatsApp:** the app prepares the list, and the owner reviews it and sends with one click. An optional weekly automatic send exists, off by default.
 
+## v1 delivery (the owner's portfolio cut, 2026-11-22 (`docs/plans/2026-11-17-fast-track.md`, section 9))
+
+16. **Reminders and statements on WhatsApp in v1** (owner, 2026-11-22, #14, #15): the reminder list works as decided (the app prepares it, the owner reviews it); each customer's "Send on WhatsApp" opens WhatsApp Web or Desktop with a click-to-chat link, the number and the reminder (name, balance, oldest due date) filled in, and the owner presses send there. A statement PDF is downloaded and attached by hand. The optional weekly automatic send (#15) waits for the WhatsApp Cloud API task (P2.8, `ideas-backlog.md`). ADR 0049.
+
 ## Open questions
 
 None.
@@ -50,3 +54,4 @@ None.
 
 - 2026-10-29 — Draft created from the planning chat on claude.ai.
 - 2026-11-17 — Finalized with the owner in fast-track sitting 1. The owner confirmed every draft idea, chose Claude's recommendation on every question, and confirmed Claude's additions: #1 named customer, #4 oldest bills first, #5 30-day default, #6 advance balance.
+- 2026-11-22 — Portfolio cut (owner): #16 click-to-chat for reminders and statements in v1; the weekly automatic send waits for P2.8 (ADR 0049).

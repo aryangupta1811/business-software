@@ -45,6 +45,7 @@ Full detail is in `00-business-setup-users-roles.md`. Summary:
 - **No super-admin panel** in v1.
 - **Languages:** English, Hindi and Hinglish (Hindi in English letters).
 - **Owner alerts:** sent on WhatsApp.
+- **v1 delivery (owner's portfolio cut, 2026-11-22):** some decided features are built after v1 and wait in `ideas-backlog.md` ("Deferred from v1"). In v1, owner alerts are in the app's bell, and WhatsApp sharing is click-to-chat links the owner sends (ADR 0049). Each module's "v1 delivery" section says what ships.
 
 ## How it is used at the shop
 
@@ -145,3 +146,4 @@ Full detail is in `00-business-setup-users-roles.md`. Summary:
 - 2026-10-29 — Owner: hosting budget is ₹0 (AWS Free plan), not the ₹1,000/month first proposed; v1 runs online. ADR 0011 redesigned before it was committed.
 - 2026-10-30 — Owner (session 6, P0.5): Hinglish added as a third interface language (scope and NFR 7).
 - 2026-11-17 — Owner (fast-track sitting 1, D3): question 3 now names the model and cap, Claude Sonnet 5.5 with $15 a month (ADR 0015 dated note).
+- 2026-11-22 — Owner (portfolio cut): v1 delivery note added under Scope decisions. No decided point changed.

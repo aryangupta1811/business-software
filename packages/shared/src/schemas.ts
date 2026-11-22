@@ -5,6 +5,7 @@ import { newPassword, passwordProblem } from './auth.js';
 import type { SettingsAlertsInput } from './alerts.js';
 import { BUSINESS_TYPES, FEATURES, GST_STATUSES } from './business.js';
 import { email, isValidGstin, optionalText, phone, text } from './fields.js';
+import { INVOICE_PREFIX_PATTERN } from './invoice.js';
 import { isBranchStateCode } from './states.js';
 import { NEGATIVE_STOCK_SETTINGS } from './stock.js';
 
@@ -126,6 +127,15 @@ export const settingsStockSchema = z.strictObject({
 });
 export type SettingsStockInput = z.infer<typeof settingsStockSchema>;
 
+/**
+ * `00` #61: what starts a one-branch business's invoice numbers (`ABC/26-27/42`), 1 to 4 capital
+ * letters or digits; empty for none (`26-27/42`). Bills already saved keep their numbers.
+ */
+export const settingsInvoicesSchema = z.strictObject({
+  invoicePrefix: optionalCode(4, (value) => INVOICE_PREFIX_PATTERN.test(value)),
+});
+export type SettingsInvoicesInput = z.infer<typeof settingsInvoicesSchema>;
+
 /** What `GET /api/settings` answers, and every save returns. */
 export interface SettingsView {
   business: SettingsBusinessInput;
@@ -133,4 +143,5 @@ export interface SettingsView {
   security: SettingsSecurityInput;
   stock: SettingsStockInput;
   alerts: SettingsAlertsInput;
+  invoices: SettingsInvoicesInput;
 }

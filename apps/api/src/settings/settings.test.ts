@@ -149,6 +149,7 @@ describe('settings', () => {
         security: { ownerLockMinutes: 5, staffIdleMinutes: 30 },
         stock: { negativeStock: 'warn' },
         alerts: { types: ['low_stock', 'out_of_stock'] },
+        invoices: { invoicePrefix: null },
       },
     });
   });

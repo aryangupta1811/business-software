@@ -21,6 +21,8 @@ import { CLOCK, SYSTEM_CLOCK, type Clock } from './auth/clock.js';
 import { BranchesController } from './branches/branches.controller.js';
 import { BranchesService } from './branches/branches.service.js';
 import { BillingController } from './billing/billing.controller.js';
+import { BillsController } from './bills/bills.controller.js';
+import { BillsService } from './bills/bills.service.js';
 import { BillingService } from './billing/billing.service.js';
 import { HeldBillsController } from './billing/held-bills.controller.js';
 import { HeldBillsService } from './billing/held-bills.service.js';
@@ -66,6 +68,7 @@ export const API_CONTROLLERS = [
   StockController,
   BillingController,
   HeldBillsController,
+  BillsController,
   CustomersController,
   StaffController,
   BranchesController,
@@ -116,6 +119,7 @@ class ApiModule {
         StockService,
         BillingService,
         HeldBillsService,
+        BillsService,
         CustomersService,
         StaffService,
         BranchesService,

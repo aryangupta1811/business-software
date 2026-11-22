@@ -33,6 +33,7 @@ const VIEW: SettingsView = {
   security: { ownerLockMinutes: 5, staffIdleMinutes: 30 },
   stock: { negativeStock: 'warn' },
   alerts: { types: ['low_stock', 'out_of_stock'] },
+  invoices: { invoicePrefix: null },
 };
 
 const HEAD_OFFICE: BranchView = {

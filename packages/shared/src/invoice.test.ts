@@ -6,6 +6,7 @@ import {
   financialYear,
   invoiceLabel,
   invoiceNumber,
+  needsBuyerDetails,
   stockQuantity,
 } from './invoice.js';
 
@@ -96,5 +97,27 @@ describe('stockQuantity', () => {
     expect(stockQuantity(2_000, 25_000)).toBe(50_000);
     // Half a pack of 0.333 kg is 0.1665 kg: rounded half up to 0.167.
     expect(stockQuantity(500, 333)).toBe(167);
+  });
+});
+
+describe('needsBuyerDetails (Rule 46, 02 #26)', () => {
+  const check = (scheme: 'regular' | 'composition' | 'unregistered', taxablePaise: number) =>
+    needsBuyerDetails({ scheme, taxablePaise, buyerGstin: null });
+
+  it('starts at ₹50,000 of taxable value on a tax invoice', () => {
+    expect(check('regular', 4_999_999)).toBe(false);
+    expect(check('regular', 5_000_000)).toBe(true);
+  });
+
+  it('never asks for a registered buyer or a business without tax invoices', () => {
+    expect(
+      needsBuyerDetails({
+        scheme: 'regular',
+        taxablePaise: 9_000_000,
+        buyerGstin: '27AAAAA0000A1Z5',
+      }),
+    ).toBe(false);
+    expect(check('composition', 9_000_000)).toBe(false);
+    expect(check('unregistered', 9_000_000)).toBe(false);
   });
 });

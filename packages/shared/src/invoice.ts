@@ -1,6 +1,7 @@
 // Invoice numbers and the other small rules of saving a bill (P1.14, design
 // `docs/plans/2026-11-22-p1.14-save-bill-design.md`). Quantities in thousandths (ADR 0008).
 import type { TaxScheme } from './gst.js';
+import type { Paise } from './money.js';
 
 /** CGST Rule 46(b): a serial number of at most 16 characters (letters, digits, `-`, `/`). */
 export const INVOICE_NUMBER_MAX_LENGTH = 16;
@@ -85,4 +86,37 @@ export function stockQuantity(
   if (packSizeThousandths === null) return quantityThousandths;
   const product = BigInt(quantityThousandths) * BigInt(packSizeThousandths);
   return Number((2n * product + 1000n) / 2000n);
+}
+
+/** CGST Rule 46 (`02` #26): from this taxable value an unregistered buyer is named on the bill. */
+export const BUYER_DETAILS_TAXABLE_PAISE = 5_000_000;
+
+/**
+ * True when a tax invoice must carry the buyer's name, address and state: a regular business,
+ * a buyer without a GSTIN, and a taxable value (before GST) of ₹50,000 or more.
+ */
+export function needsBuyerDetails(input: {
+  scheme: TaxScheme;
+  taxablePaise: Paise;
+  buyerGstin: string | null;
+}): boolean {
+  return (
+    input.scheme === 'regular' &&
+    input.buyerGstin === null &&
+    input.taxablePaise >= BUYER_DETAILS_TAXABLE_PAISE
+  );
+}
+
+/** `POST /api/bills` answers this (`201`, or `200` for a retry of a saved bill). */
+export interface SavedBillView {
+  id: string;
+  /** As printed: `ABC/26-27/42`. */
+  number: string;
+  document: BillDocument;
+  businessDate: string;
+  grandTotalPaise: Paise;
+  /** Cash handed over beyond its amount. */
+  changePaise: Paise;
+  /** Goods the `warn` setting let go below zero: the counter shows a warning. */
+  warnings: { itemId: string; balanceAfter: number }[];
 }

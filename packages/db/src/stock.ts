@@ -45,6 +45,8 @@ export interface MoveStockInput {
   belowZero: 'refuse' | NegativeStockSetting;
   /** Idempotency (ADR 0007 rule 7), for a call with one line. Bills key the bill instead. */
   requestKey?: string;
+  /** The bill a `sale` belongs to (P1.14): every line of the call is that bill's. */
+  billId?: string;
   lines: readonly StockLine[];
 }
 
@@ -231,6 +233,7 @@ export async function moveStock(tx: Transaction, input: MoveStockInput): Promise
         note: line.note ?? null,
         actorId: input.actorId,
         requestKey: input.requestKey ?? null,
+        billId: input.billId ?? null,
       })
       .returning({ id: stockMovements.id });
     if (row === undefined) throw new Error('No movement row returned');

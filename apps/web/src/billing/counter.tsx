@@ -156,6 +156,11 @@ export function Counter({
   const sending = useRef(false);
   const [saved, setSaved] = useState<SavedBillView | null>(null);
   const [problem, setProblem] = useState<SaveProblem | null>(null);
+  /**
+   * The bill can't change while it is sending, nor after a lost answer: that send may have been
+   * saved, so only Enter (the same key) or Alt+N (a new bill, asked first) go on from there.
+   */
+  const locked = saving || problem?.kind === 'network';
   const queryClient = useQueryClient();
   const now = useNow(30_000);
   const held = useQuery({
@@ -210,7 +215,7 @@ export function Counter({
   };
 
   function add(item: CatalogueItem, packId: string | null, quantity: number | null) {
-    if (saving) return;
+    if (locked) return;
     if (context.scheme === 'regular' && (item.gstRate === null || item.hsn === null)) {
       setNotice({ kind: 'noGst', name: item.name });
       return;
@@ -282,7 +287,7 @@ export function Counter({
   }, [editing?.index]); // eslint-disable-line react-hooks/exhaustive-deps -- only when it opens
 
   function saveQuantity() {
-    if (editing === null || saving) return;
+    if (editing === null || locked) return;
     const line = bill.lines[editing.index];
     const item = line === undefined ? undefined : copy.get(line.itemId);
     const quantity = parseQuantity(editing.typed);
@@ -317,7 +322,7 @@ export function Counter({
   }
 
   function setPriceList(priceList: PriceList) {
-    if (saving) return;
+    if (locked) return;
     setBill(repriceBill({ ...bill, priceList }, copy).bill);
   }
 
@@ -374,7 +379,7 @@ export function Counter({
 
   /** F9: hold a bill with lines; on an empty one, show the branch's held bills. */
   function holdOrList() {
-    if (saving) return;
+    if (locked) return;
     if (bill.lines.length > 0) setHolding(true);
     else {
       void held.refetch();
@@ -445,7 +450,7 @@ export function Counter({
 
   /** F10: payment, once the owner has OK'd any discount above the limit (design §6, §8). */
   function pay() {
-    if (priced === null || saving) return;
+    if (priced === null || locked) return;
     if (needed !== null) setAsking(true);
     else setPaying(true);
   }
@@ -525,7 +530,7 @@ export function Counter({
     description: 'shortcuts.billCustomer',
     group: 'general',
     action: () => {
-      if (saving) return;
+      if (locked) return;
       setChoosingCustomer(true);
     },
   });
@@ -540,7 +545,7 @@ export function Counter({
     description: 'shortcuts.billQuantity',
     group: 'general',
     action: () => {
-      if (saving) return;
+      if (locked) return;
       const line = bill.lines[selected];
       if (line !== undefined) {
         setEditing({ index: selected, typed: formatQuantity(line.quantityThousandths) });
@@ -560,7 +565,7 @@ export function Counter({
     description: 'shortcuts.billLineDiscount',
     group: 'general',
     action: () => {
-      if (saving) return;
+      if (locked) return;
       if (selectedLine !== undefined) setDiscountFor('line');
     },
   });
@@ -569,7 +574,7 @@ export function Counter({
     description: 'shortcuts.billDiscount',
     group: 'general',
     action: () => {
-      if (saving) return;
+      if (locked) return;
       if (bill.lines.length > 0) setDiscountFor('bill');
     },
   });
@@ -584,7 +589,7 @@ export function Counter({
     description: 'shortcuts.billRemoveLine',
     group: 'general',
     action: () => {
-      if (saving) return;
+      if (locked) return;
       remove(selected);
     },
   });
@@ -751,7 +756,7 @@ export function Counter({
           placeOfSupplyStateCode={bill.placeOfSupplyStateCode}
           branchStateCode={context.branchStateCode}
           onOpen={() => {
-            if (!saving) setChoosingCustomer(true);
+            if (!locked) setChoosingCustomer(true);
           }}
         />
       </section>

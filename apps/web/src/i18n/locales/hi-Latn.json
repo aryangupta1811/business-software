@@ -1062,7 +1062,7 @@
         "invalid_quantity": "Is bill ki ek matra uski ikai se mel nahin khaati, jaise aadha piece. Matra theek karein.",
         "payments_mismatch": "Payment kul se mel nahin khaate. Dobara payment lein (F10).",
         "key_reused": "Yeh bill pehle hi alag saman ke saath save ho chuka hai, shayad connection tootne se pehle. Naya bill shuru karein (Alt+N) aur malik se jaanchwayein.",
-        "network": "Connection nahin hai. Bill abhi save nahin hua. Phir koshish karne ke liye Enter dabayein: bill do baar save nahin hoga.",
+        "network": "Connection nahin hai. Ho sakta hai bill save ho chuka ho. Jaanchne ke liye Enter dabayein: bill do baar save nahin hoga. Tab tak bill badla nahin ja sakta.",
         "failed": "Bill save nahin ho saka. Phir koshish karein; baar-baar ho to connection jaanchein."
       }
     }

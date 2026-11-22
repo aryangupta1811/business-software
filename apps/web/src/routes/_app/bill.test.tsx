@@ -529,11 +529,16 @@ describe('saving the bill at the counter', () => {
     const api = await paidBill(user, { 'POST /api/bills': lostThenSaved(3) });
     await user.keyboard('{Enter}');
     expect(
-      await screen.findByText(/No connection\. The bill is not saved yet/, undefined, {
+      await screen.findByText(/No connection\. The bill may already be saved/, undefined, {
         timeout: 6_000,
       }),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Save bill/ })).toBeEnabled();
+    // The first send may have been saved, so the bill can't change until an answer comes back:
+    // a changed bill under the same key would be refused, and a new key would sell it twice.
+    await user.type(await search(), '8901234567890{Enter}');
+    expect(rows()).toHaveLength(1);
+    expect(rows()[0]).toHaveTextContent('1 piece');
     await user.keyboard('{Enter}');
     await screen.findByText('Bill saved, ABC/26-27/42');
     expect(keysSent(api)).toHaveLength(4);

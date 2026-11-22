@@ -1062,7 +1062,7 @@
         "invalid_quantity": "A quantity on this bill doesn't fit its unit, like half a piece. Fix the quantity.",
         "payments_mismatch": "The payments don't match the total. Take payment again (F10).",
         "key_reused": "This bill was already saved with different contents, probably before the connection dropped. Start a new bill (Alt+N) and ask the owner to check.",
-        "network": "No connection. The bill is not saved yet. Press Enter to try again: it will not be saved twice.",
+        "network": "No connection. The bill may already be saved. Press Enter to check: it will never be saved twice. The bill can't be changed until then.",
         "failed": "The bill couldn't be saved. Try again; if it keeps failing, check the connection."
       }
     }

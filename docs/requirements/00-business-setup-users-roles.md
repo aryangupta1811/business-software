@@ -34,7 +34,7 @@
 ## Business details
 
 7. **Asked at signup** (kept short so signup is quick): business name, business type, phone, state, GST status, owner's email, and the owner's password. Email is the owner's login (#27) and the way to reset a forgotten password (#30). The password has at least 10 characters, with no forced symbols, and can't be the email or the phone number; one box with a show/hide button.
-8. **Filled later in settings:** owner name, address, PIN code, logo, GSTIN, PAN (optional), drug licence number (medical), FSSAI number (kirana / food), invoice number format (e.g. `ABC/2026-27/001`, restarting every April), terms & conditions footer, signature.
+8. **Filled later in settings:** owner name, address, PIN code, logo, GSTIN, PAN (optional), drug licence number (medical), FSSAI number (kirana / food), invoice number format (e.g. `ABC/26-27/42`, restarting every April; at most 16 characters, CGST Rule 46(b); see #61), terms & conditions footer, signature.
 9. **Not included:** bank name, account number, IFSC and UPI ID. Shop owners keep their own payment QR separately.
 10. The owner can edit these details later in settings, where a change is needed.
 11. *Proposed by Claude, owner did not object:* bills already issued keep the details they were printed with. Editing the address later must not change old GST bills.
@@ -48,9 +48,10 @@
 55. **A new computer** in a business with several branches: the owner's first login on it asks which branch it is in.
 56. **Moving a computer** to another branch is done in Settings with the owner's password, and logs out whoever is on it.
 57. **Staff in other branches** (#35): the owner ticks the extra branches per staff login. Staff log in only on computers at their home branch or a ticked one, and see only the branch they're logged in at (no picker).
-58. **Invoice numbers with several branches:** each branch has its own series, with its short code in the number (`ABC/AND/2026-27/001`). A business with one branch keeps its format unchanged (#8).
+58. **Invoice numbers with several branches:** each branch has its own series, with its short code in the number (`AND/26-27/42`, #61). A business with one branch keeps its format unchanged (#8).
 59. **Archiving a branch:** any branch except the head office (the first branch), once no active staff have it as their home branch. Its computers are logged out and forgotten, its stock and history stay readable, and it can be brought back. Never deleted.
 60. **A business with one branch** sees nothing about branches (no picker, no branch column, no code in invoice numbers) until it adds a second.
+61. **Invoice number format** (P1.14, owner 2026-11-22, option A): `label/yy-yy/number`, no zero padding, at most 16 characters (CGST Rule 46(b): letters, digits, `-` and `/`). With one branch the label is the business's invoice prefix (optional, up to 4 characters; without one: `26-27/42`); with 2+ branches it is the branch code, so a branch code used in numbers is 1 to 4 characters. A number is built when the bill is saved and never changes after.
 
 ## Users, roles & access
 
@@ -120,3 +121,4 @@ None. The five raised while importing were answered on 2026-11-02 (see the Chang
 - 2026-11-20 — Owner, after the review of P1.4 PR 2 (#37): recovery-key tries are limited per IP only (5 wrong keys an hour, counted apart from reset-link requests) and no longer per email, and a right key is never refused, so neither someone who knows the owner's email nor someone sharing the owner's IP can block the recovery key. #41 holds as written ("has its own limit and always gets the owner back in"); no decided point changed. Design section 7 updated.
 - 2026-11-21 — P1.5 design answers: the owner took all 7 recommendations in `docs/plans/2026-11-21-p1.5-staff-design.md` (section 8). Added #47–#53 (staff defaults, discounts off means limit 0, which actions ask the owner's password, Settings and Staff owner-only, My password, live permission changes, owner-set staff passwords). No decided point changed.
 - 2026-11-22 — P1.6 design answers: the owner took all 7 recommendations in `docs/plans/2026-11-22-p1.6-branches-design.md` (section 9). Added #54–#60 under Branches (the computer decides the branch, choosing a new computer's branch, moving a computer, staff's extra branches, per-branch invoice series, archiving, one-branch businesses). No decided point changed.
+- 2026-11-22 — P1.14 design answers (`docs/plans/2026-11-22-p1.14-save-bill-design.md` §9). **#8 and #58 changed:** CGST Rule 46(b) caps an invoice number at 16 characters, and the old example `ABC/AND/2026-27/001` was 19. Owner chose option A: one label, the short year, the number (`ABC/26-27/42`; with 2+ branches the label is the branch code, `AND/26-27/42`). Added #61.

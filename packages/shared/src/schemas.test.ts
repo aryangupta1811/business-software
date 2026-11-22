@@ -5,6 +5,7 @@ import { fieldErrors, type FieldErrors } from './fields.js';
 import {
   settingsBusinessSchema,
   settingsFeaturesSchema,
+  settingsInvoicesSchema,
   settingsSecuritySchema,
   settingsStockSchema,
   signupSchema,
@@ -224,5 +225,30 @@ describe('settingsStockSchema (Module 01 #12, owner answer 1A)', () => {
       negativeStock: 'invalid',
     });
     expect(errorsOf(settingsStockSchema, {})).toEqual({ negativeStock: 'invalid' });
+  });
+});
+
+describe('settingsInvoicesSchema (00 #61)', () => {
+  it('takes 1 to 4 capitals or digits, upper-casing what was typed', () => {
+    expect(settingsInvoicesSchema.parse({ invoicePrefix: ' abc ' })).toEqual({
+      invoicePrefix: 'ABC',
+    });
+    expect(settingsInvoicesSchema.parse({ invoicePrefix: 'A1B2' })).toEqual({
+      invoicePrefix: 'A1B2',
+    });
+  });
+
+  it('is null when left empty: numbers start with the year', () => {
+    expect(settingsInvoicesSchema.parse({ invoicePrefix: '' })).toEqual({ invoicePrefix: null });
+    expect(settingsInvoicesSchema.parse({ invoicePrefix: null })).toEqual({ invoicePrefix: null });
+  });
+
+  it('refuses a prefix that could make a number pass 16 characters, or other characters', () => {
+    expect(
+      errorsOf(settingsInvoicesSchema, { invoicePrefix: 'ABCDE' }).invoicePrefix,
+    ).toBeDefined();
+    expect(errorsOf(settingsInvoicesSchema, { invoicePrefix: 'A/B' })).toEqual({
+      invoicePrefix: 'invalid',
+    });
   });
 });

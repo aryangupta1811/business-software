@@ -22,11 +22,15 @@ export {
 } from './client.js';
 export { runMigrations } from './migrate.js';
 export { ENTRY_ACTIONS, recordEntry, type EntryAction, type EntryInput } from './entry-log.js';
+export { takeInvoiceSequence } from './invoices.js';
 export {
   alertDismissals,
   alerts,
   AUTH_TOKEN_KINDS,
   authTokens,
+  billLines,
+  billPayments,
+  bills,
   branches,
   businesses,
   categories,
@@ -34,6 +38,7 @@ export {
   devices,
   entryLog,
   heldBills,
+  invoiceCounters,
   itemBarcodes,
   itemBranchLevels,
   items,

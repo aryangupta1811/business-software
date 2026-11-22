@@ -284,7 +284,7 @@ describe('branches', () => {
       ]);
     });
 
-    it('refuses a code already in use (409) and codes that are not 1 to 6 capitals or digits', async () => {
+    it('refuses a code already in use (409) and codes that are not 1 to 4 capitals or digits', async () => {
       const shop = await signUp();
       await addBranch(shop, 'AND');
       expect(await shop.owner.call('POST', '/branches', branchBody('AND'))).toMatchObject({
@@ -296,7 +296,7 @@ describe('branches', () => {
         status: 409,
         body: { code: 'code_taken' },
       });
-      for (const code of ['', 'TOOLONG', 'A-B', 'A B']) {
+      for (const code of ['', 'ABCDE', 'TOOLONG', 'A-B', 'A B']) {
         expect(await shop.owner.call('POST', '/branches', branchBody(code))).toMatchObject({
           status: 400,
           body: { code: 'invalid_body' },

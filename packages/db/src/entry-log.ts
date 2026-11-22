@@ -10,6 +10,7 @@ export const ENTRY_ACTIONS = {
   'settings.alerts_changed': { reasonRequired: false }, // Module 07 #3, the app switches
   'stock.adjusted': { reasonRequired: true }, // Module 01 #11
   'stock.opening_set': { reasonRequired: false }, // Module 01 #9, P1.8
+  'bill.created': { reasonRequired: false }, // Module 02 #12, #14: with its discounts (P1.14)
   // Logins (sitting 2, 06 L2; Module 00 #20). Failed logins stay with the rate limit.
   'user.logged_in': { reasonRequired: false },
   'user.logged_out': { reasonRequired: false }, // after.cause: logout, idle, replaced

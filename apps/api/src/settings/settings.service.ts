@@ -19,6 +19,7 @@ import type {
   SettingsAlertsInput,
   SettingsBusinessInput,
   SettingsFeaturesInput,
+  SettingsInvoicesInput,
   SettingsSecurityInput,
   SettingsStockInput,
   SettingsView,
@@ -156,6 +157,23 @@ export class SettingsService {
     );
   }
 
+  /**
+   * `00` #61: the prefix of a one-branch business's invoice numbers. Saved bills keep the
+   * numbers they were given, so changing it renumbers nothing.
+   */
+  saveInvoices(caller: Caller, input: SettingsInvoicesInput): Promise<SettingsView> {
+    return this.save(
+      caller,
+      (current) => current.view.invoices,
+      input,
+      (tx) =>
+        tx
+          .update(businesses)
+          .set({ invoicePrefix: input.invoicePrefix, updatedAt: new Date() })
+          .where(eq(businesses.id, caller.businessId)),
+    );
+  }
+
   /** Locks, compares, writes and logs `action` with only the changed fields. */
   private save(
     caller: Caller,
@@ -223,6 +241,7 @@ export class SettingsService {
         },
         stock: { negativeStock: business.negativeStock as NegativeStockSetting },
         alerts: { types: business.alertTypes as AlertType[] },
+        invoices: { invoicePrefix: business.invoicePrefix },
       },
     };
   }

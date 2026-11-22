@@ -3,11 +3,13 @@ import {
   settingsAlertsSchema,
   settingsBusinessSchema,
   settingsFeaturesSchema,
+  settingsInvoicesSchema,
   settingsSecuritySchema,
   settingsStockSchema,
   type SettingsAlertsInput,
   type SettingsBusinessInput,
   type SettingsFeaturesInput,
+  type SettingsInvoicesInput,
   type SettingsSecurityInput,
   type SettingsStockInput,
   type SettingsView,
@@ -17,7 +19,7 @@ import type { Caller } from '../http/session.js';
 import { ZodBodyPipe } from '../http/zod-body.pipe.js';
 import { SettingsService } from './settings.service.js';
 
-/** Five cards on the settings page, each saved whole (PUT), each answering the full view. */
+/** The cards on the settings page, each saved whole (PUT), each answering the full view. */
 @Controller('settings')
 export class SettingsController {
   constructor(@Inject(SettingsService) private readonly settings: SettingsService) {}
@@ -77,5 +79,14 @@ export class SettingsController {
     @Body(new ZodBodyPipe(settingsAlertsSchema)) body: SettingsAlertsInput,
   ): Promise<SettingsView> {
     return this.settings.saveAlerts(caller, body);
+  }
+
+  @Permission('settings.manage')
+  @Put('invoices')
+  saveInvoices(
+    @CurrentCaller() caller: Caller,
+    @Body(new ZodBodyPipe(settingsInvoicesSchema)) body: SettingsInvoicesInput,
+  ): Promise<SettingsView> {
+    return this.settings.saveInvoices(caller, body);
   }
 }

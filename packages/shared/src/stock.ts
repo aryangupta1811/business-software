@@ -5,8 +5,8 @@ import { branchScope, optionalText, uuid } from './fields.js';
 import type { Paise } from './money.js';
 import type { BuiltInUnit } from './units.js';
 
-/** What a stock movement can be. Sales, purchases, transfers and counts add theirs later. */
-export const STOCK_MOVEMENT_KINDS = ['opening', 'adjustment'] as const;
+/** What a stock movement can be. Purchases, transfers and counts add theirs later. */
+export const STOCK_MOVEMENT_KINDS = ['opening', 'adjustment', 'sale'] as const;
 export type StockMovementKind = (typeof STOCK_MOVEMENT_KINDS)[number];
 
 /** Module 01 #12 (owner answer 1A): one switch for the whole business, `warn` by default. */

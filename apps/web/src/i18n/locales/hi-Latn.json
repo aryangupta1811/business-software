@@ -108,6 +108,12 @@
     "body": "Connection check karein, phir page dobara load karein.",
     "reload": "Page dobara load karein"
   },
+  "server": {
+    "connecting": "Server se connect ho rahe hain…",
+    "title": "Server se connect nahi ho pa raha",
+    "body": "Dekhein ki yeh computer online hai, phir dobara koshish karein. Jo aapne save kiya hai woh safe hai.",
+    "retry": "Dobara koshish karein"
+  },
   "signup": {
     "title": "Apne business ka account banayein",
     "lead": "Bas ek minute lagega. Baaki sab baad mein Settings mein.",
@@ -385,6 +391,7 @@
     "features": {
       "title": "Features",
       "lead": "Jo aapki dukaan ko chahiye, woh chaalu karein. Band features ki screens chhupi rehti hain.",
+      "comingLater": "Baad mein aayega",
       "useDefaults": "{{type}} ke liye default features lagayein"
     },
     "security": {

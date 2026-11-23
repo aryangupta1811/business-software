@@ -46,6 +46,16 @@
 
 16. **Reminders and statements on WhatsApp in v1** (owner, 2026-11-22, #14, #15): the reminder list works as decided (the app prepares it, the owner reviews it); each customer's "Send on WhatsApp" opens WhatsApp Web or Desktop with a click-to-chat link, the number and the reminder (name, balance, oldest due date) filled in, and the owner presses send there. A statement PDF is downloaded and attached by hand. The optional weekly automatic send (#15) waits for the WhatsApp Cloud API task (P2.8, `ideas-backlog.md`). ADR 0049.
 
+## The P1.18 design (owner's answers, 2026-11-23; `docs/plans/2026-11-23-p1.18-udhaar-design.md` section 9)
+
+17. **No credit limit set** means the owner can give any amount; staff need the owner's password for any udhaar to that customer.
+18. **Staff over the limit:** the bill stops at "Needs the owner's OK", and the owner's password lets that one bill through, in warn and block mode alike (fills in #10).
+19. **An advance** is used only when the cashier picks "From advance" as a payment row; it is never used automatically (fills in #6).
+20. **Opening balance:** the owner enters the udhaar from the old notebook once per customer, with an "as of" date and a note; it is in the entry log.
+21. **A payment recorded by mistake** is reversed by the owner with a reason and their password: a reversing line, never an edit or a delete.
+22. **A bill's due date** is fixed when the bill is saved (bill date + the customer's due days then); changing the due days later doesn't move old bills (fills in #5).
+23. **Recording payments** needs "Sell at the counter" and no other switch (fills in #11).
+
 ## Open questions
 
 None.
@@ -55,3 +65,4 @@ None.
 - 2026-10-29 — Draft created from the planning chat on claude.ai.
 - 2026-11-17 — Finalized with the owner in fast-track sitting 1. The owner confirmed every draft idea, chose Claude's recommendation on every question, and confirmed Claude's additions: #1 named customer, #4 oldest bills first, #5 30-day default, #6 advance balance.
 - 2026-11-22 — Portfolio cut (owner): #16 click-to-chat for reminders and statements in v1; the weekly automatic send waits for P2.8 (ADR 0049).
+- 2026-11-23 — P1.18 design answers (owner took every recommendation, `docs/plans/2026-11-23-p1.18-udhaar-design.md` §9): added #17–#23. They fill in #5, #6, #10 and #11; no earlier point changed.

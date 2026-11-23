@@ -33,6 +33,8 @@ export function failureText(t: TFunction, error: unknown): string {
   if (error instanceof ApiError) {
     if (error.code === 'invalid_permissions') return t('staff.errors.invalid_permissions');
     if (error.code === 'not_found') return t('staff.errors.not_found');
+    if (error.code === 'marks_before_joining') return t('staff.errors.marks_before_joining');
+    if (error.code === 'stale') return t('staff.errors.stale');
     if (error.code === 'forbidden') return t('errors.forbidden');
     if (error.code === 'network') return t('errors.network');
   }

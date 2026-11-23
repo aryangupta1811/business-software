@@ -62,6 +62,7 @@ function stubApi(load: { status: number; body: unknown }, branches: BranchView[]
     if (url === '/api/session') return Promise.resolve(Response.json(OWNER_SESSION));
     if (url === '/api/settings') return Promise.resolve(Response.json(load.body, load));
     if (url === '/api/devices') return Promise.resolve(Response.json([]));
+    if (url.startsWith('/api/holidays')) return Promise.resolve(Response.json([]));
     if (url.startsWith('/api/branches')) return Promise.resolve(Response.json(branches));
     if (url.startsWith('/api/settings/')) {
       const card = url.slice('/api/settings/'.length);

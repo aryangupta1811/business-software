@@ -1,8 +1,11 @@
 import {
+  businessDate,
   effectivePermissions,
   type BranchView,
   type ItemsContext,
   type Permission,
+  type SalaryInput,
+  type SalaryRateView,
   type StaffView,
 } from '@business-software/shared';
 import type { FakeAnswer } from './fake-api';
@@ -37,6 +40,20 @@ export const FORMER: StaffView = {
   name: 'Suresh Kumar',
   username: 'suresh',
   active: false,
+};
+
+/** A person kept for attendance and salary only: no login (`00` #19). */
+export const HELPER: StaffView = {
+  ...CASHIER,
+  id: '00000000-0000-4000-8000-0000000000a3',
+  name: 'Raju Singh',
+  username: null,
+  phone: '9876543210',
+  joiningDate: '2026-03-01',
+  weeklyOffDay: 0,
+  paidLeavesPerMonth: 2,
+  overtimeRatePaise: 8000,
+  salary: { fromMonth: '2026-04-01', kind: 'monthly', amountPaise: 1_200_000 },
 };
 
 /** What `GET /api/items/context` answers the owner. */
@@ -87,7 +104,7 @@ export function staffRoutes(
   initial: StaffView[],
   branches = [{ id: BRANCH_ID, name: 'Main shop' }],
 ) {
-  const state = { staff: [...initial] };
+  const state = { staff: [...initial], rates: {} as Record<string, SalaryRateView[]> };
   const change = (id: string, patch: Partial<StaffView>): StaffView | undefined => {
     const index = state.staff.findIndex((person) => person.id === id);
     const current = state.staff[index];
@@ -104,24 +121,27 @@ export function staffRoutes(
       body: state.staff.filter((person) => person.active || url.includes('includeInactive=true')),
     }),
     'POST /api/staff': (body) => {
-      if (owner(body) !== OWNER_PASSWORD) return wrongPassword();
-      const input = body as {
+      const input = body as Omit<Partial<StaffView>, 'salary'> & {
         name: string;
-        username: string;
+        username?: string;
         homeBranchId: string;
         permissions?: Permission[];
         discountLimitBasisPoints?: number | null;
+        salary?: SalaryInput;
       };
+      // A record without a login needs no owner's password (`00` #19).
+      if (input.username !== undefined && owner(body) !== OWNER_PASSWORD) return wrongPassword();
+      const month = `${businessDate(new Date()).slice(0, 7)}-01`;
       const person: StaffView = {
         id: '00000000-0000-4000-8000-0000000000a9',
         name: input.name,
-        username: input.username,
-        phone: null,
-        joiningDate: '2026-11-19',
-        weeklyOffDay: null,
-        paidLeavesPerMonth: 0,
-        overtimeRatePaise: null,
-        salary: null,
+        username: input.username ?? null,
+        phone: input.phone ?? null,
+        joiningDate: input.joiningDate ?? businessDate(new Date()),
+        weeklyOffDay: input.weeklyOffDay ?? null,
+        paidLeavesPerMonth: input.paidLeavesPerMonth ?? 0,
+        overtimeRatePaise: input.overtimeRatePaise ?? null,
+        salary: input.salary === undefined ? null : { fromMonth: month, ...input.salary },
         version: 1,
         homeBranchId: input.homeBranchId,
         homeBranchName: 'Main shop',
@@ -157,6 +177,34 @@ export function staffRoutes(
     };
     routes[`POST ${base}/password`] = (body) =>
       owner(body) === OWNER_PASSWORD ? { status: 204 } : wrongPassword();
+    routes[`POST ${base}/login`] = (body) => {
+      if (owner(body) !== OWNER_PASSWORD) return wrongPassword();
+      const input = body as { username: string };
+      if (input.username === 'taken') return { status: 409, body: { code: 'username_taken' } };
+      return { body: change(person.id, { username: input.username.toLowerCase() }) };
+    };
+    routes[`GET ${base}/salary-rates`] = () => ({ body: state.rates[person.id] ?? [] });
+    routes[`POST ${base}/salary-rates`] = (body) => {
+      const input = body as SalaryInput & { fromMonth: string };
+      const thisMonth = businessDate(new Date()).slice(0, 7);
+      if (input.fromMonth < thisMonth) {
+        return { status: 400, body: { code: 'invalid_body', fields: { fromMonth: 'past_month' } } };
+      }
+      const rate: SalaryRateView = {
+        id: `00000000-0000-4000-8000-0000000000d${String((state.rates[person.id] ?? []).length)}`,
+        fromMonth: `${input.fromMonth}-01`,
+        kind: input.kind,
+        amountPaise: input.amountPaise,
+        createdAt: '2026-11-19T10:00:00.000Z',
+      };
+      state.rates[person.id] = [rate, ...(state.rates[person.id] ?? [])];
+      if (input.fromMonth === thisMonth) {
+        change(person.id, {
+          salary: { fromMonth: rate.fromMonth, kind: rate.kind, amountPaise: rate.amountPaise },
+        });
+      }
+      return { status: 201, body: rate };
+    };
     routes[`POST ${base}/deactivate`] = () => ({ body: change(person.id, { active: false }) });
     routes[`POST ${base}/reactivate`] = (body) =>
       owner(body) === OWNER_PASSWORD

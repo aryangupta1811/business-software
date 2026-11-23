@@ -925,6 +925,13 @@ describe('staff records, attendance and holidays', () => {
         [shop.businessId],
       );
       expect((await month(shop.owner, owner?.id ?? '')).status).toBe(404);
+      // Whose months can be opened: the switch's own branch, or every branch for the owner.
+      const people = (browser: Browser) => browser.call('GET', '/attendance/people');
+      expect(await people(own)).toMatchObject({ status: 403, body: { code: 'forbidden' } });
+      const names = async (browser: Browser) =>
+        as<{ id: string; name: string }[]>(await people(browser)).map((entry) => entry.name);
+      expect(await names(all)).toEqual(['PLAIN', 'Raju', 'VIEWER']);
+      expect(await names(shop.owner)).toEqual(['Asha', 'PLAIN', 'Raju', 'VIEWER']);
       // A month can't be asked for as a day.
       expect(
         (await shop.owner.call('GET', `/attendance/month?userId=${raju.id}&month=2026-11-01`))

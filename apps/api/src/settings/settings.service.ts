@@ -1,9 +1,11 @@
 import { ConflictException, Inject, Injectable } from '@nestjs/common';
 import {
+  and,
   asc,
   branches,
   businesses,
   eq,
+  invoiceCounters,
   recordEntry,
   users,
   withBusiness,
@@ -11,6 +13,7 @@ import {
   type EntryAction,
   type Transaction,
 } from '@business-software/db';
+import { businessDate, financialYear } from '@business-software/shared';
 import type {
   AlertType,
   BusinessType,
@@ -60,7 +63,7 @@ export class SettingsService {
 
   read(caller: Caller): Promise<SettingsView> {
     return withBusiness(this.database.db, caller.businessId, async (tx) => {
-      return (await this.load(tx, caller.businessId, false)).view;
+      return (await this.load(tx, caller, false)).view;
     });
   }
 
@@ -193,7 +196,7 @@ export class SettingsService {
     action: EntryAction = 'business.updated',
   ): Promise<SettingsView> {
     return withBusiness(this.database.db, caller.businessId, async (tx) => {
-      const current = await this.load(tx, caller.businessId, true);
+      const current = await this.load(tx, caller, true);
       const changed = changes(section(current), input);
       if (changed === null) return current.view;
       await write(tx, current);
@@ -204,12 +207,12 @@ export class SettingsService {
         entityId: caller.businessId,
         ...changed,
       });
-      return (await this.load(tx, caller.businessId, false)).view;
+      return (await this.load(tx, caller, false)).view;
     });
   }
 
-  private async load(tx: Transaction, businessId: string, lock: boolean): Promise<Current> {
-    const query = tx.select().from(businesses).where(eq(businesses.id, businessId));
+  private async load(tx: Transaction, caller: Caller, lock: boolean): Promise<Current> {
+    const query = tx.select().from(businesses).where(eq(businesses.id, caller.businessId));
     const [business] = lock ? await query.for('update') : await query;
     // The business details are the head office's: the oldest branch (P1.6), which is never
     // archived. Other branches are edited on their own card.
@@ -225,6 +228,14 @@ export class SettingsService {
     if (business === undefined || branch === undefined || owner === undefined) {
       throw new Error('Business, head office or owner not found');
     }
+    // The counter holds the last number given; no row yet means the next number is 1.
+    const year = financialYear(businessDate(new Date()));
+    const [counter] = await tx
+      .select({ lastNumber: invoiceCounters.lastNumber })
+      .from(invoiceCounters)
+      .where(
+        and(eq(invoiceCounters.branchId, caller.branchId), eq(invoiceCounters.financialYear, year)),
+      );
     return {
       branchId: branch.id,
       ownerId: owner.id,
@@ -252,6 +263,7 @@ export class SettingsService {
         stock: { negativeStock: business.negativeStock as NegativeStockSetting },
         alerts: { types: business.alertTypes as AlertType[] },
         invoices: { invoicePrefix: business.invoicePrefix },
+        nextInvoice: { financialYear: year, sequence: (counter?.lastNumber ?? 0) + 1 },
       },
     };
   }

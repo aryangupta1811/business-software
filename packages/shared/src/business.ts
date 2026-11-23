@@ -25,6 +25,19 @@ export const FEATURES = [
 export type Feature = (typeof FEATURES)[number];
 
 /**
+ * Switches for features P1.10 builds (`00` #62): Settings shows them as "Coming later" and
+ * can't change them, but the stored choices are kept and still sent back on every save.
+ */
+export const DEFERRED_FEATURES: readonly Feature[] = [
+  'batches',
+  'expiry_dates',
+  'expiry_alerts',
+  'variants',
+  'serial_numbers',
+  'warranty',
+];
+
+/**
  * What each business type switches on at signup (#1). The owner can change any later (#3).
  * Each list is in `FEATURES` order, the order settings saves in, so a first save of the same
  * features isn't logged as a change.

@@ -1,12 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
-  businessDate,
   BUSINESS_TYPES,
+  DEFERRED_FEATURES,
   ALERT_TYPES,
   FEATURE_PRESETS,
   FEATURES,
   BRANCH_STATES,
-  financialYear,
   GST_STATUSES,
   invoiceNumber,
   settingsAlertsSchema,
@@ -16,6 +15,7 @@ import {
   settingsSecuritySchema,
   settingsStockSchema,
   type BusinessType,
+  type Feature,
   type SettingsAlertsInput,
   type SettingsBusinessInput,
   type SettingsFeaturesInput,
@@ -38,6 +38,7 @@ import { useTranslation } from 'react-i18next';
 import type { z } from 'zod';
 import { ApiError, apiRequest } from '../../api/client';
 import { useBranches } from '../../api/branches';
+import { useSession } from '../../api/session';
 import { BranchesCard } from '../../branches/branches-card';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -104,7 +105,7 @@ function Settings() {
         <FeaturesCard saved={view.features} businessType={view.business.businessType} />
         <SecurityCard saved={view.security} />
         <StockCard saved={view.stock} />
-        <InvoicesCard saved={view.invoices} />
+        <InvoicesCard saved={view.invoices} next={view.nextInvoice} />
         <AlertsCard saved={view.alerts} />
         <PasswordCard />
       </div>
@@ -317,6 +318,8 @@ function BusinessCard({ saved }: { saved: SettingsBusinessInput }) {
 const inListOrder = (features: readonly string[]) =>
   FEATURES.filter((feature) => features.includes(feature));
 
+const isLater = (feature: Feature) => DEFERRED_FEATURES.includes(feature);
+
 function FeaturesCard({
   saved,
   businessType,
@@ -326,14 +329,17 @@ function FeaturesCard({
 }) {
   const { t } = useTranslation();
   const errorText = useFieldError();
+  // The form holds only the switches that work; the ones built later (`00` #62) are shown
+  // as they are stored and go back with every save, so nothing is lost.
+  const stored = saved.filter(isLater);
   const form = useForm<SettingsFeaturesInput>({
     resolver: zodResolver(settingsFeaturesSchema),
-    defaultValues: { features: [...saved] },
+    defaultValues: { features: saved.filter((feature) => !isLater(feature)) },
   });
   const { save, state } = useSave<SettingsFeaturesInput>('features', form.setError, (view) => {
-    form.reset({ features: [...view.features] });
+    form.reset({ features: view.features.filter((feature) => !isLater(feature)) });
   });
-  const preset = FEATURE_PRESETS[businessType];
+  const preset = FEATURE_PRESETS[businessType].filter((feature) => !isLater(feature));
   const ticked = useWatch({ control: form.control, name: 'features' });
   // Changing the type keeps the switches (a kirana that also sells stationery keeps its own);
   // the type's defaults are one click away (design §7).
@@ -348,7 +354,9 @@ function FeaturesCard({
       dirty={form.formState.isDirty}
       submitting={form.formState.isSubmitting}
       onSubmit={() =>
-        void form.handleSubmit((input) => save({ features: inListOrder(input.features) }))()
+        void form.handleSubmit((input) =>
+          save({ features: inListOrder([...input.features, ...stored]) }),
+        )()
       }
     >
       <ChoiceCards
@@ -356,7 +364,15 @@ function FeaturesCard({
         label={t('settings.features.title')}
         columns="grid-cols-3"
         error={errorText('features', form.formState.errors.features?.message)}
-        choices={FEATURES.map((feature) => ({ value: feature, title: t(`features.${feature}`) }))}
+        choices={FEATURES.map((feature) => ({
+          value: feature,
+          title: t(`features.${feature}`),
+          ...(isLater(feature) && {
+            disabled: true,
+            checked: stored.includes(feature),
+            hint: t('settings.features.comingLater'),
+          }),
+        }))}
         inputProps={form.register('features')}
       />
       {!matchesPreset && (
@@ -505,7 +521,13 @@ type InvoicesForm = z.input<typeof settingsInvoicesSchema>;
  * and by the server (archived branches count too): with two branches the code starts the number,
  * and the two would hand out the same numbers.
  */
-function InvoicesCard({ saved }: { saved: SettingsInvoicesInput }) {
+function InvoicesCard({
+  saved,
+  next,
+}: {
+  saved: SettingsInvoicesInput;
+  next: SettingsView['nextInvoice'];
+}) {
   const { t } = useTranslation();
   const errorText = useFieldError();
   const branches = useBranches();
@@ -524,10 +546,13 @@ function InvoicesCard({ saved }: { saved: SettingsInvoicesInput }) {
   const all = branches.data ?? [];
   const typed = useWatch({ control: form.control, name: 'invoicePrefix' });
   const parsed = settingsInvoicesSchema.safeParse({ invoicePrefix: typed });
-  const year = financialYear(businessDate(new Date()));
-  const example = (label: string | null) =>
-    invoiceNumber({ label, financialYear: year, sequence: 42 });
+  const session = useSession();
   const several = all.filter((branch) => !branch.archived).length >= 2;
+  const numberFor = (label: string | null, sequence: number) =>
+    invoiceNumber({ label, financialYear: next.financialYear, sequence });
+  // The next bill of this computer's branch: with two branches its code starts the number.
+  const branchCode = session.data?.state === 'active' ? session.data.branch.code : null;
+  const label = several ? branchCode : parsed.success ? parsed.data.invoicePrefix : null;
 
   return (
     <SettingsCard
@@ -560,15 +585,15 @@ function InvoicesCard({ saved }: { saved: SettingsInvoicesInput }) {
           />
         )}
       </Field>
-      {parsed.success && (
+      {(several || parsed.success) && (
         <p className="text-muted">
-          {t('settings.invoices.example', { number: example(parsed.data.invoicePrefix) })}
+          {t('settings.invoices.example', { number: numberFor(label, next.sequence) })}
         </p>
       )}
       {several && (
         <p className="text-label text-muted">
           {t('settings.invoices.branches', {
-            number: example(all.find((branch) => branch.headOffice)?.code ?? null),
+            number: numberFor(all.find((branch) => branch.headOffice)?.code ?? null, 42),
           })}
         </p>
       )}

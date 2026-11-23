@@ -6,6 +6,12 @@ export interface Choice {
   title: string;
   hint?: string;
   icon?: ReactNode;
+  /**
+   * Shown but not part of the form: it can't be changed, and `checked` says how it shows. For
+   * choices kept as they are, such as a feature that isn't built yet.
+   */
+  disabled?: boolean;
+  checked?: boolean;
 }
 
 /**
@@ -45,13 +51,15 @@ export function ChoiceCards({
         {choices.map((choice) => (
           <label
             key={choice.value}
-            className="flex min-h-14 cursor-pointer items-start gap-3 rounded-lg border border-input-border bg-surface px-3 py-2.5 has-checked:border-primary has-checked:bg-surface-muted has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary"
+            className="flex min-h-14 cursor-pointer items-start has-disabled:cursor-not-allowed has-disabled:opacity-60 gap-3 rounded-lg border border-input-border bg-surface px-3 py-2.5 has-checked:border-primary has-checked:bg-surface-muted has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary"
           >
             <input
               type={type}
               value={choice.value}
               className="sr-only"
-              {...inputProps}
+              {...(choice.disabled
+                ? { disabled: true, defaultChecked: choice.checked }
+                : inputProps)}
               {...(choice.hint && { 'aria-describedby': `${id}-${choice.value}-hint` })}
             />
             {choice.icon && (

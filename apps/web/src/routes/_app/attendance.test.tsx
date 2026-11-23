@@ -352,7 +352,9 @@ function openMonth(session: ActiveSession, path: string, people: FakePerson[] = 
   const api = fakeApi(session, {
     ...register.routes,
     'GET /api/attendance/month': monthRoute(people),
-    'GET /api/staff': { body: people.map((p) => ({ id: p.id, name: p.name, active: true })) },
+    'GET /api/attendance/people': {
+      body: people.map((p) => ({ id: p.id, name: p.name, homeBranchId: 'branch', active: true })),
+    },
   });
   renderAt(path);
   return api;
@@ -411,12 +413,9 @@ test('staff without "See everyone\'s attendance" see only their own month, with 
   expect(monthRequests(api)).toEqual([`/api/attendance/month?userId=${self.id}&month=2026-10`]);
 });
 
-test('a login with "See everyone\'s attendance" and the register picks from the branch\'s people', async () => {
+test('a login with only "See everyone\'s attendance" picks from the branch\'s people', async () => {
   const self: FakePerson = { id: STAFF_SESSION.user.id, name: 'Meena' };
-  const api = openMonth(staffWith('attendance.mark', 'attendance.view_all'), '/attendance/month', [
-    RAJU,
-    self,
-  ]);
+  const api = openMonth(staffWith('attendance.view_all'), '/attendance/month', [RAJU, self]);
   const picker = await screen.findByLabelText('Person');
   expect(
     within(picker)

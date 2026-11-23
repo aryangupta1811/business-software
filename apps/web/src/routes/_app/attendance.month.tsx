@@ -2,9 +2,8 @@ import { businessDate } from '@business-software/shared';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useMonth, useRegister } from '../../api/attendance';
+import { useAttendancePeople, useMonth } from '../../api/attendance';
 import { useSession } from '../../api/session';
-import { useStaffList } from '../../api/staff';
 import { MonthCountsCard, MonthGrid } from '../../attendance/month-grid';
 import { AttendanceTabs } from '../../attendance/tabs';
 import { Button } from '../../components/ui/button';
@@ -55,16 +54,14 @@ function MonthPage() {
   const thisMonth = today.slice(0, 7);
   const month = search.month ?? thisMonth;
 
-  // Who can be picked. The owner reads the staff list; a login with "See everyone's attendance"
-  // and the register reads the branch's people from it; anyone else sees only themselves.
-  const fromList = isOwner;
-  const fromRegister = !isOwner && may('attendance.view_all') && may('attendance.mark');
-  const list = useStaffList(true, fromList);
-  const register = useRegister(today, undefined, fromRegister);
-  const picking = fromList || fromRegister;
-  const choices: Choice[] = fromList
-    ? (list.data ?? []).map((person) => ({ id: person.id, name: person.name }))
-    : (register.data?.rows ?? []).map((row) => ({ id: row.userId, name: row.name }));
+  // Who can be picked: the owner everyone, "See everyone's attendance" its own branch's people;
+  // anyone else sees only themselves.
+  const picking = isOwner || may('attendance.view_all');
+  const list = useAttendancePeople(picking);
+  const choices: Choice[] = (list.data ?? []).map((person) => ({
+    id: person.id,
+    name: person.name,
+  }));
 
   const person = !picking
     ? meId
@@ -84,7 +81,7 @@ function MonthPage() {
         {picking ? t('attendance.month.lead') : t('attendance.month.onlyOwn')}
       </p>
 
-      <LoadGate queries={fromList ? [list] : fromRegister ? [register] : []}>
+      <LoadGate queries={picking ? [list] : []}>
         {() => (
           <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-end gap-3">

@@ -379,6 +379,15 @@ export interface MonthDay {
   state: DayState | null;
 }
 
+/** `GET /api/attendance/people`: whose months the caller may open (owner: everyone; else `view_all`, own branch). */
+export interface AttendancePerson {
+  id: string;
+  name: string;
+  homeBranchId: string;
+  /** False once deactivated: their past months stay readable. */
+  active: boolean;
+}
+
 export interface MonthView {
   userId: string;
   name: string;

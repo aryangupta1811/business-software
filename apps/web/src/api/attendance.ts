@@ -2,6 +2,7 @@
 // and the shop holidays.
 import type {
   AttendanceMarkInput,
+  AttendancePerson,
   HolidayInput,
   HolidayView,
   MonthView,
@@ -34,6 +35,15 @@ export const useRegister = (date: string, branch: string | undefined, enabled = 
 
 export const markAttendance = (userId: string, date: string, input: AttendanceMarkInput) =>
   apiRequest<RegisterRow>('PUT', `/api/attendance/${userId}/${date}`, input);
+
+/** Whose months the caller may open (the owner, or "See everyone's attendance"). */
+export const useAttendancePeople = (enabled: boolean) =>
+  useQuery({
+    queryKey: [...ATTENDANCE_KEY, 'people'],
+    queryFn: () => apiRequest<AttendancePerson[]>('GET', '/api/attendance/people'),
+    enabled,
+    retry: false,
+  });
 
 /** One person's month; `userId` null waits until it is known. */
 export const useMonth = (userId: string | null, month: string) =>

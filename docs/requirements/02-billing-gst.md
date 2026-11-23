@@ -71,6 +71,16 @@
 
 27. **Sharing on WhatsApp in v1** (owner, 2026-11-22, #16): "Send on WhatsApp" opens WhatsApp Web or Desktop with a click-to-chat link, the customer's number and a short message filled in; the owner presses send there. The PDF is downloaded and attached by hand. Sending from the app through the WhatsApp Cloud API waits for P2.8 (backlog). ADR 0049.
 
+## The P1.15 design (owner's answers, 2026-11-23; `docs/plans/2026-11-23-p1.15-printing-design.md` section 9)
+
+28. **PDFs** are made by the worker with Chromium (its own image), as a queue job, and kept once made (ADR 0014).
+29. **Receipt size (80 or 58 mm) and auto-print** are set per counter computer, not per business.
+30. **Auto-print** is on by default: the receipt prints when the bill is saved; `P` reprints.
+31. **A bill with the buyer's GSTIN** prints on A4 by default; `P` still gives the receipt (fills in #16).
+32. **The Bills page:** staff with "Sell at the counter" see their branch's bills; the owner sees every branch's. Reprints are in the entry log.
+33. **A reprint** says "Reprint" and its date under the title.
+34. **The PDF's language** is always the business's bill language (#17).
+
 ## Open questions
 
 None.
@@ -84,3 +94,4 @@ None.
 - 2026-11-21 — The owner answered the P1.13 design's 12 questions (`docs/plans/2026-11-20-p1.13-billing-design.md` §16), taking every recommendation: the billing key table; the same item scanned again adds to its line; no typed prices (a lower price is a discount); the staff limit applies per line and to the bill total; the owner's OK is given with the discount and lasts 30 minutes for that bill; held bills on the server per branch; discarding an unsaved bill is logged; an unknown code offers a quick "Add item"; a B2B buyer from another state gets IGST by default with a "delivered at the counter" switch; wholesale is one switch per bill; no scale barcodes in v1; 1.5% joins the GST rates. They fill in #5, #8, #11 and #12; no earlier point changed.
 - 2026-11-22 — P1.14 design answers (`docs/plans/2026-11-22-p1.14-save-bill-design.md` §9). **#25 changed:** the GSTIN checked before a tax invoice is the selling branch's, the one printed on the bill (ADR 0045); for a one-branch business that is still the head office. Added #26 (Rule 46's ₹50,000 is the taxable value).
 - 2026-11-22 — Portfolio cut (owner): #9 quotations deferred; #27 WhatsApp sharing by click-to-chat link in v1 (ADR 0049).
+- 2026-11-23 — P1.15 design answers (owner took every recommendation, `docs/plans/2026-11-23-p1.15-printing-design.md` §9): added #28–#34. They fill in #16 and #17; no earlier point changed.

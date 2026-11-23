@@ -108,6 +108,12 @@
     "body": "Check the connection, then reload the page.",
     "reload": "Reload the page"
   },
+  "server": {
+    "connecting": "Connecting to the server…",
+    "title": "Can't reach the server",
+    "body": "Check that this computer is online, then try again. Nothing you saved is lost.",
+    "retry": "Try again"
+  },
   "signup": {
     "title": "Create your business account",
     "lead": "It takes a minute. Everything else can wait for Settings.",
@@ -385,6 +391,7 @@
     "features": {
       "title": "Features",
       "lead": "Switch on what your shop needs. Screens for switched-off features stay hidden.",
+      "comingLater": "Coming later",
       "useDefaults": "Use the defaults for {{type}}"
     },
     "security": {

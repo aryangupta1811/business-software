@@ -144,4 +144,6 @@ export interface SettingsView {
   stock: SettingsStockInput;
   alerts: SettingsAlertsInput;
   invoices: SettingsInvoicesInput;
+  /** The next bill number in the caller's branch: this year's counter plus one (1 if none yet). */
+  nextInvoice: { financialYear: string; sequence: number };
 }

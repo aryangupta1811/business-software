@@ -40,6 +40,7 @@ const SETTINGS: SettingsView = {
   stock: { negativeStock: 'warn' },
   alerts: { types: ['low_stock', 'out_of_stock'] },
   invoices: { invoicePrefix: null },
+  nextInvoice: { financialYear: '2026-27', sequence: 1 },
 };
 
 function openBranches(initial = TWO_BRANCHES, gstStatus: 'regular' | 'unregistered' = 'regular') {

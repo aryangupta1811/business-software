@@ -140,3 +140,51 @@ test('"Log out" ends the session and opens the login page', async () => {
   expect(screen.queryByText('Meena')).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Staff' })).toHaveAttribute('aria-pressed', 'true');
 });
+
+test('shows a connecting state, not a blank page, while the session is being read', async () => {
+  let answer = (): void => undefined;
+  fakeApi(OWNER_SESSION, {
+    'GET /api/session': {
+      body: OWNER_SESSION,
+      wait: new Promise<void>((resolve) => {
+        answer = resolve;
+      }),
+    },
+  });
+  renderAt('/');
+  expect(await screen.findByRole('status')).toHaveTextContent('Connecting to the server…');
+  answer();
+  expect(await screen.findByText('Ravi Sharma')).toBeInTheDocument();
+  expect(screen.queryByText('Connecting to the server…')).not.toBeInTheDocument();
+});
+
+test('when the server is unreachable, says so and "Try again" reads the session again', async () => {
+  let up = false;
+  const api = fakeApi(OWNER_SESSION, {
+    'GET /api/session': () => (up ? { body: OWNER_SESSION } : { fail: true }),
+  });
+  renderAt('/');
+  expect(await screen.findByRole('alert')).toHaveTextContent("Can't reach the server");
+  expect(screen.queryByText('Ravi Sharma')).not.toBeInTheDocument();
+  up = true;
+  await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  expect(await screen.findByText('Ravi Sharma')).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(api.sent('GET', '/api/session')).toHaveLength(2);
+});
+
+test('a server error on the session reads as unreachable too', async () => {
+  fakeApi(OWNER_SESSION, { 'GET /api/session': { status: 502, body: { code: 'server' } } });
+  renderAt('/');
+  expect(await screen.findByRole('alert')).toHaveTextContent("Can't reach the server");
+});
+
+test('a 401 on the session is not "unreachable": the page shows and says what happened', async () => {
+  fakeApi(OWNER_SESSION, {
+    'GET /api/session': { status: 401, body: { code: 'not_logged_in' } },
+    'GET /api/settings': { status: 401, body: { code: 'not_logged_in' } },
+  });
+  renderAt('/settings');
+  expect(await screen.findByText('Log in to see settings')).toBeInTheDocument();
+  expect(screen.queryByText("Can't reach the server")).not.toBeInTheDocument();
+});

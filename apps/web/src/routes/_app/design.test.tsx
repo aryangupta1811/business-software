@@ -1,10 +1,19 @@
 import { createMemoryHistory } from '@tanstack/react-router';
 import { act, render, screen, within } from '@testing-library/react';
-import { expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { App } from '../../app';
 import { changeLanguage } from '../../i18n';
 import { createQueryClient } from '../../query-client';
 import { createAppRouter } from '../../router';
+import { fakeApi, OWNER_SESSION } from '../../test/fake-api';
+
+// The pages under test sit behind the session, so the server has to answer it.
+beforeEach(() => {
+  fakeApi(OWNER_SESSION);
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function renderDesign() {
   const router = createAppRouter(createMemoryHistory({ initialEntries: ['/design'] }));

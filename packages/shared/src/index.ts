@@ -46,6 +46,7 @@ export {
 } from './auth.js';
 export {
   BUSINESS_TYPES,
+  DEFERRED_FEATURES,
   FEATURE_PRESETS,
   FEATURES,
   GST_STATUSES,

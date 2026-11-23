@@ -34,6 +34,7 @@ const VIEW: SettingsView = {
   stock: { negativeStock: 'warn' },
   alerts: { types: ['low_stock', 'out_of_stock'] },
   invoices: { invoicePrefix: null },
+  nextInvoice: { financialYear: '2026-27', sequence: 7 },
 };
 
 const HEAD_OFFICE: BranchView = {
@@ -56,12 +57,12 @@ const HEAD_OFFICE: BranchView = {
  * The owner is logged in; GET /api/settings answers `load`, every PUT the view it was sent
  * merged in.
  */
-function stubApi(load: { status: number; body: unknown }) {
+function stubApi(load: { status: number; body: unknown }, branches: BranchView[] = [HEAD_OFFICE]) {
   const fetchMock = vi.fn((url: string, init?: RequestInit) => {
     if (url === '/api/session') return Promise.resolve(Response.json(OWNER_SESSION));
     if (url === '/api/settings') return Promise.resolve(Response.json(load.body, load));
     if (url === '/api/devices') return Promise.resolve(Response.json([]));
-    if (url.startsWith('/api/branches')) return Promise.resolve(Response.json([HEAD_OFFICE]));
+    if (url.startsWith('/api/branches')) return Promise.resolve(Response.json(branches));
     if (url.startsWith('/api/settings/')) {
       const card = url.slice('/api/settings/'.length);
       const sent = JSON.parse(init?.body as string) as Record<string, unknown>;
@@ -111,8 +112,8 @@ test("fills each card with the business's settings", async () => {
   expect(business.getByLabelText('State')).toHaveValue('07');
   expect(business.getByLabelText('PAN')).toHaveValue('');
   const features = within(await card('Features'));
-  expect(features.getByRole('checkbox', { name: 'Expiry dates' })).toBeChecked();
-  expect(features.getByRole('checkbox', { name: 'Batch numbers' })).not.toBeChecked();
+  expect(features.getByRole('checkbox', { name: /^Expiry dates/ })).toBeChecked();
+  expect(features.getByRole('checkbox', { name: /^Batch numbers/ })).not.toBeChecked();
   const security = within(await card('Security'));
   expect(security.getByLabelText('Staff logout after')).toHaveValue(30);
 });
@@ -145,20 +146,53 @@ test("refuses a GSTIN from another state, in the GSTIN field's own words", async
   expect(putsTo(fetchMock, 'business')).toEqual([]);
 });
 
-test("keeps the switches and offers the type's defaults", async () => {
+test('marks the switches built later as "Coming later" and keeps their stored choices (00 #62)', async () => {
+  const fetchMock = stubApi({ status: 200, body: VIEW });
+  renderSettings();
+  const user = userEvent.setup();
+  const features = within(await card('Features'));
+  for (const name of [
+    /^Batch numbers/,
+    /^Expiry dates/,
+    /^Expiry alerts/,
+    /^Sizes and colours/,
+    /^Serial numbers/,
+    /^Warranty/,
+  ]) {
+    const box = features.getByRole('checkbox', { name });
+    expect(box).toBeDisabled();
+    expect(box).toHaveAccessibleDescription('Coming later');
+  }
+  // The stored choice still shows, so nobody thinks it was lost.
+  expect(features.getByRole('checkbox', { name: /^Expiry dates/ })).toBeChecked();
+  expect(features.getByRole('checkbox', { name: /^Batch numbers/ })).not.toBeChecked();
+  expect(features.getByRole('checkbox', { name: 'MRP on items' })).toBeEnabled();
+  expect(features.getAllByText('Coming later')).toHaveLength(6);
+
+  await user.click(features.getByRole('checkbox', { name: 'MRP on items' }));
+  await user.click(features.getByRole('button', { name: 'Save' }));
+  expect(await features.findByRole('status')).toHaveTextContent('Saved');
+  // The stored "Expiry dates" goes back with the save, so it isn't dropped.
+  expect(putsTo(fetchMock, 'features')).toEqual([
+    { features: ['loose_weight', 'expiry_dates', 'udhaar_prominent', 'mrp'] },
+  ]);
+});
+
+test("keeps the switches and offers the type's defaults, leaving the later ones alone", async () => {
   const fetchMock = stubApi({ status: 200, body: VIEW });
   renderSettings();
   const user = userEvent.setup();
   const features = within(await card('Features'));
   await user.click(features.getByRole('button', { name: 'Use the defaults for Medical' }));
-  expect(features.getByRole('checkbox', { name: 'Batch numbers' })).toBeChecked();
+  expect(features.getByRole('checkbox', { name: 'MRP on items' })).toBeChecked();
   expect(features.getByRole('checkbox', { name: 'Sell loose items by weight' })).not.toBeChecked();
   expect(features.queryByRole('button', { name: /^Use the defaults/ })).toBeNull();
   await user.click(features.getByRole('button', { name: 'Save' }));
   expect(await features.findByRole('status')).toHaveTextContent('Saved');
   expect(putsTo(fetchMock, 'features')).toEqual([
-    // In the list's own order, whatever order they were ticked in.
-    { features: ['expiry_dates', 'batches', 'mrp', 'expiry_alerts'] },
+    // In the list's own order. Stored "Expiry dates" stays; Medical's batches and expiry alerts
+    // are not switched on behind the owner's back.
+    { features: ['expiry_dates', 'mrp'] },
   ]);
 });
 
@@ -210,13 +244,26 @@ test('sets the invoice prefix, with an example of the next bill number', async (
   const user = userEvent.setup();
   const invoices = within(await card('Invoice numbers'));
   expect(invoices.getByLabelText('Prefix (optional)')).toHaveValue('');
-  expect(invoices.getByText(/^Your next bill: \d\d-\d\d\/42$/)).toBeInTheDocument();
+  expect(invoices.getByText('Your next bill: 26-27/7')).toBeInTheDocument();
   await user.type(invoices.getByLabelText('Prefix (optional)'), 'abc');
-  expect(invoices.getByText(/^Your next bill: ABC\/\d\d-\d\d\/42$/)).toBeInTheDocument();
+  expect(invoices.getByText('Your next bill: ABC/26-27/7')).toBeInTheDocument();
   await user.click(invoices.getByRole('button', { name: 'Save' }));
   expect(await invoices.findByRole('status')).toHaveTextContent('Saved');
   expect(putsTo(fetchMock, 'invoices')).toEqual([{ invoicePrefix: 'ABC' }]);
   expect(invoices.getByLabelText('Prefix (optional)')).toHaveValue('ABC');
+});
+
+test("with several branches the next bill starts with this computer's branch code", async () => {
+  stubApi({ status: 200, body: VIEW }, [
+    HEAD_OFFICE,
+    { ...HEAD_OFFICE, id: 'made-up-second-branch', code: 'AND', headOffice: false },
+  ]);
+  renderSettings();
+  const invoices = within(await card('Invoice numbers'));
+  // This computer's branch (HO) counts, not the typed prefix, which isn't used any more.
+  expect(await invoices.findByText('Your next bill: HO/26-27/7')).toBeInTheDocument();
+  await userEvent.type(invoices.getByLabelText('Prefix (optional)'), 'abc');
+  expect(invoices.getByText('Your next bill: HO/26-27/7')).toBeInTheDocument();
 });
 
 test('sends an emptied prefix as none', async () => {

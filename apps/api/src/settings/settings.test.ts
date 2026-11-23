@@ -5,7 +5,7 @@ import type { IncomingMessage, Server } from 'node:http';
 import type { INestApplication } from '@nestjs/common';
 import { createDatabase, type Database } from '@business-software/db';
 import { startTestDatabase, type TestDatabase } from '@business-software/db/testing';
-import { PERMISSIONS } from '@business-software/shared';
+import { businessDate, financialYear, PERMISSIONS } from '@business-software/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../app.js';
 import { hashToken } from '../auth/tokens.js';
@@ -31,6 +31,8 @@ const signupBody = (name: string, email: string) => ({
   email,
   password: 'correct horse battery',
 });
+
+const thisYear = () => financialYear(businessDate(new Date()));
 
 const business = {
   businessName: 'Sharma Kirana',
@@ -150,8 +152,31 @@ describe('settings', () => {
         stock: { negativeStock: 'warn' },
         alerts: { types: ['low_stock', 'out_of_stock'] },
         invoices: { invoicePrefix: null },
+        // No bill yet in this branch's counter: the first number is 1.
+        nextInvoice: { financialYear: thisYear(), sequence: 1 },
       },
     });
+  });
+
+  it("shows the next invoice number from the caller's own branch counter", async () => {
+    const { rows } = await admin.pool.query<{ id: string }>(
+      'select id from branches where business_id = $1',
+      [a.businessId],
+    );
+    const here = { ...a, branchId: rows[0]?.id ?? '' };
+    await admin.pool.query(
+      `insert into invoice_counters (business_id, branch_id, financial_year, last_number)
+       values ($1, $2, $3, 41), ($1, $2, '2001-02', 900)`,
+      [a.businessId, here.branchId, thisYear()],
+    );
+    const view = (await call('GET', '/settings', here)).body as { nextInvoice: unknown };
+    // 41 bills so far this year; an old year's counter and the other business don't count.
+    expect(view.nextInvoice).toEqual({ financialYear: thisYear(), sequence: 42 });
+    const other = (await call('GET', '/settings', b)).body as { nextInvoice: unknown };
+    expect(other.nextInvoice).toEqual({ financialYear: thisYear(), sequence: 1 });
+    // A save answers with it too (this one changes nothing, so it writes no log entry).
+    const saved = (await call('PUT', '/settings/stock', here, { negativeStock: 'warn' })).body;
+    expect((saved as { nextInvoice: unknown }).nextInvoice).toEqual(view.nextInvoice);
   });
 
   it('saves the business details and logs only what changed', async () => {

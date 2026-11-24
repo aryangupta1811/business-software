@@ -2200,3 +2200,15 @@ Entry format:
 - **Why / what I learned:** a rule that makes the code simpler still changes what the owner decided. Compare each refusal in the code with a sentence in the requirements.
 - **Say it in an interview:** "In review I check every error the API can return against a requirement. One had no source: it was a shortcut that would have locked real users out."
 - **Follow-ups to expect:** how can a late entry be the oldest? (the order used for oldest-first is worked out when read, so it can put the opening first).
+
+### 2026-11-24 — A docs-only pull request failed a test: a flake with a real cause `#testing` `#ci` `#gotcha`
+- **What happened:** CI failed `items.test.tsx` on #81, which changes only documents. The test simulates a barcode scanner; the app calls keys less than 50 ms apart one scan. On a slow runner a pause split the code, the tail was sent as its own barcode, and the fake API's default answer had no item. Forcing a 60 ms pause gave the same two errors. The simulated keys now share one time.
+- **Why / what I learned:** don't just re-run a flake. A failure the change can't have caused is a chance to find the cause; reproduce it before fixing it, then check the fix under the same condition.
+- **Say it in an interview:** "A test failed on a docs change. I reproduced it by forcing a pause, found the test depended on the machine's speed, and fixed the clock instead of adding a retry."
+- **Follow-ups to expect:** can a real scanner's code be split the same way? (the app uses the event's own time, set when the key arrives, not when the page gets to it; not tested on real hardware).
+
+### 2026-11-24 — Windows Smart App Control blocked an editor's updater `#security` `#gotcha`
+- **What happened:** "Error 4551: An Application Control policy has blocked this file" popped up while the project's lanes were running. The Code Integrity log (events 3077 and 3033) named the process and the file: the Antigravity IDE's own auto-updater, whose signed installer unpacks a `.tmp` program that Smart App Control refuses. Nothing in this project caused it.
+- **Why / what I learned:** the Code Integrity log says which file was blocked and by whom; the popup doesn't. Smart App Control can't make an exception for one app.
+- **Say it in an interview:** "I looked up the blocked file in the event log before touching the security setting."
+- **Follow-ups to expect:** why not switch it off? (it protects the whole computer, for one editor's update).

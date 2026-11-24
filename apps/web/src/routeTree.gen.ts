@@ -14,6 +14,7 @@ import { Route as PublicRouteImport } from './routes/_public'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppAccountRouteImport } from './routes/_app/account'
 import { Route as AppBillRouteImport } from './routes/_app/bill'
+import { Route as AppBillsRouteImport } from './routes/_app/bills'
 import { Route as AppDesignRouteImport } from './routes/_app/design'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as PublicForgotPasswordRouteImport } from './routes/_public/forgot-password'
@@ -52,6 +53,11 @@ const AppAccountRoute = AppAccountRouteImport.update({
 const AppBillRoute = AppBillRouteImport.update({
   id: '/bill',
   path: '/bill',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppBillsRoute = AppBillsRouteImport.update({
+  id: '/bills',
+  path: '/bills',
   getParentRoute: () => AppRoute,
 } as any)
 const AppDesignRoute = AppDesignRouteImport.update({
@@ -141,6 +147,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/account': typeof AppAccountRoute
   '/bill': typeof AppBillRoute
+  '/bills': typeof AppBillsRoute
   '/design': typeof AppDesignRoute
   '/settings': typeof AppSettingsRoute
   '/forgot-password': typeof PublicForgotPasswordRoute
@@ -162,6 +169,7 @@ export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/account': typeof AppAccountRoute
   '/bill': typeof AppBillRoute
+  '/bills': typeof AppBillsRoute
   '/design': typeof AppDesignRoute
   '/settings': typeof AppSettingsRoute
   '/forgot-password': typeof PublicForgotPasswordRoute
@@ -185,6 +193,7 @@ export interface FileRoutesById {
   '/_public': typeof PublicRouteWithChildren
   '/_app/account': typeof AppAccountRoute
   '/_app/bill': typeof AppBillRoute
+  '/_app/bills': typeof AppBillsRoute
   '/_app/design': typeof AppDesignRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_public/forgot-password': typeof PublicForgotPasswordRoute
@@ -209,6 +218,7 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/bill'
+    | '/bills'
     | '/design'
     | '/settings'
     | '/forgot-password'
@@ -230,6 +240,7 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/bill'
+    | '/bills'
     | '/design'
     | '/settings'
     | '/forgot-password'
@@ -252,6 +263,7 @@ export interface FileRouteTypes {
     | '/_public'
     | '/_app/account'
     | '/_app/bill'
+    | '/_app/bills'
     | '/_app/design'
     | '/_app/settings'
     | '/_public/forgot-password'
@@ -311,6 +323,13 @@ declare module '@tanstack/react-router' {
       path: '/bill'
       fullPath: '/bill'
       preLoaderRoute: typeof AppBillRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/bills': {
+      id: '/_app/bills'
+      path: '/bills'
+      fullPath: '/bills'
+      preLoaderRoute: typeof AppBillsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/design': {
@@ -431,6 +450,7 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppAccountRoute: typeof AppAccountRoute
   AppBillRoute: typeof AppBillRoute
+  AppBillsRoute: typeof AppBillsRoute
   AppDesignRoute: typeof AppDesignRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -447,6 +467,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppAccountRoute: AppAccountRoute,
   AppBillRoute: AppBillRoute,
+  AppBillsRoute: AppBillsRoute,
   AppDesignRoute: AppDesignRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppIndexRoute: AppIndexRoute,

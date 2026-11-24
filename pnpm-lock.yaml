@@ -265,6 +265,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@business-software/print':
+        specifier: workspace:*
+        version: link:../../packages/print
       '@business-software/shared':
         specifier: workspace:*
         version: link:../../packages/shared

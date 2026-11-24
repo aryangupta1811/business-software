@@ -13,7 +13,8 @@
     "billing": "Billing",
     "staff": "Staff",
     "attendance": "Hazri",
-    "myAttendance": "Meri hazri"
+    "myAttendance": "Meri hazri",
+    "bills": "Bills"
   },
   "theme": {
     "toDark": "Dark mode chalu karein",
@@ -43,7 +44,11 @@
     "billCustomer": "Customer khojein ya jodein",
     "billPay": "Payment lein",
     "openAlerts": "Alerts kholein",
-    "goAttendance": "Hazri par jaayein"
+    "goAttendance": "Hazri par jaayein",
+    "goBills": "Bills par jaayein",
+    "billPrintReceipt": "Save hua bill receipt ke roop mein chhaapein",
+    "billPrintA4": "Save hua bill A4 par chhaapein",
+    "billWhatsApp": "Save hua bill WhatsApp par bhejein"
   },
   "connection": {
     "checking": "Connection check ho raha hai…",
@@ -462,6 +467,28 @@
       "hint": "4 tak bade akshar ya ank, jaise ABC. Prefix na chahiye to khaali chhodein.",
       "example": "Aapka agla bill: {{number}}",
       "branches": "Do ya zyada chaalu branch hone par har bill apni branch ke code se shuru hota hai (jaise {{number}}), aur yeh prefix istemal nahin hota."
+    },
+    "printing": {
+      "title": "Chhapai",
+      "lead": "Aapke bill kaise dikhein. Jo bill chhap chuke hain woh apni bhasha mein hi rehte hain.",
+      "language": "Bill ki bhasha",
+      "languageHint": "Jis saamaan ka Hindi naam hai, woh Hindi mein chhapta hai. GSTIN, HSN aur tax ke aankde kaanoon ke hisaab se hamesha angrezi akshron mein rehte hain.",
+      "footer": "Har bill ke neeche ka note",
+      "footerHint": "Jaise \"Bika hua maal waapas nahin hoga.\" Adhiktam 200 akshar.",
+      "test": "Test print",
+      "testHint": "Ek banaavati bill chhaapta hai, taaki aap kaagaz aur printer jaanch sakein.",
+      "testReceipt": "{{size}} mm receipt ka test",
+      "testA4": "A4 invoice ka test",
+      "testFailed": "Test nahin chhap paaya. Printer dekhein, phir dobara koshish karein.",
+      "guideTitle": "Ek key se, bina dialog ke chhaapein",
+      "guideLead": "Chrome bill seedhe printer ko bhej sakta hai. Har counter computer par yeh ek baar lagayein:",
+      "guide": {
+        "step1": "Receipt wale printer ko Windows ka default printer banayein.",
+        "step2": "Uski printer settings mein kaagaz ka size 80 mm (ya 58 mm) aur margin \"none\" rakhein.",
+        "step3": "Jis Chrome shortcut se yeh app kholte hain us par right-click karein, Properties chunein, aur Target ke ant mein ek space aur --kiosk-printing jodein. Phir Chrome ki saari window band karein aur usi shortcut se kholein.",
+        "step4": "Neeche test print dabayein. Receipt bina dialog ke nikalni chahiye."
+      },
+      "guideNote": "Yeh chaalu hone par har chhapai default printer par jaati hai, A4 invoice bhi. Jis counter par A4 invoice chhaapni ho, wahan --kiosk-printing ke bina doosra Chrome shortcut rakhein, taaki Chrome printer poochhe."
     }
   },
   "features": {
@@ -898,7 +925,17 @@
       "moveBody": "Is computer par bane bill aur stock ke badlav ab aapki chuni branch ke honge. Is par logged in har vyakti logout ho jaayega.",
       "moveBodyThis": "Isse aap yahan bhi logout ho jaayenge, aur nayi branch mein dobara login karenge.",
       "moveTarget": "Is branch mein bhejein",
-      "moveConfirm": "Computer bhejein"
+      "moveConfirm": "Computer bhejein",
+      "printing": {
+        "title": "Is computer ki chhapai",
+        "receiptSize": "Receipt ka kaagaz",
+        "size80": "80 mm",
+        "size58": "58 mm",
+        "autoPrint": "Bill save hote hi receipt chhaapein",
+        "autoPrintHint": "Alt+P use dobara chhaapta hai, \"Dobara chhapa\" likhkar.",
+        "saved": "Save ho gaya",
+        "failed": "Save nahin ho paaya. Dobara koshish karein."
+      }
     }
   },
   "billing": {
@@ -1109,7 +1146,13 @@
         "key_reused": "Yeh bill pehle hi alag saman ke saath save ho chuka hai, shayad connection tootne se pehle. Naya bill shuru karein (Alt+N) aur malik se jaanchwayein.",
         "network": "Connection nahin hai. Ho sakta hai bill save ho chuka ho. Jaanchne ke liye Enter dabayein: bill do baar save nahin hoga. Tab tak bill badla nahin ja sakta.",
         "failed": "Bill save nahin ho saka. Phir koshish karein; baar-baar ho to connection jaanchein."
-      }
+      },
+      "printReceipt": "Receipt chhaapein ({{size}} mm)",
+      "printA4": "A4 invoice chhaapein",
+      "whatsApp": "WhatsApp par bhejein",
+      "printFailed": "Chhap nahin paaya. Connection aur printer dekhein, phir dobara koshish karein.",
+      "noPhone": "Is bill mein grahak ka phone number nahin hai. Pehle grahak (F3) mein number jodein.",
+      "whatsAppFailed": "WhatsApp nahin khul paaya. Connection dekhein aur dobara koshish karein."
     }
   },
   "notAllowed": {
@@ -1511,5 +1554,33 @@
     "removeReason": "Kaaran (optional)",
     "removeConfirm": "Chhutti hatayein",
     "removed": "{{name}} hata di gayi."
+  },
+  "printing": {
+    "whatsapp": "{{shop}}: aapka bill {{number}}, {{total}} ka. Dhanyavaad!"
+  },
+  "bills": {
+    "lead": "Aapke counter par save hue bill, naye sabse upar. Kisi bill ko chunkar dobara chhaapein ya WhatsApp par bhejein. Pehle aaj ke bill dikhte hain.",
+    "search": "Khojein",
+    "searchHint": "Bill number, grahak ka naam ya phone",
+    "from": "Se",
+    "to": "Tak",
+    "allDates": "Saari tareekhein dikhayein",
+    "actionsFor": "Bill {{number}} ke kaam",
+    "selected": "Bill {{number}}",
+    "empty": "Koi bill nahin mila. Khoj ya tareekh badlein.",
+    "more": "Aur bill dikhayein",
+    "walkIn": "Counter ka grahak",
+    "columns": {
+      "bill": "Bill",
+      "when": "Save hua",
+      "customer": "Grahak",
+      "paidBy": "Bhugtaan",
+      "total": "Kul"
+    },
+    "documents": {
+      "tax_invoice": "Tax invoice",
+      "bill_of_supply": "Bill of supply",
+      "bill": "Bill"
+    }
   }
 }

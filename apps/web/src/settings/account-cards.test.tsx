@@ -32,6 +32,7 @@ const SETTINGS: SettingsView = {
   stock: { negativeStock: 'warn' },
   alerts: { types: ['low_stock', 'out_of_stock'] },
   invoices: { invoicePrefix: null },
+  printing: { billLanguage: 'en', footerNote: null },
   nextInvoice: { financialYear: '2026-27', sequence: 1 },
 };
 
@@ -44,6 +45,7 @@ const HERE: DeviceView = {
   createdAt: '2026-11-19T04:30:00.000Z',
   lastSeenAt: '2026-11-19T04:30:00.000Z',
   thisComputer: true,
+  printing: { receiptSize: 80, autoPrint: true },
 };
 const BACK: DeviceView = {
   ...HERE,

@@ -1,6 +1,7 @@
 // Account recovery, your own password and remembered computers (Module 00 #30-#32, #44, #46).
 import type {
   ChangePasswordInput,
+  DevicePrintingInput,
   DeviceView,
   RecoveryKeyResult,
   RecoveryResetInput,
@@ -47,6 +48,11 @@ export function listDevices() {
 
 export function renameDevice(id: string, name: string) {
   return apiRequest<DeviceView>('PUT', `/api/devices/${id}/name`, { name });
+}
+
+/** `02` #29, #30: a computer's receipt paper and auto-print. */
+export function setDevicePrinting(id: string, input: DevicePrintingInput) {
+  return apiRequest<DeviceView>('PUT', `/api/devices/${id}/printing`, input);
 }
 
 export function forgetDevice(id: string, ownerPassword: string) {

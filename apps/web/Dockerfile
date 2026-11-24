@@ -13,12 +13,15 @@ WORKDIR /repo
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/
 COPY packages/shared/package.json packages/shared/
+COPY packages/print/package.json packages/print/
 RUN pnpm install --frozen-lockfile --filter @business-software/web...
 
 COPY tsconfig.base.json ./
 COPY apps/web apps/web
 # The form schemas, read from their TypeScript source (vite.config.ts, 'source' condition).
 COPY packages/shared packages/shared
+# The bill template and its print stylesheets, also from source.
+COPY packages/print packages/print
 RUN pnpm --filter @business-software/web build
 
 # Caddy is one static Go binary, so Alpine's musl doesn't matter here (unlike Node and

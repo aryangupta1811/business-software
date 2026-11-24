@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { DEVICES_KEY, forgetDevice, listDevices, renameDevice } from '../api/account';
+import { DevicePrinting } from './device-printing';
 import { BRANCHES_KEY, liveBranches, moveDevice, useBranches } from '../api/branches';
 import { ApiError } from '../api/client';
 import { forgetSession } from '../api/session';
@@ -143,6 +144,7 @@ function DeviceRow({ device, branches }: { device: DeviceView; branches: readonl
           </div>
         )}
       </div>
+      <DevicePrinting device={device} />
       <MoveDialog
         open={moving}
         device={device}

@@ -9,11 +9,12 @@ import {
   type Discount,
   type HeldBillView,
   type PriceList,
+  type PrintSize,
   type ResumedBillView,
   type SavedBillView,
 } from '@business-software/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CircleCheck, Search, ShieldAlert } from 'lucide-react';
+import { CircleCheck, FileText, MessageCircle, Printer, Search, ShieldAlert } from 'lucide-react';
 import {
   useDeferredValue,
   useEffect,
@@ -35,6 +36,7 @@ import { formatQuantity, parseQuantity } from '../items/item-form';
 import { unitName } from '../items/labels';
 import { useScanner } from '../items/scan';
 import { stockText } from '../items/stock-form';
+import { printSavedBill, sendOnWhatsApp } from '../printing/actions';
 import { useShortcut } from '../shortcuts/use-shortcut';
 import { PaymentPanel, type PaymentRow } from './payment-panel';
 import type { CatalogueCopy } from './catalogue-copy';
@@ -82,6 +84,9 @@ type Notice =
   | { kind: 'heldGone' };
 
 const HELD_KEY = ['billing', 'held'] as const;
+
+/** What the printing and sharing buttons of a saved bill are doing. */
+type SavedAction = 'idle' | 'busy' | 'printFailed' | 'noPhone' | 'whatsAppFailed';
 
 /** The clock, for an owner's OK running out while the bill is on screen. */
 function useNow(everyMs: number): number {
@@ -155,6 +160,9 @@ export function Counter({
   /** Synchronous twin of `saving`: two Enters in one tick must not send twice. */
   const sending = useRef(false);
   const [saved, setSaved] = useState<SavedBillView | null>(null);
+  const [action, setAction] = useState<SavedAction>('idle');
+  /** The saved bills printed once already: another print of one is a reprint (`02` #33). */
+  const printed = useRef(new Set<string>());
   const [problem, setProblem] = useState<SaveProblem | null>(null);
   /**
    * The bill can't change while it is sending, nor after a lost answer: that send may have been
@@ -334,12 +342,40 @@ export function Counter({
     setReady(null);
     setHeldFrom(null);
     setSaved(done);
+    setAction('idle');
     setProblem(null);
     setSelected(-1);
     setChanged(new Set());
     setNotice(null);
     setQuery('');
     focusSearch();
+  }
+
+  /** Prints a saved bill; the second print of the same bill is a reprint, logged and marked. */
+  async function printSaved(view: SavedBillView, size: PrintSize | 'auto') {
+    setAction('busy');
+    try {
+      await printSavedBill({
+        id: view.id,
+        size,
+        receiptSize: session.printing.receiptSize,
+        reprint: printed.current.has(view.id),
+      });
+      printed.current.add(view.id);
+      setAction('idle');
+    } catch {
+      setAction('printFailed');
+    }
+  }
+
+  /** Opens WhatsApp for the saved bill's customer; a walk-in has no number to open. */
+  async function shareSaved(view: SavedBillView) {
+    setAction('busy');
+    try {
+      setAction((await sendOnWhatsApp(view.id)) ? 'idle' : 'noPhone');
+    } catch {
+      setAction('whatsAppFailed');
+    }
   }
 
   /** Question 7: a full bill thrown away is logged with its lines and total. */
@@ -479,6 +515,8 @@ export function Counter({
       clearApproval(bill.billKey);
       saveCustomer(bill.billKey, null);
       startNew(view);
+      // `02` #30: on by default, so the receipt is out before the next customer steps up.
+      if (session.printing.autoPrint) void printSaved(view, 'auto');
     } catch (error) {
       const found = saveProblem(error);
       setProblem(found);
@@ -591,6 +629,35 @@ export function Counter({
     action: () => {
       if (locked) return;
       remove(selected);
+    },
+  });
+  // The keys of the "Bill saved" panel. A plain letter is refused (ADR 0026: the search box
+  // always has the focus). Alt+A is also the payment panel's split key, but that one is a dialog
+  // key (`inDialog`): it works only while the panel is open, and these only while it is not.
+  useShortcut({
+    keys: 'Alt+P',
+    description: 'shortcuts.billPrintReceipt',
+    group: 'general',
+    action: () => {
+      if (saved !== null && action !== 'busy') {
+        void printSaved(saved, session.printing.receiptSize === 80 ? '80' : '58');
+      }
+    },
+  });
+  useShortcut({
+    keys: 'Alt+A',
+    description: 'shortcuts.billPrintA4',
+    group: 'general',
+    action: () => {
+      if (saved !== null && action !== 'busy') void printSaved(saved, 'a4');
+    },
+  });
+  useShortcut({
+    keys: 'Alt+W',
+    description: 'shortcuts.billWhatsApp',
+    group: 'general',
+    action: () => {
+      if (saved !== null && action !== 'busy') void shareSaved(saved);
     },
   });
   useShortcut({
@@ -766,6 +833,10 @@ export function Counter({
           <SavedPanel
             saved={saved}
             copy={copy}
+            action={action}
+            receiptSize={session.printing.receiptSize}
+            onPrint={(size) => void printSaved(saved, size)}
+            onWhatsApp={() => void shareSaved(saved)}
             onNext={() => {
               startNew();
             }}
@@ -910,10 +981,18 @@ export function Counter({
 function SavedPanel({
   saved,
   copy,
+  action,
+  receiptSize,
+  onPrint,
+  onWhatsApp,
   onNext,
 }: {
   saved: SavedBillView;
   copy: CatalogueCopy;
+  action: SavedAction;
+  receiptSize: 80 | 58;
+  onPrint: (size: PrintSize) => void;
+  onWhatsApp: () => void;
   onNext: () => void;
 }) {
   const { t } = useTranslation();
@@ -948,6 +1027,49 @@ function SavedPanel({
           </p>
         );
       })}
+      <div className="flex flex-col gap-2">
+        <Button
+          variant="secondary"
+          disabled={action === 'busy'}
+          aria-keyshortcuts="Alt+P"
+          onClick={() => {
+            onPrint(receiptSize === 80 ? '80' : '58');
+          }}
+        >
+          <Printer aria-hidden="true" />
+          <span className="flex-1 text-left">
+            {t('billing.save.printReceipt', { size: receiptSize })}
+          </span>
+          <Kbd aria-hidden="true">Alt+P</Kbd>
+        </Button>
+        <Button
+          variant="secondary"
+          disabled={action === 'busy'}
+          aria-keyshortcuts="Alt+A"
+          onClick={() => {
+            onPrint('a4');
+          }}
+        >
+          <FileText aria-hidden="true" />
+          <span className="flex-1 text-left">{t('billing.save.printA4')}</span>
+          <Kbd aria-hidden="true">Alt+A</Kbd>
+        </Button>
+        <Button
+          variant="secondary"
+          disabled={action === 'busy'}
+          aria-keyshortcuts="Alt+W"
+          onClick={onWhatsApp}
+        >
+          <MessageCircle aria-hidden="true" />
+          <span className="flex-1 text-left">{t('billing.save.whatsApp')}</span>
+          <Kbd aria-hidden="true">Alt+W</Kbd>
+        </Button>
+        {action !== 'idle' && action !== 'busy' && (
+          <p role="alert" className="text-label text-danger">
+            {t(`billing.save.${action}`)}
+          </p>
+        )}
+      </div>
       <Button variant="secondary" onClick={onNext}>
         {t('billing.save.next')}
         <Kbd aria-hidden="true" className="ml-2">

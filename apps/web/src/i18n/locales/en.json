@@ -13,7 +13,8 @@
     "billing": "Billing",
     "staff": "Staff",
     "attendance": "Attendance",
-    "myAttendance": "My attendance"
+    "myAttendance": "My attendance",
+    "bills": "Bills"
   },
   "theme": {
     "toDark": "Switch to dark mode",
@@ -43,7 +44,11 @@
     "billCustomer": "Find or add the customer",
     "billPay": "Take payment",
     "openAlerts": "Open the alerts",
-    "goAttendance": "Go to Attendance"
+    "goAttendance": "Go to Attendance",
+    "goBills": "Go to Bills",
+    "billPrintReceipt": "Print the saved bill as a receipt",
+    "billPrintA4": "Print the saved bill on A4",
+    "billWhatsApp": "Send the saved bill on WhatsApp"
   },
   "connection": {
     "checking": "Checking connection…",
@@ -462,6 +467,28 @@
       "hint": "Up to 4 capital letters or digits, like ABC. Leave it empty for no prefix.",
       "example": "Your next bill: {{number}}",
       "branches": "With two or more active branches, every bill starts with its branch's code instead (for example {{number}}), and this prefix is not used."
+    },
+    "printing": {
+      "title": "Printing",
+      "lead": "How your bills read. Bills already printed keep the language they were printed in.",
+      "language": "Bill language",
+      "languageHint": "Item names print in Hindi where the item has a Hindi name. GSTIN, HSN and the tax figures are always in English letters, as the law asks.",
+      "footer": "Note at the bottom of every bill",
+      "footerHint": "For example \"Goods once sold will not be taken back.\" Up to 200 characters.",
+      "test": "Test print",
+      "testHint": "Prints a made-up bill, so you can check the paper and the printer.",
+      "testReceipt": "Test {{size}} mm receipt",
+      "testA4": "Test A4 invoice",
+      "testFailed": "Couldn't print the test. Check the printer, then try again.",
+      "guideTitle": "Print with one key, no dialog",
+      "guideLead": "Chrome can send a bill straight to the printer. Set this up once on each counter computer:",
+      "guide": {
+        "step1": "Make the receipt printer the Windows default printer.",
+        "step2": "In its printer preferences, set the paper size to 80 mm (or 58 mm) and the margins to none.",
+        "step3": "Right-click the Chrome shortcut you open this app with, choose Properties, and add a space and --kiosk-printing at the end of Target. Then close every Chrome window and open it from that shortcut.",
+        "step4": "Press a test print below. The receipt should come out without a dialog."
+      },
+      "guideNote": "With this switched on, every print goes to the default printer, an A4 invoice included. A counter that prints A4 invoices should use another Chrome shortcut, without --kiosk-printing, so Chrome asks which printer."
     }
   },
   "features": {
@@ -898,7 +925,17 @@
       "moveBody": "Bills and stock changes made on this computer will belong to the branch you pick. Anyone logged in on it is logged out.",
       "moveBodyThis": "This logs you out here too, and you log in again at the new branch.",
       "moveTarget": "Move to",
-      "moveConfirm": "Move computer"
+      "moveConfirm": "Move computer",
+      "printing": {
+        "title": "Printing on this computer",
+        "receiptSize": "Receipt paper",
+        "size80": "80 mm",
+        "size58": "58 mm",
+        "autoPrint": "Print the receipt when a bill is saved",
+        "autoPrintHint": "Alt+P prints it again, marked Reprint.",
+        "saved": "Saved",
+        "failed": "Couldn't save. Try again."
+      }
     }
   },
   "billing": {
@@ -1109,7 +1146,13 @@
         "key_reused": "This bill was already saved with different contents, probably before the connection dropped. Start a new bill (Alt+N) and ask the owner to check.",
         "network": "No connection. The bill may already be saved. Press Enter to check: it will never be saved twice. The bill can't be changed until then.",
         "failed": "The bill couldn't be saved. Try again; if it keeps failing, check the connection."
-      }
+      },
+      "printReceipt": "Print receipt ({{size}} mm)",
+      "printA4": "Print A4 invoice",
+      "whatsApp": "Send on WhatsApp",
+      "printFailed": "Couldn't print. Check the connection and the printer, then try again.",
+      "noPhone": "This bill has no customer phone number. Add one to the customer (F3) first.",
+      "whatsAppFailed": "Couldn't open WhatsApp. Check the connection and try again."
     }
   },
   "notAllowed": {
@@ -1511,5 +1554,33 @@
     "removeReason": "Reason (optional)",
     "removeConfirm": "Remove holiday",
     "removed": "{{name}} removed."
+  },
+  "printing": {
+    "whatsapp": "{{shop}}: your bill {{number}} for {{total}}. Thank you!"
+  },
+  "bills": {
+    "lead": "The bills saved at your counter, newest first. Pick one to print it again or send it on WhatsApp. Today's bills show first.",
+    "search": "Search",
+    "searchHint": "Bill number, customer name or phone",
+    "from": "From",
+    "to": "To",
+    "allDates": "Show every date",
+    "actionsFor": "Actions for bill {{number}}",
+    "selected": "Bill {{number}}",
+    "empty": "No bills match. Change the search or the dates.",
+    "more": "Show more bills",
+    "walkIn": "Walk-in customer",
+    "columns": {
+      "bill": "Bill",
+      "when": "Saved",
+      "customer": "Customer",
+      "paidBy": "Paid by",
+      "total": "Total"
+    },
+    "documents": {
+      "tax_invoice": "Tax invoice",
+      "bill_of_supply": "Bill of supply",
+      "bill": "Bill"
+    }
   }
 }

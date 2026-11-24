@@ -169,3 +169,93 @@ export const settingsUdhaarSchema = z.strictObject({
   overCreditLimit: z.enum(OVER_CREDIT_LIMIT_SETTINGS, { error: 'invalid' }),
 });
 export type SettingsUdhaarInput = z.infer<typeof settingsUdhaarSchema>;
+
+// ---- Queries ----
+
+/** At most this many rows on a page of the customer list or a ledger. */
+export const UDHAAR_PAGE_SIZE = 50;
+
+/** `GET /api/udhaar/customers`: names and phones that match `q`; `owing` keeps only balances above 0. */
+export const udhaarCustomersQuerySchema = z.strictObject({
+  q: optionalText(100).optional(),
+  owing: z
+    .enum(['true', 'false'], { error: 'invalid' })
+    .optional()
+    .transform((value) => value === 'true'),
+  /** Rows to skip, for the next page. */
+  offset: z.coerce
+    .number({ error: 'invalid' })
+    .int({ error: 'invalid' })
+    .min(0, { error: 'invalid' })
+    .max(1_000_000, { error: 'invalid' })
+    .default(0),
+});
+export type UdhaarCustomersQuery = z.infer<typeof udhaarCustomersQuerySchema>;
+
+/** `GET /api/udhaar/customers/:id`: the page of the ledger that ends before this entry. */
+export const udhaarLedgerQuerySchema = z.strictObject({
+  before: uuid().optional(),
+});
+export type UdhaarLedgerQuery = z.infer<typeof udhaarLedgerQuerySchema>;
+
+// ---- What the routes answer ----
+
+export interface UdhaarCustomerRow {
+  id: string;
+  name: string;
+  phone: string | null;
+  /** Above 0 they owe; below 0 it's an advance. */
+  balancePaise: number;
+  creditLimitPaise: number | null;
+  /** The oldest due date among the unpaid entries; null if nothing is owed. */
+  oldestDueDate: string | null;
+}
+
+export interface UdhaarCustomersView {
+  customers: UdhaarCustomerRow[];
+  /** True when another page follows (`offset` plus the page's length). */
+  more: boolean;
+}
+
+export interface UdhaarEntryView {
+  id: string;
+  kind: UdhaarEntryKind;
+  amountPaise: number;
+  balanceAfterPaise: number;
+  billId: string | null;
+  /** As printed on the bill, for `bill` and `advance_used`. */
+  billNumber: string | null;
+  mode: 'cash' | 'upi' | 'card' | 'cheque' | null;
+  reference: string | null;
+  reversesEntryId: string | null;
+  dueDate: string | null;
+  businessDate: string;
+  reason: string | null;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface UdhaarUnpaidView {
+  entry: UdhaarEntryView;
+  unpaidPaise: number;
+}
+
+export interface UdhaarLedgerView {
+  customerId: string;
+  balancePaise: number;
+  creditLimitPaise: number | null;
+  dueDays: number;
+  /** Newest first. */
+  entries: UdhaarEntryView[];
+  /** Pass as `before` for the next page; null when this was the last. */
+  next: string | null;
+  /** Oldest first: what is still owed, and when each part falls due (`03` #4, #5). */
+  unpaid: UdhaarUnpaidView[];
+}
+
+/** What recording a payment or an opening balance answers; the receipt reads it (`03` #11). */
+export interface UdhaarMoveView {
+  entry: UdhaarEntryView;
+  customerId: string;
+  balancePaise: number;
+}

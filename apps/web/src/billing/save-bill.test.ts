@@ -32,6 +32,7 @@ const SAVED: SavedBillView = {
   grandTotalPaise: 6_600,
   changePaise: 400,
   warnings: [],
+  creditWarning: null,
 };
 
 describe('billDraft', () => {

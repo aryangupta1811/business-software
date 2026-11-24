@@ -4,6 +4,8 @@ import {
   addDays,
   creditLimitVerdict,
   settingsUdhaarSchema,
+  udhaarCustomersQuerySchema,
+  udhaarLedgerQuerySchema,
   udhaarOpeningSchema,
   udhaarPaymentSchema,
   udhaarReversalSchema,
@@ -244,5 +246,24 @@ describe('settingsUdhaarSchema (`03` #8, #9)', () => {
     });
     expect(settingsUdhaarSchema.safeParse({ overCreditLimit: 'allow' }).success).toBe(false);
     expect(settingsUdhaarSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+describe('the list queries', () => {
+  it('reads the customer list query from the URL: text, owing, offset', () => {
+    expect(udhaarCustomersQuerySchema.parse({})).toEqual({ owing: false, offset: 0 });
+    expect(
+      udhaarCustomersQuerySchema.parse({ q: ' Sunita ', owing: 'true', offset: '50' }),
+    ).toEqual({ q: 'Sunita', owing: true, offset: 50 });
+    for (const bad of [{ owing: 'yes' }, { offset: '-1' }, { offset: '1.5' }, { page: '2' }]) {
+      expect(udhaarCustomersQuerySchema.safeParse(bad).success).toBe(false);
+    }
+  });
+
+  it('takes a ledger page cursor that is an id, and nothing else', () => {
+    expect(udhaarLedgerQuerySchema.parse({})).toEqual({});
+    expect(udhaarLedgerQuerySchema.parse({ before: KEY })).toEqual({ before: KEY });
+    expect(udhaarLedgerQuerySchema.safeParse({ before: 'x' }).success).toBe(false);
+    expect(udhaarLedgerQuerySchema.safeParse({ after: KEY }).success).toBe(false);
   });
 });

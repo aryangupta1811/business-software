@@ -128,10 +128,12 @@ export async function moveUdhaar(tx: Transaction, input: MoveUdhaarInput): Promi
     }
   }
   if (kind === 'opening') {
+    // The old notebook comes first: once there is any entry, an opening would sit out of order.
     const [existing] = await tx
       .select({ id: udhaarEntries.id })
       .from(udhaarEntries)
-      .where(and(eq(udhaarEntries.customerId, customerId), eq(udhaarEntries.kind, 'opening')));
+      .where(eq(udhaarEntries.customerId, customerId))
+      .limit(1);
     if (existing !== undefined) throw new UdhaarRuleError('opening_exists', customerId);
   }
   if (kind === 'payment_reversal') await checkReversal(tx, input);

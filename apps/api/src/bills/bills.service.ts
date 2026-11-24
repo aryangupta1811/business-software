@@ -22,13 +22,17 @@ import {
   isNull,
   items,
   itemUnits,
+  lockUdhaarAccount,
   moveStock,
+  moveUdhaar,
   ownerApprovals,
   recordEntry,
   sql,
   stockMovements,
   StockRuleError,
   takeInvoiceSequence,
+  udhaarEntries,
+  UdhaarRuleError,
   units,
   users,
   type Database,
@@ -39,6 +43,7 @@ import {
   businessDate,
   calculateBill,
   cartToBillInput,
+  creditLimitVerdict,
   discountShares,
   discountWithinLimit,
   documentFor,
@@ -58,6 +63,8 @@ import {
   type Feature,
   type ItemKind,
   type NegativeStockSetting,
+  type OverCreditLimitSetting,
+  type PaymentMode,
   type SavedBillView,
   type TaxScheme,
 } from '@business-software/shared';
@@ -86,6 +93,13 @@ function stockAnswer(error: StockRuleError): HttpException | StockRuleError {
     default:
       return error;
   }
+}
+
+/** What the draft pays in one mode, in paise. */
+function paidBy(draft: BillDraft, mode: PaymentMode): number {
+  return draft.payments
+    .filter((payment) => payment.mode === mode)
+    .reduce((sum, payment) => sum + payment.amountPaise, 0);
 }
 
 function packOf(item: CatalogueItem, packId: string | null): CataloguePack | null {
@@ -155,6 +169,7 @@ export class BillsService {
         gstStatus: businesses.gstStatus,
         features: businesses.features,
         negativeStock: businesses.negativeStock,
+        overCreditLimit: businesses.overCreditLimit,
         invoicePrefix: businesses.invoicePrefix,
       })
       .from(businesses);
@@ -228,7 +243,7 @@ export class BillsService {
     }
 
     // 7. The customer as they are now, copied onto the bill.
-    const buyer = await this.buyer(tx, draft, branch.stateCode);
+    const { buyer, phone, creditLimitPaise } = await this.buyer(tx, draft, branch.stateCode);
     const named = buyer === null ? false : buyer.address !== null && buyer.stateCode !== null;
     if (
       !named &&
@@ -241,8 +256,23 @@ export class BillsService {
       throw new UnprocessableEntityException({ code: 'buyer_details_required' });
     }
 
+    // 7b. Udhaar and advance belong to a customer, and udhaar to one with a name and phone
+    // (`03` #1); staff give udhaar only with the switch on (`03` #10).
+    const udhaarPaise = paidBy(draft, 'udhaar');
+    const advancePaise = paidBy(draft, 'advance');
+    if ((udhaarPaise > 0 || advancePaise > 0) && draft.customerId === null) {
+      throw new UnprocessableEntityException({ code: 'udhaar_needs_customer' });
+    }
+    if (udhaarPaise > 0 && phone === null) {
+      throw new UnprocessableEntityException({ code: 'udhaar_needs_phone' });
+    }
+    if (udhaarPaise > 0 && !caller.permissions.includes('billing.udhaar')) {
+      throw new ForbiddenException({ code: 'udhaar_not_allowed' });
+    }
+
     // 8. Discounts above the cashier's limit need the owner's OK, used up here (`02` #12).
     const approvalId = await this.useApproval(tx, caller, draft, input, now);
+    const creditApprovalId = await this.useCreditApproval(tx, caller, draft, udhaarPaise, now);
 
     // 9. A bill resumed from the held list keeps a link to it; resuming already closed it.
     if (draft.heldBillId !== undefined) {
@@ -323,6 +353,7 @@ export class BillsService {
         grandTotalPaise: bill.grandTotalPaise,
         billDiscount: draft.billDiscount ?? null,
         approvalId,
+        creditApprovalId,
         heldBillId: draft.heldBillId ?? null,
         createdBy: caller.userId,
         createdAt: now,
@@ -355,6 +386,19 @@ export class BillsService {
       // The whole save rolls back, its number included: the next bill gets that number.
       throw error instanceof StockRuleError ? stockAnswer(error) : error;
     }
+    // 12b. Last of all, the customer's account (ADR 0050: after the invoice counter and the stock
+    // rows, so two bills can never wait on each other). The advance goes first, then the rest is
+    // owed; whether that is past the credit limit is decided on the balance now locked.
+    const ledger = await this.moveLedger(tx, caller, {
+      customerId: draft.customerId,
+      billId: row.id,
+      businessDate: date,
+      udhaarPaise,
+      advancePaise,
+      limitPaise: creditLimitPaise,
+      setting: business.overCreditLimit as OverCreditLimitSetting,
+      approved: creditApprovalId !== null,
+    });
     const stockOf = new Map(goods.map(({ index, stock }, at) => [index, { stock, at }]));
 
     await tx.insert(billLines).values(
@@ -430,6 +474,10 @@ export class BillsService {
         ),
         billDiscount: draft.billDiscount ?? null,
         approvalId,
+        creditApprovalId,
+        udhaarPaise,
+        advancePaise,
+        udhaarBalanceAfterPaise: ledger,
         heldBillId: draft.heldBillId ?? null,
         warned: moved
           .filter((line) => line.warned)
@@ -495,11 +543,12 @@ export class BillsService {
   }
 
   /**
-   * The customer's details as they are now, for the bill's own copy. A business customer's bill
+   * The customer's details as they are now, for the bill's own copy, with what udhaar needs of
+   * them: the phone and the credit limit. A business customer's bill
    * is supplied either in their state or at the counter (P1.13 design §7).
    */
   private async buyer(tx: Transaction, draft: BillDraft, branchStateCode: string) {
-    if (draft.customerId === null) return null;
+    if (draft.customerId === null) return { buyer: null, phone: null, creditLimitPaise: null };
     const [customer] = await tx
       .select()
       .from(customers)
@@ -516,12 +565,16 @@ export class BillsService {
       throw new UnprocessableEntityException({ code: 'place_of_supply' });
     }
     return {
-      name: customer.name,
-      gstin: customer.gstin,
-      legalName: customer.legalName,
-      address: customer.address,
-      pinCode: customer.pinCode,
-      stateCode: customer.stateCode,
+      buyer: {
+        name: customer.name,
+        gstin: customer.gstin,
+        legalName: customer.legalName,
+        address: customer.address,
+        pinCode: customer.pinCode,
+        stateCode: customer.stateCode,
+      },
+      phone: customer.phone,
+      creditLimitPaise: customer.creditLimitPaise,
     };
   }
 
@@ -566,6 +619,104 @@ export class BillsService {
     return used.id;
   }
 
+  /**
+   * The owner's OK for this bill's udhaar, used up here when the draft carries one (the bill is
+   * then linked to it): its own approval, apart from a discount's (`03` #18). Null when there is no
+   * udhaar or no OK. Whether the OK is needed is decided once the balance is locked.
+   */
+  private async useCreditApproval(
+    tx: Transaction,
+    caller: Caller,
+    draft: BillDraft,
+    udhaarPaise: number,
+    now: Date,
+  ): Promise<string | null> {
+    if (draft.creditApprovalId === undefined || udhaarPaise === 0) return null;
+    const [used] = await tx
+      .update(ownerApprovals)
+      .set({ usedAt: now })
+      .where(
+        and(
+          eq(ownerApprovals.id, draft.creditApprovalId),
+          eq(ownerApprovals.branchId, caller.branchId),
+          eq(ownerApprovals.billKey, draft.billKey),
+          eq(ownerApprovals.kind, 'credit_limit'),
+          isNull(ownerApprovals.usedAt),
+          sql`${ownerApprovals.expiresAt} > ${now}`,
+          sql`${ownerApprovals.amountPaise} >= ${udhaarPaise}`,
+        ),
+      )
+      .returning({ id: ownerApprovals.id });
+    if (used === undefined) throw new ConflictException({ code: 'approval_invalid' });
+    return used.id;
+  }
+
+  /**
+   * The bill's entries in the customer's ledger: the advance used, then the udhaar given, once the
+   * limit allows it. Returns the balance after, or null when the bill touches no account.
+   */
+  private async moveLedger(
+    tx: Transaction,
+    caller: Caller,
+    bill: {
+      customerId: string | null;
+      billId: string;
+      businessDate: string;
+      udhaarPaise: number;
+      advancePaise: number;
+      limitPaise: number | null;
+      setting: OverCreditLimitSetting;
+      approved: boolean;
+    },
+  ): Promise<number | null> {
+    const { customerId, billId, udhaarPaise, advancePaise } = bill;
+    if (customerId === null || (udhaarPaise === 0 && advancePaise === 0)) return null;
+    const entry = {
+      customerId,
+      billId,
+      branchId: caller.branchId,
+      actorId: caller.userId,
+      businessDate: bill.businessDate,
+    };
+    try {
+      let balance: number;
+      if (advancePaise > 0) {
+        const used = await moveUdhaar(tx, {
+          ...entry,
+          kind: 'advance_used',
+          amountPaise: advancePaise,
+        });
+        balance = used.balanceAfterPaise;
+      } else {
+        balance = await lockUdhaarAccount(tx, customerId);
+      }
+      if (udhaarPaise === 0) return balance;
+      const verdict = creditLimitVerdict({
+        who: caller.role,
+        setting: bill.setting,
+        limitPaise: bill.limitPaise,
+        balanceAfterPaise: balance + udhaarPaise,
+      });
+      if (verdict === 'needs_approval' && !bill.approved) {
+        throw new ConflictException({
+          code: 'over_credit_limit',
+          balancePaise: balance,
+          limitPaise: bill.limitPaise,
+        });
+      }
+      const given = await moveUdhaar(tx, { ...entry, kind: 'bill', amountPaise: udhaarPaise });
+      return given.balanceAfterPaise;
+    } catch (error) {
+      if (error instanceof UdhaarRuleError && error.code === 'advance_changed') {
+        throw new ConflictException({
+          code: 'advance_changed',
+          availablePaise: error.availablePaise,
+        });
+      }
+      throw error;
+    }
+  }
+
   /** The save's answer, read back from what was stored, so a retry gets the same. */
   private async view(tx: Transaction, billId: string): Promise<SavedBillView> {
     const [bill] = await tx
@@ -589,6 +740,15 @@ export class BillsService {
       .from(stockMovements)
       .where(and(eq(stockMovements.billId, billId), sql`${stockMovements.balanceAfter} < 0`))
       .orderBy(asc(stockMovements.id));
+    // Udhaar this bill put past the customer's credit limit, for the owner's warning (`03` #9).
+    const [credit] = await tx
+      .select({
+        balanceAfterPaise: udhaarEntries.balanceAfterPaise,
+        limitPaise: customers.creditLimitPaise,
+      })
+      .from(udhaarEntries)
+      .innerJoin(customers, eq(customers.id, udhaarEntries.customerId))
+      .where(and(eq(udhaarEntries.billId, billId), eq(udhaarEntries.kind, 'bill')));
     const warnings = new Map(below.map((line) => [line.itemId, line.balanceAfter]));
     return {
       ...bill,
@@ -599,6 +759,10 @@ export class BillsService {
         0,
       ),
       warnings: [...warnings].map(([itemId, balanceAfter]) => ({ itemId, balanceAfter })),
+      creditWarning:
+        credit?.limitPaise != null && credit.balanceAfterPaise > credit.limitPaise
+          ? { balanceAfterPaise: credit.balanceAfterPaise, limitPaise: credit.limitPaise }
+          : null,
     };
   }
 }

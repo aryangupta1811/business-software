@@ -1015,7 +1015,9 @@
         "cash": "Cash",
         "upi": "UPI",
         "card": "Card",
-        "cheque": "Cheque"
+        "cheque": "Cheque",
+        "udhaar": "Udhaar",
+        "advance": "Advance se"
       },
       "amount": "Rakam",
       "received": "Cash mila",
@@ -1077,6 +1079,7 @@
         "phone_taken": "Is phone number ka customer pehle se hai. Use dhoondhein.",
         "gstin_taken": "Is GSTIN ka customer pehle se hai. Use dhoondhein.",
         "gstin_state": "GSTIN ke pehle do ank rajya batate hain",
+        "credit_terms_owner_only": "Credit seema aur bhugtaan ke din sirf malik tay kar sakta hai.",
         "failed": "Customer save nahin ho saka. Connection dekhein aur phir koshish karein."
       },
       "onHeldBill": "Bill ke saath save kiya gaya customer"
@@ -1107,6 +1110,11 @@
         "invalid_quantity": "Is bill ki ek matra uski ikai se mel nahin khaati, jaise aadha piece. Matra theek karein.",
         "payments_mismatch": "Payment kul se mel nahin khaate. Dobara payment lein (F10).",
         "key_reused": "Yeh bill pehle hi alag saman ke saath save ho chuka hai, shayad connection tootne se pehle. Naya bill shuru karein (Alt+N) aur malik se jaanchwayein.",
+        "udhaar_needs_customer": "Udhaar ke liye customer chahiye. Customer ka naam aur phone jodein (F3), ya bill se udhaar hatayein (F10).",
+        "udhaar_needs_phone": "Udhaar ke liye customer ka phone number chahiye. Use customer mein jodein (F3).",
+        "udhaar_not_allowed": "Yeh login udhaar nahin de sakta. Malik se ise chalu karwayein, ya bill se udhaar hatayein (F10).",
+        "over_credit_limit": "Yeh udhaar customer ki credit seema se upar hai. Malik se manzoor karwayein, ya kam udhaar lein (F10).",
+        "advance_changed": "Chunne ke baad customer ka advance badal gaya hai. Phir se payment lein (F10).",
         "network": "Connection nahin hai. Ho sakta hai bill save ho chuka ho. Jaanchne ke liye Enter dabayein: bill do baar save nahin hoga. Tab tak bill badla nahin ja sakta.",
         "failed": "Bill save nahin ho saka. Phir koshish karein; baar-baar ho to connection jaanchein."
       }
@@ -1210,6 +1218,10 @@
         "discount": {
           "label": "Chhoot dena",
           "hint": "Neeche ki seema tak. Usse upar bill ke liye aapka password chahiye."
+        },
+        "udhaar": {
+          "label": "Udhaar dena",
+          "hint": "Naam aur phone wale customer ko udhaar bechein. Credit seema se upar bill ke liye aapka password chahiye."
         }
       },
       "customers": {

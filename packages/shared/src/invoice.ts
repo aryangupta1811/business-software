@@ -119,4 +119,6 @@ export interface SavedBillView {
   changePaise: Paise;
   /** Goods the `warn` setting let go below zero: the counter shows a warning. */
   warnings: { itemId: string; balanceAfter: number }[];
+  /** Udhaar the bill put past the customer's credit limit (`03` #9): the counter shows a warning. */
+  creditWarning: { balanceAfterPaise: Paise; limitPaise: Paise } | null;
 }

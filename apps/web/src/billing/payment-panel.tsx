@@ -1,6 +1,6 @@
 import {
   formatPaise,
-  PAYMENT_MODES,
+  MONEY_PAYMENT_MODES,
   paymentIssues,
   parseRupees,
   type Paise,
@@ -192,7 +192,7 @@ function Panel({
   function addRow() {
     if (drafts.length >= MAX_ROWS) return;
     const id = nextId.current++;
-    const mode = PAYMENT_MODES.find((m) => !drafts.some((d) => d.mode === m)) ?? 'cash';
+    const mode = MONEY_PAYMENT_MODES.find((m) => !drafts.some((d) => d.mode === m)) ?? 'cash';
     setDrafts([...drafts, { id, mode, text: left > 0 ? rupeesText(left) : '', reference: '' }]);
     setActiveId(id);
     refocus.current = id;
@@ -266,7 +266,9 @@ function Panel({
     };
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.altKey || event.ctrlKey || event.metaKey || isTypingTarget(event.target)) return;
-      const mode = /^[1-4]$/.test(event.key) ? PAYMENT_MODES[Number(event.key) - 1] : undefined;
+      const mode = /^[1-4]$/.test(event.key)
+        ? MONEY_PAYMENT_MODES[Number(event.key) - 1]
+        : undefined;
       const row = event.target === null ? null : rowOf(event.target);
       if (mode === undefined || row === null) return;
       event.preventDefault();
@@ -430,7 +432,7 @@ function PaymentRowCard({
       </div>
 
       <div className="mt-2 grid grid-cols-4 gap-2">
-        {PAYMENT_MODES.map((mode, index) => (
+        {MONEY_PAYMENT_MODES.map((mode, index) => (
           <Button
             key={mode}
             variant={draft.mode === mode ? 'primary' : 'secondary'}

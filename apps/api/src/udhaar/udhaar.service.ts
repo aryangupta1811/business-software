@@ -285,7 +285,11 @@ export class UdhaarService {
   }
 
   /** `03` #20: what the old notebook says the customer owed, once, before anything else. */
-  setOpening(caller: Caller, input: UdhaarOpeningInput): Promise<UdhaarMoveView> {
+  async setOpening(caller: Caller, input: UdhaarOpeningInput): Promise<UdhaarMoveView> {
+    // A future day would push the due date out, so the customer would never be overdue.
+    if (input.asOf > businessDate(this.clock.now())) {
+      throw new UnprocessableEntityException({ code: 'future_date' });
+    }
     const same = (row: EntryRow) =>
       row.kind === 'opening' &&
       row.customerId === input.customerId &&

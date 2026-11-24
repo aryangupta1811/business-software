@@ -913,6 +913,11 @@ describe('udhaar', () => {
       expect((await opening(a, sunita, { amountPaise: 0 })).status).toBe(400);
       expect((await opening(a, sunita, { asOf: '2026-02-30' })).status).toBe(400);
       expect((await opening(a, sunita, { reason: '' })).status).toBe(400);
+      // A future day would push the due date out, so the customer would never be overdue.
+      expect(await opening(a, sunita, { asOf: '2099-01-01' })).toMatchObject({
+        status: 422,
+        body: { code: 'future_date' },
+      });
       expect((await opening(a, sunita, { amountPaise: -2_500 })).body.balancePaise).toBe(-2_500);
     });
   });

@@ -164,8 +164,9 @@ export class BillingService {
 
   /**
    * The owner's OK for discounts above a cashier's limit, or for udhaar past a credit limit, on one
-   * bill (design §6, question 5; `03` #9, #18): the owner types their password at the counter. Kept for 30 minutes, used up by the save
-   * (P1.14), logged at once. The password is checked under its rate limit and never stored.
+   * bill (design §6, question 5; `03` #9, #18): the owner types their password at the counter.
+   * Kept for 30 minutes, used up by the save (P1.14), logged at once. The password is checked
+   * under its rate limit and never stored.
    */
   async approve(caller: Caller, input: ApprovalInput): Promise<ApprovalView> {
     await this.sessions.requireOwnerPassword(caller, input.ownerPassword);

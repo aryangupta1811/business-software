@@ -24,7 +24,7 @@ Overwritten at the end of every session. Older handoffs are in git history: `git
 
 **Owner's answers (2026-11-24, session 33):** credit limit and due days owner-only (`03` #24); printing keys `Alt+P`, `Alt+A`, `Alt+W`, Bills page `Alt+V` (`02` #30, #31); the register's header becomes "Everyone due today is in" (to do, small fix).
 
-**Question for the owner:** was sitting 3 held (04, 08, 09, D5)? It unblocks P2.1, the dashboards, demo data and the AI assistant.
+**Sitting 3 held 2026-11-24:** 04, 08, 09 DECIDED; D5 in ADR 0016's dated note; D6: cash closing, then expenses, after v1. Opening balance at any time (`03` #20, built in P1.18 PR 2).
 
 **Next step:** `/start-session`, then one task: finish P1.18 PR 1 in its worktree, review, merge. Then P1.15 PR 1. Then Day 9. Tell the owner what the lost day means for 2026-11-29.
 

@@ -2188,3 +2188,15 @@ Entry format:
 - **Why / what I learned:** open a file before judging it from its name. A lane should commit its first working, tested slice, so a stop costs little. Worktrees kept the two lanes' unfinished work apart from `main` and from each other.
 - **Say it in an interview:** "Unfinished work lives on its own branch in its own worktree, so an agent that stops halfway can't break main."
 - **Follow-ups to expect:** why start from a stub that throws? (every test then fails for the right reason before any code can make it pass).
+
+### 2026-11-24 — Going through requirements again after a scope cut found gaps in them `#requirements` `#product` `#gst`
+- **What happened:** sitting 3's question sheet was written on 2026-11-20, before the portfolio cut. Checking it against the decided modules before asking found cases it had missed: free goods ("10 + 1 free") would make costs wrong; a composition shop can't claim purchase GST back, so its cost must include it; suppliers restart bill numbers every April, so "same bill number" needs the financial year; a per-business AI cap could pass the total budget with several shops; demo visitors would be stuck at password dialogs.
+- **Why / what I learned:** a requirements sheet goes stale when the scope changes. Re-read it against what is decided and built before asking anyone to agree to it.
+- **Say it in an interview:** "Before signing off a module I walk through it as a real shop would, with free goods, cancelled bills and the April number reset. That found errors in cost and profit before any code existed."
+- **Follow-ups to expect:** why does composition change the cost? (it can't claim input tax credit, so the GST it pays is part of what the goods cost).
+
+### 2026-11-24 — A build that was stricter than the requirement `#requirements` `#testing`
+- **What happened:** "the owner enters the opening balance once per customer" was built as "only before the customer's first entry", because oldest-first is simpler when the opening is first. In a real shop a cashier can give udhaar on day one, and the owner would then be locked out for good. The review raised it and the owner chose: any time, once, counted as the oldest.
+- **Why / what I learned:** a rule that makes the code simpler still changes what the owner decided. Compare each refusal in the code with a sentence in the requirements.
+- **Say it in an interview:** "In review I check every error the API can return against a requirement. One had no source: it was a shortcut that would have locked real users out."
+- **Follow-ups to expect:** how can a late entry be the oldest? (the order used for oldest-first is worked out when read, so it can put the opening first).

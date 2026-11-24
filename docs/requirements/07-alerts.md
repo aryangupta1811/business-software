@@ -52,6 +52,7 @@
 17. **Items with no low-stock level** still get an out-of-stock alert when they reach 0.
 18. **On the billing page** the bell shows its count like everywhere else and opens only when clicked.
 19. **A dismissed low-stock alert shows again when the item runs out** (it got worse). The reverse doesn't: an alert dismissed at out of stock stays hidden when the item is back to low. A dismissal never makes anyone else's alert reappear.
+20. **Supplier payments due** (`04` #19): "due in 3 days" (settable) and "overdue", in the bell and the daily summary only. Off for staff by default, like the other money alerts (#2). With P2.2.
 
 ## v1 delivery (the owner's portfolio cut, 2026-11-22 (`docs/plans/2026-11-17-fast-track.md`, section 9))
 
@@ -69,3 +70,4 @@ None. To check in P2.8 (not owner decisions): the dashboard's temporary WhatsApp
 - 2026-11-22 — P2.7 part 2 design answers: the owner took all 5 recommendations in `docs/plans/2026-11-22-p2.7-alerts-design.md` (section 9). Added #14–#18. #13's test alert type is replaced by low stock, which now has its data (P1.8). No decided point changed.
 - 2026-11-22 — Owner: a dismissed low-stock alert shows again when the item runs out (#19). No decided point changed.
 - 2026-11-22 — Portfolio cut (owner): WhatsApp (#8–12), expiring soon, suspicious activity and supplier dues deferred with their tasks. No decided point changed.
+- 2026-11-24 — Sitting 3: added #20, the supplier payments due alert #1 was waiting for. No decided point changed.

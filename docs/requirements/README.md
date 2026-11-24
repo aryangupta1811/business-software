@@ -11,12 +11,12 @@ Imported from the planning chat on claude.ai (29 Oct 2026). **This folder is now
 | 01 | Items & inventory | DECIDED (open questions answered 2026-11-17) | `01-items-inventory.md` |
 | 02 | Billing & GST | DECIDED (2026-11-17) | `02-billing-gst.md` |
 | 03 | Udhaar (customer credit) | DECIDED (2026-11-17) | `03-udhaar.md` |
-| 04 | Suppliers & purchases | DRAFT | `04-suppliers-purchases.md` |
+| 04 | Suppliers & purchases | DECIDED (2026-11-24) | `04-suppliers-purchases.md` |
 | 05 | Staff, attendance & salary | DECIDED (2026-11-19) | `05-staff-attendance-salary.md` |
 | 06 | Entry logs | DECIDED (2026-11-19) | `06-entry-logs.md` |
 | 07 | Alerts | DECIDED (2026-11-19) | `07-alerts.md` |
-| 08 | Dashboard | DRAFT | `08-dashboard.md` |
-| 09 | AI assistant | DRAFT | `09-ai-assistant.md` |
+| 08 | Dashboard | DECIDED (2026-11-24) | `08-dashboard.md` |
+| 09 | AI assistant | DECIDED (2026-11-24) | `09-ai-assistant.md` |
 | — | Ideas not yet placed | Backlog | `ideas-backlog.md` |
 
 **v1 delivery (owner's portfolio cut, 2026-11-22):** a DECIDED module can have a "v1 delivery" section saying which of its points ship in v1 and which wait in `ideas-backlog.md` ("Deferred from v1"). Deferred points stay DECIDED and come back as whole tasks.

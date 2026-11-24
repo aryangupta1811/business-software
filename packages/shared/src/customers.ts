@@ -2,8 +2,10 @@
 // none; a business customer brings a GSTIN, legal name and address. P1.18 adds credit limit,
 // due days and the udhaar ledger. Error messages are codes the web app translates (ADR 0036).
 import { z } from 'zod';
+import { MAX_BILL_PAISE } from './billing.js';
 import { isValidGstin, optionalPhone, optionalText, text } from './fields.js';
 import { isStateCode } from './states.js';
+import { MAX_DUE_DAYS } from './udhaar.js';
 
 const PIN_CODE = /^[1-9]\d{5}$/;
 
@@ -23,6 +25,22 @@ const customerShape = {
     .string({ error: 'invalid' })
     .refine((code) => isStateCode(code), { error: 'invalid' })
     .nullable(),
+  /**
+   * `03` #8, #17: the most udhaar the customer may owe; null is "no limit set". Left out, a new
+   * customer has none and a saved one keeps theirs.
+   */
+  creditLimitPaise: z
+    .int({ error: 'invalid' })
+    .min(0, { error: 'too_small' })
+    .max(MAX_BILL_PAISE, { error: 'too_big' })
+    .nullable()
+    .optional(),
+  /** `03` #5: days from a bill to its due date. Left out, 30 for a new customer, else unchanged. */
+  dueDays: z
+    .int({ error: 'invalid' })
+    .min(0, { error: 'too_small' })
+    .max(MAX_DUE_DAYS, { error: 'too_big' })
+    .optional(),
 };
 
 type CustomerFields = z.infer<z.ZodObject<typeof customerShape>>;
@@ -85,5 +103,8 @@ export interface CustomerView {
   address: string | null;
   pinCode: string | null;
   stateCode: string | null;
+  /** Null: no limit set (`03` #17). */
+  creditLimitPaise: number | null;
+  dueDays: number;
   version: number;
 }

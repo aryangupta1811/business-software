@@ -16,9 +16,20 @@ import type { BuiltInUnit } from './units.js';
 export const PRICE_LISTS = ['retail', 'wholesale'] as const;
 export type PriceList = (typeof PRICE_LISTS)[number];
 
-/** `02` #10. Udhaar joins with P1.18, which brings its ledger and credit limit. */
-export const PAYMENT_MODES = ['cash', 'upi', 'card', 'cheque'] as const;
+/** The ways money arrives (`02` #10); a payment recorded against udhaar uses these. */
+export const MONEY_PAYMENT_MODES = ['cash', 'upi', 'card', 'cheque'] as const;
+export type MoneyPaymentMode = (typeof MONEY_PAYMENT_MODES)[number];
+
+/**
+ * `02` #10, `03` #6: the four ways money arrives, then the unpaid part going on the customer's
+ * udhaar, and the customer's advance used up. The last two take no cash handed over and no
+ * reference.
+ */
+export const PAYMENT_MODES = [...MONEY_PAYMENT_MODES, 'udhaar', 'advance'] as const;
 export type PaymentMode = (typeof PAYMENT_MODES)[number];
+
+/** Udhaar and advance settle part of a bill without money changing hands. */
+const isLedgerMode = (mode: PaymentMode) => mode === 'udhaar' || mode === 'advance';
 
 // ---- The catalogue copy in the browser (design §4) ----
 
@@ -308,7 +319,7 @@ export function discountShares(input: BillInput): DiscountLimits {
 // ---- The save request (design §10) and a held bill's cart (§9) ----
 
 /** ₹1 lakh crore: far above any bill, far below 2^53. */
-const MAX_BILL_PAISE = 10_000_000_000_000;
+export const MAX_BILL_PAISE = 10_000_000_000_000;
 const MAX_LINES = 500;
 
 const discountSchema = z.discriminatedUnion(
@@ -391,14 +402,14 @@ export type PaymentIssue =
       /** The payment it's about. */
       index: number;
       field: 'tenderedPaise' | 'reference';
-      code: 'cash_only' | 'too_small' | 'required';
+      code: 'cash_only' | 'too_small' | 'required' | 'not_allowed';
     }
   | { index: null; field: null; code: 'payments_mismatch' };
 
 /**
  * The rules for the payments of a bill, in one place for the save request and the payment
  * panel: only cash is handed over (and not less than its amount), a cheque needs its number,
- * and the amounts add up to exactly the bill (`02` #11). Only cash can be handed over in
+ * udhaar and advance take no reference, and the amounts add up to exactly the bill (`02` #11). Only cash can be handed over in
  * excess, and that's `tenderedPaise`, not the amount.
  */
 export function paymentIssues(payments: readonly PaymentRule[], totalPaise: Paise): PaymentIssue[] {
@@ -414,6 +425,9 @@ export function paymentIssues(payments: readonly PaymentRule[], totalPaise: Pais
     if (payment.mode === 'cheque' && (payment.reference ?? null) === null) {
       issues.push({ index, field: 'reference', code: 'required' });
     }
+    if (isLedgerMode(payment.mode) && (payment.reference ?? null) !== null) {
+      issues.push({ index, field: 'reference', code: 'not_allowed' });
+    }
   });
   const paid = payments.reduce((sum, payment) => sum + payment.amountPaise, 0);
   if (paid !== totalPaise) issues.push({ index: null, field: null, code: 'payments_mismatch' });
@@ -427,6 +441,8 @@ export const billDraftSchema = z
     payments: z.array(paymentSchema, { error: 'invalid' }).max(10, { error: 'too_many' }),
     /** An owner's OK for a discount above the cashier's limit (design §6). */
     approvalId: uuid().optional(),
+    /** An owner's OK for udhaar over the credit limit (P1.18 design §5): its own approval. */
+    creditApprovalId: uuid().optional(),
     /** The held bill this one was resumed from (design §9). */
     heldBillId: uuid().optional(),
     shownGrandTotalPaise: amount(),
@@ -530,8 +546,8 @@ export interface ResumedBillView {
   draft: BillCart;
 }
 
-/** `discount` today; P1.18 adds `credit_limit` (`03` #9). */
-export const APPROVAL_KINDS = ['discount'] as const;
+/** A discount above a cashier's limit (`02` #12), or udhaar over a credit limit (`03` #9, #18). */
+export const APPROVAL_KINDS = ['discount', 'credit_limit'] as const;
 export type ApprovalKind = (typeof APPROVAL_KINDS)[number];
 
 /** An owner's OK lasts this long, for one bill, and is used up by its save (question 5). */
@@ -542,26 +558,42 @@ const share = () =>
     error: 'too_big',
   });
 
+const ownerPassword = () =>
+  z.string({ error: 'required' }).min(1, { error: 'required' }).max(128, { error: 'too_long' });
+
 /**
  * `POST /api/billing/approvals`: the owner types their password at the counter to allow the
- * discounts shown (`discountShares`), for this bill only. The password is sent once, never kept.
+ * discounts shown (`discountShares`) or the most udhaar to put on the bill, for this bill only.
+ * The password is sent once, never kept, and is exactly as typed (ADR 0035).
  */
-export const approvalSchema = z
-  .strictObject({
-    billKey: uuid(),
-    kind: z.enum(APPROVAL_KINDS, { error: 'invalid' }),
-    lineBasisPoints: share(),
-    billBasisPoints: share(),
-    /** Exactly as typed: never trimmed (ADR 0035). */
-    ownerPassword: z
-      .string({ error: 'required' })
-      .min(1, { error: 'required' })
-      .max(128, { error: 'too_long' }),
-  })
-  .refine((value) => value.lineBasisPoints > 0 || value.billBasisPoints > 0, {
-    path: ['billBasisPoints'],
-    error: 'too_small',
-  });
+export const approvalSchema = z.discriminatedUnion(
+  'kind',
+  [
+    z
+      .strictObject({
+        billKey: uuid(),
+        kind: z.literal('discount'),
+        lineBasisPoints: share(),
+        billBasisPoints: share(),
+        ownerPassword: ownerPassword(),
+      })
+      .refine((value) => value.lineBasisPoints > 0 || value.billBasisPoints > 0, {
+        path: ['billBasisPoints'],
+        error: 'too_small',
+      }),
+    z.strictObject({
+      billKey: uuid(),
+      kind: z.literal('credit_limit'),
+      /** The most udhaar the owner allows on this bill. */
+      amountPaise: z
+        .int({ error: 'invalid' })
+        .min(1, { error: 'too_small' })
+        .max(MAX_BILL_PAISE, { error: 'too_big' }),
+      ownerPassword: ownerPassword(),
+    }),
+  ],
+  { error: 'invalid' },
+);
 export type ApprovalInput = z.infer<typeof approvalSchema>;
 
 export interface ApprovalView {

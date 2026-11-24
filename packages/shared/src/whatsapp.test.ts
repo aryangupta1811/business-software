@@ -30,10 +30,16 @@ describe('whatsAppLink', () => {
     expect(link.split('?')).toHaveLength(2);
   });
 
-  it.each(['', '98765', '98765432101', '0123456789', '+919876543210', '98765 43210', 'abcdefghij'])(
-    'refuses %j: only a stored 10-digit number is used',
-    (phone) => {
-      expect(() => whatsAppLink(phone, 'Hello')).toThrow(RangeError);
-    },
-  );
+  it.each([
+    '',
+    '98765',
+    '987654321',
+    '98765432101',
+    '0123456789',
+    '+919876543210',
+    '98765 43210',
+    'abcdefghij',
+  ])('refuses %j: only a stored 10-digit number is used', (phone) => {
+    expect(() => whatsAppLink(phone, 'Hello')).toThrow(RangeError);
+  });
 });

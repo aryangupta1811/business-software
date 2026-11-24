@@ -92,3 +92,44 @@ describe('billListQuerySchema', () => {
     expect(result.success ? null : fieldErrors(result.error)).toEqual({ to: 'before_from' });
   });
 });
+
+describe('the settings and the query, pinned', () => {
+  it('keeps the footer note to exactly 200 characters, not the constant it is read from', () => {
+    expect(FOOTER_NOTE_MAX_LENGTH).toBe(200);
+  });
+
+  it.each(['en', 'hi', 'hi-Latn'])('takes the bill language %s', (billLanguage) => {
+    expect(settingsPrintingSchema.parse({ billLanguage, footerNote: null }).billLanguage).toBe(
+      billLanguage,
+    );
+  });
+
+  it('takes a range of a single day', () => {
+    expect(billListQuerySchema.parse({ from: '2026-11-23', to: '2026-11-23' })).toEqual({
+      from: '2026-11-23',
+      to: '2026-11-23',
+    });
+  });
+
+  it('refuses a cursor that is not an id', () => {
+    const result = billListQuerySchema.safeParse({ after: 'not-an-id' });
+    expect(result.success).toBe(false);
+  });
+
+  it('refuses a branch that is neither "all" nor an id', () => {
+    expect(billListQuerySchema.safeParse({ branch: 'north' }).success).toBe(false);
+    expect(billListQuerySchema.safeParse({ branch: 'all' }).success).toBe(true);
+  });
+
+  it('keeps the search to 100 characters', () => {
+    expect(billListQuerySchema.safeParse({ q: 'a'.repeat(100) }).success).toBe(true);
+    expect(billListQuerySchema.safeParse({ q: 'a'.repeat(101) }).success).toBe(false);
+  });
+
+  it('refuses a field it does not know', () => {
+    expect(billListQuerySchema.safeParse({ page: '2' }).success).toBe(false);
+    expect(devicePrintingSchema.safeParse({ receiptSize: 80, autoPrint: true, x: 1 }).success).toBe(
+      false,
+    );
+  });
+});

@@ -65,6 +65,10 @@ export const ENTRY_ACTIONS = {
   'staff.login_added': { reasonRequired: false }, // a record without a login was given one
   'holiday.added': { reasonRequired: false },
   'holiday.removed': { reasonRequired: false },
+  // P1.15 (`02` #29, #32, #33): the bill language and footer, a computer's printer, a reprint.
+  'settings.printing_changed': { reasonRequired: false },
+  'device.printing_changed': { reasonRequired: false },
+  'bill.reprinted': { reasonRequired: false },
 } as const satisfies Record<string, { reasonRequired: boolean }>;
 
 export type EntryAction = keyof typeof ENTRY_ACTIONS;

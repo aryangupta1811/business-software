@@ -8,6 +8,7 @@ export {
   inArray,
   isNotNull,
   isNull,
+  lt,
   ne,
   or,
   sql,

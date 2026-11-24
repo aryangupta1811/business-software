@@ -16,6 +16,7 @@ import {
 import { businessDate, financialYear } from '@business-software/shared';
 import type {
   AlertType,
+  BillLanguage,
   BusinessType,
   Feature,
   GstStatus,
@@ -23,6 +24,7 @@ import type {
   SettingsBusinessInput,
   SettingsFeaturesInput,
   SettingsInvoicesInput,
+  SettingsPrintingInput,
   SettingsSecurityInput,
   SettingsStockInput,
   SettingsView,
@@ -187,6 +189,25 @@ export class SettingsService {
     );
   }
 
+  /** `02` #17, #16: the language bills print in and the note under them. */
+  savePrinting(caller: Caller, input: SettingsPrintingInput): Promise<SettingsView> {
+    return this.save(
+      caller,
+      (current) => current.view.printing,
+      input,
+      (tx) =>
+        tx
+          .update(businesses)
+          .set({
+            billLanguage: input.billLanguage,
+            billFooterNote: input.footerNote,
+            updatedAt: new Date(),
+          })
+          .where(eq(businesses.id, caller.businessId)),
+      'settings.printing_changed',
+    );
+  }
+
   /** Locks, compares, writes and logs `action` with only the changed fields. */
   private save(
     caller: Caller,
@@ -263,6 +284,10 @@ export class SettingsService {
         stock: { negativeStock: business.negativeStock as NegativeStockSetting },
         alerts: { types: business.alertTypes as AlertType[] },
         invoices: { invoicePrefix: business.invoicePrefix },
+        printing: {
+          billLanguage: business.billLanguage as BillLanguage,
+          footerNote: business.billFooterNote,
+        },
         nextInvoice: { financialYear: year, sequence: (counter?.lastNumber ?? 0) + 1 },
       },
     };

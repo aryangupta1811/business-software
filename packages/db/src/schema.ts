@@ -14,10 +14,13 @@ import {
   GST_RATES,
   GST_STATUSES,
   INDIAN_STATES,
+  BILL_LANGUAGES,
+  FOOTER_NOTE_MAX_LENGTH,
   ITEM_KINDS,
   NEGATIVE_STOCK_SETTINGS,
   PAYMENT_MODES,
   PRICE_LISTS,
+  RECEIPT_SIZES,
   SALARY_KINDS,
   STOCK_MOVEMENT_KINDS,
   type StockAlertDetails,
@@ -113,6 +116,10 @@ export const businesses = pgTable(
     negativeStock: text('negative_stock').notNull().default('warn'),
     /** `00` #61: starts a one-branch business's invoice numbers; null for none (`26-27/42`). */
     invoicePrefix: text('invoice_prefix'),
+    /** `02` #17: the language every bill prints in. */
+    billLanguage: text('bill_language').notNull().default('en'),
+    /** The note under every bill (`02` #16); null for none. */
+    billFooterNote: text('bill_footer_note'),
     /** The alert types the app shows (Module 07 #3). A type left out still records alerts. */
     alertTypes: text('alert_types')
       .array()
@@ -138,6 +145,14 @@ export const businesses = pgTable(
       sql`${t.alertTypes} <@ array[${literals(ALERT_TYPES)}]::text[]`,
     ),
     check('businesses_invoice_prefix_check', sql`${t.invoicePrefix} ~ '^[A-Z0-9]{1,4}$'`),
+    check(
+      'businesses_bill_language_check',
+      sql`${t.billLanguage} in (${literals(BILL_LANGUAGES)})`,
+    ),
+    check(
+      'businesses_bill_footer_note_check',
+      sql`char_length(${t.billFooterNote}) between 1 and ${sql.raw(String(FOOTER_NOTE_MAX_LENGTH))}`,
+    ),
     check(
       'businesses_negative_stock_check',
       sql`${t.negativeStock} in (${literals(NEGATIVE_STOCK_SETTINGS)})`,
@@ -409,6 +424,9 @@ export const devices = pgTable(
     createdAt: createdAt(),
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    /** `02` #29, #30: this counter's receipt paper in mm, and whether a saved bill prints at once. */
+    receiptSize: smallint('receipt_size').notNull().default(80),
+    autoPrint: boolean('auto_print').notNull().default(true),
   },
   (t) => [
     ...tenantPolicies(t.businessId),
@@ -425,6 +443,10 @@ export const devices = pgTable(
       foreignColumns: [users.businessId, users.id],
     }),
     check('devices_token_hash_check', tokenHashCheck(t.tokenHash)),
+    check(
+      'devices_receipt_size_check',
+      sql`${t.receiptSize} in (${sql.raw(RECEIPT_SIZES.join(', '))})`,
+    ),
   ],
 );
 

@@ -645,6 +645,79 @@ describe('account recovery and remembered computers', () => {
       );
     });
 
+    it('prints at 80 mm with auto-print until the owner says otherwise, and the session shows it', async () => {
+      const { owner } = await signUp('printing-default@example.com');
+      const [self] = (await owner.call('GET', '/devices')).body as unknown as {
+        id: string;
+        printing: unknown;
+      }[];
+      expect(self?.printing).toEqual({ receiptSize: 80, autoPrint: true });
+      expect((await owner.session()).body).toMatchObject({
+        printing: { receiptSize: 80, autoPrint: true },
+      });
+    });
+
+    it("sets one computer's receipt paper and auto-print, and the staff on it get them", async () => {
+      const { owner, businessId } = await signUp('printing-set@example.com');
+      const [self] = (await owner.call('GET', '/devices')).body as unknown as { id: string }[];
+      const id = self?.id ?? '';
+      const saved = await owner.call('PUT', `/devices/${id}/printing`, {
+        receiptSize: 58,
+        autoPrint: false,
+      });
+      expect(saved).toMatchObject({
+        status: 200,
+        body: { id, printing: { receiptSize: 58, autoPrint: false } },
+      });
+      expect((await owner.session()).body).toMatchObject({
+        printing: { receiptSize: 58, autoPrint: false },
+      });
+      const staff = await addStaff(businessId, owner, 'counter-staff');
+      expect((await staff.session()).body).toMatchObject({
+        printing: { receiptSize: 58, autoPrint: false },
+      });
+      expect(
+        (await actions(businessId)).filter((entry) => entry.action === 'device.printing_changed'),
+      ).toEqual([
+        { action: 'device.printing_changed', after: { receiptSize: 58, autoPrint: false } },
+      ]);
+      // The same again writes no second log entry.
+      await owner.call('PUT', `/devices/${id}/printing`, { receiptSize: 58, autoPrint: false });
+      expect(
+        (await actions(businessId)).filter((entry) => entry.action === 'device.printing_changed'),
+      ).toHaveLength(1);
+    });
+
+    it('lets only the owner change it, and refuses a paper size that is not 80 or 58', async () => {
+      const { owner, businessId } = await signUp('printing-who@example.com');
+      const [self] = (await owner.call('GET', '/devices')).body as unknown as { id: string }[];
+      const id = self?.id ?? '';
+      const staff = await addStaff(businessId, owner, 'cashier-staff');
+      expect(
+        (await staff.call('PUT', `/devices/${id}/printing`, { receiptSize: 58, autoPrint: true }))
+          .status,
+      ).toBe(403);
+      expect(
+        (await owner.call('PUT', `/devices/${id}/printing`, { receiptSize: 70, autoPrint: true }))
+          .status,
+      ).toBe(400);
+    });
+
+    it("can't change another business's computer's printing", async () => {
+      const { owner } = await signUp('printing-a@example.com');
+      const { owner: other } = await signUp('printing-b@example.com');
+      const [theirs] = (await other.call('GET', '/devices')).body as unknown as { id: string }[];
+      expect(
+        await owner.call('PUT', `/devices/${theirs?.id ?? ''}/printing`, {
+          receiptSize: 58,
+          autoPrint: false,
+        }),
+      ).toMatchObject({ status: 404 });
+      expect((await other.call('GET', '/devices')).body).toMatchObject([
+        { printing: { receiptSize: 80, autoPrint: true } },
+      ]);
+    });
+
     it("can't see or touch another business's computer", async () => {
       const { owner } = await signUp('devices-a@example.com');
       const { owner: otherOwner } = await signUp('devices-b@example.com');

@@ -4,12 +4,14 @@ import {
   settingsBusinessSchema,
   settingsFeaturesSchema,
   settingsInvoicesSchema,
+  settingsPrintingSchema,
   settingsSecuritySchema,
   settingsStockSchema,
   type SettingsAlertsInput,
   type SettingsBusinessInput,
   type SettingsFeaturesInput,
   type SettingsInvoicesInput,
+  type SettingsPrintingInput,
   type SettingsSecurityInput,
   type SettingsStockInput,
   type SettingsView,
@@ -88,5 +90,14 @@ export class SettingsController {
     @Body(new ZodBodyPipe(settingsInvoicesSchema)) body: SettingsInvoicesInput,
   ): Promise<SettingsView> {
     return this.settings.saveInvoices(caller, body);
+  }
+
+  @Permission('settings.manage')
+  @Put('printing')
+  savePrinting(
+    @CurrentCaller() caller: Caller,
+    @Body(new ZodBodyPipe(settingsPrintingSchema)) body: SettingsPrintingInput,
+  ): Promise<SettingsView> {
+    return this.settings.savePrinting(caller, body);
   }
 }

@@ -134,6 +134,13 @@
       "when": 1795356742343,
       "tag": "0018_staff_attendance",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795496941735,
+      "tag": "0019_printing_settings",
+      "breakpoints": true
     }
   ]
 }

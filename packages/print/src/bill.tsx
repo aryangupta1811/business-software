@@ -84,7 +84,7 @@ interface Context {
   reprintedAt: string | null;
 }
 
-type Total = 'taxableBeforeDiscountsPaise' | 'discountOffTaxablePaise';
+type Total = 'taxableBeforeDiscountsPaise' | 'discountOffTaxablePaise' | 'grossPaise';
 const sumOf = (lines: readonly BillLineView[], key: Total) =>
   lines.reduce((total, line) => total + line[key], 0);
 
@@ -243,8 +243,13 @@ function Footer({ ctx }: { ctx: Context }): ReactNode {
 
 // ---- Receipt (80 and 58 mm) ----
 
+/**
+ * A receipt shows what the customer pays for each line, tax included (owner, 2026-11-24):
+ * gross less the discounts is the line's total. The taxable values are in the tax rows below.
+ */
 function ReceiptLine({ ctx, line }: { ctx: Context; line: BillLineView }): ReactNode {
   const { labels, bill } = ctx;
+  const discount = line.grossPaise - line.totalPaise;
   return (
     <div className="line">
       <div className="name">{itemName(line, bill)}</div>
@@ -252,9 +257,11 @@ function ReceiptLine({ ctx, line }: { ctx: Context; line: BillLineView }): React
         <span>
           {formatQuantity(line.quantityThousandths)} {labels.units[line.unit] ?? line.unit} ×{' '}
           {amount(line.unitPricePaise)}
-          {ctx.showTax && line.priceIncludesTax && <small> {labels.inclusive}</small>}
+          {ctx.showTax && (
+            <small> {line.priceIncludesTax ? labels.inclusive : labels.exclusive}</small>
+          )}
         </span>
-        <span className="amt">{amount(line.taxableBeforeDiscountsPaise)}</span>
+        <span className="amt">{amount(line.grossPaise)}</span>
       </div>
       {ctx.showHsn && line.hsn !== '' && (
         <div className="fine">
@@ -262,10 +269,10 @@ function ReceiptLine({ ctx, line }: { ctx: Context; line: BillLineView }): React
           {ctx.showTax && <span>GST {formatRate(line.rateBasisPoints)}</span>}
         </div>
       )}
-      {line.discountOffTaxablePaise > 0 && (
+      {discount > 0 && (
         <div className="fine">
           <span>{labels.discount}</span>
-          <span>-{amount(line.discountOffTaxablePaise)}</span>
+          <span>-{amount(discount)}</span>
         </div>
       )}
     </div>
@@ -276,6 +283,10 @@ function ReceiptTaxRows({ ctx }: { ctx: Context }): ReactNode {
   const { bill, labels } = ctx;
   return (
     <section className="taxes">
+      <div className="row">
+        <span>{labels.taxableValue}</span>
+        <span>{amount(bill.taxablePaise)}</span>
+      </div>
       {taxByRate(bill.lines).map((row) => (
         <div className="trow" key={row.rateBasisPoints}>
           <span className="tbase">
@@ -307,7 +318,8 @@ function ReceiptTaxRows({ ctx }: { ctx: Context }): ReactNode {
 
 function Receipt({ ctx }: { ctx: Context }): ReactNode {
   const { bill, labels } = ctx;
-  const discount = sumOf(bill.lines, 'discountOffTaxablePaise');
+  const gross = sumOf(bill.lines, 'grossPaise');
+  const discount = gross - bill.totalPaise;
   return (
     <>
       <Header ctx={ctx} />
@@ -325,7 +337,7 @@ function Receipt({ ctx }: { ctx: Context }): ReactNode {
           <>
             <div className="row">
               <span>{labels.subtotal}</span>
-              <span>{amount(sumOf(bill.lines, 'taxableBeforeDiscountsPaise'))}</span>
+              <span>{amount(gross)}</span>
             </div>
             <div className="row">
               <span>{labels.discount}</span>
@@ -333,15 +345,6 @@ function Receipt({ ctx }: { ctx: Context }): ReactNode {
             </div>
           </>
         )}
-        {ctx.showTax && (
-          <div className="row">
-            <span>{labels.taxableValue}</span>
-            <span>{amount(bill.taxablePaise)}</span>
-          </div>
-        )}
-      </section>
-      {ctx.showTax && <ReceiptTaxRows ctx={ctx} />}
-      <section className="totals">
         {bill.roundOffPaise !== 0 && (
           <div className="row">
             <span>{labels.roundOff}</span>
@@ -353,6 +356,7 @@ function Receipt({ ctx }: { ctx: Context }): ReactNode {
           <span>{formatPaise(bill.grandTotalPaise)}</span>
         </div>
       </section>
+      {ctx.showTax && <ReceiptTaxRows ctx={ctx} />}
       <Payments ctx={ctx} />
       <Footer ctx={ctx} />
     </>

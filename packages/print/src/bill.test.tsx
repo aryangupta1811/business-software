@@ -1,6 +1,7 @@
-import type { BillDetailView } from '@business-software/shared';
+import { calculateBill, type BillDetailView } from '@business-software/shared';
 import { describe, expect, it } from 'vitest';
 import { renderBill, taxByHsn, taxByRate } from './bill.js';
+import { amount } from './format.js';
 import { sampleBill } from './sample.js';
 
 const regular = sampleBill();
@@ -11,6 +12,35 @@ const gujaratBuyer = (() => {
   if (interState.buyer === null) throw new Error('The inter-state sample has a buyer');
   return interState.buyer;
 })();
+
+/** The sample goods again, with ₹10 off the first and 5% off the bill, priced by the engine. */
+function withDiscounts() {
+  const priced = calculateBill({
+    scheme: 'regular',
+    supplierStateCode: '27',
+    placeOfSupplyStateCode: '27',
+    lines: regular.lines.map((line, at) => ({
+      unitPricePaise: line.unitPricePaise,
+      quantityThousandths: line.quantityThousandths,
+      rateBasisPoints: line.rateBasisPoints,
+      priceIncludesTax: line.priceIncludesTax,
+      hsn: line.hsn,
+      ...(at === 0 && { discount: { kind: 'amount' as const, paise: 1_000 } }),
+    })),
+    billDiscount: { kind: 'percent', basisPoints: 500 },
+  });
+  const lines = regular.lines.map((line, at) => ({ ...line, ...priced.lines[at] }));
+  const discounted: BillDetailView = {
+    ...regular,
+    lines,
+    grossPaise: priced.grossPaise,
+    totalPaise: priced.totalPaise,
+    taxablePaise: priced.taxablePaise,
+    roundOffPaise: priced.roundOffPaise,
+    grandTotalPaise: priced.grandTotalPaise,
+  };
+  return { discounted, priced };
+}
 
 /** The visible text of some markup: tags dropped, entities left as they are. */
 const text = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
@@ -46,13 +76,39 @@ describe('a tax invoice (a regular business)', () => {
     expect(words).not.toContain('Place of supply');
   });
 
-  it('prints each line before tax and the totals that follow from them', () => {
+  it.each(['80', '58'] as const)(
+    'shows what the customer pays for each line, tax included (%s)',
+    (size) => {
+      const words = text(renderBill(regular, { size }));
+      // 2.5 kg at 110.00 including GST is 275.00, not its 261.90 before tax.
+      expect(words).toContain('2.5 kg × 110.00 incl. GST 275.00');
+      expect(words).not.toContain('incl. GST 261.90');
+      // A price before tax says so, because 3 × 45.00 is not what the line costs.
+      expect(words).toContain('3 piece × 45.00 + GST 151.20');
+    },
+  );
+
+  it('puts the taxable value and the taxes under the grand total on a receipt', () => {
     const words = text(html);
-    expect(words).toContain('Taxable value');
-    expect(words).toContain('Grand total');
-    expect(words).toContain(
-      `₹${(regular.grandTotalPaise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
-    );
+    expect(words).toMatch(/Round off -0\.20 Grand total ₹466\.00 Taxable value 430\.80/);
+    expect(words).toContain('Total tax');
+    expect(words).not.toContain('Subtotal');
+  });
+
+  it('adds up with discounts: subtotal, less the discount, plus round-off, is the grand total', () => {
+    const { discounted, priced } = withDiscounts();
+    const words = text(renderBill(discounted, { size: '80' }));
+    const off = priced.grossPaise - priced.totalPaise;
+    expect(off).toBeGreaterThan(0);
+    expect(words).toContain(`Subtotal ${amount(priced.grossPaise)} Discount -${amount(off)}`);
+    // The lines' own discounts are in the customer's money too, and add up to the same.
+    const lineOff = priced.lines.map((line) => line.grossPaise - line.totalPaise);
+    expect(lineOff.reduce((sum, paise) => sum + paise, 0)).toBe(off);
+    for (const paise of lineOff) expect(words).toContain(`Discount -${amount(paise)}`);
+  });
+
+  it('keeps the before-tax column on A4, as a tax invoice needs', () => {
+    expect(text(renderBill(regular, { size: 'a4' }))).toContain('261.90');
   });
 });
 
@@ -415,13 +471,7 @@ describe('the rest of the header and the footer', () => {
 
   it('shows a discount line only when there was a discount', () => {
     expect(text(renderBill(regular, { size: '80' }))).not.toContain('Discount');
-    const [first, ...others] = regular.lines;
-    if (first === undefined) throw new Error('no lines');
-    const bill: BillDetailView = {
-      ...regular,
-      lines: [{ ...first, discountOffTaxablePaise: 1_000 }, ...others],
-    };
-    expect(text(renderBill(bill, { size: '80' }))).toContain('Discount');
+    expect(text(renderBill(withDiscounts().discounted, { size: '80' }))).toContain('Discount');
   });
 
   it('shows the round-off only when there is one', () => {

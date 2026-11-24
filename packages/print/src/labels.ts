@@ -20,6 +20,7 @@ export interface Labels {
   taxable: string;
   amount: string;
   inclusive: string;
+  exclusive: string;
   discount: string;
   subtotal: string;
   taxableValue: string;
@@ -56,6 +57,7 @@ const en: Labels = {
   taxable: 'Taxable value',
   amount: 'Amount',
   inclusive: 'incl. GST',
+  exclusive: '+ GST',
   discount: 'Discount',
   subtotal: 'Subtotal',
   taxableValue: 'Taxable value',
@@ -112,6 +114,7 @@ const hi: Labels = {
   taxable: 'कर योग्य मूल्य',
   amount: 'रकम',
   inclusive: 'GST सहित',
+  exclusive: '+ GST',
   discount: 'छूट',
   subtotal: 'उप-जोड़',
   taxableValue: 'कर योग्य मूल्य',
@@ -168,6 +171,7 @@ const hiLatn: Labels = {
   taxable: 'Kar yogya moolya',
   amount: 'Rakam',
   inclusive: 'GST sahit',
+  exclusive: '+ GST',
   discount: 'Chhoot',
   subtotal: 'Up-jod',
   taxableValue: 'Kar yogya moolya',

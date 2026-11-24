@@ -60,7 +60,7 @@ const RECEIPT = `
 .s80 .amt,.s58 .amt{white-space:nowrap}
 .s80 .fine,.s58 .fine{flex-wrap:wrap;font-size:.85em}
 .s80 .totals,.s58 .totals{padding-top:1mm}
-.s80 .taxes,.s58 .taxes{margin-top:1mm;padding:1mm 0;border-top:1px dotted #666;border-bottom:1px dotted #666}
+.s80 .taxes,.s58 .taxes{margin-top:2mm;padding-bottom:1mm;border-bottom:1px dotted #666}
 .s80 .trow,.s58 .trow{display:flex;flex-wrap:wrap;justify-content:space-between;gap:0 2mm;font-size:.85em}
 .s80 .row.strong,.s58 .row.strong{font-weight:500}
 .s80 .row.grand,.s58 .row.grand{margin-top:1mm;padding:1mm 0;border-top:1px solid #000;border-bottom:1px solid #000;font-size:1.25em}

@@ -2201,7 +2201,7 @@ Entry format:
 - **Say it in an interview:** "In review I check every error the API can return against a requirement. One had no source: it was a shortcut that would have locked real users out."
 - **Follow-ups to expect:** how can a late entry be the oldest? (the order used for oldest-first is worked out when read, so it can put the opening first).
 
-### 2026-11-24 — A docs-only pull request failed a test: a flake with a real cause `#testing` `#ci` `#gotcha`
+### 2026-11-24 — A docs-only pull request failed a test: a flake with a real cause `#testing` `#devops` `#gotcha`
 - **What happened:** CI failed `items.test.tsx` on #81, which changes only documents. The test simulates a barcode scanner; the app calls keys less than 50 ms apart one scan. On a slow runner a pause split the code, the tail was sent as its own barcode, and the fake API's default answer had no item. Forcing a 60 ms pause gave the same two errors. The simulated keys now share one time.
 - **Why / what I learned:** don't just re-run a flake. A failure the change can't have caused is a chance to find the cause; reproduce it before fixing it, then check the fix under the same condition.
 - **Say it in an interview:** "A test failed on a docs change. I reproduced it by forcing a pause, found the test depended on the machine's speed, and fixed the clock instead of adding a retry."

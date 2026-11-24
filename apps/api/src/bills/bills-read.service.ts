@@ -51,6 +51,7 @@ export class BillsReadService {
   /** A page of bills, newest first (the ids are time-ordered, so the id is the cursor). */
   list(caller: Caller, query: BillListQuery): Promise<BillListPage> {
     const scope = branchScope(caller, query.branch, 'all');
+    const seesPhones = caller.permissions.includes('customers.view');
     return inBusiness(this.database, caller, async (tx) => {
       const conditions: (SQL | undefined)[] = [
         scope === 'all' ? undefined : eq(bills.branchId, scope),
@@ -62,7 +63,7 @@ export class BillsReadService {
         const like = likeText(query.q);
         conditions.push(
           sql`(${bills.number} ilike ${like} or ${bills.buyer}->>'name' ilike ${like}
-            or ${customers.name} ilike ${like} or ${customers.phone} like ${like})`,
+            or ${customers.name} ilike ${like} or (${seesPhones} and ${customers.phone} like ${like}))`,
         );
       }
       const rows = await tx
@@ -98,6 +99,7 @@ export class BillsReadService {
       return {
         bills: page.map((row) => ({
           ...row,
+          customerPhone: seesPhones ? row.customerPhone : null,
           document: row.document as BillDetailView['document'],
           createdAt: row.createdAt.toISOString(),
         })),
@@ -134,7 +136,7 @@ export class BillsReadService {
     const [row] = await tx
       .select({
         bill: bills,
-        cashierName: sql<string>`coalesce(${users.name}, ${users.email}, ${users.username})`,
+        cashierName: sql<string | null>`coalesce(${users.name}, ${users.username})`,
         customerPhone: customers.phone,
         language: businesses.billLanguage,
         footerNote: businesses.billFooterNote,
@@ -173,7 +175,7 @@ export class BillsReadService {
       cashierName: row.cashierName,
       seller: bill.seller as BillSellerView,
       buyer: bill.buyer as BillBuyerView | null,
-      customerPhone: row.customerPhone,
+      customerPhone: caller.permissions.includes('customers.view') ? row.customerPhone : null,
       tax: bill.tax as BillDetailView['tax'],
       supplierStateCode: bill.supplierStateCode,
       placeOfSupplyStateCode: bill.placeOfSupplyStateCode,

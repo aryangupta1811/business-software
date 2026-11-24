@@ -1,4 +1,10 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   and,
   asc,
@@ -10,11 +16,12 @@ import {
   type Database,
   type Transaction,
 } from '@business-software/db';
-import type {
-  CustomerInput,
-  CustomerQuery,
-  CustomerUpdateInput,
-  CustomerView,
+import {
+  DEFAULT_DUE_DAYS,
+  type CustomerInput,
+  type CustomerQuery,
+  type CustomerUpdateInput,
+  type CustomerView,
 } from '@business-software/shared';
 import { DATABASE } from '../database.module.js';
 import { changes, inBusiness } from '../items/conflicts.js';
@@ -36,6 +43,8 @@ function toView(row: CustomerRecord): CustomerView {
     address: row.address,
     pinCode: row.pinCode,
     stateCode: row.stateCode,
+    creditLimitPaise: row.creditLimitPaise,
+    dueDays: row.dueDays,
     version: row.version,
   };
 }
@@ -46,6 +55,29 @@ function logged(view: CustomerView): Record<string, unknown> {
   delete fields.id;
   delete fields.version;
   return fields;
+}
+
+/**
+ * `03` #24: the credit limit and the due days are the owner's. Staff see them and may send them
+ * back as they are (the form does), but changing them, or setting them on a new customer, is
+ * refused. Left out means unchanged (or the defaults for a new customer).
+ */
+function creditTerms(
+  caller: Caller,
+  input: CustomerInput,
+  current: { creditLimitPaise: number | null; dueDays: number },
+) {
+  const terms = {
+    creditLimitPaise:
+      input.creditLimitPaise === undefined ? current.creditLimitPaise : input.creditLimitPaise,
+    dueDays: input.dueDays ?? current.dueDays,
+  };
+  const changed =
+    terms.creditLimitPaise !== current.creditLimitPaise || terms.dueDays !== current.dueDays;
+  if (changed && caller.role !== 'owner') {
+    throw new ForbiddenException({ code: 'credit_terms_owner_only' });
+  }
+  return terms;
 }
 
 /** The columns a customer form sets. */
@@ -87,7 +119,14 @@ export class CustomersService {
 
   create(caller: Caller, input: CustomerInput): Promise<CustomerView> {
     return inBusiness(this.database, caller, async (tx) => {
-      const [row] = await tx.insert(customers).values(columns(input)).returning();
+      const terms = creditTerms(caller, input, {
+        creditLimitPaise: null,
+        dueDays: DEFAULT_DUE_DAYS,
+      });
+      const [row] = await tx
+        .insert(customers)
+        .values({ ...columns(input), ...terms })
+        .returning();
       if (row === undefined) throw new Error('No customer row returned');
       const view = toView(row);
       await recordEntry(tx, {
@@ -107,12 +146,14 @@ export class CustomersService {
       const current = await this.lock(tx, id);
       if (current.version !== input.version) throw new ConflictException({ code: 'stale' });
       const before = toView(current);
-      const changed = changes(logged(before), logged({ ...before, ...columns(input) }));
+      const terms = creditTerms(caller, input, before);
+      const columnsNow = { ...columns(input), ...terms };
+      const changed = changes(logged(before), logged({ ...before, ...columnsNow }));
       if (changed === null) return before;
       const [row] = await tx
         .update(customers)
         .set({
-          ...columns(input),
+          ...columnsNow,
           version: sql`${customers.version} + 1`,
           updatedAt: new Date(),
         })

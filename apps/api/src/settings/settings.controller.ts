@@ -7,6 +7,7 @@ import {
   settingsPrintingSchema,
   settingsSecuritySchema,
   settingsStockSchema,
+  settingsUdhaarSchema,
   type SettingsAlertsInput,
   type SettingsBusinessInput,
   type SettingsFeaturesInput,
@@ -14,6 +15,7 @@ import {
   type SettingsPrintingInput,
   type SettingsSecurityInput,
   type SettingsStockInput,
+  type SettingsUdhaarInput,
   type SettingsView,
 } from '@business-software/shared';
 import { CurrentCaller, Permission } from '../http/permission.decorator.js';
@@ -99,5 +101,14 @@ export class SettingsController {
     @Body(new ZodBodyPipe(settingsPrintingSchema)) body: SettingsPrintingInput,
   ): Promise<SettingsView> {
     return this.settings.savePrinting(caller, body);
+  }
+
+  @Permission('settings.manage')
+  @Put('udhaar')
+  saveUdhaar(
+    @CurrentCaller() caller: Caller,
+    @Body(new ZodBodyPipe(settingsUdhaarSchema)) body: SettingsUdhaarInput,
+  ): Promise<SettingsView> {
+    return this.settings.saveUdhaar(caller, body);
   }
 }

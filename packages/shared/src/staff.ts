@@ -35,6 +35,7 @@ export interface StaffSwitch {
 export const STAFF_SWITCHES: readonly StaffSwitch[] = [
   { permission: 'billing.sell', group: 'billing', default: true, parent: null },
   { permission: 'billing.discount', group: 'billing', default: false, parent: 'billing.sell' },
+  { permission: 'billing.udhaar', group: 'billing', default: false, parent: 'billing.sell' },
   { permission: 'customers.view', group: 'customers', default: true, parent: null },
   { permission: 'customers.manage', group: 'customers', default: true, parent: 'customers.view' },
   { permission: 'items.view', group: 'items', default: true, parent: null },

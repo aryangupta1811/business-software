@@ -70,7 +70,14 @@ const en: Labels = {
   amountInWords: 'Amount in words',
   signatory: 'Authorised signatory',
   forBusiness: 'For',
-  payment: { cash: 'Cash', upi: 'UPI', card: 'Card', cheque: 'Cheque' },
+  payment: {
+    cash: 'Cash',
+    upi: 'UPI',
+    card: 'Card',
+    cheque: 'Cheque',
+    udhaar: 'Udhaar',
+    advance: 'From advance',
+  },
   units: {
     kg: 'kg',
     g: 'g',
@@ -119,7 +126,14 @@ const hi: Labels = {
   amountInWords: 'शब्दों में रकम',
   signatory: 'अधिकृत हस्ताक्षरकर्ता',
   forBusiness: 'के लिए',
-  payment: { cash: 'नकद', upi: 'यूपीआई', card: 'कार्ड', cheque: 'चेक' },
+  payment: {
+    cash: 'नकद',
+    upi: 'यूपीआई',
+    card: 'कार्ड',
+    cheque: 'चेक',
+    udhaar: 'उधार',
+    advance: 'एडवांस से',
+  },
   units: {
     kg: 'किलो',
     g: 'ग्राम',
@@ -168,7 +182,14 @@ const hiLatn: Labels = {
   amountInWords: 'Shabdon mein rakam',
   signatory: 'Adhikrit hastakshar',
   forBusiness: 'Ke liye',
-  payment: { cash: 'Cash', upi: 'UPI', card: 'Card', cheque: 'Cheque' },
+  payment: {
+    cash: 'Cash',
+    upi: 'UPI',
+    card: 'Card',
+    cheque: 'Cheque',
+    udhaar: 'Udhaar',
+    advance: 'Advance se',
+  },
   units: {
     kg: 'kilo',
     g: 'gram',

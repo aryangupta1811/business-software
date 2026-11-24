@@ -9,6 +9,7 @@ import { INVOICE_PREFIX_PATTERN } from './invoice.js';
 import { isBranchStateCode } from './states.js';
 import type { SettingsPrintingInput } from './printing.js';
 import { NEGATIVE_STOCK_SETTINGS } from './stock.js';
+import type { SettingsUdhaarInput } from './udhaar.js';
 
 // A pick-one field left empty says `choose`, not `invalid`: missing from the body, an empty
 // select (''), or a radio group with nothing picked (the form library sends null).
@@ -146,6 +147,7 @@ export interface SettingsView {
   alerts: SettingsAlertsInput;
   invoices: SettingsInvoicesInput;
   printing: SettingsPrintingInput;
+  udhaar: SettingsUdhaarInput;
   /** The next bill number in the caller's branch: this year's counter plus one (1 if none yet). */
   nextInvoice: { financialYear: string; sequence: number };
 }

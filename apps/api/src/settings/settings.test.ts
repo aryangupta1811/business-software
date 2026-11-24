@@ -153,6 +153,7 @@ describe('settings', () => {
         alerts: { types: ['low_stock', 'out_of_stock'] },
         invoices: { invoicePrefix: null },
         printing: { billLanguage: 'en', footerNote: null },
+        udhaar: { overCreditLimit: 'warn' },
         // No bill yet in this branch's counter: the first number is 1.
         nextInvoice: { financialYear: thisYear(), sequence: 1 },
       },

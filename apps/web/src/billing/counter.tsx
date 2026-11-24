@@ -540,6 +540,7 @@ export function Counter({
           setApproval(null);
           break;
         case 'payments_mismatch':
+        case 'advance_changed':
           setReady(null);
           break;
         case 'held_bill_invalid':

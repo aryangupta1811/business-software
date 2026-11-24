@@ -135,10 +135,20 @@ function Header({ ctx }: { ctx: Context }): ReactNode {
   );
 }
 
+/**
+ * CGST Rule 5(1)(f): a composition business (the only one that makes a bill of supply, `00` #6)
+ * says this at the top of it, in these words, whatever the bill language.
+ */
+const COMPOSITION_DECLARATION =
+  'Composition taxable person, not eligible to collect tax on supplies';
+
 function Title({ ctx }: { ctx: Context }): ReactNode {
   const { labels, bill } = ctx;
   return (
     <>
+      {bill.document === 'bill_of_supply' && (
+        <p className="declaration">{COMPOSITION_DECLARATION}</p>
+      )}
       <h2 className="title">{labels.documents[bill.document]}</h2>
       {ctx.reprintedAt !== null && (
         <p className="reprint">
@@ -155,7 +165,9 @@ function Meta({ ctx }: { ctx: Context }): ReactNode {
     [labels.billNo, bill.number],
     [labels.date, formatDate(bill.businessDate)],
     [labels.time, formatDateTime(bill.createdAt).time],
-    [labels.cashier, bill.cashierName],
+    ...(bill.cashierName === null
+      ? []
+      : [[labels.cashier, bill.cashierName] satisfies [string, string]]),
   ];
   return (
     <dl className="meta">

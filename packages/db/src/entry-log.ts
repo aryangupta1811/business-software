@@ -69,6 +69,11 @@ export const ENTRY_ACTIONS = {
   'settings.printing_changed': { reasonRequired: false },
   'device.printing_changed': { reasonRequired: false },
   'bill.reprinted': { reasonRequired: false },
+  // P1.18 (`03` #9, #11, #20, #21): the owner's OK past a credit limit, payments, the old notebook.
+  'credit_limit.approved': { reasonRequired: false },
+  'udhaar.payment_recorded': { reasonRequired: false },
+  'udhaar.payment_reversed': { reasonRequired: true },
+  'udhaar.opening_set': { reasonRequired: true },
 } as const satisfies Record<string, { reasonRequired: boolean }>;
 
 export type EntryAction = keyof typeof ENTRY_ACTIONS;

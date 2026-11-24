@@ -115,11 +115,11 @@ export interface BillDetailView {
   businessDate: string;
   /** When it was saved, ISO 8601. */
   createdAt: string;
-  /** The login that saved it. */
-  cashierName: string;
+  /** The name or username of the login that saved it; null if it has neither (never an email). */
+  cashierName: string | null;
   seller: BillSellerView;
   buyer: BillBuyerView | null;
-  /** The customer's phone now, for "Send on WhatsApp"; it is not printed. */
+  /** The customer's phone now, for "Send on WhatsApp"; not printed, and null without `customers.view`. */
   customerPhone: string | null;
   tax: 'cgst-sgst' | 'igst' | 'none';
   supplierStateCode: string;

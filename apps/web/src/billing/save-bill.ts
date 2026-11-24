@@ -94,6 +94,11 @@ const PLAIN = [
   'invalid_quantity',
   'payments_mismatch',
   'key_reused',
+  'udhaar_needs_customer',
+  'udhaar_needs_phone',
+  'udhaar_not_allowed',
+  'over_credit_limit',
+  'advance_changed',
 ] as const;
 
 export function saveProblem(error: unknown): SaveProblem {

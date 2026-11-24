@@ -107,6 +107,24 @@ describe('the switch list', () => {
     });
   });
 
+  it('has "Give udhaar" off by default, under "Bill customers" (`03` #10)', () => {
+    expect(STAFF_SWITCHES.find((entry) => entry.permission === 'billing.udhaar')).toEqual({
+      permission: 'billing.udhaar',
+      group: 'billing',
+      default: false,
+      parent: 'billing.sell',
+    });
+    // An old login that never had a choice about it gets the default: off (ADR 0044).
+    expect(effectivePermissions(NONE)).not.toContain('billing.udhaar');
+    expect(effectivePermissions({ added: ['billing.udhaar'], removed: [] })).toContain(
+      'billing.udhaar',
+    );
+    // ...and it goes with its parent.
+    expect(
+      effectivePermissions({ added: ['billing.udhaar'], removed: ['billing.sell'] }),
+    ).not.toContain('billing.udhaar');
+  });
+
   it('keeps the owner-only permissions off the list', () => {
     const names: string[] = STAFF_SWITCHES.map((entry) => entry.permission);
     for (const owner of ['session.own', 'settings.view', 'settings.manage', 'staff.manage']) {

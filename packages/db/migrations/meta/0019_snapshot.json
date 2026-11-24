@@ -1,5 +1,5 @@
 {
-  "id": "8aefea4d-68d8-4488-a8aa-af116db874b3",
+  "id": "c7eed259-c713-43d9-9e91-5d32cbe9b60e",
   "prevId": "8adaff26-cd13-4a20-96a9-30e251aca11c",
   "version": "7",
   "dialect": "postgresql",
@@ -1187,7 +1187,7 @@
       "checkConstraints": {
         "bill_payments_mode_check": {
           "name": "bill_payments_mode_check",
-          "value": "\"bill_payments\".\"mode\" in ('cash', 'upi', 'card', 'cheque')"
+          "value": "\"bill_payments\".\"mode\" in ('cash', 'upi', 'card', 'cheque', 'udhaar', 'advance')"
         },
         "bill_payments_amount_check": {
           "name": "bill_payments_amount_check",
@@ -1200,6 +1200,10 @@
         "bill_payments_reference_check": {
           "name": "bill_payments_reference_check",
           "value": "char_length(\"bill_payments\".\"reference\") between 1 and 40"
+        },
+        "bill_payments_ledger_check": {
+          "name": "bill_payments_ledger_check",
+          "value": "\"bill_payments\".\"reference\" is null or \"bill_payments\".\"mode\" in ('cash', 'upi', 'card', 'cheque')"
         }
       },
       "isRLSEnabled": false
@@ -1384,6 +1388,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "credit_approval_id": {
+          "name": "credit_approval_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "held_bill_id": {
           "name": "held_bill_id",
           "type": "uuid",
@@ -1423,6 +1433,28 @@
           ],
           "isUnique": true,
           "where": "\"bills\".\"approval_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "bills_credit_approval_unique": {
+          "name": "bills_credit_approval_unique",
+          "columns": [
+            {
+              "expression": "business_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "credit_approval_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"bills\".\"credit_approval_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -1506,6 +1538,21 @@
           "columnsFrom": [
             "business_id",
             "approval_id"
+          ],
+          "columnsTo": [
+            "business_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "bills_credit_approval_fk": {
+          "name": "bills_credit_approval_fk",
+          "tableFrom": "bills",
+          "tableTo": "owner_approvals",
+          "columnsFrom": [
+            "business_id",
+            "credit_approval_id"
           ],
           "columnsTo": [
             "business_id",
@@ -1882,21 +1929,15 @@
           "notNull": true,
           "default": "'warn'"
         },
-        "invoice_prefix": {
-          "name": "invoice_prefix",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "bill_language": {
-          "name": "bill_language",
+        "over_credit_limit": {
+          "name": "over_credit_limit",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "'en'"
+          "default": "'warn'"
         },
-        "bill_footer_note": {
-          "name": "bill_footer_note",
+        "invoice_prefix": {
+          "name": "invoice_prefix",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -1985,17 +2026,13 @@
           "name": "businesses_invoice_prefix_check",
           "value": "\"businesses\".\"invoice_prefix\" ~ '^[A-Z0-9]{1,4}$'"
         },
-        "businesses_bill_language_check": {
-          "name": "businesses_bill_language_check",
-          "value": "\"businesses\".\"bill_language\" in ('en', 'hi', 'hi-Latn')"
-        },
-        "businesses_bill_footer_note_check": {
-          "name": "businesses_bill_footer_note_check",
-          "value": "char_length(\"businesses\".\"bill_footer_note\") between 1 and 200"
-        },
         "businesses_negative_stock_check": {
           "name": "businesses_negative_stock_check",
           "value": "\"businesses\".\"negative_stock\" in ('warn', 'block')"
+        },
+        "businesses_over_credit_limit_check": {
+          "name": "businesses_over_credit_limit_check",
+          "value": "\"businesses\".\"over_credit_limit\" in ('warn', 'block')"
         }
       },
       "isRLSEnabled": false
@@ -2184,6 +2221,19 @@
           "primaryKey": false,
           "notNull": false
         },
+        "credit_limit_paise": {
+          "name": "credit_limit_paise",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "due_days": {
+          "name": "due_days",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 30
+        },
         "archived_at": {
           "name": "archived_at",
           "type": "timestamp with time zone",
@@ -2337,6 +2387,14 @@
         "customers_version_check": {
           "name": "customers_version_check",
           "value": "\"customers\".\"version\" >= 1"
+        },
+        "customers_credit_limit_check": {
+          "name": "customers_credit_limit_check",
+          "value": "\"customers\".\"credit_limit_paise\" >= 0"
+        },
+        "customers_due_days_check": {
+          "name": "customers_due_days_check",
+          "value": "\"customers\".\"due_days\" between 0 and 365"
         }
       },
       "isRLSEnabled": false
@@ -2401,20 +2459,6 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
-        },
-        "receipt_size": {
-          "name": "receipt_size",
-          "type": "smallint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 80
-        },
-        "auto_print": {
-          "name": "auto_print",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
         }
       },
       "indexes": {},
@@ -2507,10 +2551,6 @@
         "devices_token_hash_check": {
           "name": "devices_token_hash_check",
           "value": "\"devices\".\"token_hash\" ~ '^[0-9a-f]{64}$'"
-        },
-        "devices_receipt_size_check": {
-          "name": "devices_receipt_size_check",
-          "value": "\"devices\".\"receipt_size\" in (80, 58)"
         }
       },
       "isRLSEnabled": false
@@ -4072,13 +4112,19 @@
           "name": "line_basis_points",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "bill_basis_points": {
           "name": "bill_basis_points",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "amount_paise": {
+          "name": "amount_paise",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
         },
         "requested_by": {
           "name": "requested_by",
@@ -4208,11 +4254,15 @@
       "checkConstraints": {
         "owner_approvals_kind_check": {
           "name": "owner_approvals_kind_check",
-          "value": "\"owner_approvals\".\"kind\" in ('discount')"
+          "value": "\"owner_approvals\".\"kind\" in ('discount', 'credit_limit')"
         },
         "owner_approvals_shares_check": {
           "name": "owner_approvals_shares_check",
           "value": "\"owner_approvals\".\"line_basis_points\" between 0 and 10000 and \"owner_approvals\".\"bill_basis_points\" between 0 and 10000"
+        },
+        "owner_approvals_kind_shape_check": {
+          "name": "owner_approvals_kind_shape_check",
+          "value": "(\"owner_approvals\".\"kind\" = 'discount' and \"owner_approvals\".\"line_basis_points\" is not null and \"owner_approvals\".\"bill_basis_points\" is not null and \"owner_approvals\".\"amount_paise\" is null)\n        or (\"owner_approvals\".\"kind\" = 'credit_limit' and \"owner_approvals\".\"line_basis_points\" is null and \"owner_approvals\".\"bill_basis_points\" is null and \"owner_approvals\".\"amount_paise\" is not null and \"owner_approvals\".\"amount_paise\" > 0)"
         },
         "owner_approvals_expiry_check": {
           "name": "owner_approvals_expiry_check",
@@ -5322,6 +5372,524 @@
         "stock_movements_note_check": {
           "name": "stock_movements_note_check",
           "value": "char_length(\"stock_movements\".\"note\") between 1 and 200"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.udhaar_accounts": {
+      "name": "udhaar_accounts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuidv7()"
+        },
+        "business_id": {
+          "name": "business_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "app_current_business_id()"
+        },
+        "customer_id": {
+          "name": "customer_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "balance_paise": {
+          "name": "balance_paise",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "last_entry_id": {
+          "name": "last_entry_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "udhaar_accounts_business_id_businesses_id_fk": {
+          "name": "udhaar_accounts_business_id_businesses_id_fk",
+          "tableFrom": "udhaar_accounts",
+          "tableTo": "businesses",
+          "columnsFrom": [
+            "business_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "udhaar_accounts_customer_fk": {
+          "name": "udhaar_accounts_customer_fk",
+          "tableFrom": "udhaar_accounts",
+          "tableTo": "customers",
+          "columnsFrom": [
+            "business_id",
+            "customer_id"
+          ],
+          "columnsTo": [
+            "business_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "udhaar_accounts_last_entry_fk": {
+          "name": "udhaar_accounts_last_entry_fk",
+          "tableFrom": "udhaar_accounts",
+          "tableTo": "udhaar_entries",
+          "columnsFrom": [
+            "business_id",
+            "last_entry_id"
+          ],
+          "columnsTo": [
+            "business_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "udhaar_accounts_business_id_id_unique": {
+          "name": "udhaar_accounts_business_id_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "business_id",
+            "id"
+          ]
+        },
+        "udhaar_accounts_customer_unique": {
+          "name": "udhaar_accounts_customer_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "business_id",
+            "customer_id"
+          ]
+        }
+      },
+      "policies": {
+        "tenant_isolation": {
+          "name": "tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "using": "\"udhaar_accounts\".\"business_id\" = (select app_current_business_id())",
+          "withCheck": "\"udhaar_accounts\".\"business_id\" = (select app_current_business_id())"
+        },
+        "backup_read": {
+          "name": "backup_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_backup"
+          ],
+          "using": "true"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.udhaar_entries": {
+      "name": "udhaar_entries",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuidv7()"
+        },
+        "business_id": {
+          "name": "business_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "app_current_business_id()"
+        },
+        "customer_id": {
+          "name": "customer_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "branch_id": {
+          "name": "branch_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount_paise": {
+          "name": "amount_paise",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "balance_after_paise": {
+          "name": "balance_after_paise",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bill_id": {
+          "name": "bill_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mode": {
+          "name": "mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reference": {
+          "name": "reference",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reverses_entry_id": {
+          "name": "reverses_entry_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "due_date": {
+          "name": "due_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "business_date": {
+          "name": "business_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "request_key": {
+          "name": "request_key",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "udhaar_entries_customer_idx": {
+          "name": "udhaar_entries_customer_idx",
+          "columns": [
+            {
+              "expression": "business_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "customer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "udhaar_entries_reverses_unique": {
+          "name": "udhaar_entries_reverses_unique",
+          "columns": [
+            {
+              "expression": "business_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "reverses_entry_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"udhaar_entries\".\"reverses_entry_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "udhaar_entries_opening_unique": {
+          "name": "udhaar_entries_opening_unique",
+          "columns": [
+            {
+              "expression": "business_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "customer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"udhaar_entries\".\"kind\" = 'opening'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "udhaar_entries_bill_unique": {
+          "name": "udhaar_entries_bill_unique",
+          "columns": [
+            {
+              "expression": "business_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "bill_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"udhaar_entries\".\"bill_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "udhaar_entries_business_id_businesses_id_fk": {
+          "name": "udhaar_entries_business_id_businesses_id_fk",
+          "tableFrom": "udhaar_entries",
+          "tableTo": "businesses",
+          "columnsFrom": [
+            "business_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "udhaar_entries_customer_fk": {
+          "name": "udhaar_entries_customer_fk",
+          "tableFrom": "udhaar_entries",
+          "tableTo": "customers",
+          "columnsFrom": [
+            "business_id",
+            "customer_id"
+          ],
+          "columnsTo": [
+            "business_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "udhaar_entries_branch_fk": {
+          "name": "udhaar_entries_branch_fk",
+          "tableFrom": "udhaar_entries",
+          "tableTo": "branches",
+          "columnsFrom": [
+            "business_id",
+            "branch_id"
+          ],
+          "columnsTo": [
+            "business_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "udhaar_entries_bill_fk": {
+          "name": "udhaar_entries_bill_fk",
+          "tableFrom": "udhaar_entries",
+          "tableTo": "bills",
+          "columnsFrom": [
+            "business_id",
+            "bill_id"
+          ],
+          "columnsTo": [
+            "business_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "udhaar_entries_reverses_fk": {
+          "name": "udhaar_entries_reverses_fk",
+          "tableFrom": "udhaar_entries",
+          "tableTo": "udhaar_entries",
+          "columnsFrom": [
+            "business_id",
+            "reverses_entry_id"
+          ],
+          "columnsTo": [
+            "business_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "udhaar_entries_created_by_fk": {
+          "name": "udhaar_entries_created_by_fk",
+          "tableFrom": "udhaar_entries",
+          "tableTo": "users",
+          "columnsFrom": [
+            "business_id",
+            "created_by"
+          ],
+          "columnsTo": [
+            "business_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "udhaar_entries_business_id_id_unique": {
+          "name": "udhaar_entries_business_id_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "business_id",
+            "id"
+          ]
+        },
+        "udhaar_entries_request_key_unique": {
+          "name": "udhaar_entries_request_key_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "business_id",
+            "request_key"
+          ]
+        }
+      },
+      "policies": {
+        "tenant_isolation": {
+          "name": "tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "using": "\"udhaar_entries\".\"business_id\" = (select app_current_business_id())",
+          "withCheck": "\"udhaar_entries\".\"business_id\" = (select app_current_business_id())"
+        },
+        "backup_read": {
+          "name": "backup_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_backup"
+          ],
+          "using": "true"
+        }
+      },
+      "checkConstraints": {
+        "udhaar_entries_kind_check": {
+          "name": "udhaar_entries_kind_check",
+          "value": "\"udhaar_entries\".\"kind\" in ('opening', 'bill', 'advance_used', 'payment', 'payment_reversal')"
+        },
+        "udhaar_entries_amount_check": {
+          "name": "udhaar_entries_amount_check",
+          "value": "(\"udhaar_entries\".\"kind\" in ('bill', 'advance_used', 'payment_reversal') and \"udhaar_entries\".\"amount_paise\" > 0)\n        or (\"udhaar_entries\".\"kind\" = 'payment' and \"udhaar_entries\".\"amount_paise\" < 0)\n        or (\"udhaar_entries\".\"kind\" = 'opening' and \"udhaar_entries\".\"amount_paise\" <> 0)"
+        },
+        "udhaar_entries_bill_check": {
+          "name": "udhaar_entries_bill_check",
+          "value": "(\"udhaar_entries\".\"kind\" in ('bill', 'advance_used')) = (\"udhaar_entries\".\"bill_id\" is not null)"
+        },
+        "udhaar_entries_reverses_check": {
+          "name": "udhaar_entries_reverses_check",
+          "value": "(\"udhaar_entries\".\"kind\" = 'payment_reversal') = (\"udhaar_entries\".\"reverses_entry_id\" is not null)"
+        },
+        "udhaar_entries_mode_check": {
+          "name": "udhaar_entries_mode_check",
+          "value": "(\"udhaar_entries\".\"kind\" = 'payment') = (\"udhaar_entries\".\"mode\" is not null)\n        and (\"udhaar_entries\".\"mode\" is null or \"udhaar_entries\".\"mode\" in ('cash', 'upi', 'card', 'cheque'))\n        and (\"udhaar_entries\".\"mode\" is distinct from 'cheque' or \"udhaar_entries\".\"reference\" is not null)\n        and (\"udhaar_entries\".\"reference\" is null or \"udhaar_entries\".\"kind\" = 'payment')"
+        },
+        "udhaar_entries_reference_check": {
+          "name": "udhaar_entries_reference_check",
+          "value": "char_length(\"udhaar_entries\".\"reference\") between 1 and 40"
+        },
+        "udhaar_entries_due_date_check": {
+          "name": "udhaar_entries_due_date_check",
+          "value": "(\"udhaar_entries\".\"amount_paise\" > 0) = (\"udhaar_entries\".\"due_date\" is not null)"
+        },
+        "udhaar_entries_reason_check": {
+          "name": "udhaar_entries_reason_check",
+          "value": "(\"udhaar_entries\".\"kind\" in ('payment_reversal', 'opening')) = (\"udhaar_entries\".\"reason\" is not null)\n        and char_length(\"udhaar_entries\".\"reason\") between 1 and 200"
         }
       },
       "isRLSEnabled": false

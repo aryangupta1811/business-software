@@ -223,7 +223,8 @@ describe('reading saved bills', () => {
         language: 'hi',
         footerNote: 'Goods once sold will not be taken back.',
         customerPhone: '9876543210',
-        cashierName: expect.stringContaining('@') as unknown,
+        // The owner has no name: a bill must never carry their email instead.
+        cashierName: null,
         buyer: expect.objectContaining({ name: 'Meena Devi' }) as unknown,
         seller: expect.objectContaining({
           gstin: '27ABCDE1234F1Z5',
@@ -294,6 +295,39 @@ describe('reading saved bills', () => {
       });
       // The owner reads any branch's bill, whichever computer they are at.
       expect((await call('GET', `/bills/${away.id}`, owner)).status).toBe(200);
+    });
+
+    it('names the cashier by name, else by username, never by email', async () => {
+      const owner = await shop();
+      const rice = await stocked(owner);
+      const saved = await sell(owner, rice);
+      const cashierName = async () =>
+        (await call<BillDetailView>('GET', `/bills/${saved.id}`, owner)).body.cashierName;
+      await admin.pool.query('update users set name = $2 where id = $1', [owner.userId, 'Asha']);
+      expect(await cashierName()).toBe('Asha');
+      await admin.pool.query('update users set name = null where id = $1', [owner.userId]);
+      expect(await cashierName()).toBeNull();
+    });
+
+    it('answers the phone only to someone who may see customers', async () => {
+      const owner = await shop();
+      const rice = await stocked(owner);
+      const meena = await customer(owner, 'Meena Devi', '9876543210');
+      const saved = await sell(owner, rice, { customerId: meena });
+      const seller = cashier(owner);
+      const viewer: Caller = {
+        ...seller,
+        permissions: ['session.own', 'billing.sell', 'customers.view'],
+      };
+      const phone = async (caller: Caller) =>
+        (await call<BillDetailView>('GET', `/bills/${saved.id}`, caller)).body.customerPhone;
+      expect(await phone(viewer)).toBe('9876543210');
+      expect(await phone(seller)).toBeNull();
+      expect((await list(viewer, 'q=76543')).body.bills[0]?.customerPhone).toBe('9876543210');
+      expect((await list(seller)).body.bills[0]?.customerPhone).toBeNull();
+      // Nor can it be found out by searching.
+      expect((await list(seller, 'q=76543')).body.bills).toEqual([]);
+      expect((await list(seller, 'q=meena')).body.bills).toHaveLength(1);
     });
 
     it("keeps two businesses apart, even with the other's id", async () => {

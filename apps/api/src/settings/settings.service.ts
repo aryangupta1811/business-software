@@ -27,6 +27,8 @@ import type {
   SettingsPrintingInput,
   SettingsSecurityInput,
   SettingsStockInput,
+  SettingsUdhaarInput,
+  OverCreditLimitSetting,
   SettingsView,
   NegativeStockSetting,
   BranchStateCode,
@@ -140,6 +142,20 @@ export class SettingsService {
         tx
           .update(businesses)
           .set({ negativeStock: input.negativeStock, updatedAt: new Date() })
+          .where(eq(businesses.id, caller.businessId)),
+    );
+  }
+
+  /** `03` #9: past a credit limit the owner is warned, or needs their own password. */
+  saveUdhaar(caller: Caller, input: SettingsUdhaarInput): Promise<SettingsView> {
+    return this.save(
+      caller,
+      (current) => current.view.udhaar,
+      input,
+      (tx) =>
+        tx
+          .update(businesses)
+          .set({ overCreditLimit: input.overCreditLimit, updatedAt: new Date() })
           .where(eq(businesses.id, caller.businessId)),
     );
   }
@@ -288,6 +304,7 @@ export class SettingsService {
           billLanguage: business.billLanguage as BillLanguage,
           footerNote: business.billFooterNote,
         },
+        udhaar: { overCreditLimit: business.overCreditLimit as OverCreditLimitSetting },
         nextInvoice: { financialYear: year, sequence: (counter?.lastNumber ?? 0) + 1 },
       },
     };

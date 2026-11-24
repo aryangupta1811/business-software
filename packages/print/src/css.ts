@@ -35,6 +35,7 @@ html,body{margin:0;background:#fff;color:#000}
 .name,.shop p,.buyer p{overflow-wrap:anywhere}
 .shop-name{font-weight:600}
 .title{font-weight:600}
+.declaration{font-size:.85em}
 .reprint{font-weight:500}
 .meta div,.row,.calc,.fine{display:flex;justify-content:space-between;gap:2mm}
 .meta dt{font-weight:500}
@@ -48,6 +49,7 @@ const RECEIPT = `
 .s80 .shop,.s58 .shop{text-align:center;padding-bottom:2mm;border-bottom:1px dashed #000}
 .s80 .shop-name,.s58 .shop-name{font-size:1.3em}
 .s80 .title,.s58 .title{text-align:center;margin:2mm 0 1mm;letter-spacing:.03em}
+.s80 .declaration,.s58 .declaration{text-align:center;margin-top:2mm}
 .s80 .reprint,.s58 .reprint{text-align:center;margin-bottom:1mm;border:1px solid #000;padding:0 2mm}
 .s80 .supply,.s58 .supply{margin-top:1mm}
 .s80 .buyer,.s58 .buyer{margin-top:2mm;padding-top:1mm;border-top:1px dashed #000}

@@ -11,18 +11,23 @@ import {
   APPROVAL_KINDS,
   ATTENDANCE_STATUSES,
   BILL_DOCUMENTS,
+  DEFAULT_DUE_DAYS,
   GST_RATES,
   GST_STATUSES,
   INDIAN_STATES,
   BILL_LANGUAGES,
   FOOTER_NOTE_MAX_LENGTH,
   ITEM_KINDS,
+  MAX_DUE_DAYS,
+  MONEY_PAYMENT_MODES,
   NEGATIVE_STOCK_SETTINGS,
+  OVER_CREDIT_LIMIT_SETTINGS,
   PAYMENT_MODES,
   PRICE_LISTS,
   RECEIPT_SIZES,
   SALARY_KINDS,
   STOCK_MOVEMENT_KINDS,
+  UDHAAR_ENTRY_KINDS,
   type StockAlertDetails,
 } from '@business-software/shared';
 import { sql, type SQL } from 'drizzle-orm';
@@ -114,6 +119,8 @@ export const businesses = pgTable(
     staffIdleMinutes: smallint('staff_idle_minutes').notNull().default(30),
     /** Module 01 #12: selling past zero stock warns or is blocked (P1.14 reads it). */
     negativeStock: text('negative_stock').notNull().default('warn'),
+    /** `03` #8, #9: udhaar past a customer's credit limit warns the owner, or needs their password. */
+    overCreditLimit: text('over_credit_limit').notNull().default('warn'),
     /** `00` #61: starts a one-branch business's invoice numbers; null for none (`26-27/42`). */
     invoicePrefix: text('invoice_prefix'),
     /** `02` #17: the language every bill prints in. */
@@ -156,6 +163,10 @@ export const businesses = pgTable(
     check(
       'businesses_negative_stock_check',
       sql`${t.negativeStock} in (${literals(NEGATIVE_STOCK_SETTINGS)})`,
+    ),
+    check(
+      'businesses_over_credit_limit_check',
+      sql`${t.overCreditLimit} in (${literals(OVER_CREDIT_LIMIT_SETTINGS)})`,
     ),
   ],
 );
@@ -812,6 +823,10 @@ export const customers = pgTable(
     pinCode: text('pin_code'),
     /** From the GSTIN's first two digits when there is one. */
     stateCode: text('state_code'),
+    /** `03` #8, #17: the most udhaar they may owe; null means no limit set. */
+    creditLimitPaise: money('credit_limit_paise'),
+    /** `03` #5: days from a bill to its due date. */
+    dueDays: integer('due_days').notNull().default(DEFAULT_DUE_DAYS),
     archivedAt: archivedAt(),
     /** +1 on every save: a save made from an older copy answers 409 stale. */
     version: integer('version').notNull().default(1),
@@ -842,6 +857,11 @@ export const customers = pgTable(
       sql`${t.stateCode} in (${literals(INDIAN_STATES.map((s) => s.code))})`,
     ),
     check('customers_version_check', sql`${t.version} >= 1`),
+    check('customers_credit_limit_check', sql`${t.creditLimitPaise} >= 0`),
+    check(
+      'customers_due_days_check',
+      sql`${t.dueDays} between 0 and ${sql.raw(String(MAX_DUE_DAYS))}`,
+    ),
   ],
 );
 
@@ -916,8 +936,11 @@ export const ownerApprovals = pgTable(
     branchId: uuid('branch_id').notNull(),
     billKey: uuid('bill_key').notNull(),
     kind: text('kind').notNull(),
-    lineBasisPoints: integer('line_basis_points').notNull(),
-    billBasisPoints: integer('bill_basis_points').notNull(),
+    /** A discount OK: the biggest line share and the bill's share it allows (null for the others). */
+    lineBasisPoints: integer('line_basis_points'),
+    billBasisPoints: integer('bill_basis_points'),
+    /** A credit limit OK: the most udhaar it allows on the bill (null for the others). */
+    amountPaise: money('amount_paise'),
     requestedBy: uuid('requested_by').notNull(),
     approvedBy: uuid('approved_by').notNull(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
@@ -946,6 +969,12 @@ export const ownerApprovals = pgTable(
     check(
       'owner_approvals_shares_check',
       sql`${t.lineBasisPoints} between 0 and 10000 and ${t.billBasisPoints} between 0 and 10000`,
+    ),
+    // Each kind carries its own numbers and none of the other's (`03` #9).
+    check(
+      'owner_approvals_kind_shape_check',
+      sql`(${t.kind} = 'discount' and ${t.lineBasisPoints} is not null and ${t.billBasisPoints} is not null and ${t.amountPaise} is null)
+        or (${t.kind} = 'credit_limit' and ${t.lineBasisPoints} is null and ${t.billBasisPoints} is null and ${t.amountPaise} is not null and ${t.amountPaise} > 0)`,
     ),
     check('owner_approvals_expiry_check', sql`${t.expiresAt} > ${t.createdAt}`),
   ],
@@ -1021,6 +1050,8 @@ export const bills = pgTable(
     grandTotalPaise: money('grand_total_paise').notNull(),
     billDiscount: jsonb('bill_discount'),
     approvalId: uuid('approval_id'),
+    /** The owner's OK for udhaar over the credit limit (P1.18); its own, as a bill may need both. */
+    creditApprovalId: uuid('credit_approval_id'),
     heldBillId: uuid('held_bill_id'),
     createdBy: uuid('created_by').notNull(),
     createdAt: createdAt(),
@@ -1048,6 +1079,14 @@ export const bills = pgTable(
     foreignKey({
       name: 'bills_approval_fk',
       columns: [t.businessId, t.approvalId],
+      foreignColumns: [ownerApprovals.businessId, ownerApprovals.id],
+    }),
+    uniqueIndex('bills_credit_approval_unique')
+      .on(t.businessId, t.creditApprovalId)
+      .where(sql`${t.creditApprovalId} is not null`),
+    foreignKey({
+      name: 'bills_credit_approval_fk',
+      columns: [t.businessId, t.creditApprovalId],
       foreignColumns: [ownerApprovals.businessId, ownerApprovals.id],
     }),
     foreignKey({
@@ -1183,6 +1222,11 @@ export const billPayments = pgTable(
       sql`${t.tenderedPaise} is null or (${t.mode} = 'cash' and ${t.tenderedPaise} >= ${t.amountPaise})`,
     ),
     check('bill_payments_reference_check', sql`char_length(${t.reference}) between 1 and 40`),
+    // Udhaar and advance settle a bill without money: no reference (`03` #6).
+    check(
+      'bill_payments_ledger_check',
+      sql`${t.reference} is null or ${t.mode} in (${literals(MONEY_PAYMENT_MODES)})`,
+    ),
   ],
 );
 
@@ -1503,5 +1547,152 @@ export const shopHolidays = pgTable(
       .on(t.businessId, t.branchId, t.date)
       .where(sql`${t.branchId} is not null and ${t.archivedAt} is null`),
     check('shop_holidays_name_check', sql`char_length(${t.name}) between 1 and 100`),
+  ],
+);
+
+// ---- Udhaar (P1.18, design `docs/plans/2026-11-23-p1.18-udhaar-design.md`; Module 03; ADR 0050) ----
+// Both tables are written only by moveUdhaar (src/udhaar.ts), in the action's own transaction.
+
+// The running balance per customer: the row two counters lock (ADR 0007 rules 4 and 6). Above 0
+// the customer owes; below 0 they have an advance.
+export const udhaarAccounts = pgTable(
+  'udhaar_accounts',
+  {
+    id: id(),
+    businessId: ownBusinessId(),
+    customerId: uuid('customer_id').notNull(),
+    balancePaise: money('balance_paise').notNull().default(0),
+    /** The entry that last changed this row; null means nothing has moved yet. */
+    lastEntryId: uuid('last_entry_id'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    unique('udhaar_accounts_business_id_id_unique').on(t.businessId, t.id),
+    unique('udhaar_accounts_customer_unique').on(t.businessId, t.customerId),
+    foreignKey({
+      name: 'udhaar_accounts_customer_fk',
+      columns: [t.businessId, t.customerId],
+      foreignColumns: [customers.businessId, customers.id],
+    }),
+    foreignKey({
+      name: 'udhaar_accounts_last_entry_fk',
+      columns: [t.businessId, t.lastEntryId],
+      foreignColumns: [udhaarEntries.businessId, udhaarEntries.id],
+    }),
+  ],
+);
+
+// The ledger: append-only (the migration revokes UPDATE; DELETE was never granted). A mistake is
+// fixed by a new entry. Which bill a payment cleared is not stored: it is worked out from these
+// rows (`unpaidEntries` in shared).
+export const udhaarEntries = pgTable(
+  'udhaar_entries',
+  {
+    id: id(),
+    businessId: ownBusinessId(),
+    customerId: uuid('customer_id').notNull(),
+    /** The branch where it happened; the balance is business-wide. */
+    branchId: uuid('branch_id').notNull(),
+    kind: text('kind').notNull(),
+    /** Signed: above 0 the customer owes more, below 0 they paid. */
+    amountPaise: money('amount_paise').notNull(),
+    /** The customer's balance once this entry counts, so the ledger page needs no window function. */
+    balanceAfterPaise: money('balance_after_paise').notNull(),
+    /** For a `bill` and an `advance_used`. */
+    billId: uuid('bill_id'),
+    /** For a `payment`: how the money came; a cheque carries its number. */
+    mode: text('mode'),
+    reference: text('reference'),
+    /** For a `payment_reversal`: the payment it takes back (once). */
+    reversesEntryId: uuid('reverses_entry_id'),
+    /** For every entry above 0: the day it falls due, fixed when it was made (`03` #22). */
+    dueDate: date('due_date', { mode: 'string' }),
+    /** The IST day the entry belongs to (`06` #7). */
+    businessDate: date('business_date', { mode: 'string' }).notNull(),
+    /** Idempotency (ADR 0007 rule 7): a retried request finds its first entry. */
+    requestKey: uuid('request_key'),
+    /** Required for a `payment_reversal` and an `opening`. */
+    reason: text('reason'),
+    createdBy: uuid('created_by').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    ...tenantPolicies(t.businessId),
+    unique('udhaar_entries_business_id_id_unique').on(t.businessId, t.id),
+    unique('udhaar_entries_request_key_unique').on(t.businessId, t.requestKey),
+    foreignKey({
+      name: 'udhaar_entries_customer_fk',
+      columns: [t.businessId, t.customerId],
+      foreignColumns: [customers.businessId, customers.id],
+    }),
+    foreignKey({
+      name: 'udhaar_entries_branch_fk',
+      columns: [t.businessId, t.branchId],
+      foreignColumns: [branches.businessId, branches.id],
+    }),
+    foreignKey({
+      name: 'udhaar_entries_bill_fk',
+      columns: [t.businessId, t.billId],
+      foreignColumns: [bills.businessId, bills.id],
+    }),
+    foreignKey({
+      name: 'udhaar_entries_reverses_fk',
+      columns: [t.businessId, t.reversesEntryId],
+      foreignColumns: [t.businessId, t.id],
+    }),
+    foreignKey({
+      name: 'udhaar_entries_created_by_fk',
+      columns: [t.businessId, t.createdBy],
+      foreignColumns: [users.businessId, users.id],
+    }),
+    // A customer's ledger, newest first, and the audit's sum.
+    index('udhaar_entries_customer_idx').on(t.businessId, t.customerId, t.id),
+    // A payment is reversed once; a customer has one opening balance; a bill makes at most one
+    // `bill` entry and one `advance_used` entry, so a retried save can't count twice.
+    uniqueIndex('udhaar_entries_reverses_unique')
+      .on(t.businessId, t.reversesEntryId)
+      .where(sql`${t.reversesEntryId} is not null`),
+    uniqueIndex('udhaar_entries_opening_unique')
+      .on(t.businessId, t.customerId)
+      .where(sql`${t.kind} = 'opening'`),
+    uniqueIndex('udhaar_entries_bill_unique')
+      .on(t.businessId, t.billId, t.kind)
+      .where(sql`${t.billId} is not null`),
+    check('udhaar_entries_kind_check', sql`${t.kind} in (${literals(UDHAAR_ENTRY_KINDS)})`),
+    check(
+      'udhaar_entries_amount_check',
+      sql`(${t.kind} in ('bill', 'advance_used', 'payment_reversal') and ${t.amountPaise} > 0)
+        or (${t.kind} = 'payment' and ${t.amountPaise} < 0)
+        or (${t.kind} = 'opening' and ${t.amountPaise} <> 0)`,
+    ),
+    check(
+      'udhaar_entries_bill_check',
+      sql`(${t.kind} in ('bill', 'advance_used')) = (${t.billId} is not null)`,
+    ),
+    check(
+      'udhaar_entries_reverses_check',
+      sql`(${t.kind} = 'payment_reversal') = (${t.reversesEntryId} is not null)`,
+    ),
+    // Only a payment has a mode, and a cheque has its number; only a payment has a reference.
+    check(
+      'udhaar_entries_mode_check',
+      sql`(${t.kind} = 'payment') = (${t.mode} is not null)
+        and (${t.mode} is null or ${t.mode} in (${literals(MONEY_PAYMENT_MODES)}))
+        and (${t.mode} is distinct from 'cheque' or ${t.reference} is not null)
+        and (${t.reference} is null or ${t.kind} = 'payment')`,
+    ),
+    check('udhaar_entries_reference_check', sql`char_length(${t.reference}) between 1 and 40`),
+    check(
+      'udhaar_entries_due_date_check',
+      sql`(${t.amountPaise} > 0) = (${t.dueDate} is not null)`,
+    ),
+    // The owner's note on a reversal and on an opening balance; no other entry has one.
+    check(
+      'udhaar_entries_reason_check',
+      sql`(${t.kind} in ('payment_reversal', 'opening')) = (${t.reason} is not null)
+        and char_length(${t.reason}) between 1 and 200`,
+    ),
   ],
 );

@@ -293,7 +293,51 @@ describe('a reprint (02 #33)', () => {
   });
 });
 
+describe('a bill of supply (a composition business)', () => {
+  const declaration = 'Composition taxable person, not eligible to collect tax on supplies';
+  it.each(['80', '58', 'a4'] as const)(
+    'carries the declaration the GST rules ask for (%s)',
+    (size) => {
+      expect(text(renderBill(composition, { size }))).toContain(declaration);
+      expect(text(renderBill({ ...composition, language: 'hi' }, { size }))).toContain(declaration);
+      expect(text(renderBill(regular, { size }))).not.toContain(declaration);
+      expect(text(renderBill(plain, { size }))).not.toContain(declaration);
+    },
+  );
+});
+
+describe('the cashier', () => {
+  it('is left out when the login has no name to print', () => {
+    expect(text(renderBill(regular, { size: '80' }))).toContain('Cashier');
+    expect(text(renderBill({ ...regular, cashierName: null }, { size: '80' }))).not.toContain(
+      'Cashier',
+    );
+  });
+});
+
 describe('payments', () => {
+  it.each([
+    ['en', 'Udhaar', 'From advance'],
+    ['hi', 'उधार', 'एडवांस से'],
+    ['hi-Latn', 'Udhaar', 'Advance se'],
+  ] as const)('names udhaar and the advance (%s)', (language, udhaar, advance) => {
+    const words = text(
+      renderBill(
+        {
+          ...regular,
+          language,
+          payments: [
+            { mode: 'udhaar', amountPaise: 100, tenderedPaise: null, reference: null },
+            { mode: 'advance', amountPaise: 100, tenderedPaise: null, reference: null },
+          ],
+        },
+        { size: '80' },
+      ),
+    );
+    expect(words).toContain(udhaar);
+    expect(words).toContain(advance);
+  });
+
   it('lists each way the bill was paid, and the change from the cash', () => {
     const words = text(renderBill(regular, { size: '80' }));
     expect(words).toContain('Cash');
@@ -314,7 +358,7 @@ describe('payments', () => {
       changePaise: 0,
       payments: [
         {
-          mode: 'udhaar' as 'cash',
+          mode: 'gift' as 'cash',
           amountPaise: regular.grandTotalPaise,
           tenderedPaise: null,
           reference: 'UTR123',
@@ -322,7 +366,7 @@ describe('payments', () => {
       ],
     };
     const words = text(renderBill(bill, { size: '80' }));
-    expect(words).toContain('udhaar');
+    expect(words).toContain('gift');
     expect(words).toContain('UTR123');
   });
 });

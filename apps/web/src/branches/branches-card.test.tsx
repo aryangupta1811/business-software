@@ -41,6 +41,7 @@ const SETTINGS: SettingsView = {
   alerts: { types: ['low_stock', 'out_of_stock'] },
   invoices: { invoicePrefix: null },
   printing: { billLanguage: 'en', footerNote: null },
+  udhaar: { overCreditLimit: 'warn' },
   nextInvoice: { financialYear: '2026-27', sequence: 1 },
 };
 

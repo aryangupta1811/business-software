@@ -75,6 +75,8 @@ export const PERMISSIONS = [
   'billing.sell',
   // P1.13: discounts up to the person's limit (`02` #12); the owner sets each staff login's limit.
   'billing.discount',
+  // P1.18: sell on credit, to a customer with a name and phone (`03` #10). Off unless the owner turns it on.
+  'billing.udhaar',
   // P1.13: find customers at the counter; add and edit them (`02` #2, #7).
   'customers.view',
   'customers.manage',

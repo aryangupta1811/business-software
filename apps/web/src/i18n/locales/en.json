@@ -11,7 +11,9 @@
     "settings": "Settings",
     "items": "Items",
     "billing": "Billing",
-    "staff": "Staff"
+    "staff": "Staff",
+    "attendance": "Attendance",
+    "myAttendance": "My attendance"
   },
   "theme": {
     "toDark": "Switch to dark mode",
@@ -40,7 +42,8 @@
     "billHold": "Hold this bill, or open the held bills",
     "billCustomer": "Find or add the customer",
     "billPay": "Take payment",
-    "openAlerts": "Open the alerts"
+    "openAlerts": "Open the alerts",
+    "goAttendance": "Go to Attendance"
   },
   "connection": {
     "checking": "Checking connection…",
@@ -279,6 +282,40 @@
       "invoicePrefix": {
         "invalid": "Use 1 to 4 capital letters or digits",
         "branch_code": "A branch already uses this as its code. Choose another prefix."
+      },
+      "joiningDate": {
+        "required": "Choose the joining date",
+        "invalid": "Choose a real date"
+      },
+      "paidLeavesPerMonth": {
+        "required": "Enter 0 if none",
+        "invalid": "Enter 0 to 31",
+        "too_big": "Enter 0 to 31"
+      },
+      "overtimeRatePaise": {
+        "invalid": "Enter an amount like 80",
+        "too_small": "Enter more than ₹0",
+        "too_big": "This is too big"
+      },
+      "salaryAmount": {
+        "invalid": "Enter an amount like 12000",
+        "too_small": "Enter more than ₹0",
+        "too_big": "This is too big"
+      },
+      "amountPaise": {
+        "invalid": "Enter an amount like 12000",
+        "too_small": "Enter more than ₹0",
+        "too_big": "This is too big"
+      },
+      "fromMonth": {
+        "past_month": "A change can start this month or later, not earlier"
+      },
+      "date": {
+        "invalid": "Choose a real date",
+        "required": "Choose a date"
+      },
+      "reason": {
+        "required": "Fill this in"
       }
     },
     "too_small": "This is too small",
@@ -302,7 +339,8 @@
     "network": "Can't reach the server",
     "forbidden": "You aren't allowed to do this",
     "username_taken": "This username is taken. Choose another",
-    "same_as_username": "Don't use the username as the password"
+    "same_as_username": "Don't use the username as the password",
+    "holiday_exists": "There is a holiday on this day already"
   },
   "recoveryKey": {
     "title": "Save your recovery key",
@@ -1130,12 +1168,25 @@
     },
     "person": {
       "title": "Person",
-      "lead": "Who this login belongs to.",
+      "lead": "Who this is, and how they are paid.",
       "name": "Name",
       "username": "Username",
       "usernameHint": "They type this to log in: 3 to 32 letters, digits, dots, dashes or underscores.",
       "password": "Password",
-      "branch": "Home branch"
+      "branch": "Home branch",
+      "canLogin": "Can log in",
+      "canLoginHint": "Switch off for someone who needs no login of their own. Attendance and salary are kept either way.",
+      "phone": "Phone",
+      "joiningDate": "Joining date",
+      "payTitle": "Pay and leave",
+      "weeklyOff": "Weekly off",
+      "noWeeklyOff": "None",
+      "paidLeaves": "Paid leaves a month",
+      "overtimeRate": "Overtime pay per hour (₹)",
+      "overtimeHint": "Leave empty if they get no overtime.",
+      "salaryKind": "Salary type",
+      "salaryAmount": "Salary (₹)",
+      "salaryHint": "You can set it later. Until then it shows Salary not set."
     },
     "access": {
       "title": "Access",
@@ -1210,7 +1261,8 @@
       "submit": "Add staff login",
       "confirmTitle": "Add this login",
       "confirmBody": "A new login can be used at once, so adding one needs your password.",
-      "confirm": "Add login"
+      "confirm": "Add login",
+      "submitRecord": "Add staff member"
     },
     "reset": {
       "title": "Reset password for {{name}}",
@@ -1241,7 +1293,44 @@
     },
     "errors": {
       "invalid_permissions": "Those switches don't fit together. Reload the page and try again.",
-      "not_found": "This login no longer exists. Go back to the list."
+      "not_found": "This login no longer exists. Go back to the list.",
+      "marks_before_joining": "Attendance is already marked before this joining date. Choose an earlier date.",
+      "stale": "Someone else changed this person. Reload the page and try again."
+    },
+    "noLogin": "No login",
+    "noLoginAccess": "Attendance and salary only",
+    "salaryNotSet": "Salary not set",
+    "salary": {
+      "monthly": "{{amount}} a month",
+      "daily": "{{amount}} a day",
+      "from": "{{rate}} from {{month}}"
+    },
+    "salaryCard": {
+      "title": "Salary",
+      "lead": "A change starts from the 1st of a month. Old rates stay on record, so old slips stay right.",
+      "none": "No salary set yet.",
+      "now": "Now",
+      "change": "Change salary",
+      "set": "Set salary",
+      "dialogTitle": "Salary for {{name}}",
+      "startsFrom": "Starts from the 1st of",
+      "thisMonth": "{{month}} (this month)",
+      "kind": "Salary type",
+      "monthly": "Monthly salary",
+      "daily": "Daily wage",
+      "amount": "Amount (₹)",
+      "save": "Save salary",
+      "saved": "Salary from {{month}} saved.",
+      "loadFailed": "Couldn't load the salary history."
+    },
+    "login": {
+      "title": "Login",
+      "lead": "{{name}} has no login. Attendance and salary work without one; give a login so they can sign in.",
+      "give": "Give a login",
+      "dialogTitle": "Give {{name}} a login",
+      "body": "They can log in at once with these. Choose what they can do after.",
+      "confirm": "Give login",
+      "done": "{{name}} can now log in as {{username}}. Choose what they can do below."
     }
   },
   "branches": {
@@ -1323,5 +1412,104 @@
       "out_of_stock": "An item has run out at a branch.",
       "low_stock": "An item is at or under its low-stock level."
     }
+  },
+  "attendance": {
+    "tabs": {
+      "label": "Attendance views",
+      "register": "Daily register",
+      "month": "Month view"
+    },
+    "lead": "Everyone starts as present. Tap to change a day.",
+    "date": "Date",
+    "previousDay": "Previous day",
+    "nextDay": "Next day",
+    "today": "Today",
+    "pickBranch": "Choose one branch to see its register.",
+    "empty": "Nobody is on the register for this branch and day.",
+    "counts": {
+      "everyoneIn": "Everyone is in",
+      "absent": "{{count}} absent",
+      "halfDay": "{{count}} half-day",
+      "onLeave": "{{count}} on leave"
+    },
+    "status": {
+      "present": "Present",
+      "half_day": "Half-day",
+      "absent": "Absent",
+      "paid_leave": "Paid leave",
+      "weekly_off": "Weekly off",
+      "holiday": "Holiday"
+    },
+    "statusFor": "Status: {{name}}",
+    "late": "Late",
+    "lateFor": "Late: {{name}}",
+    "overtimeFor": "Overtime: {{name}}",
+    "noOvertime": "No overtime",
+    "hours_one": "{{count}} hour",
+    "hours_other": "{{count}} hours",
+    "leavesUsed": "{{used}} of {{total}} paid leaves used this month",
+    "own": "You can't mark your own attendance",
+    "reason": {
+      "title": "Why change a past day?",
+      "lead": "{{date}} is before today, so the change goes in the log with your reason.",
+      "label": "Reason",
+      "save": "Save change",
+      "current": "Reason for this day: {{reason}}",
+      "change": "Change reason"
+    },
+    "changed": "{{name}} was changed by someone else. Check it and tap again.",
+    "failed": "Couldn't save that change. Check the connection and try again.",
+    "errors": {
+      "future_date": "Attendance can be marked for today and earlier days, not ahead.",
+      "not_on_register": "That person wasn't working on this day.",
+      "other_branch": "That person belongs to another branch.",
+      "own_attendance": "You can't mark your own attendance."
+    },
+    "month": {
+      "person": "Person",
+      "previous": "Previous month",
+      "next": "Next month",
+      "days": "Days of the month",
+      "counts": "This month",
+      "onlyOwn": "Only your own days show here.",
+      "lead": "One person's days, month by month. Days ahead are blank.",
+      "empty": "No staff to show yet.",
+      "late": "late",
+      "overtime": "overtime {{time}}",
+      "offRegister": "not on the register",
+      "leavesOf": "{{used}} of {{total}} paid leaves",
+      "present": "Present",
+      "halfDay": "Half-days",
+      "absent": "Absent",
+      "paidLeave": "Paid leave",
+      "weeklyOff": "Weekly offs",
+      "holiday": "Shop holidays",
+      "lateCount": "Late",
+      "overtimeTotal": "Overtime",
+      "holidaysTaken": "Holidays taken",
+      "holidaysTakenHint": "Absent and leave days. Weekly offs and shop holidays are not counted."
+    }
+  },
+  "holidays": {
+    "title": "Shop holidays",
+    "lead": "Days the shop is closed. Everyone shows as on holiday, so nobody has to be marked.",
+    "previousYear": "Previous year",
+    "nextYear": "Next year",
+    "empty": "No holidays in {{year}} yet.",
+    "loadFailed": "Couldn't load the holidays. Check the connection and try again.",
+    "date": "Date",
+    "name": "Name",
+    "nameHint": "Like Diwali or Holi.",
+    "branch": "Applies to",
+    "everyBranch": "Every branch",
+    "add": "Add holiday",
+    "added": "{{name}} added.",
+    "removeNamed": "Remove {{name}}",
+    "remove": "Remove",
+    "removeTitle": "Remove {{name}}?",
+    "removeBody": "It stops counting from now on. It stays on record, and the log keeps who removed it.",
+    "removeReason": "Reason (optional)",
+    "removeConfirm": "Remove holiday",
+    "removed": "{{name}} removed."
   }
 }

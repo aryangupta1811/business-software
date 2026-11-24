@@ -204,6 +204,7 @@ export {
   type MonthCounts,
   type MonthDay,
   type MonthQuery,
+  type AttendancePerson,
   type MonthView,
   type RegisterPerson,
   type RegisterQuery,

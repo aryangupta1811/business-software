@@ -102,7 +102,7 @@ test('adding a branch starts from the head office state and GSTIN, and sends the
   });
   expect(await (await card()).findByRole('status')).toHaveTextContent('Thane shop added.');
   // The second branch turns the one-button card into a list.
-  expect(await screen.findByText('Thane shop')).toBeInTheDocument();
+  expect(await (await card()).findByText('Thane shop')).toBeInTheDocument();
 });
 
 test('a code another branch already uses shows under the code box', async () => {

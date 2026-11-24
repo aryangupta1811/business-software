@@ -39,6 +39,7 @@ import type { z } from 'zod';
 import { ApiError, apiRequest } from '../../api/client';
 import { useBranches } from '../../api/branches';
 import { useSession } from '../../api/session';
+import { HolidaysCard } from '../../attendance/holidays-card';
 import { BranchesCard } from '../../branches/branches-card';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -102,6 +103,7 @@ function Settings() {
       <div className="flex flex-col gap-6 print:hidden">
         <BusinessCard saved={view.business} />
         <BranchesCard gstStatus={view.business.gstStatus} />
+        <HolidaysCard />
         <FeaturesCard saved={view.features} businessType={view.business.businessType} />
         <SecurityCard saved={view.security} />
         <StockCard saved={view.stock} />

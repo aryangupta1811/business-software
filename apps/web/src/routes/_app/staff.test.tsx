@@ -1,4 +1,4 @@
-import type { ActiveSession, StaffView } from '@business-software/shared';
+import { businessDate, type ActiveSession, type StaffView } from '@business-software/shared';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -499,6 +499,12 @@ test("editing the person saves the name, username and branch without the owner's
     name: 'Meena Sharma',
     username: 'meena',
     homeBranchId: BRANCH_ID,
+    phone: null,
+    joiningDate: '2026-01-01',
+    weeklyOffDay: null,
+    paidLeavesPerMonth: 0,
+    overtimeRatePaise: null,
+    version: 1,
   });
   expect(person.queryByLabelText('Home branch')).toBeNull();
 });
@@ -551,6 +557,11 @@ test("adds a login: the person, the defaults, and the owner's password", async (
     permissions: ['billing.sell', 'customers.view', 'customers.manage', 'items.view', 'stock.view'],
     discountLimitBasisPoints: null,
     ownerPassword: OWNER_PASSWORD,
+    phone: null,
+    joiningDate: businessDate(new Date()),
+    weeklyOffDay: null,
+    paidLeavesPerMonth: 0,
+    overtimeRatePaise: null,
   });
   expect(await screen.findByRole('row', { name: /Ravi Kumar/ })).toBeInTheDocument();
 });

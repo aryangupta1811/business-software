@@ -1,6 +1,15 @@
 import type { ActiveSession, Permission } from '@business-software/shared';
 import { Link, useMatches, useNavigate } from '@tanstack/react-router';
-import { House, IndianRupee, Keyboard, MapPin, Package, Settings, Users } from 'lucide-react';
+import {
+  CalendarCheck,
+  House,
+  IndianRupee,
+  Keyboard,
+  MapPin,
+  Package,
+  Settings,
+  Users,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AlertsBell } from '../alerts/alerts-bell';
@@ -20,6 +29,7 @@ import { Kbd, KbdGroup } from './ui/kbd';
 const HOME_KEYS = 'Alt+H';
 const BILLING_KEYS = 'Alt+B';
 const ITEMS_KEYS = 'Alt+I';
+const ATTENDANCE_KEYS = 'Alt+T';
 const NAV_LINK =
   'flex min-h-10 items-center gap-2.5 rounded-lg px-2 text-muted hover:bg-surface-muted data-[status=active]:bg-surface-muted data-[status=active]:font-semibold data-[status=active]:text-foreground';
 
@@ -69,6 +79,15 @@ export function AppShell({
     group: 'navigation',
     action: () => {
       if (may('items.view')) void navigate({ to: '/items' });
+    },
+  });
+
+  useShortcut({
+    keys: ATTENDANCE_KEYS,
+    description: 'shortcuts.goAttendance',
+    group: 'navigation',
+    action: () => {
+      if (may('attendance.mark')) void navigate({ to: '/attendance' });
     },
   });
 
@@ -125,6 +144,25 @@ export function AppShell({
                   ))}
                 </KbdGroup>
               </Link>
+            )}
+            {may('attendance.mark') ? (
+              <Link to="/attendance" aria-keyshortcuts={ATTENDANCE_KEYS} className={NAV_LINK}>
+                <CalendarCheck aria-hidden="true" className="size-4" />
+                <span className="flex-1">{t('nav.attendance')}</span>
+                <KbdGroup aria-hidden="true">
+                  {keyLabels(ATTENDANCE_KEYS).map((label) => (
+                    <Kbd key={label}>{label}</Kbd>
+                  ))}
+                </KbdGroup>
+              </Link>
+            ) : (
+              // Staff see their own month; the owner's switches decide the rest (`05` #25).
+              session?.user.role === 'staff' && (
+                <Link to="/attendance/month" className={NAV_LINK}>
+                  <CalendarCheck aria-hidden="true" className="size-4" />
+                  {t('nav.myAttendance')}
+                </Link>
+              )
             )}
             {may('staff.manage') && (
               <Link to="/staff" className={NAV_LINK}>

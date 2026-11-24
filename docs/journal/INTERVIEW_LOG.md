@@ -2164,3 +2164,27 @@ Entry format:
 - **Why / what I learned:** a permission check can be right and still useless: every switch needs a path through the screens, not only a guard on one route. Testing each switch alone (not only in the combinations the UI happens to use) finds this.
 - **Say it in an interview:** "Each permission is tested on its own. That's how we found a switch that passed every API check but gave the user nothing to click, because the list it depended on was behind a different permission."
 - **Follow-ups to expect:** why not just open the staff list to that switch? (the staff list carries salaries and logins; the new route returns only names and branches).
+
+### 2026-11-23 — A pull request with conflicts runs no CI, and why I merged instead of rebasing `#git` `#github` `#gotcha`
+- **What happened:** #76 showed "no checks". Nothing was wrong with CI: #76 and #78 had both added an entry at the end of this log, and GitHub doesn't start `pull_request` workflows when it can't build the merge commit. Claude rebased and tried `git push --force-with-lease`. The permission check refused it, and this project's rule is never to force-push without asking. The rebase was undone and `main` merged into the branch instead; the squash-merge flattens that anyway.
+- **Why / what I learned:** "no checks" on a pull request: look at `mergeable` first. A rebase rewrites published commits, so it always needs a force-push; a merge doesn't. Files every branch appends to always conflict.
+- **Say it in an interview:** "When a PR shows no checks I look for a merge conflict first, because GitHub runs CI on the merge result. I update branches by merging main in: with squash merges, main's history stays just as clean and nobody has to force-push."
+- **Follow-ups to expect:** isn't a merge commit messy? (only on the branch; the squash makes one commit on `main`).
+
+### 2026-11-23 — A command that acts on "the current branch" used the wrong one `#git` `#github` `#gotcha`
+- **What happened:** with several worktrees, `gh pr create` was run from the main folder, which was on another branch that already had a pull request. It printed that one's link (#77) and created nothing. Running it with `--head feat/p2.3-staff-screens --base main` made #79.
+- **Why / what I learned:** with worktrees, name the branch instead of relying on the folder, and read the answer: the link was for a different pull request.
+- **Say it in an interview:** "With parallel worktrees I pass the branch explicitly to tools that default to the current one."
+- **Follow-ups to expect:** what is a worktree? (a second checkout of the same repository in another folder, on its own branch).
+
+### 2026-11-24 — A check reported as passed that hadn't been done `#testing` `#process` `#mistake`
+- **What happened:** #79's Chrome check was reported as passed and the PR merged. The window was meant to be 1024 px, but the resize had no effect and the page stayed 1536 px wide. Light mode wasn't checked, and most screenshots timed out, so the check was mostly page text. A mutation check done by an agent was also reported as if the reviewer had done it. Both were corrected the next day, and the missing checks are on the list.
+- **Why / what I learned:** check that the test set-up took effect (read `innerWidth` after resizing) before trusting the result. Report what was seen, what wasn't, and who saw it. "Passed alone" doesn't explain why a test failed in the full run: two local failures were put down to load without reading the error.
+- **Say it in an interview:** "I once found a UI check had been signed off at the wrong window size. Now the check starts by proving its own conditions, and the report lists what was not checked."
+- **Follow-ups to expect:** how would you automate it? (a browser test with a fixed viewport in both themes, in CI).
+
+### 2026-11-24 — Parallel agents hit the usage limit with nothing committed `#process` `#gotcha`
+- **What happened:** two Sonnet lanes stopped in the middle of their work on the weekly usage limit. Their files survived in their worktrees, but nothing was committed. The reviewer saw `udhaar.ts` with no test file beside it and concluded its code had come before its tests. It was a stub that throws, so the tests could fail first. Both lanes were resumed, then asked to commit and report when the session closed.
+- **Why / what I learned:** open a file before judging it from its name. A lane should commit its first working, tested slice, so a stop costs little. Worktrees kept the two lanes' unfinished work apart from `main` and from each other.
+- **Say it in an interview:** "Unfinished work lives on its own branch in its own worktree, so an agent that stops halfway can't break main."
+- **Follow-ups to expect:** why start from a stub that throws? (every test then fails for the right reason before any code can make it pass).

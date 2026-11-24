@@ -44,7 +44,7 @@ export interface FakeAnswer {
 
 /**
  * Stands in for the API: `routes` maps "METHOD /path" to an answer (or a function making one).
- * `GET /api/session` answers `session`; anything else unlisted answers the health check. A
+ * `GET /api/session` answers `session`, an unlisted `GET /api/holidays` an empty calendar; anything else unlisted answers the health check. A
  * route function gets the request body and the URL.
  */
 export function fakeApi(
@@ -62,7 +62,10 @@ export function fakeApi(
         : (route ??
           (url === '/api/session'
             ? { body: session }
-            : { body: { status: 'ok', database: 'ok' } }));
+            : // The Settings page lists the shop holidays; most tests have none.
+              method === 'GET' && url.startsWith('/api/holidays')
+              ? { body: [] }
+              : { body: { status: 'ok', database: 'ok' } }));
     const status = answer.status ?? 200;
     if (answer.fail === true) return Promise.reject(new TypeError('fetch failed'));
     const response =

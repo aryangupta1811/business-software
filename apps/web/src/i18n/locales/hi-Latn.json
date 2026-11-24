@@ -11,7 +11,9 @@
     "settings": "Settings",
     "items": "Saamaan",
     "billing": "Billing",
-    "staff": "Staff"
+    "staff": "Staff",
+    "attendance": "Hazri",
+    "myAttendance": "Meri hazri"
   },
   "theme": {
     "toDark": "Dark mode chalu karein",
@@ -40,7 +42,8 @@
     "billHold": "Yeh bill rokein, ya roke gaye bill kholein",
     "billCustomer": "Customer khojein ya jodein",
     "billPay": "Payment lein",
-    "openAlerts": "Alerts kholein"
+    "openAlerts": "Alerts kholein",
+    "goAttendance": "Hazri par jaayein"
   },
   "connection": {
     "checking": "Connection check ho raha hai…",
@@ -279,6 +282,40 @@
       "invoicePrefix": {
         "invalid": "1 se 4 bade akshar ya ank likhein",
         "branch_code": "Yeh kisi branch ka code hai. Doosra prefix chunein."
+      },
+      "joiningDate": {
+        "required": "Joining ki tareekh chunein",
+        "invalid": "Sahi tareekh chunein"
+      },
+      "paidLeavesPerMonth": {
+        "required": "Koi nahi to 0 likhein",
+        "invalid": "0 se 31 likhein",
+        "too_big": "0 se 31 likhein"
+      },
+      "overtimeRatePaise": {
+        "invalid": "80 jaisi rakam likhein",
+        "too_small": "₹0 se zyada likhein",
+        "too_big": "Yeh bahut badi hai"
+      },
+      "salaryAmount": {
+        "invalid": "12000 jaisi rakam likhein",
+        "too_small": "₹0 se zyada likhein",
+        "too_big": "Yeh bahut badi hai"
+      },
+      "amountPaise": {
+        "invalid": "12000 jaisi rakam likhein",
+        "too_small": "₹0 se zyada likhein",
+        "too_big": "Yeh bahut badi hai"
+      },
+      "fromMonth": {
+        "past_month": "Badlaav isi mahine ya aage se shuru ho sakta hai, pehle se nahi"
+      },
+      "date": {
+        "invalid": "Sahi tareekh chunein",
+        "required": "Tareekh chunein"
+      },
+      "reason": {
+        "required": "Ise bharein"
       }
     },
     "too_small": "Yeh bahut kam hai",
@@ -302,7 +339,8 @@
     "network": "Server se jud nahi pa rahe",
     "forbidden": "Aapko iski anumati nahi hai",
     "username_taken": "Yeh username kisi aur ka hai. Doosra chunein",
-    "same_as_username": "Password mein username na rakhein"
+    "same_as_username": "Password mein username na rakhein",
+    "holiday_exists": "Is din ki chhutti pehle se hai"
   },
   "recoveryKey": {
     "title": "Apni recovery key sambhaal kar rakhein",
@@ -1130,12 +1168,25 @@
     },
     "person": {
       "title": "Vyakti",
-      "lead": "Yeh login kiska hai.",
+      "lead": "Yeh kaun hain, aur inhein salary kaise milti hai.",
       "name": "Naam",
       "username": "Username",
       "usernameHint": "Login karte samay yahi likhna hoga: 3 se 32 akshar, ank, dot, dash ya underscore.",
       "password": "Password",
-      "branch": "Mukhya shaakha"
+      "branch": "Mukhya shaakha",
+      "canLogin": "Login kar sakte hain",
+      "canLoginHint": "Jise apne login ki zaroorat nahi, uske liye band rakhein. Hazri aur salary dono haalat mein darj rehti hain.",
+      "phone": "Phone",
+      "joiningDate": "Joining ki tareekh",
+      "payTitle": "Salary aur chhutti",
+      "weeklyOff": "Saptahik chhutti",
+      "noWeeklyOff": "Koi nahi",
+      "paidLeaves": "Mahine mein paid chhuttiyan",
+      "overtimeRate": "Overtime ka prati ghanta pay (₹)",
+      "overtimeHint": "Overtime nahi milta to khaali chhodein.",
+      "salaryKind": "Salary ka prakaar",
+      "salaryAmount": "Salary (₹)",
+      "salaryHint": "Baad mein bhi tay kar sakte hain. Tab tak \"Salary tay nahi\" dikhega."
     },
     "access": {
       "title": "Anumatiyaan",
@@ -1210,7 +1261,8 @@
       "submit": "Staff login jodein",
       "confirmTitle": "Yeh login jodein",
       "confirmBody": "Naya login turant istemaal ho sakta hai, isliye jodne ke liye aapka password chahiye.",
-      "confirm": "Login jodein"
+      "confirm": "Login jodein",
+      "submitRecord": "Staff jodein"
     },
     "reset": {
       "title": "{{name}} ka password reset karein",
@@ -1241,7 +1293,44 @@
     },
     "errors": {
       "invalid_permissions": "Yeh switch aapas mein mel nahi khaate. Page phir se kholkar koshish karein.",
-      "not_found": "Yeh login ab nahi hai. List par wapas jaayein."
+      "not_found": "Yeh login ab nahi hai. List par wapas jaayein.",
+      "marks_before_joining": "Is joining tareekh se pehle ki hazri lagi hui hai. Pehle ki tareekh chunein.",
+      "stale": "Kisi aur ne is vyakti ko badal diya hai. Page dobara kholkar phir koshish karein."
+    },
+    "noLogin": "Login nahi",
+    "noLoginAccess": "Sirf hazri aur salary",
+    "salaryNotSet": "Salary tay nahi",
+    "salary": {
+      "monthly": "{{amount}} mahina",
+      "daily": "{{amount}} roz",
+      "from": "{{month}} se {{rate}}"
+    },
+    "salaryCard": {
+      "title": "Salary",
+      "lead": "Badlaav kisi mahine ki 1 tareekh se shuru hota hai. Purane rate record mein rehte hain, isliye purani parchiyan sahi rehti hain.",
+      "none": "Abhi salary tay nahi hai.",
+      "now": "Abhi",
+      "change": "Salary badlein",
+      "set": "Salary tay karein",
+      "dialogTitle": "{{name}} ki salary",
+      "startsFrom": "Kis mahine ki 1 tareekh se",
+      "thisMonth": "{{month}} (yeh mahina)",
+      "kind": "Salary ka prakaar",
+      "monthly": "Mahine ki salary",
+      "daily": "Dihaadi",
+      "amount": "Rakam (₹)",
+      "save": "Salary save karein",
+      "saved": "{{month}} se salary save ho gayi.",
+      "loadFailed": "Salary ka itihaas load nahi ho saka."
+    },
+    "login": {
+      "title": "Login",
+      "lead": "{{name}} ka login nahi hai. Hazri aur salary bina login ke bhi chalti hain; login dein to woh sign in kar sakenge.",
+      "give": "Login dein",
+      "dialogTitle": "{{name}} ko login dein",
+      "body": "Woh inse turant login kar sakenge. Kya kar sakte hain, yeh baad mein chunein.",
+      "confirm": "Login dein",
+      "done": "{{name}} ab {{username}} naam se login kar sakte hain. Neeche chunein ki woh kya kar sakte hain."
     }
   },
   "branches": {
@@ -1323,5 +1412,104 @@
       "out_of_stock": "Kisi branch mein koi saamaan khatam ho gaya hai.",
       "low_stock": "Koi saamaan apne kam-stock level par ya usse neeche hai."
     }
+  },
+  "attendance": {
+    "tabs": {
+      "label": "Hazri ke drishya",
+      "register": "Roz ka register",
+      "month": "Mahine ka drishya"
+    },
+    "lead": "Sab pehle se maujood maane jaate hain. Din badalne ke liye tap karein.",
+    "date": "Tareekh",
+    "previousDay": "Pichhla din",
+    "nextDay": "Agla din",
+    "today": "Aaj",
+    "pickBranch": "Register dekhne ke liye ek shaakha chunein.",
+    "empty": "Is shaakha aur din ke register mein koi nahi hai.",
+    "counts": {
+      "everyoneIn": "Sab maujood hain",
+      "absent": "{{count}} gair-haazir",
+      "halfDay": "{{count}} aadha din",
+      "onLeave": "{{count}} chhutti par"
+    },
+    "status": {
+      "present": "Maujood",
+      "half_day": "Aadha din",
+      "absent": "Gair-haazir",
+      "paid_leave": "Paid chhutti",
+      "weekly_off": "Saptahik chhutti",
+      "holiday": "Dukaan ki chhutti"
+    },
+    "statusFor": "Sthiti: {{name}}",
+    "late": "Der se",
+    "lateFor": "Der se: {{name}}",
+    "overtimeFor": "Overtime: {{name}}",
+    "noOvertime": "Overtime nahi",
+    "hours_one": "{{count}} ghanta",
+    "hours_other": "{{count}} ghante",
+    "leavesUsed": "Is mahine {{total}} mein se {{used}} paid chhuttiyan li gayeen",
+    "own": "Aap apni hazri khud nahi laga sakte",
+    "reason": {
+      "title": "Pichhla din kyon badal rahe hain?",
+      "lead": "{{date}} aaj se pehle ka din hai, isliye yeh badlaav aapke kaaran ke saath log mein jaayega.",
+      "label": "Kaaran",
+      "save": "Badlaav save karein",
+      "current": "Is din ka kaaran: {{reason}}",
+      "change": "Kaaran badlein"
+    },
+    "changed": "{{name}} ko kisi aur ne badal diya hai. Dekhkar phir tap karein.",
+    "failed": "Yeh badlaav save nahi ho saka. Connection jaanchkar phir koshish karein.",
+    "errors": {
+      "future_date": "Hazri aaj aur pichhle dinon ki hi lag sakti hai, aage ki nahi.",
+      "not_on_register": "Woh vyakti is din kaam par nahi tha.",
+      "other_branch": "Woh vyakti kisi aur shaakha ka hai.",
+      "own_attendance": "Aap apni hazri khud nahi laga sakte."
+    },
+    "month": {
+      "person": "Vyakti",
+      "previous": "Pichhla mahina",
+      "next": "Agla mahina",
+      "days": "Mahine ke din",
+      "counts": "Is mahine",
+      "onlyOwn": "Yahan sirf aapke apne din dikhte hain.",
+      "lead": "Ek vyakti ke din, mahine ke hisaab se. Aage ke din khaali rehte hain.",
+      "empty": "Dikhane ke liye abhi koi staff nahi hai.",
+      "late": "der se",
+      "overtime": "overtime {{time}}",
+      "offRegister": "register mein nahi",
+      "leavesOf": "{{total}} mein se {{used}} paid chhuttiyan",
+      "present": "Maujood",
+      "halfDay": "Aadhe din",
+      "absent": "Gair-haazir",
+      "paidLeave": "Paid chhutti",
+      "weeklyOff": "Saptahik chhuttiyan",
+      "holiday": "Dukaan ki chhuttiyan",
+      "lateCount": "Der se",
+      "overtimeTotal": "Overtime",
+      "holidaysTaken": "Li gayi chhuttiyan",
+      "holidaysTakenHint": "Gair-haazir aur chhutti ke din. Saptahik chhutti aur dukaan ki chhuttiyan ginti mein nahi aatin."
+    }
+  },
+  "holidays": {
+    "title": "Dukaan ki chhuttiyan",
+    "lead": "Jin dinon dukaan band rehti hai. Sab chhutti par dikhte hain, isliye kisi ko mark nahi karna padta.",
+    "previousYear": "Pichhla saal",
+    "nextYear": "Agla saal",
+    "empty": "{{year}} mein abhi koi chhutti nahi hai.",
+    "loadFailed": "Chhuttiyan load nahi ho sakeen. Connection jaanchkar phir koshish karein.",
+    "date": "Tareekh",
+    "name": "Naam",
+    "nameHint": "Jaise Diwali ya Holi.",
+    "branch": "Kis par laagu",
+    "everyBranch": "Har shaakha",
+    "add": "Chhutti jodein",
+    "added": "{{name}} jod di gayi.",
+    "removeNamed": "{{name}} hatayein",
+    "remove": "Hatayein",
+    "removeTitle": "{{name}} hatayein?",
+    "removeBody": "Yeh abhi se ginti mein nahi aayegi. Record mein rahegi, aur log mein darj rahega ki kisne hatayi.",
+    "removeReason": "Kaaran (optional)",
+    "removeConfirm": "Chhutti hatayein",
+    "removed": "{{name}} hata di gayi."
   }
 }

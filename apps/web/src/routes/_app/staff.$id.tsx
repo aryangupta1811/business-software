@@ -1,12 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { staffUpdateSchema, username, type StaffView } from '@business-software/shared';
+import type { StaffView } from '@business-software/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { z } from 'zod';
 import { liveBranches, useBranches } from '../../api/branches';
 import { ApiError } from '../../api/client';
 import { setStaffPermissions, STAFF_KEY, updateStaff, useStaffList } from '../../api/staff';
@@ -22,7 +21,15 @@ import { StaffDialogs } from '../../staff/dialogs';
 import { useStaffDialogs } from '../../staff/use-staff-dialogs';
 import { failureText, showFieldErrors } from '../../staff/errors';
 import { LoadGate } from '../../staff/load-gate';
-import { PersonFields, type PersonForm } from '../../staff/person-fields';
+import { LoginCard } from '../../staff/login-card';
+import { PersonFields } from '../../staff/person-fields';
+import {
+  personFormOf,
+  personFormSchema,
+  recordPayload,
+  type PersonForm,
+} from '../../staff/record-form';
+import { SalaryCard } from '../../staff/salary-card';
 
 /** One staff login (P1.5 design §6): the person, and what they may do. */
 export const Route = createFileRoute('/_app/staff/$id')({
@@ -30,11 +37,9 @@ export const Route = createFileRoute('/_app/staff/$id')({
   staticData: { titleKey: 'staff.editTitle', permission: 'staff.manage' },
 });
 
-// The same checks as the server's, with a password box the page doesn't use (it is only for
-// adding), so one form type serves both pages.
-const personSchema = staffUpdateSchema
-  .pick({ name: true, homeBranchId: true })
-  .extend({ username: username(), password: z.string() });
+// The same checks as the server's, with no password box (it is only for adding), so one form
+// type serves both pages.
+const personSchema = personFormSchema({ password: false });
 
 function EditStaff() {
   const { id } = Route.useParams();
@@ -75,13 +80,6 @@ function NotFound() {
   );
 }
 
-const personFormOf = (person: StaffView): PersonForm => ({
-  name: person.name,
-  username: person.username ?? '',
-  password: '',
-  homeBranchId: person.homeBranchId,
-});
-
 function StaffEditor({
   person,
   branches,
@@ -93,6 +91,7 @@ function StaffEditor({
   const queryClient = useQueryClient();
   const dialogs = useStaffDialogs();
   const { ask, notice } = dialogs;
+  const hasLogin = person.username !== null;
   const [banner, setBanner] = useState<string | null>(null);
 
   // The Person card.
@@ -113,14 +112,28 @@ function StaffEditor({
     try {
       const view = await updateStaff(person.id, {
         name: values.name,
-        username: values.username,
+        // A person without a login has no username to change.
+        ...(hasLogin && { username: values.username }),
         homeBranchId: values.homeBranchId,
+        ...recordPayload(values),
+        version: person.version,
       });
       reset(personFormOf(view));
       setPersonSaved(true);
       void queryClient.invalidateQueries({ queryKey: STAFF_KEY });
     } catch (error) {
-      if (!showFieldErrors(error, setError, ['name', 'username', 'homeBranchId'])) {
+      if (
+        !showFieldErrors(error, setError, [
+          'name',
+          'username',
+          'homeBranchId',
+          'phone',
+          'joiningDate',
+          'weeklyOffDay',
+          'paidLeavesPerMonth',
+          'overtimeRatePaise',
+        ])
+      ) {
         setBanner(failureText(t, error));
       }
     }
@@ -187,17 +200,25 @@ function StaffEditor({
               {t(person.active ? 'staff.status.active' : 'staff.status.inactive')}
             </Badge>
           </div>
-          <p className="font-mono text-label text-muted">{person.username}</p>
+          {hasLogin ? (
+            <p className="font-mono text-label text-muted">{person.username}</p>
+          ) : (
+            <p>
+              <Badge>{t('staff.noLogin')}</Badge>
+            </p>
+          )}
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="secondary"
-            onClick={() => {
-              ask('reset', person);
-            }}
-          >
-            {t('staff.actions.reset')}
-          </Button>
+          {hasLogin && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                ask('reset', person);
+              }}
+            >
+              {t('staff.actions.reset')}
+            </Button>
+          )}
           {person.active ? (
             <Button
               variant="secondary"
@@ -241,7 +262,10 @@ function StaffEditor({
             register={register}
             errors={errors}
             branches={branches}
+            withUsername={hasLogin}
             withPassword={false}
+            withSalary={false}
+            loginSwitch={false}
           />
           <div className="flex items-center gap-4 border-t border-border pt-5">
             <Button type="submit" disabled={isSubmitting}>
@@ -256,30 +280,45 @@ function StaffEditor({
         </form>
       </AccountCard>
 
-      {/* Only with two or more branches: with one there is nowhere else to work. */}
-      {branches.length > 1 && <BranchAccessCard person={person} branches={branches} />}
+      <SalaryCard person={person} />
 
-      <AccessCard
-        value={access}
-        limitInvalid={limitInvalid}
-        onChange={(next) => {
-          setAccess(next);
-          setLimitInvalid(false);
-          setAccessSaved(false);
-        }}
-        footer={
-          <div className="flex items-center gap-4 border-t border-border pt-5">
-            <Button disabled={!changed} onClick={reviewAccess}>
-              {t('staff.access.save')}
-            </Button>
-            {accessSaved && (
-              <p role="status" className="text-label text-success">
-                {t('staff.access.saved')}
-              </p>
-            )}
-          </div>
-        }
-      />
+      {/* A person without a login can be given one; no second record is made (00 #19). */}
+      {!hasLogin && person.active && (
+        <LoginCard
+          person={person}
+          onGiven={(view) => {
+            reset(personFormOf(view));
+            dialogs.done(t('staff.login.done', { name: view.name, username: view.username ?? '' }));
+          }}
+        />
+      )}
+
+      {/* Only with two or more branches: with one there is nowhere else to work. */}
+      {hasLogin && branches.length > 1 && <BranchAccessCard person={person} branches={branches} />}
+
+      {hasLogin && (
+        <AccessCard
+          value={access}
+          limitInvalid={limitInvalid}
+          onChange={(next) => {
+            setAccess(next);
+            setLimitInvalid(false);
+            setAccessSaved(false);
+          }}
+          footer={
+            <div className="flex items-center gap-4 border-t border-border pt-5">
+              <Button disabled={!changed} onClick={reviewAccess}>
+                {t('staff.access.save')}
+              </Button>
+              {accessSaved && (
+                <p role="status" className="text-label text-success">
+                  {t('staff.access.saved')}
+                </p>
+              )}
+            </div>
+          }
+        />
+      )}
 
       <OwnerPasswordDialog
         open={confirming}

@@ -12,7 +12,7 @@ import { Card } from '../../components/ui/card';
 import { StaffDialogs } from '../../staff/dialogs';
 import { useStaffDialogs, type StaffDialogsHost } from '../../staff/use-staff-dialogs';
 import { LoadGate } from '../../staff/load-gate';
-import { accessSummary } from '../../staff/summary';
+import { accessSummary, salaryLine } from '../../staff/summary';
 
 /**
  * The owner's staff list (P1.5 design §6, Module 00 #15, #34): who has a login, what each may
@@ -122,17 +122,28 @@ function StaffRow({
   return (
     <tr className={person.active ? 'hover:bg-surface-muted' : 'text-muted hover:bg-surface-muted'}>
       <td className="px-4 py-2.5">
-        <Link
-          to="/staff/$id"
-          params={{ id: person.id }}
-          className="font-medium text-foreground hover:underline"
-        >
-          {person.name}
-        </Link>
+        <div className="flex flex-col">
+          <Link
+            to="/staff/$id"
+            params={{ id: person.id }}
+            className="font-medium text-foreground hover:underline"
+          >
+            {person.name}
+          </Link>
+          <span
+            className={person.salary === null ? 'text-label text-warning' : 'text-label text-muted'}
+          >
+            {person.salary === null ? t('staff.salaryNotSet') : salaryLine(t, person.salary)}
+          </span>
+        </div>
       </td>
-      <td className="px-4 py-2.5 font-mono text-label">{person.username}</td>
+      <td className="px-4 py-2.5 font-mono text-label">
+        {person.username ?? <Badge>{t('staff.noLogin')}</Badge>}
+      </td>
       {showBranch && <td className="px-4 py-2.5 text-muted">{person.homeBranchName}</td>}
-      <td className="px-4 py-2.5 text-muted">{accessSummary(t, person.permissions)}</td>
+      <td className="px-4 py-2.5 text-muted">
+        {person.username === null ? t('staff.noLoginAccess') : accessSummary(t, person.permissions)}
+      </td>
       <td className="px-4 py-2.5">
         <Badge tone={person.active ? 'success' : 'warning'}>
           {t(person.active ? 'staff.status.active' : 'staff.status.inactive')}
@@ -148,16 +159,18 @@ function StaffRow({
           >
             {t('staff.actions.edit')}
           </Link>
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-label={t('staff.actions.resetNamed', { name: person.name })}
-            onClick={() => {
-              ask('reset', person);
-            }}
-          >
-            {t('staff.actions.reset')}
-          </Button>
+          {person.username !== null && (
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={t('staff.actions.resetNamed', { name: person.name })}
+              onClick={() => {
+                ask('reset', person);
+              }}
+            >
+              {t('staff.actions.reset')}
+            </Button>
+          )}
           {person.active ? (
             <Button
               variant="ghost"

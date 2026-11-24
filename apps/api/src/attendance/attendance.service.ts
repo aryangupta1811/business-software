@@ -34,6 +34,7 @@ import {
   type AttendanceMarkInput,
   type AttendanceStatus,
   type MarkedDay,
+  type AttendancePerson,
   type MonthQuery,
   type MonthView,
   type RegisterPerson,
@@ -266,6 +267,29 @@ export class AttendanceService {
       const row = this.rowOf(person, date, holidays, saved, leaves.get(userId) ?? 0);
       if (row === null) throw new Error('A marked day is on the register');
       return row;
+    });
+  }
+
+  /** Whose months the caller may open: the owner everyone, `view_all` its own branch. */
+  people(caller: Caller): Promise<AttendancePerson[]> {
+    const owner = caller.role === 'owner';
+    if (!owner && !caller.permissions.includes('attendance.view_all')) {
+      throw new ForbiddenException({ code: 'forbidden' });
+    }
+    return inBusiness(this.database, caller, async (tx) => {
+      const people = await tx
+        .select(PERSON)
+        .from(users)
+        .where(
+          and(eq(users.role, 'staff'), owner ? undefined : eq(users.homeBranchId, caller.branchId)),
+        )
+        .orderBy(asc(users.name), asc(users.id));
+      return people.map((person) => ({
+        id: person.id,
+        name: person.name ?? '',
+        homeBranchId: registerPerson(person).homeBranchId,
+        active: person.deactivatedAt === null,
+      }));
     });
   }
 

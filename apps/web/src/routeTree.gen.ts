@@ -19,6 +19,8 @@ import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as PublicForgotPasswordRouteImport } from './routes/_public/forgot-password'
 import { Route as PublicLoginRouteImport } from './routes/_public/login'
 import { Route as PublicSignupRouteImport } from './routes/_public/signup'
+import { Route as AppAttendanceIndexRouteImport } from './routes/_app/attendance.index'
+import { Route as AppAttendanceMonthRouteImport } from './routes/_app/attendance.month'
 import { Route as AppItemsIndexRouteImport } from './routes/_app/items.index'
 import { Route as AppItemsIdRouteImport } from './routes/_app/items.$id'
 import { Route as AppItemsNewRouteImport } from './routes/_app/items.new'
@@ -77,6 +79,16 @@ const PublicSignupRoute = PublicSignupRouteImport.update({
   path: '/signup',
   getParentRoute: () => PublicRoute,
 } as any)
+const AppAttendanceIndexRoute = AppAttendanceIndexRouteImport.update({
+  id: '/attendance/',
+  path: '/attendance/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAttendanceMonthRoute = AppAttendanceMonthRouteImport.update({
+  id: '/attendance/month',
+  path: '/attendance/month',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppItemsIndexRoute = AppItemsIndexRouteImport.update({
   id: '/items/',
   path: '/items/',
@@ -134,11 +146,13 @@ export interface FileRoutesByFullPath {
   '/forgot-password': typeof PublicForgotPasswordRoute
   '/login': typeof PublicLoginRoute
   '/signup': typeof PublicSignupRoute
+  '/attendance/month': typeof AppAttendanceMonthRoute
   '/items/$id': typeof AppItemsIdRoute
   '/items/new': typeof AppItemsNewRoute
   '/staff/$id': typeof AppStaffIdRoute
   '/staff/new': typeof AppStaffNewRoute
   '/signup/recovery-key': typeof PublicSignupRecoveryKeyRoute
+  '/attendance/': typeof AppAttendanceIndexRoute
   '/items/': typeof AppItemsIndexRoute
   '/staff/': typeof AppStaffIndexRoute
   '/confirm-email/$businessId/$token': typeof PublicConfirmEmailBusinessIdTokenRoute
@@ -153,11 +167,13 @@ export interface FileRoutesByTo {
   '/forgot-password': typeof PublicForgotPasswordRoute
   '/login': typeof PublicLoginRoute
   '/signup': typeof PublicSignupRoute
+  '/attendance/month': typeof AppAttendanceMonthRoute
   '/items/$id': typeof AppItemsIdRoute
   '/items/new': typeof AppItemsNewRoute
   '/staff/$id': typeof AppStaffIdRoute
   '/staff/new': typeof AppStaffNewRoute
   '/signup/recovery-key': typeof PublicSignupRecoveryKeyRoute
+  '/attendance': typeof AppAttendanceIndexRoute
   '/items': typeof AppItemsIndexRoute
   '/staff': typeof AppStaffIndexRoute
   '/confirm-email/$businessId/$token': typeof PublicConfirmEmailBusinessIdTokenRoute
@@ -175,11 +191,13 @@ export interface FileRoutesById {
   '/_public/login': typeof PublicLoginRoute
   '/_public/signup': typeof PublicSignupRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/attendance/month': typeof AppAttendanceMonthRoute
   '/_app/items/$id': typeof AppItemsIdRoute
   '/_app/items/new': typeof AppItemsNewRoute
   '/_app/staff/$id': typeof AppStaffIdRoute
   '/_app/staff/new': typeof AppStaffNewRoute
   '/_public/signup_/recovery-key': typeof PublicSignupRecoveryKeyRoute
+  '/_app/attendance/': typeof AppAttendanceIndexRoute
   '/_app/items/': typeof AppItemsIndexRoute
   '/_app/staff/': typeof AppStaffIndexRoute
   '/_public/confirm-email/$businessId/$token': typeof PublicConfirmEmailBusinessIdTokenRoute
@@ -196,11 +214,13 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/signup'
+    | '/attendance/month'
     | '/items/$id'
     | '/items/new'
     | '/staff/$id'
     | '/staff/new'
     | '/signup/recovery-key'
+    | '/attendance/'
     | '/items/'
     | '/staff/'
     | '/confirm-email/$businessId/$token'
@@ -215,11 +235,13 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/signup'
+    | '/attendance/month'
     | '/items/$id'
     | '/items/new'
     | '/staff/$id'
     | '/staff/new'
     | '/signup/recovery-key'
+    | '/attendance'
     | '/items'
     | '/staff'
     | '/confirm-email/$businessId/$token'
@@ -236,11 +258,13 @@ export interface FileRouteTypes {
     | '/_public/login'
     | '/_public/signup'
     | '/_app/'
+    | '/_app/attendance/month'
     | '/_app/items/$id'
     | '/_app/items/new'
     | '/_app/staff/$id'
     | '/_app/staff/new'
     | '/_public/signup_/recovery-key'
+    | '/_app/attendance/'
     | '/_app/items/'
     | '/_app/staff/'
     | '/_public/confirm-email/$businessId/$token'
@@ -324,6 +348,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PublicSignupRouteImport
       parentRoute: typeof PublicRoute
     }
+    '/_app/attendance/': {
+      id: '/_app/attendance/'
+      path: '/attendance'
+      fullPath: '/attendance/'
+      preLoaderRoute: typeof AppAttendanceIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/attendance/month': {
+      id: '/_app/attendance/month'
+      path: '/attendance/month'
+      fullPath: '/attendance/month'
+      preLoaderRoute: typeof AppAttendanceMonthRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/items/': {
       id: '/_app/items/'
       path: '/items'
@@ -396,10 +434,12 @@ interface AppRouteChildren {
   AppDesignRoute: typeof AppDesignRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppAttendanceMonthRoute: typeof AppAttendanceMonthRoute
   AppItemsIdRoute: typeof AppItemsIdRoute
   AppItemsNewRoute: typeof AppItemsNewRoute
   AppStaffIdRoute: typeof AppStaffIdRoute
   AppStaffNewRoute: typeof AppStaffNewRoute
+  AppAttendanceIndexRoute: typeof AppAttendanceIndexRoute
   AppItemsIndexRoute: typeof AppItemsIndexRoute
   AppStaffIndexRoute: typeof AppStaffIndexRoute
 }
@@ -410,10 +450,12 @@ const AppRouteChildren: AppRouteChildren = {
   AppDesignRoute: AppDesignRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppIndexRoute: AppIndexRoute,
+  AppAttendanceMonthRoute: AppAttendanceMonthRoute,
   AppItemsIdRoute: AppItemsIdRoute,
   AppItemsNewRoute: AppItemsNewRoute,
   AppStaffIdRoute: AppStaffIdRoute,
   AppStaffNewRoute: AppStaffNewRoute,
+  AppAttendanceIndexRoute: AppAttendanceIndexRoute,
   AppItemsIndexRoute: AppItemsIndexRoute,
   AppStaffIndexRoute: AppStaffIndexRoute,
 }

@@ -7,6 +7,7 @@ import {
   monthQuerySchema,
   registerQuerySchema,
   type AttendanceMarkInput,
+  type AttendancePerson,
   type MonthQuery,
   type MonthView,
   type RegisterQuery,
@@ -31,6 +32,13 @@ export class AttendanceController {
     @Query(new ZodBodyPipe(registerQuerySchema)) query: RegisterQuery,
   ): Promise<RegisterView> {
     return this.attendance.register(caller, query);
+  }
+
+  /** Whose months the caller may open; the service says who may ask. */
+  @Permission('session.own')
+  @Get('people')
+  people(@CurrentCaller() caller: Caller): Promise<AttendancePerson[]> {
+    return this.attendance.people(caller);
   }
 
   /** One person's month; whose month, and so who may see it, is the service's to say. */

@@ -70,6 +70,40 @@ describe('customerSchema (02 #2, #7; design §7)', () => {
   });
 });
 
+describe('credit limit and due days (P1.18 design §3; `03` #5, #8, #17)', () => {
+  it('leaves them out unless they are sent, and takes null for "no limit set"', () => {
+    expect(customerSchema.parse(walkIn)).not.toHaveProperty('creditLimitPaise');
+    expect(customerSchema.parse({ ...walkIn, creditLimitPaise: null }).creditLimitPaise).toBeNull();
+    const set = customerSchema.parse({ ...walkIn, creditLimitPaise: 500_000, dueDays: 15 });
+    expect(set).toMatchObject({ creditLimitPaise: 500_000, dueDays: 15 });
+    expect(customerSchema.parse({ ...walkIn, creditLimitPaise: 0, dueDays: 0 })).toMatchObject({
+      creditLimitPaise: 0,
+      dueDays: 0,
+    });
+  });
+
+  it.each([
+    ['a negative limit', { creditLimitPaise: -1 }, { creditLimitPaise: 'too_small' }],
+    ['half a paisa', { creditLimitPaise: 1.5 }, { creditLimitPaise: 'invalid' }],
+    [
+      'a limit too big to hold',
+      { creditLimitPaise: 10_000_000_000_001 },
+      { creditLimitPaise: 'too_big' },
+    ],
+    ['negative due days', { dueDays: -1 }, { dueDays: 'too_small' }],
+    ['more than a year of due days', { dueDays: 366 }, { dueDays: 'too_big' }],
+    ['null due days', { dueDays: null }, { dueDays: 'invalid' }],
+  ])('refuses %s', (_, change, errors) => {
+    expect(errorsOf(customerUpdateSchema, { ...walkIn, version: 1, ...change })).toEqual(errors);
+  });
+
+  it('takes them on a saved customer too', () => {
+    expect(
+      customerUpdateSchema.parse({ ...walkIn, version: 2, creditLimitPaise: 1_000, dueDays: 7 }),
+    ).toMatchObject({ creditLimitPaise: 1_000, dueDays: 7 });
+  });
+});
+
 describe('customerUpdateSchema', () => {
   it('needs the version the customer was read at', () => {
     expect(errorsOf(customerUpdateSchema, { ...walkIn, version: 1 })).toEqual({});

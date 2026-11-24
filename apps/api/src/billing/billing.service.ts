@@ -163,9 +163,10 @@ export class BillingService {
   }
 
   /**
-   * The owner's OK for discounts above a cashier's limit on one bill (design §6, question 5):
-   * the owner types their password at the counter. Kept for 30 minutes, used up by the save
-   * (P1.14), logged at once. The password is checked under its rate limit and never stored.
+   * The owner's OK for discounts above a cashier's limit, or for udhaar past a credit limit, on one
+   * bill (design §6, question 5; `03` #9, #18): the owner types their password at the counter.
+   * Kept for 30 minutes, used up by the save (P1.14), logged at once. The password is checked
+   * under its rate limit and never stored.
    */
   async approve(caller: Caller, input: ApprovalInput): Promise<ApprovalView> {
     await this.sessions.requireOwnerPassword(caller, input.ownerPassword);
@@ -174,14 +175,17 @@ export class BillingService {
     return inBusiness(this.database, caller, async (tx) => {
       const [owner] = await tx.select({ id: users.id }).from(users).where(eq(users.role, 'owner'));
       if (owner === undefined) throw new Error('Business has no owner');
+      const granted =
+        input.kind === 'discount'
+          ? { lineBasisPoints: input.lineBasisPoints, billBasisPoints: input.billBasisPoints }
+          : { amountPaise: input.amountPaise };
       const [row] = await tx
         .insert(ownerApprovals)
         .values({
           branchId: caller.branchId,
           billKey: input.billKey,
           kind: input.kind,
-          lineBasisPoints: input.lineBasisPoints,
-          billBasisPoints: input.billBasisPoints,
+          ...granted,
           requestedBy: caller.userId,
           approvedBy: owner.id,
           expiresAt,
@@ -192,15 +196,14 @@ export class BillingService {
       const view = { approvalId: row.id, expiresAt: expiresAt.toISOString() };
       await recordEntry(tx, {
         actorId: caller.userId,
-        action: 'discount.approved',
+        action: input.kind === 'discount' ? 'discount.approved' : 'credit_limit.approved',
         entityType: 'owner_approval',
         entityId: row.id,
         branchId: caller.branchId,
         after: {
           billKey: input.billKey,
           kind: input.kind,
-          lineBasisPoints: input.lineBasisPoints,
-          billBasisPoints: input.billBasisPoints,
+          ...granted,
           approvedBy: owner.id,
           expiresAt: view.expiresAt,
         },

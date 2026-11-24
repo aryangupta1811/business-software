@@ -6,12 +6,14 @@ import {
   settingsInvoicesSchema,
   settingsSecuritySchema,
   settingsStockSchema,
+  settingsUdhaarSchema,
   type SettingsAlertsInput,
   type SettingsBusinessInput,
   type SettingsFeaturesInput,
   type SettingsInvoicesInput,
   type SettingsSecurityInput,
   type SettingsStockInput,
+  type SettingsUdhaarInput,
   type SettingsView,
 } from '@business-software/shared';
 import { CurrentCaller, Permission } from '../http/permission.decorator.js';
@@ -88,5 +90,14 @@ export class SettingsController {
     @Body(new ZodBodyPipe(settingsInvoicesSchema)) body: SettingsInvoicesInput,
   ): Promise<SettingsView> {
     return this.settings.saveInvoices(caller, body);
+  }
+
+  @Permission('settings.manage')
+  @Put('udhaar')
+  saveUdhaar(
+    @CurrentCaller() caller: Caller,
+    @Body(new ZodBodyPipe(settingsUdhaarSchema)) body: SettingsUdhaarInput,
+  ): Promise<SettingsView> {
+    return this.settings.saveUdhaar(caller, body);
   }
 }

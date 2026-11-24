@@ -145,6 +145,8 @@ describe('customers', () => {
         address: '12 MG Road, Pune',
         pinCode: '411001',
         stateCode: '27',
+        creditLimitPaise: null,
+        dueDays: 30,
         version: 1,
       },
     });

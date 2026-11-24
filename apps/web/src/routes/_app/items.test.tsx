@@ -1,6 +1,6 @@
 import type { ItemPage, ItemRow, ItemsContext, ItemView } from '@business-software/shared';
 import { createMemoryHistory } from '@tanstack/react-router';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 import { App } from '../../app';
@@ -138,10 +138,17 @@ const codeOf = (key: string) =>
       ? `Key${key.toUpperCase()}`
       : ({ '/': 'Slash', '-': 'Minus', Enter: 'Enter' }[key] ?? key);
 
-/** A scanner's burst: every key at once, then Enter, each to whatever has focus (as a keyboard). */
+/**
+ * A scanner's burst: every key at once, then Enter, each to whatever has focus (as a keyboard).
+ * The keys share one time, so a slow machine's pause between them can't split the code.
+ */
 function scan(code: string) {
+  const at = performance.now();
   for (const key of [...Array.from(code), 'Enter']) {
-    fireEvent.keyDown(document.activeElement ?? document.body, { key, code: codeOf(key) });
+    const target = document.activeElement ?? document.body;
+    const event = createEvent.keyDown(target, { key, code: codeOf(key) });
+    Object.defineProperty(event, 'timeStamp', { value: at });
+    fireEvent(target, event);
   }
 }
 

@@ -55,6 +55,7 @@
 21. **A payment recorded by mistake** is reversed by the owner with a reason and their password: a reversing line, never an edit or a delete.
 22. **A bill's due date** is fixed when the bill is saved (bill date + the customer's due days then); changing the due days later doesn't move old bills (fills in #5).
 23. **Recording payments** needs "Sell at the counter" and no other switch (fills in #11).
+24. **The credit limit and the due days** are changed only by the owner; staff with "Add and edit customers" see them but can't change them (a new customer added by staff has none set).
 
 ## Open questions
 
@@ -66,3 +67,4 @@ None.
 - 2026-11-17 — Finalized with the owner in fast-track sitting 1. The owner confirmed every draft idea, chose Claude's recommendation on every question, and confirmed Claude's additions: #1 named customer, #4 oldest bills first, #5 30-day default, #6 advance balance.
 - 2026-11-22 — Portfolio cut (owner): #16 click-to-chat for reminders and statements in v1; the weekly automatic send waits for P2.8 (ADR 0049).
 - 2026-11-23 — P1.18 design answers (owner took every recommendation, `docs/plans/2026-11-23-p1.18-udhaar-design.md` §9): added #17–#23. They fill in #5, #6, #10 and #11; no earlier point changed.
+- 2026-11-24 — Added #24 (owner): otherwise staff who also give udhaar could raise a limit and skip the owner's OK of #18.

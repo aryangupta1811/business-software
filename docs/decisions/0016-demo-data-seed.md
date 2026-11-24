@@ -40,6 +40,13 @@ Demo data that goes through the real services can't contain states the app would
 - Generating months of data through services may take a while, so it runs once per environment with batched transactions.
 - The seed script must never run against production data. It refuses unless the target database is marked as a demo or local database.
 - This moves the first demo data from Phase 3 to the end of Phase 1, so the dashboard can be built against realistic numbers.
+- **Added 2026-11-24 (owner, sitting 3, decision D5).** The demo's rules and reset:
+  - Two buttons, "Try as the owner" and "Try as a cashier", into one shared demo business, with a banner: public, resets, no real data, and the demo's passwords (the lock screen and the owner's-OK dialogs ask for one).
+  - Refused in the demo, by a server-side flag checked in the services, each with a test: changing the password, email or recovery key; logging others out or forgetting computers; staff logins and permissions; sending email; GST status, business type, invoice label; archiving branches. Everything else works.
+  - Demo customers have numbers that can't belong to real people (WhatsApp links open a real chat). The sheet's Excel and WhatsApp-sending limits drop out, as neither is in v1.
+  - The assistant: $5 a month inside the app's $15 (`09` #19), 10 questions per visitor per hour.
+  - A reset builds a new demo business; the buttons switch to it and old ones are hidden and archived, never deleted. At most weekly, when the worker starts, and by hand before an interview. This replaces "reset on a schedule".
+  - Two Diwalis need more than a year of history, so older months get fewer bills; the size is measured at P1.20.
 
 ## Interview note
 

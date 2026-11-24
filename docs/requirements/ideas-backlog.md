@@ -4,8 +4,8 @@ Ideas suggested by Claude in the planning chat (29 Oct 2026) that are not yet pa
 
 | Idea | What it is | Status |
 | --- | --- | --- |
-| Expense tracking | Rent, electricity, transport, so profit is real profit | Open |
-| Day-end cash closing | Cash actually counted vs cash the system expects | Open |
+| Expense tracking | Rent, electricity, transport, so profit is real profit | Picked second for after v1 (D6, 2026-11-24) |
+| Day-end cash closing | Cash actually counted vs cash the system expects | Picked first for after v1 (D6, 2026-11-24) |
 | Customer profiles & loyalty | Customer history, loyalty points | Open |
 | Report export for the CA | PDF / Excel reports | Open (also part of the zero-data-loss "export all data" proposal) |
 | Data backup & export | Owner can back up and export everything | Moved to non-functional requirements in `product-overview.md` |
@@ -18,6 +18,9 @@ Ideas suggested by Claude in the planning chat (29 Oct 2026) that are not yet pa
 | Transliterated item search | Typing "aata" finds "आटा" at the billing counter | Open (out of v1, P1.13 design §4, 2026-11-21) |
 | Weighing-scale barcodes | Labels whose barcode carries the weight or price, read at the counter | Open (out of v1, P1.13 question 11, 2026-11-21) |
 | Forced password change | A staff member must choose their own password at the next login after the owner sets one | Open (out of v1, P1.5 question 7, 2026-11-21) |
+| Purchase orders | Ordering from a supplier before the goods arrive | Open (out of v1, `04` #2, 2026-11-24) |
+| Read a supplier's bill from a photo or PDF | The AI fills the purchase entry, with a review screen and its own eval set | Open, strong candidate (out of v1, sitting 3, 2026-11-24) |
+| Voice input for the assistant | Asking by speaking; needs a privacy note and a CSP change | Open (out of v1, `09` #16, 2026-11-24) |
 | Last login on the staff list | The staff list shows when each login was last used | Open (out of v1, P1.5 design, 2026-11-21) |
 | Third role (manager) | A role between owner and staff | Superseded: owner chose Owner + Staff with per-person feature switches (`00` #15–17) |
 
@@ -33,8 +36,8 @@ These are **decided** features, not loose ideas: their requirements stay DECIDED
 | P1.9 Excel import | Opening stock from an Excel file: preview, errors by row, import the good rows, bad rows back as Excel | `01` #17 | — | 1–2 sessions | Deferred |
 | P1.11 Branch transfers & stock count | Transfers (same GSTIN: delivery challan; different GSTIN: IGST invoice and a purchase entry at the receiver) and the physical stock count | `01` #18 | P2.1 for the purchase side | 2 sessions | Deferred |
 | Quotations (part of P1.17) | A quotation that later becomes a bill | `02` #9 | — | 1 session | Deferred |
-| P2.2 Supplier ledger | Supplier balances, payments, purchase returns, the "supplier payments due" alert | Module 04 (DRAFT until sitting 3) | P2.1 | 2 sessions | Deferred |
+| P2.2 Supplier ledger | Supplier balances, payments, purchase returns, the "supplier payments due" alert | `04` #16–#19 | P2.1 | 2 sessions | Deferred |
 | P2.6 Entry-log viewer | The viewer with filters, "watched actions", Excel export, the three flag rules and the "suspicious activity" alert; the log itself is already recorded from day one | `06` #7–#12; `07` #1 | — | 2 sessions | Deferred |
 | P2.8 WhatsApp Cloud API | Sending from the app: the outbox, the 21:30 daily summary, quiet hours, templates, the weekly reminder send, PDFs attached; replaces the v1 click-to-chat links (ADR 0049) where automatic sending is needed | `07` #8–#12; `03` #15; `00` #26; ADR 0010 | Owner: Meta developer account, test number, token | 2–3 sessions | Deferred |
-| Chosen ideas (D6) | The ideas the owner picks from the table above | Sitting 3, D6 | Sitting 3 | Depends on the pick | Deferred |
+| Chosen ideas (D6) | Cash closing first, then expense tracking (D6, 2026-11-24) | Sitting 3, D6 | Sitting 3 | Depends on the pick | Deferred |
 | DevOps stage 11 | The stretch stage in `docs/devops/DEVOPS_PLAN.md` | — | Stages 9–10 | 1–2 sessions | Deferred (was already a stretch) |

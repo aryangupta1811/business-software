@@ -2188,3 +2188,27 @@ Entry format:
 - **Why / what I learned:** open a file before judging it from its name. A lane should commit its first working, tested slice, so a stop costs little. Worktrees kept the two lanes' unfinished work apart from `main` and from each other.
 - **Say it in an interview:** "Unfinished work lives on its own branch in its own worktree, so an agent that stops halfway can't break main."
 - **Follow-ups to expect:** why start from a stub that throws? (every test then fails for the right reason before any code can make it pass).
+
+### 2026-11-24 — Going through requirements again after a scope cut found gaps in them `#requirements` `#product` `#gst`
+- **What happened:** sitting 3's question sheet was written on 2026-11-20, before the portfolio cut. Checking it against the decided modules before asking found cases it had missed: free goods ("10 + 1 free") would make costs wrong; a composition shop can't claim purchase GST back, so its cost must include it; suppliers restart bill numbers every April, so "same bill number" needs the financial year; a per-business AI cap could pass the total budget with several shops; demo visitors would be stuck at password dialogs.
+- **Why / what I learned:** a requirements sheet goes stale when the scope changes. Re-read it against what is decided and built before asking anyone to agree to it.
+- **Say it in an interview:** "Before signing off a module I walk through it as a real shop would, with free goods, cancelled bills and the April number reset. That found errors in cost and profit before any code existed."
+- **Follow-ups to expect:** why does composition change the cost? (it can't claim input tax credit, so the GST it pays is part of what the goods cost).
+
+### 2026-11-24 — A build that was stricter than the requirement `#requirements` `#testing`
+- **What happened:** "the owner enters the opening balance once per customer" was built as "only before the customer's first entry", because oldest-first is simpler when the opening is first. In a real shop a cashier can give udhaar on day one, and the owner would then be locked out for good. The review raised it and the owner chose: any time, once, counted as the oldest.
+- **Why / what I learned:** a rule that makes the code simpler still changes what the owner decided. Compare each refusal in the code with a sentence in the requirements.
+- **Say it in an interview:** "In review I check every error the API can return against a requirement. One had no source: it was a shortcut that would have locked real users out."
+- **Follow-ups to expect:** how can a late entry be the oldest? (the order used for oldest-first is worked out when read, so it can put the opening first).
+
+### 2026-11-24 — A docs-only pull request failed a test: a flake with a real cause `#testing` `#devops` `#gotcha`
+- **What happened:** CI failed `items.test.tsx` on #81, which changes only documents. The test simulates a barcode scanner; the app calls keys less than 50 ms apart one scan. On a slow runner a pause split the code, the tail was sent as its own barcode, and the fake API's default answer had no item. Forcing a 60 ms pause gave the same two errors. The simulated keys now share one time.
+- **Why / what I learned:** don't just re-run a flake. A failure the change can't have caused is a chance to find the cause; reproduce it before fixing it, then check the fix under the same condition.
+- **Say it in an interview:** "A test failed on a docs change. I reproduced it by forcing a pause, found the test depended on the machine's speed, and fixed the clock instead of adding a retry."
+- **Follow-ups to expect:** can a real scanner's code be split the same way? (the app uses the event's own time, set when the key arrives, not when the page gets to it; not tested on real hardware).
+
+### 2026-11-24 — Windows Smart App Control blocked an editor's updater `#security` `#gotcha`
+- **What happened:** "Error 4551: An Application Control policy has blocked this file" popped up while the project's lanes were running. The Code Integrity log (events 3077 and 3033) named the process and the file: the Antigravity IDE's own auto-updater, whose signed installer unpacks a `.tmp` program that Smart App Control refuses. Nothing in this project caused it.
+- **Why / what I learned:** the Code Integrity log says which file was blocked and by whom; the popup doesn't. Smart App Control can't make an exception for one app.
+- **Say it in an interview:** "I looked up the blocked file in the event log before touching the security setting."
+- **Follow-ups to expect:** why not switch it off? (it protects the whole computer, for one editor's update).

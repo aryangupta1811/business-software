@@ -114,7 +114,7 @@
 
 The next real deploy runs migrations 0013–0018 on RDS for the first time. The live server runs `c099acd` (#62).
 
-**Next step:** finish, review and merge P1.18 PR 1, then P1.15 PR 1 (both made migration `0019`; the second to merge regenerates); then Day 9 of the schedule below. Owner: sitting 3, if not done yet.
+**Next step:** finish, review and merge P1.18 PR 1, then P1.15 PR 1 (both made migration `0019`; the second to merge regenerates); then Day 9 of the schedule below. Sitting 3 was held on 2026-11-24.
 
 **Last updated:** 2026-11-24 (session 32)
 
@@ -154,12 +154,12 @@ The live server keeps running the skeleton until stage 7 is done (Day 3), so P1.
 | 01 Items & inventory | DECIDED (open questions answered 2026-11-17) |
 | 02 Billing & GST | DECIDED (2026-11-17, sitting 1) |
 | 03 Udhaar | DECIDED (2026-11-17, sitting 1) |
-| 04 Suppliers & purchases | DRAFT |
+| 04 Suppliers & purchases | DECIDED (2026-11-24, sitting 3) |
 | 05 Staff, attendance & salary | DECIDED (2026-11-19, sitting 2) |
 | 06 Entry logs | DECIDED (2026-11-19, sitting 2) |
 | 07 Alerts | DECIDED (2026-11-19, sitting 2) |
-| 08 Dashboard | DRAFT |
-| 09 AI assistant | DRAFT |
+| 08 Dashboard | DECIDED (2026-11-24, sitting 3) |
+| 09 AI assistant | DECIDED (2026-11-24, sitting 3) |
 
 ## Phase 0 — Foundations
 
@@ -259,7 +259,7 @@ Step 3 — Something to show:
   - P1.19: buckets, views, PDF statement, reminders the owner approves (#12–15).
   - No interest in v1 (#7).
 - [ ] **P1.18 Udhaar ledger:** (design accepted 2026-11-23: `docs/plans/2026-11-23-p1.18-udhaar-design.md`, `03` #17–#23; PR 1 the API, PR 2 the screens) **From P1.13:** udhaar joins `PAYMENT_MODES`; `customers` gains credit limit and due days (new columns); `APPROVAL_KINDS` gains `credit_limit` (`03` #9). running balance, payments, credit-limit check at billing
-- [ ] **P1.20 Demo data v1:** seed a kirana shop with items, bills and udhaar [ADR 0016]. **From the 2026-11-10 scan (raise with the owner before building):** (a) the one-click demo login is public, so decide what a visitor may not do in the demo business: change its password or email, create staff logins, send WhatsApp messages, spend the AI budget; (b) "reset on a schedule" can't delete rows (ADR 0007: the app has no DELETE and the entry log is append-only): choose between a fresh demo business per reset (old ones stay) and a reset run as the owner role outside the app, with the owner's OK each time; (c) months of history need the services to take the business date from a clock the seed can set; `entry_log.created_at` stays the seeding time (since P1.4, D4, the app can't set it at all; the 06 flag rules count by the business date stored in the row)
+- [ ] **P1.20 Demo data v1:** seed a kirana shop with items, bills and udhaar [ADR 0016]. **From the 2026-11-10 scan (raise with the owner before building):** (a) the one-click demo login is public, so decide what a visitor may not do in the demo business: change its password or email, create staff logins, send WhatsApp messages, spend the AI budget; (b) "reset on a schedule" can't delete rows (ADR 0007: the app has no DELETE and the entry log is append-only): choose between a fresh demo business per reset (old ones stay) and a reset run as the owner role outside the app, with the owner's OK each time; (c) months of history need the services to take the business date from a clock the seed can set; `entry_log.created_at` stays the seeding time (since P1.4, D4, the app can't set it at all; the 06 flag rules count by the business date stored in the row). **D5 answered 2026-11-24 (sitting 3): ADR 0016's dated note** has the demo rules and the reset (a and b)
 - [x] **Decide with the owner** (answered by the fast track, 2026-11-17: the full assistant is built on Days 8–9, so no thin slice): a thin slice of the AI assistant now (three or four read-only tools over bills and udhaar, Module 09 finalized first), or keep it for Phase 3 as planned. It is the most distinctive feature and the last one built (`docs/plans/2026-11-10-plan-review.md`, section 4).
 
 Step 4 — The rest of Phase 1 (deferred 2026-11-10; none of it blocks a first demo):
@@ -270,13 +270,13 @@ Step 4 — The rest of Phase 1 (deferred 2026-11-10; none of it blocks a first d
 - [ ] *(Deferred to the backlog, portfolio cut 2026-11-22: `ideas-backlog.md`)* **P1.10 Business-type stock features:** batches and expiry (soonest expiry first), variants, IMEI/serial numbers. **From `01` #15:** medical profit uses the purchase price of the batch actually sold
 - [ ] *(Deferred to the backlog, portfolio cut 2026-11-22: `ideas-backlog.md`)* **P1.11 Branch transfers & physical stock count.** **From `01` #18:** same GSTIN → a stock movement with a delivery challan; different GSTINs → an IGST tax invoice from the sending branch (invoice numbering, P1.14) and a matching purchase entry at the receiving branch. Purchase entries arrive with P2.1 (fast track Day 7) while P1.11 is on Day 5: Day 5's plan decides whether the purchase side waits for P2.1. Edge case to confirm with the owner: two GST registrations in the *same* state would be CGST+SGST, not IGST
 - [ ] **P1.16 Cancellations & credit notes** (returns) **From P1.18's design:** cancelling a bill that had udhaar or used an advance adds a reversing `udhaar_entries` row (`bill_cancelled`) through `moveUdhaar`
-- [ ] **P1.17 Remaining Module 02 features:** the GST summary export (`02` #18). Quotations (`02` #9) deferred to the backlog (portfolio cut 2026-11-22); held bills moved to P1.13
+- [ ] **P1.17 Remaining Module 02 features:** the GST summary export (`02` #18), with the purchase register sheet (`04` #12, after P2.1). Quotations (`02` #9) deferred to the backlog (portfolio cut 2026-11-22); held bills moved to P1.13
 - [ ] **P1.19 Udhaar views:** overdue buckets, customer statement. **From the portfolio cut (2026-11-22):** reminders and statements go out by click-to-chat "Send on WhatsApp" (`03` #16, ADR 0049); the weekly automatic send waits for P2.8. **From P1.18's design:** buckets, the reminder's oldest due date and the statement read `unpaidEntries` (oldest bills first, computed), never a stored allocation. **From P1.15's design:** the statement PDF reuses the `document.render` job and `packages/print`
 - [ ] Phase 1 journal
 
 ## Phase 2 — Running the business
 
-- [ ] Finalize Modules 04, 05, 06, 07, 08 (one session each; re-cut the tasks below afterwards). **05, 06, 07 done 2026-11-19 (sitting 2); the re-cut is in the "From sitting 2" notes below.** 04 and 08 are in sitting 3 (sheet `docs/plans/2026-11-20-sitting-3.md`, with 09, D5 and D6; waiting for the owner)
+- [x] **All done 2026-11-24 (sitting 3 finished 04 and 08).** Finalize Modules 04, 05, 06, 07, 08 (one session each; re-cut the tasks below afterwards). **05, 06, 07 done 2026-11-19 (sitting 2); the re-cut is in the "From sitting 2" notes below.** 04 and 08 are in sitting 3 (sheet `docs/plans/2026-11-20-sitting-3.md`, with 09, D5 and D6; waiting for the owner)
 - [ ] **P2.1 Suppliers & purchase entries** (stock in). Batch, expiry and IMEI fields come with P1.10, deferred (portfolio cut 2026-11-22)
 - [ ] *(Deferred to the backlog, portfolio cut 2026-11-22: `ideas-backlog.md`)* **P2.2 Supplier ledger, payments, purchase returns**
 - [x] **P2.3 Staff records & attendance** (done 2026-11-23: #74, #79; the Chrome check at 1024 px and in light mode is left) (design accepted 2026-11-22: `docs/plans/2026-11-22-p2.3-staff-attendance-design.md`, `05` #29–#33; PR 1 the API, PR 2 the screens) **From sitting 2 (`05`):** staff record fields (#1), salary history from the 1st of a month (#3), one daily branch register marked by the owner or a switched-on staff member, everyone starting present (#5–9), past-day changes with a reason in the log; adds the "absent staff" line and its test to the daily summary (`07` #13)
@@ -295,7 +295,7 @@ Step 4 — The rest of Phase 1 (deferred 2026-11-10; none of it blocks a first d
 
 ## Phase 3 — AI assistant
 
-- [ ] Finalize Module 09; choose the model and monthly cap (update ADR 0015); owner creates a Claude Console API key with a spend limit. The key follows `docs/devops/secrets.md`: server-only (`ANTHROPIC_API_KEY` read by `api`), `.env` locally and SSM on AWS, never `VITE_`, never in the image or logs; separate keys for local and demo
+- [ ] **Module 09 finalized 2026-11-24 (sitting 3); left: the owner's API key.** Finalize Module 09; choose the model and monthly cap (update ADR 0015); owner creates a Claude Console API key with a spend limit. The key follows `docs/devops/secrets.md`: server-only (`ANTHROPIC_API_KEY` read by `api`), `.env` locally and SSM on AWS, never `VITE_`, never in the image or logs; separate keys for local and demo
 - [ ] **P3.1 Demo data v3:** enough history for every example question
 - [ ] **P3.2 AI tools layer:** read-only, permission-checked query functions with unit tests
 - [ ] **P3.3 Chat:** Claude API tool calling, streaming answers, English/Hindi/Hinglish

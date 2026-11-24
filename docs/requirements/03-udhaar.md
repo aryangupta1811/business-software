@@ -51,7 +51,7 @@
 17. **No credit limit set** means the owner can give any amount; staff need the owner's password for any udhaar to that customer.
 18. **Staff over the limit:** the bill stops at "Needs the owner's OK", and the owner's password lets that one bill through, in warn and block mode alike (fills in #10).
 19. **An advance** is used only when the cashier picks "From advance" as a payment row; it is never used automatically (fills in #6).
-20. **Opening balance:** the owner enters the udhaar from the old notebook once per customer, with an "as of" date and a note; it is in the entry log.
+20. **Opening balance:** the owner enters the udhaar from the old notebook once per customer, with an "as of" date and a note; it is in the entry log. It can be entered at any time, also after the customer's first bill or payment, and always counts as the oldest entry, so payments clear it first (2026-11-24).
 21. **A payment recorded by mistake** is reversed by the owner with a reason and their password: a reversing line, never an edit or a delete.
 22. **A bill's due date** is fixed when the bill is saved (bill date + the customer's due days then); changing the due days later doesn't move old bills (fills in #5).
 23. **Recording payments** needs "Sell at the counter" and no other switch (fills in #11).
@@ -68,3 +68,4 @@ None.
 - 2026-11-22 — Portfolio cut (owner): #16 click-to-chat for reminders and statements in v1; the weekly automatic send waits for P2.8 (ADR 0049).
 - 2026-11-23 — P1.18 design answers (owner took every recommendation, `docs/plans/2026-11-23-p1.18-udhaar-design.md` §9): added #17–#23. They fill in #5, #6, #10 and #11; no earlier point changed.
 - 2026-11-24 — Added #24 (owner): otherwise staff who also give udhaar could raise a limit and skip the owner's OK of #18.
+- 2026-11-24 — #20: the opening balance can be entered at any time, once, and counts as the oldest entry (owner). The first build refused it after a customer's first entry, which could lock the owner out when a cashier gave udhaar first.

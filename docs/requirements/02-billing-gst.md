@@ -96,3 +96,4 @@ None.
 - 2026-11-22 — Portfolio cut (owner): #9 quotations deferred; #27 WhatsApp sharing by click-to-chat link in v1 (ADR 0049).
 - 2026-11-23 — P1.15 design answers (owner took every recommendation, `docs/plans/2026-11-23-p1.15-printing-design.md` §9): added #28–#34. They fill in #16 and #17; no earlier point changed.
 - 2026-11-24 — #30 and #31: the keys are `Alt+P` (receipt), `Alt+A` (A4) and `Alt+W` (Send on WhatsApp); the Bills page opens with `Alt+V` (owner). A plain `P` can't be a shortcut: ADR 0026 refuses letters because they would type into the search box.
+- 2026-11-24 — Sitting 3: #18's export gains a purchase register sheet (`04` #12). No earlier point changed.

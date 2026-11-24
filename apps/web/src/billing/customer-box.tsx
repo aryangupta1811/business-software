@@ -521,7 +521,12 @@ interface FormValues {
 }
 
 /** The codes only this box words: the API's 409s, plus the schema's GSTIN-state check. */
-const OWN_ERRORS = new Set(['phone_taken', 'gstin_taken', 'gstin_state']);
+const OWN_ERRORS = new Set([
+  'phone_taken',
+  'gstin_taken',
+  'gstin_state',
+  'credit_terms_owner_only',
+]);
 
 /** Add a customer; a "Business customer" tick adds the GSTIN, legal name and address. */
 function AddForm({
@@ -600,7 +605,9 @@ function AddForm({
     const code = errors[field];
     if (code === undefined) return undefined;
     return OWN_ERRORS.has(code)
-      ? t(`billing.customer.errors.${code as 'phone_taken' | 'gstin_taken' | 'gstin_state'}`)
+      ? t(
+          `billing.customer.errors.${code as 'phone_taken' | 'gstin_taken' | 'gstin_state' | 'credit_terms_owner_only'}`,
+        )
       : errorText(field, code);
   };
   // An error on a field that isn't on this form (a PIN code, say) still needs saying.

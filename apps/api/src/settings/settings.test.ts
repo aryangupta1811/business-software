@@ -152,6 +152,7 @@ describe('settings', () => {
         stock: { negativeStock: 'warn' },
         alerts: { types: ['low_stock', 'out_of_stock'] },
         invoices: { invoicePrefix: null },
+        udhaar: { overCreditLimit: 'warn' },
         // No bill yet in this branch's counter: the first number is 1.
         nextInvoice: { financialYear: thisYear(), sequence: 1 },
       },

@@ -37,6 +37,7 @@ const APPEND_ONLY = [
   'bill_lines',
   'bill_payments',
   'salary_rates',
+  'udhaar_entries',
 ];
 
 /**

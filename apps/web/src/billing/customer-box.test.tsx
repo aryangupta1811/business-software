@@ -34,6 +34,8 @@ const MEENA: CustomerView = {
   address: null,
   pinCode: null,
   stateCode: null,
+  creditLimitPaise: null,
+  dueDays: 30,
   version: 1,
 };
 const MEENA_BILL: BillCustomer = {

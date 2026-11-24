@@ -11,6 +11,8 @@ import {
   discountWithinLimit,
   holdBillSchema,
   linePrice,
+  MONEY_PAYMENT_MODES,
+  PAYMENT_MODES,
   paymentIssues,
   type CartLine,
   type CatalogueItem,
@@ -483,7 +485,7 @@ describe('billDraftSchema (what P1.14 saves, design §10)', () => {
     ],
     [
       'an unknown mode',
-      { payments: [{ mode: 'udhaar', amountPaise: 2_800 }] },
+      { payments: [{ mode: 'bitcoin', amountPaise: 2_800 }] },
       'payments.0.mode',
       'invalid',
     ],
@@ -594,6 +596,63 @@ describe('holdBillSchema and discardBillSchema (design §9, question 7)', () => 
   });
 });
 
+describe('payment modes (P1.18 design §3)', () => {
+  it('has udhaar and advance after the four ways money arrives', () => {
+    expect(PAYMENT_MODES).toEqual(['cash', 'upi', 'card', 'cheque', 'udhaar', 'advance']);
+    expect(MONEY_PAYMENT_MODES).toEqual(['cash', 'upi', 'card', 'cheque']);
+  });
+
+  it('takes no cash handed over and no reference on udhaar or advance', () => {
+    expect(
+      paymentIssues(
+        [
+          { mode: 'udhaar', amountPaise: 500, tenderedPaise: 500, reference: 'x' },
+          { mode: 'advance', amountPaise: 500, reference: 'x' },
+        ],
+        1_000,
+      ),
+    ).toEqual([
+      { index: 0, field: 'tenderedPaise', code: 'cash_only' },
+      { index: 0, field: 'reference', code: 'not_allowed' },
+      { index: 1, field: 'reference', code: 'not_allowed' },
+    ]);
+    expect(
+      paymentIssues(
+        [
+          { mode: 'cash', amountPaise: 500 },
+          { mode: 'udhaar', amountPaise: 500 },
+        ],
+        1_000,
+      ),
+    ).toEqual([]);
+  });
+
+  it('lets a save request carry them, and an owner OK for the credit limit', () => {
+    const draft = {
+      billKey: KEY,
+      priceList: 'retail',
+      customerId: RICE,
+      placeOfSupplyStateCode: '27',
+      lines: [{ itemId: RICE, packId: null, quantityThousandths: 1_000, shownUnitPricePaise: 100 }],
+      payments: [
+        { mode: 'advance', amountPaise: 30 },
+        { mode: 'udhaar', amountPaise: 70 },
+      ],
+      shownGrandTotalPaise: 100,
+    };
+    expect(billDraftSchema.safeParse(draft).success).toBe(true);
+    expect(billDraftSchema.safeParse({ ...draft, creditApprovalId: SALT }).success).toBe(true);
+    expect(billDraftSchema.safeParse({ ...draft, creditApprovalId: 'no' }).success).toBe(false);
+    const bad = billDraftSchema.safeParse({
+      ...draft,
+      payments: [{ mode: 'udhaar', amountPaise: 100, reference: 'x' }],
+    });
+    expect(bad.success).toBe(false);
+    if (!bad.success)
+      expect(fieldErrors(bad.error)).toEqual({ 'payments.0.reference': 'not_allowed' });
+  });
+});
+
 describe('approvalSchema (design §6, question 5)', () => {
   const asked = {
     billKey: KEY,
@@ -610,9 +669,29 @@ describe('approvalSchema (design §6, question 5)', () => {
   it.each([
     ['a share over 100%', { billBasisPoints: 10_001 }],
     ['nothing to approve', { lineBasisPoints: 0, billBasisPoints: 0 }],
-    ['an unknown kind', { kind: 'credit_limit' }],
+    ['an unknown kind', { kind: 'free_stuff' }],
+    ['a credit limit kind with discount shares', { kind: 'credit_limit' }],
     ['no password', { ownerPassword: '' }],
   ])('refuses %s', (_, change) => {
     expect(approvalSchema.safeParse({ ...asked, ...change }).success).toBe(false);
+  });
+
+  it('takes the most udhaar to allow, for the credit limit (`03` #9, #18)', () => {
+    const credit = {
+      billKey: KEY,
+      kind: 'credit_limit',
+      amountPaise: 250_000,
+      ownerPassword: 'pw',
+    };
+    expect(approvalSchema.parse(credit)).toEqual(credit);
+    expect(approvalSchema.safeParse({ ...credit, amountPaise: 0 }).success).toBe(false);
+    expect(approvalSchema.safeParse({ ...credit, amountPaise: -1 }).success).toBe(false);
+    expect(approvalSchema.safeParse({ ...credit, amountPaise: 1.5 }).success).toBe(false);
+    expect(approvalSchema.safeParse({ ...credit, lineBasisPoints: 100 }).success).toBe(false);
+    expect(
+      approvalSchema.safeParse({ billKey: KEY, kind: 'credit_limit', ownerPassword: 'pw' }).success,
+    ).toBe(false);
+    // A discount OK doesn't carry an amount.
+    expect(approvalSchema.safeParse({ ...asked, amountPaise: 5 }).success).toBe(false);
   });
 });

@@ -952,7 +952,7 @@ export const ownerApprovals = pgTable(
     check(
       'owner_approvals_kind_shape_check',
       sql`(${t.kind} = 'discount' and ${t.lineBasisPoints} is not null and ${t.billBasisPoints} is not null and ${t.amountPaise} is null)
-        or (${t.kind} = 'credit_limit' and ${t.lineBasisPoints} is null and ${t.billBasisPoints} is null and ${t.amountPaise} > 0)`,
+        or (${t.kind} = 'credit_limit' and ${t.lineBasisPoints} is null and ${t.billBasisPoints} is null and ${t.amountPaise} is not null and ${t.amountPaise} > 0)`,
     ),
     check('owner_approvals_expiry_check', sql`${t.expiresAt} > ${t.createdAt}`),
   ],

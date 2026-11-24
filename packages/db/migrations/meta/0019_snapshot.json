@@ -4262,7 +4262,7 @@
         },
         "owner_approvals_kind_shape_check": {
           "name": "owner_approvals_kind_shape_check",
-          "value": "(\"owner_approvals\".\"kind\" = 'discount' and \"owner_approvals\".\"line_basis_points\" is not null and \"owner_approvals\".\"bill_basis_points\" is not null and \"owner_approvals\".\"amount_paise\" is null)\n        or (\"owner_approvals\".\"kind\" = 'credit_limit' and \"owner_approvals\".\"line_basis_points\" is null and \"owner_approvals\".\"bill_basis_points\" is null and \"owner_approvals\".\"amount_paise\" > 0)"
+          "value": "(\"owner_approvals\".\"kind\" = 'discount' and \"owner_approvals\".\"line_basis_points\" is not null and \"owner_approvals\".\"bill_basis_points\" is not null and \"owner_approvals\".\"amount_paise\" is null)\n        or (\"owner_approvals\".\"kind\" = 'credit_limit' and \"owner_approvals\".\"line_basis_points\" is null and \"owner_approvals\".\"bill_basis_points\" is null and \"owner_approvals\".\"amount_paise\" is not null and \"owner_approvals\".\"amount_paise\" > 0)"
         },
         "owner_approvals_expiry_check": {
           "name": "owner_approvals_expiry_check",

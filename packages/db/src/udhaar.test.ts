@@ -184,7 +184,8 @@ describe('udhaar ledger', () => {
       ['a payment with no mode', { mode: null }, 'udhaar_entries_mode_check'],
       ['a cheque with no number', { mode: 'cheque' }, 'udhaar_entries_mode_check'],
       ['a mode that is not money', { mode: 'udhaar' }, 'udhaar_entries_mode_check'],
-      ['an unknown kind', { kind: 'gift' }, 'udhaar_entries_kind_check'],
+      // PostgreSQL checks constraints by name, and the amount check also names the kinds it knows.
+      ['an unknown kind', { kind: 'gift' }, 'udhaar_entries_amount_check'],
       [
         'a bill entry with no bill',
         { kind: 'bill', amountPaise: 100, mode: null, dueDate: '2026-12-20' },

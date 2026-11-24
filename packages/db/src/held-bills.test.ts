@@ -126,7 +126,7 @@ describe('held bills and owner approvals', () => {
 
   it('stores an approval, and refuses an unknown kind, a share over 100% or no expiry', async () => {
     expect(await approve(a)).toMatchObject({ usedAt: null, kind: 'discount' });
-    await expect(approve(a, { kind: 'credit_limit' })).rejects.toMatchObject(
+    await expect(approve(a, { kind: 'gift' })).rejects.toMatchObject(
       failsWith('23514', 'owner_approvals_kind_check'),
     );
     await expect(approve(a, { billBasisPoints: 10_001 })).rejects.toMatchObject(
@@ -135,6 +135,24 @@ describe('held bills and owner approvals', () => {
     await expect(approve(a, { expiresAt: new Date(Date.now() - 1_000) })).rejects.toMatchObject(
       failsWith('23514', 'owner_approvals_expiry_check'),
     );
+  });
+
+  it('stores a credit-limit approval with its amount and no discount shares, and nothing else', async () => {
+    const credit = { kind: 'credit_limit', lineBasisPoints: null, billBasisPoints: null };
+    expect(await approve(a, { ...credit, amountPaise: 5_000 })).toMatchObject({
+      kind: 'credit_limit',
+      amountPaise: 5_000,
+    });
+    for (const values of [
+      { ...credit },
+      { ...credit, amountPaise: 0 },
+      { ...credit, amountPaise: 5_000, billBasisPoints: 500, lineBasisPoints: 500 },
+      { amountPaise: 5_000 },
+    ]) {
+      await expect(approve(a, values)).rejects.toMatchObject(
+        failsWith('23514', 'owner_approvals_kind_shape_check'),
+      );
+    }
   });
 
   it("refuses an approval by another business's owner", async () => {

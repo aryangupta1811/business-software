@@ -53,6 +53,8 @@ export {
   shopHolidays,
   staffBranches,
   stockMovements,
+  udhaarAccounts,
+  udhaarEntries,
   units,
   users,
   type AuthTokenKind,
@@ -70,3 +72,13 @@ export {
 } from './stock.js';
 export { syncStockAlerts, type SyncScope } from './alerts.js';
 export { alsoInBusiness, withBusiness, withNewBusiness, type Transaction } from './tenancy.js';
+export {
+  findUdhaarMismatches,
+  lockUdhaarAccount,
+  moveUdhaar,
+  UdhaarRuleError,
+  type MovedUdhaar,
+  type MoveUdhaarInput,
+  type UdhaarMismatch,
+  type UdhaarRuleCode,
+} from './udhaar.js';

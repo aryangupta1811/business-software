@@ -80,9 +80,11 @@ ALTER TABLE "businesses" ADD CONSTRAINT "businesses_over_credit_limit_check" CHE
 ALTER TABLE "customers" ADD CONSTRAINT "customers_credit_limit_check" CHECK ("customers"."credit_limit_paise" >= 0);--> statement-breakpoint
 ALTER TABLE "customers" ADD CONSTRAINT "customers_due_days_check" CHECK ("customers"."due_days" between 0 and 365);--> statement-breakpoint
 ALTER TABLE "owner_approvals" ADD CONSTRAINT "owner_approvals_kind_shape_check" CHECK (("owner_approvals"."kind" = 'discount' and "owner_approvals"."line_basis_points" is not null and "owner_approvals"."bill_basis_points" is not null and "owner_approvals"."amount_paise" is null)
-        or ("owner_approvals"."kind" = 'credit_limit' and "owner_approvals"."line_basis_points" is null and "owner_approvals"."bill_basis_points" is null and "owner_approvals"."amount_paise" > 0));--> statement-breakpoint
+        or ("owner_approvals"."kind" = 'credit_limit' and "owner_approvals"."line_basis_points" is null and "owner_approvals"."bill_basis_points" is null and "owner_approvals"."amount_paise" is not null and "owner_approvals"."amount_paise" > 0));--> statement-breakpoint
 ALTER TABLE "owner_approvals" ADD CONSTRAINT "owner_approvals_kind_check" CHECK ("owner_approvals"."kind" in ('discount', 'credit_limit'));--> statement-breakpoint
 CREATE POLICY "tenant_isolation" ON "udhaar_accounts" AS PERMISSIVE FOR ALL TO public USING ("udhaar_accounts"."business_id" = (select app_current_business_id())) WITH CHECK ("udhaar_accounts"."business_id" = (select app_current_business_id()));--> statement-breakpoint
 CREATE POLICY "backup_read" ON "udhaar_accounts" AS PERMISSIVE FOR SELECT TO "app_backup" USING (true);--> statement-breakpoint
 CREATE POLICY "tenant_isolation" ON "udhaar_entries" AS PERMISSIVE FOR ALL TO public USING ("udhaar_entries"."business_id" = (select app_current_business_id())) WITH CHECK ("udhaar_entries"."business_id" = (select app_current_business_id()));--> statement-breakpoint
 CREATE POLICY "backup_read" ON "udhaar_entries" AS PERMISSIVE FOR SELECT TO "app_backup" USING (true);
+--> statement-breakpoint
+REVOKE UPDATE ON "udhaar_entries" FROM app_runtime;

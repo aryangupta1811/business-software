@@ -7,6 +7,7 @@ import { BUSINESS_TYPES, FEATURES, GST_STATUSES } from './business.js';
 import { email, isValidGstin, optionalText, phone, text } from './fields.js';
 import { INVOICE_PREFIX_PATTERN } from './invoice.js';
 import { isBranchStateCode } from './states.js';
+import type { SettingsPrintingInput } from './printing.js';
 import { NEGATIVE_STOCK_SETTINGS } from './stock.js';
 
 // A pick-one field left empty says `choose`, not `invalid`: missing from the body, an empty
@@ -144,6 +145,7 @@ export interface SettingsView {
   stock: SettingsStockInput;
   alerts: SettingsAlertsInput;
   invoices: SettingsInvoicesInput;
+  printing: SettingsPrintingInput;
   /** The next bill number in the caller's branch: this year's counter plus one (1 if none yet). */
   nextInvoice: { financialYear: string; sequence: number };
 }

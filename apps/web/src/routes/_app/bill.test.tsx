@@ -20,6 +20,9 @@ import {
   type FakeAnswer,
 } from '../../test/fake-api';
 
+// Printing after a save is tested in printing-saved.test.tsx; these tests are about the bill.
+vi.mock('../../printing/print-bill', () => ({ printBill: vi.fn(() => Promise.resolve()) }));
+
 afterEach(() => {
   vi.unstubAllGlobals();
   sessionStorage.clear();

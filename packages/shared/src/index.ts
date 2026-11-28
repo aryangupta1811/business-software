@@ -352,6 +352,31 @@ export {
   type StockAlertDetails,
 } from './alerts.js';
 export {
+  BILL_LANGUAGES,
+  billListQuerySchema,
+  devicePrintingSchema,
+  FOOTER_NOTE_MAX_LENGTH,
+  PRINT_SIZES,
+  RECEIPT_SIZES,
+  settingsPrintingSchema,
+  type BillBuyerView,
+  type BillDetailView,
+  type BillLanguage,
+  type BillLineView,
+  type BillListItem,
+  type BillListPage,
+  type BillListQuery,
+  type BillPaymentView,
+  type BillSellerView,
+  type ComputerPrinting,
+  type DevicePrintingInput,
+  type PrintSize,
+  type ReceiptSize,
+  type ReprintView,
+  type SettingsPrintingInput,
+} from './printing.js';
+export { whatsAppLink } from './whatsapp.js';
+export {
   addDays,
   creditLimitVerdict,
   DEFAULT_DUE_DAYS,

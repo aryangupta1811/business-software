@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import type { Permission } from './business.js';
 import { email, normalizePhone, text, uuid } from './fields.js';
+import type { ComputerPrinting } from './printing.js';
 
 /** A password exactly as typed: never trimmed (ADR 0035). */
 const typedPassword = () =>
@@ -117,6 +118,8 @@ export interface DeviceView {
   lastSeenAt: string;
   /** The computer this request came from. */
   thisComputer: boolean;
+  /** `02` #29, #30: how this computer prints. */
+  printing: ComputerPrinting;
 }
 
 /** #21, #38: unlocking needs the password again. */
@@ -161,6 +164,8 @@ export interface ActiveSession {
   discountLimitBasisPoints: number | null;
   /** Everything this person holds right now, read on every request (P1.5, ADR 0044). */
   permissions: Permission[];
+  /** How the computer this session works on prints (`02` #29, #30), for the counter's auto-print. */
+  printing: ComputerPrinting;
 }
 
 /** What `GET /api/session` answers. */

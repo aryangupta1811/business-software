@@ -8,6 +8,7 @@ import {
   Keyboard,
   MapPin,
   Package,
+  Receipt,
   Settings,
   Users,
 } from 'lucide-react';
@@ -29,6 +30,7 @@ import { Kbd, KbdGroup } from './ui/kbd';
 
 const HOME_KEYS = 'Alt+H';
 const BILLING_KEYS = 'Alt+B';
+const BILLS_KEYS = 'Alt+V';
 const ITEMS_KEYS = 'Alt+I';
 const ATTENDANCE_KEYS = 'Alt+T';
 const CUSTOMERS_KEYS = 'Alt+C';
@@ -72,6 +74,16 @@ export function AppShell({
     group: 'navigation',
     action: () => {
       if (may('billing.sell')) void navigate({ to: '/bill' });
+    },
+  });
+
+  // Alt+L is Lock and Alt+B the counter, so the Bills page is Alt+V ("view bills").
+  useShortcut({
+    keys: BILLS_KEYS,
+    description: 'shortcuts.goBills',
+    group: 'navigation',
+    action: () => {
+      if (may('billing.sell')) void navigate({ to: '/bills' });
     },
   });
 
@@ -140,6 +152,17 @@ export function AppShell({
                 <span className="flex-1">{t('nav.billing')}</span>
                 <KbdGroup aria-hidden="true">
                   {keyLabels(BILLING_KEYS).map((label) => (
+                    <Kbd key={label}>{label}</Kbd>
+                  ))}
+                </KbdGroup>
+              </Link>
+            )}
+            {may('billing.sell') && (
+              <Link to="/bills" aria-keyshortcuts={BILLS_KEYS} className={NAV_LINK}>
+                <Receipt aria-hidden="true" className="size-4" />
+                <span className="flex-1">{t('nav.bills')}</span>
+                <KbdGroup aria-hidden="true">
+                  {keyLabels(BILLS_KEYS).map((label) => (
                     <Kbd key={label}>{label}</Kbd>
                   ))}
                 </KbdGroup>

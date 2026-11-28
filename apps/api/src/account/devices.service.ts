@@ -15,7 +15,7 @@ import {
   type Database,
   type Transaction,
 } from '@business-software/db';
-import type { DeviceView } from '@business-software/shared';
+import type { DevicePrintingInput, DeviceView, ReceiptSize } from '@business-software/shared';
 import { CLOCK, type Clock } from '../auth/clock.js';
 import {
   SESSION_SERVICE,
@@ -64,6 +64,39 @@ export class DevicesService {
       });
       const view = (await this.viewsIn(tx, mine, id))[0];
       if (view === undefined) throw new Error('Renamed device not found');
+      return view;
+    });
+  }
+
+  /** `02` #29, #30: how this computer prints. Logged with what changed. */
+  async setPrinting(
+    caller: Caller,
+    id: string,
+    input: DevicePrintingInput,
+    context: RequestContext,
+  ): Promise<DeviceView> {
+    const mine = this.sessions.deviceTokenHashOf(context);
+    return withBusiness(this.database.db, caller.businessId, async (tx) => {
+      const [before] = await tx
+        .select({ receiptSize: devices.receiptSize, autoPrint: devices.autoPrint })
+        .from(devices)
+        .where(and(eq(devices.id, id), isNull(devices.revokedAt)))
+        .for('update');
+      if (before === undefined) throw new NotFoundException({ code: 'not_found' });
+      if (before.receiptSize !== input.receiptSize || before.autoPrint !== input.autoPrint) {
+        await tx.update(devices).set(input).where(eq(devices.id, id));
+        await recordEntry(tx, {
+          actorId: caller.userId,
+          action: 'device.printing_changed',
+          entityType: 'device',
+          entityId: id,
+          branchId: caller.branchId,
+          before,
+          after: input,
+        });
+      }
+      const view = (await this.viewsIn(tx, mine, id))[0];
+      if (view === undefined) throw new Error('Device not found after setting its printing');
       return view;
     });
   }
@@ -159,6 +192,8 @@ export class DevicesService {
         createdAt: devices.createdAt,
         lastSeenAt: devices.lastSeenAt,
         tokenHash: devices.tokenHash,
+        receiptSize: devices.receiptSize,
+        autoPrint: devices.autoPrint,
       })
       .from(devices)
       .innerJoin(
@@ -167,8 +202,9 @@ export class DevicesService {
       )
       .where(and(isNull(devices.revokedAt), id === undefined ? undefined : eq(devices.id, id)))
       .orderBy(asc(devices.createdAt), asc(devices.id));
-    return rows.map(({ tokenHash, createdAt, lastSeenAt, ...row }) => ({
+    return rows.map(({ tokenHash, createdAt, lastSeenAt, receiptSize, autoPrint, ...row }) => ({
       ...row,
+      printing: { receiptSize: receiptSize as ReceiptSize, autoPrint },
       createdAt: createdAt.toISOString(),
       lastSeenAt: lastSeenAt.toISOString(),
       thisComputer: tokenHash === mine,

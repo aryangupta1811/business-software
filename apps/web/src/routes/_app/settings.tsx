@@ -12,6 +12,7 @@ import {
   settingsBusinessSchema,
   settingsFeaturesSchema,
   settingsInvoicesSchema,
+  settingsPrintingSchema,
   settingsSecuritySchema,
   settingsStockSchema,
   settingsUdhaarSchema,
@@ -21,9 +22,11 @@ import {
   type SettingsBusinessInput,
   type SettingsFeaturesInput,
   type SettingsInvoicesInput,
+  type SettingsPrintingInput,
   type SettingsSecurityInput,
   type SettingsStockInput,
   type SettingsUdhaarInput,
+  type PrintSize,
   type SettingsView,
 } from '@business-software/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -41,6 +44,8 @@ import type { z } from 'zod';
 import { ApiError, apiRequest } from '../../api/client';
 import { useBranches } from '../../api/branches';
 import { useSession } from '../../api/session';
+import { LANGUAGES } from '../../i18n';
+import { printBill } from '../../printing/print-bill';
 import { HolidaysCard } from '../../attendance/holidays-card';
 import { BranchesCard } from '../../branches/branches-card';
 import { Button } from '../../components/ui/button';
@@ -111,6 +116,7 @@ function Settings() {
         <StockCard saved={view.stock} />
         <UdhaarCard saved={view.udhaar} />
         <InvoicesCard saved={view.invoices} next={view.nextInvoice} />
+        <PrintingCard saved={view.printing} gstStatus={view.business.gstStatus} />
         <AlertsCard saved={view.alerts} />
         <PasswordCard />
       </div>
@@ -127,7 +133,8 @@ function Settings() {
  * case) and updates the page's copy, so the other cards see the new business type.
  */
 function useSave<Form extends FieldValues>(
-  card: 'business' | 'features' | 'security' | 'stock' | 'alerts' | 'invoices' | 'udhaar',
+  card:
+    'business' | 'features' | 'security' | 'stock' | 'alerts' | 'invoices' | 'udhaar' | 'printing',
   setError: UseFormSetError<Form>,
   onSaved: (view: SettingsView) => void,
   /** API answers that belong to one field, by code: shown on that field, not as a failed save. */
@@ -640,6 +647,132 @@ function InvoicesCard({
           })}
         </p>
       )}
+    </SettingsCard>
+  );
+}
+
+type PrintingForm = z.input<typeof settingsPrintingSchema>;
+
+/**
+ * `02` #16, #17: the language every bill prints in (the PDF follows it, #34) and the note under
+ * it, with a test print of a made-up bill that shows the unsaved choice, and the one-time
+ * kiosk-printing steps for a counter computer.
+ */
+function PrintingCard({
+  saved,
+  gstStatus,
+}: {
+  saved: SettingsPrintingInput;
+  gstStatus: SettingsBusinessInput['gstStatus'];
+}) {
+  const { t } = useTranslation();
+  const errorText = useFieldError();
+  const session = useSession().data;
+  const receiptSize = session?.state === 'active' ? session.printing.receiptSize : 80;
+  const [testFailed, setTestFailed] = useState(false);
+  const form = useForm<PrintingForm, unknown, SettingsPrintingInput>({
+    resolver: zodResolver(settingsPrintingSchema),
+    defaultValues: { billLanguage: saved.billLanguage, footerNote: saved.footerNote ?? '' },
+  });
+  const { save, state } = useSave<PrintingForm>('printing', form.setError, (view) => {
+    form.reset({
+      billLanguage: view.printing.billLanguage,
+      footerNote: view.printing.footerNote ?? '',
+    });
+  });
+
+  /** Prints a made-up bill with what is on the card now, saved or not. */
+  async function testPrint(size: PrintSize) {
+    setTestFailed(false);
+    try {
+      const { sampleBill } = await import('@business-software/print');
+      const { billLanguage, footerNote } = form.getValues();
+      const note = typeof footerNote === 'string' ? footerNote.trim() : '';
+      await printBill(
+        {
+          ...sampleBill({ scheme: gstStatus, language: billLanguage }),
+          footerNote: note === '' ? null : note,
+        },
+        size,
+        null,
+      );
+    } catch {
+      setTestFailed(true);
+    }
+  }
+
+  return (
+    <SettingsCard
+      title={t('settings.printing.title')}
+      lead={t('settings.printing.lead')}
+      state={state}
+      dirty={form.formState.isDirty}
+      submitting={form.formState.isSubmitting}
+      onSubmit={() => void form.handleSubmit(save)()}
+    >
+      <Field
+        label={t('settings.printing.language')}
+        hint={t('settings.printing.languageHint')}
+        error={errorText('billLanguage', form.formState.errors.billLanguage?.message)}
+      >
+        {(props) => (
+          <Select {...props} className="w-56" {...form.register('billLanguage')}>
+            {LANGUAGES.map(({ code, name }) => (
+              <option key={code} value={code}>
+                {name}
+              </option>
+            ))}
+          </Select>
+        )}
+      </Field>
+      <Field
+        label={t('settings.printing.footer')}
+        hint={t('settings.printing.footerHint')}
+        error={errorText('footerNote', form.formState.errors.footerNote?.message)}
+      >
+        {(props) => <Textarea {...props} rows={2} {...form.register('footerNote')} />}
+      </Field>
+      <div className="flex flex-col gap-2 border-t border-border pt-5">
+        <CardTitle level={3}>{t('settings.printing.test')}</CardTitle>
+        <p className="text-muted">{t('settings.printing.testHint')}</p>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              void testPrint(receiptSize === 80 ? '80' : '58');
+            }}
+          >
+            {t('settings.printing.testReceipt', { size: receiptSize })}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              void testPrint('a4');
+            }}
+          >
+            {t('settings.printing.testA4')}
+          </Button>
+        </div>
+        {testFailed && (
+          <p role="alert" className="text-danger">
+            {t('settings.printing.testFailed')}
+          </p>
+        )}
+      </div>
+      <details className="rounded-lg border border-border px-4 py-3">
+        <summary className="cursor-pointer font-medium">
+          {t('settings.printing.guideTitle')}
+        </summary>
+        <div className="mt-3 flex flex-col gap-2 text-muted">
+          <p>{t('settings.printing.guideLead')}</p>
+          <ol className="flex list-decimal flex-col gap-1.5 pl-5">
+            {(['step1', 'step2', 'step3', 'step4'] as const).map((step) => (
+              <li key={step}>{t(`settings.printing.guide.${step}`)}</li>
+            ))}
+          </ol>
+          <p className="text-label">{t('settings.printing.guideNote')}</p>
+        </div>
+      </details>
     </SettingsCard>
   );
 }

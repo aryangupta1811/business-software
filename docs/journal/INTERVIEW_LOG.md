@@ -2230,3 +2230,9 @@ Entry format:
 - **Why / what I learned:** a rule enforced in one place (the registry) beats a rule each screen has to remember. When a design and a guard disagree, change the design and write down why.
 - **Say it in an interview:** "Keyboard shortcuts go through one registry that rejects keys which clash with typing, so a screen can't add a bug by picking a bad one."
 - **Follow-ups to expect:** what about a Hindi keyboard layout? (letters match the physical key, so Alt+P works where that key types another letter).
+
+### 2026-11-28 — After printing, the counter stopped hearing the scanner `#frontend` `#testing` `#bug`
+- **What happened:** the Chrome check of printing (#84) saved a bill, which auto-prints, then pressed `Alt+A`: nothing happened, and a barcode scanned next went nowhere. Printing a hidden iframe needs `frame.focus()` before `print()`, and nothing gave the focus back, so every key after an auto-print went to the invisible frame. Unit tests replaced the print module (jsdom can't print), so none of them could see it. Fixed test-first: `printFrame` puts the focus back where it was, even when printing fails.
+- **Why / what I learned:** a test double hides the behaviour of what it replaces. The one place that touches the browser's print is small, so it now has its own tests with a fake frame that moves focus as a real one does.
+- **Say it in an interview:** "The bug only showed in a real browser: after an auto-print the scanner's keystrokes went into a hidden iframe. I proved it by scanning right after a save, wrote a failing test, then restored the focus in a `finally`."
+- **Follow-ups to expect:** why not just focus the search box after printing? (the print helper doesn't know the page; giving back whatever had the focus also works on the Bills page, where it was a button).

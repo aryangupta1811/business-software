@@ -2,44 +2,23 @@
 
 Overwritten at the end of every session. Older handoffs are in git history: `git log -p docs/HANDOFF.md`.
 
-**Session:** 32 — fast track Day 8 (2026-11-23, into 11-24): four lanes; two finished and merged, two started. About a day behind the schedule.
+**Session:** 34 — fast track Day 13 (2026-11-28). Stopped early: the session limit was close. Session 33 (2026-11-24) never wrote a handoff; it merged #81 (sitting 3), #82 (P1.18 PR 1, udhaar API), #83 (scan test fix) and opened #84.
 
-**Done (merged, in order):**
-- **#78** the three Chrome-check fixes (connecting state, real next invoice number, "Coming later").
-- **#76** P1.18 udhaar design (`03` #17–#23) and **#77** P1.15 printing design (`02` #28–#34); the owner took every recommendation.
-- **#79** P2.3 PR 2, staff and attendance screens, plus `GET /api/attendance/people`.
+**Done:**
+- **#84 merged** (P1.15 PR 1, printing). Chrome check done (local, 1024 px, light/dark, English/Hindi). It found one bug, fixed test-first: after any print the focus stayed on the hidden print frame, so the next scan and every counter key went nowhere (`printFrame` now gives the focus back).
 
-**Half-done (committed on local branches, not pushed, not reviewed):**
-- **P1.18 PR 1, udhaar API:** `feat/p1.18-udhaar-api` in `../bs-lane-udhaar`, commit `70dce57`. `origin/main` (#79) not merged in yet.
-  - Done: shared rules (`packages/shared/src/udhaar.ts`, billing, customers, staff; the lane reported 1,136 shared tests green) and migration `0019_udhaar_ledger.sql` with the schema.
-  - `packages/db/src/udhaar.ts` is a **stub that throws**; `udhaar.test.ts` (about 29 tests) is red on it. Two later fixes to the test file were only type-checked.
-  - Next, in order: run that test red; implement `lockUdhaarAccount`, `moveUdhaar`, `findUdhaarMismatches`; add `REVOKE UPDATE ON "udhaar_entries" FROM app_runtime;` at the end of the migration (the role test is red until then); add the table to `APPEND_ONLY` in `tenancy-guard.test.ts`; then test-first: entry-log actions, settings, customers, approvals, `POST /api/bills`, the routes, ADR 0050 with its README row and the ADR 0007 note, `MONEY_PAYMENT_MODES` in the web payment panel, the switch's name and the error messages in three languages.
-  - Choices to review: the design's section 11.
-- **P1.15 PR 1, printing:** `feat/p1.15-printing` in `../bs-lane-print`, commit `2b48152`, #79 already merged in.
-  - Done: `whatsAppLink`, `amountInWords`, the shared printing types, `packages/print` set up.
-  - `pnpm typecheck` **fails with 8 errors**; the lane expects this until the API and web fill the new `printing` field in the session, devices and settings views. The `printing.ts` schemas were written before their tests and `sample.ts` has none: mutation-check both.
-  - Not started: the bill template and its CSS, the settings migration and routes, the bills API, printing and the Bills page, Settings → Printing, the setup guide, the locales.
-  - Findings and plan: the design's section 11.
-- **#79's Chrome check:** done at 1536 px, dark, mostly by page text. Left: 1024 px (read `innerWidth` after resizing) and light mode. Still left from before: two counters, a live permission change, Branches (a second Chrome profile).
+**Open, in this order:**
+1. **#85** (P1.18 PR 2, udhaar screens; branch `feat/p1.19-udhaar-views`, worktree `../bs-lane-udhaar-views`). `main` (printing) merged in at `4161ba3`: locale conflicts merged key by key, `likeText` now from `http/like.js`, printing test fixture given `overCreditLimit`/`canGiveUdhaar`. Typecheck green, but the local `pnpm check` after the merge **fails 9 of 10 tests in `apps/web/src/routes/_app/printing-saved.test.tsx`** (the counter's print and WhatsApp tests meet the udhaar payment changes; cause not read yet; fix test-first before anything else on #85). `backup.test.ts` timed out again (known). **Left:** read CI, Chrome check at 1024 px (payment panel with six modes, credit-limit meter, Hindi on `text-display`), merge. Owner choices to review are in the PR body (Alt+P for Record payment, credit OK in page state only, no "Add customer" on the Customers page).
+2. **#87** (P1.19 udhaar views; `feat/p1.19-udhaar-buckets`, built on #85). After #85 merges: merge `main` in (expect a one-line `index.ts` conflict: `whatsAppLink` now on main), check, merge. Owner to confirm: **four buckets** (1–30, 31–60, 61–90, 90+) where `03` #12 says "30 / 60 / 90+"; "collected this week" = last 7 days.
+3. **Lane 3** (P1.20 demo data, then P2.9 owner dashboard): a background agent in `../bs-lane-demo` (`feat/p2.11-demo-data-dashboard`) was still running when the session stopped. Look for its pushed branches and PRs (`gh pr list`); if nothing was pushed, look at the worktree's commits.
+4. **Live run (lane 4), not started:** `aws login` gave the owner an error 400; a `--remote` login was offered and not finished. Then: start RDS, then EC2 (`docs/devops/terraform.md`), approve the deploy run for `main`, read the migrate log (0013–0020 run on RDS for the first time), `scripts/deploy/check-live.sh`, stop both.
 
-**Owner's answers (2026-11-24, session 33):** credit limit and due days owner-only (`03` #24); printing keys `Alt+P`, `Alt+A`, `Alt+W`, Bills page `Alt+V` (`02` #30, #31); the register's header becomes "Everyone due today is in" (to do, small fix).
+**Found, not fixed:** on `/bill` at 1024 px, item names wrap onto three lines and the table scrolls sideways (P1.13's page). Polish for Day 14.
 
-**Sitting 3 held 2026-11-24:** 04, 08, 09 DECIDED; D5 in ADR 0016's dated note; D6: cash closing, then expenses, after v1. Opening balance at any time (`03` #20, built in P1.18 PR 2).
-
-**Next step:** `/start-session`, then one task: finish P1.18 PR 1 in its worktree, review, merge. Then P1.15 PR 1. Then Day 9. Tell the owner what the lost day means for 2026-11-29.
+**Next step:** `/start-session` (Day 14, the buffer): items 1–4 above, then PROGRESS (sessions 33–34 are not recorded there), the Phase 1 journal, and the final review. Tell the owner what is moved to the backlog (Days 9–12 tasks not built: P2.4, P1.16, P2.5, P1.17, P2.1, stages 9–10, P2.10, P3.x).
 
 **Watch out for:**
-- **The agents that built the lanes are gone.** Their notes are here and in the two designs.
-- **Migration numbers:** only udhaar has `0019` so far; printing needs its own, and whoever merges second regenerates.
-- **Local test failures, cause not known:** under `pnpm check`, `packages/db` `backup.test.ts` failed twice and web `devices-move.test.tsx` failed once in a combined api and web run. Each passed alone and CI was green. Read the error next time. `billing.test.ts` "the overlap" can also flake (two clocks).
-- **"No checks" on a PR** can mean a conflict: look at `mergeable`, then merge `origin/main` into the branch. Never force-push. `docs/journal/INTERVIEW_LOG.md` conflicts whenever two branches add entries: keep both.
-- **With worktrees, run `gh pr create` with `--head` and `--base`**, or it uses the current folder's branch.
-- **Chrome:** screenshots time out often, mostly after a page load; read the page with JavaScript. The extension was disconnected at times on both days. Docker Desktop can be off: check `docker ps`.
-- **An idle owner session locks** after the business's lock minutes (default 5), even while a script calls the API from the page.
-- **The next real deploy** runs migrations 0013–0018 on RDS for the first time. Read the migrate log. 0014 and 0018 turn RLS's FORCE off and on inside their transactions for backfills.
-- **The AWS MCP server didn't connect** this session; nothing needed it.
-- **The usage limit** stopped both lanes on 2026-11-23. Have each lane commit its first tested slice.
-- **Older `.env` files lack six keys** (`docs/devops/local-database.md`).
-- **Make lane worktrees by hand** (the tool's own fail on `c:` vs `C:`): `git worktree add ../bs-lane-x -b branch origin/main`, copy `.env`, then `pnpm install --frozen-lockfile --prefer-offline`.
-- **PR titles max 72 characters.** `gh` bodies via `--body-file`. **No AI attribution in commits or PR bodies** (rule 6).
-- **Leftover folders** (not worktrees): `../bs-lane-alerts`, `-attendance`, `-bell`, `-branches`, `-customer`, `-fixes`, `-keys`, `-pay`, `-queue`, `-save`, `-staff-screens`, `-staff-ui`; local branches `backup/p1.3-before-rewrite`, `feat/p1.13-billing-counter` (listed by session 31). Delete only with the owner's OK. Test businesses "Chrome Check Kirana" and "Attendance Check …" are in the local database.
+- **Local test business:** "Print Check Kirana" (login in the session's scratchpad only; not in git). Its bill language is now Hindi.
+- **The dev server leaves `dist/main.js` running on port 3000** after its task is stopped; find it with `netstat -ano | grep :3000` and stop it.
+- **Locale conflicts:** merge them as JSON three ways (base, ours, theirs), not as text: two lanes adding keys to neighbouring objects nest wrongly in a text merge.
+- From before: worktrees by hand (`git worktree add ../bs-lane-x -b branch origin/main`, copy `.env`); `gh pr create --head --base`; no AI attribution in commits or PRs; `backup.test.ts` times out sometimes under a full local `pnpm check` (passes alone); leftover `../bs-lane-*` folders wait for the owner's OK to delete.

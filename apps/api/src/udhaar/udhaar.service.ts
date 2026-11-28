@@ -45,7 +45,7 @@ import {
 } from '@business-software/shared';
 import { CLOCK, type Clock } from '../auth/clock.js';
 import { SESSION_SERVICE, type SessionService } from '../auth/session.service.js';
-import { likeText } from '../customers/customers.service.js';
+import { likeText, toView as toCustomerView } from '../customers/customers.service.js';
 import { DATABASE } from '../database.module.js';
 import { inBusiness } from '../items/conflicts.js';
 import type { Caller } from '../http/session.js';
@@ -170,10 +170,7 @@ export class UdhaarService {
   /** One customer's ledger, newest first and paged, and what of it is still unpaid. */
   ledger(caller: Caller, customerId: string, query: UdhaarLedgerQuery): Promise<UdhaarLedgerView> {
     return inBusiness(this.database, caller, async (tx) => {
-      const [customer] = await tx
-        .select({ creditLimitPaise: customers.creditLimitPaise, dueDays: customers.dueDays })
-        .from(customers)
-        .where(eq(customers.id, customerId));
+      const [customer] = await tx.select().from(customers).where(eq(customers.id, customerId));
       if (customer === undefined) throw new NotFoundException({ code: 'customer_not_found' });
       const [account] = await tx
         .select({ balancePaise: udhaarAccounts.balancePaise })
@@ -195,6 +192,7 @@ export class UdhaarService {
       const page = older.slice(0, UDHAAR_PAGE_SIZE);
       return {
         customerId,
+        customer: toCustomerView(customer),
         balancePaise,
         creditLimitPaise: customer.creditLimitPaise,
         dueDays: customer.dueDays,
@@ -284,7 +282,7 @@ export class UdhaarService {
     });
   }
 
-  /** `03` #20: what the old notebook says the customer owed, once, before anything else. */
+  /** `03` #20: what the old notebook says the customer owed, once, at any time; the oldest entry. */
   async setOpening(caller: Caller, input: UdhaarOpeningInput): Promise<UdhaarMoveView> {
     // A future day would push the due date out, so the customer would never be overdue.
     if (input.asOf > businessDate(this.clock.now())) {

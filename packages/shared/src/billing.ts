@@ -10,6 +10,7 @@ import { MAX_PAISE, MAX_THOUSANDTHS, packPrice, type ItemKind } from './items.js
 import type { Paise } from './money.js';
 import { isStateCode } from './states.js';
 import type { NegativeStockSetting } from './stock.js';
+import type { OverCreditLimitSetting } from './udhaar.js';
 import type { BuiltInUnit } from './units.js';
 
 /** Question 10: one switch per bill; an item with no wholesale price sells at retail. */
@@ -109,6 +110,8 @@ export interface BillingContext {
   features: Feature[];
   /** What the save does with a line that takes stock below zero (P1.14). */
   negativeStock: NegativeStockSetting;
+  /** What the save does with udhaar past a customer's credit limit (`03` #9). */
+  overCreditLimit: OverCreditLimitSetting;
   canViewStock: boolean;
   /** `items.manage`: an unknown code offers "Add item" (question 8). */
   canManageItems: boolean;
@@ -116,6 +119,8 @@ export interface BillingContext {
   canManageCustomers: boolean;
   /** `billing.discount`: discounts up to the session's limit; above it, the owner's OK. */
   canDiscount: boolean;
+  /** `billing.udhaar`: the owner always; staff when the owner switched it on (`03` #10). */
+  canGiveUdhaar: boolean;
 }
 
 /** `GET /api/billing/catalogue`: everything, or only what changed at or after `since`. */

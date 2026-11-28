@@ -382,13 +382,21 @@ describe('udhaar ledger', () => {
       expect((await accountOf(a, customerId))?.balancePaise).toBe(700);
     });
 
-    it('takes an opening balance only before the first entry, so it is always the oldest', async () => {
+    it('takes an opening balance after the first entry too (03 #20), still once', async () => {
       const customerId = await addCustomer(a);
       await sell(a, customerId, 1_000);
+      const moved = await move(a, customerId, {
+        kind: 'opening',
+        amountPaise: 700,
+        reason: 'Notebook',
+        dueFrom: '2026-10-01',
+      });
+      expect(moved.balanceAfterPaise).toBe(1_700);
+      expect(moved.dueDate).toBe('2026-10-31');
+      expect((await accountOf(a, customerId))?.balancePaise).toBe(1_700);
       await expect(
-        move(a, customerId, { kind: 'opening', amountPaise: 700, reason: 'Notebook' }),
+        move(a, customerId, { kind: 'opening', amountPaise: 100, reason: 'Again' }),
       ).rejects.toMatchObject(ruleError('opening_exists'));
-      expect((await accountOf(a, customerId))?.balancePaise).toBe(1_000);
     });
 
     it.each([

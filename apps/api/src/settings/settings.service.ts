@@ -32,6 +32,7 @@ import type {
   BranchStateCode,
 } from '@business-software/shared';
 import { DATABASE } from '../database.module.js';
+import { refuseInDemo } from '../demo/demo-rules.js';
 import type { Caller } from '../http/session.js';
 
 type Section = Record<string, unknown>;
@@ -75,6 +76,11 @@ export class SettingsService {
       (current) => current.view.business,
       input,
       async (tx, current) => {
+        // What kind of shop the demo is, and whether it charges GST, stay as they are.
+        const was = current.view.business;
+        if (was.businessType !== input.businessType || was.gstStatus !== input.gstStatus) {
+          await refuseInDemo(tx);
+        }
         await tx
           .update(businesses)
           .set({
@@ -188,6 +194,7 @@ export class SettingsService {
       (current) => current.view.invoices,
       input,
       async (tx) => {
+        await refuseInDemo(tx);
         if (input.invoicePrefix !== null) {
           const [clash] = await tx
             .select({ id: branches.id })

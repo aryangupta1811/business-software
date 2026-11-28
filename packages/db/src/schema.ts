@@ -125,6 +125,11 @@ export const businesses = pgTable(
       .array()
       .notNull()
       .default(sql`array[${literals(ALERT_TYPES)}]::text[]`),
+    /**
+     * ADR 0016's 2026-11-24 note: the public demo shop. Only the demo seed sets it; the services
+     * refuse what could spoil it for the next visitor (apps/api/src/demo).
+     */
+    demo: boolean('demo').notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

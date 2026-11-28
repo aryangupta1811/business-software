@@ -12,6 +12,7 @@
     "dev": "pnpm --parallel --filter @business-software/api --filter @business-software/web dev",
     "db:up": "docker compose up -d --wait --quiet-pull db mailpit",
     "app:up": "docker compose up -d --build --wait",
+    "seed:demo": "pnpm --filter @business-software/api exec node --env-file-if-exists=../../.env dist/demo/seed-cli.js",
     "db:generate": "pnpm --filter @business-software/db db:generate",
     "db:migrate": "pnpm --filter @business-software/db db:migrate",
     "format": "prettier --write .",

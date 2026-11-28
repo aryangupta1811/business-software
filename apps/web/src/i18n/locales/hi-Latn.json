@@ -1523,5 +1523,18 @@
     "removeReason": "Kaaran (optional)",
     "removeConfirm": "Chhutti hatayein",
     "removed": "{{name}} hata di gayi."
+  },
+  "demo": {
+    "label": "Public demo",
+    "title": "Bas dekhna chahte hain?",
+    "lead": "Namoona data se bhari shared demo dukaan kholein. Sign up ki zaroorat nahi.",
+    "owner": "Maalik bankar dekhein",
+    "cashier": "Cashier bankar dekhein",
+    "opening": "Khul raha hai…",
+    "unavailable": "Demo abhi uplabdh nahi hai. Ek minute baad phir koshish karein.",
+    "bannerTitle": "Public demo.",
+    "banner": "Aap jo bhi likhenge use koi bhi dekh sakta hai, aur yeh niyamit roop se reset hota hai. Asli data na daalein.",
+    "passwords": "Jo screen password maangti hain (lock screen, maalik ki manzoori), unmein yeh daalein:",
+    "refused": "Public demo mein yeh band hai, taaki agla aane wala bahar na reh jaaye."
   }
 }

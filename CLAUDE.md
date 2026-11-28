@@ -31,6 +31,7 @@ Read files when a task needs them. Don't load everything at once.
 | `docs/devops/git-workflow.md` | Branches, commit messages, PRs, secrets, GitHub settings | Unsure about a branch name, commit message or PR |
 | `docs/devops/aws-account.md` | AWS account setup, sign-in and Free plan rules | AWS console or cloud work |
 | `docs/devops/terraform.md` | Terraform plan/apply, start and stop, server access, database facts, errors seen | Any Terraform or AWS resource work |
+| `docs/devops/demo-data.md` | The demo shop: what the seed makes, the command, the weekly reset, what visitors may not do | Demo data or the demo login |
 | `docs/devops/backup-restore.md` | Nightly backups to S3, the restore drill, getting data back | Any backup, restore or database-recovery work |
 | `docs/devops/secrets.md` | Where secrets live and the five ways they leak (git, images, browser, CI, logs) | Anything touching a password, key or token |
 | `docs/journal/` | Build journal per phase, for interviews | End of each phase |
@@ -66,6 +67,7 @@ Run from the repo root. Node 24+, pnpm 12.
 - Run everything in containers: `pnpm app:up` (database, migrations, api, worker, web at http://127.0.0.1:8080); stop with `docker compose stop`
 - Build: `pnpm build` (TypeScript project references → `dist/`)
 - Database: `pnpm db:up` (PostgreSQL in Docker Compose), `pnpm db:migrate`, `pnpm db:generate`. First time: copy `.env.example` to `.env` (`docs/devops/local-database.md`)
+- Demo shop: `pnpm seed:demo [--force]` after `pnpm build` (`docs/devops/demo-data.md`)
 - Test: `pnpm test` (Vitest, every package; Docker Desktop must be running for the integration tests)
 - Lint: `pnpm lint` (ESLint with type-aware rules)
 - Type-check: `pnpm typecheck`

@@ -35,6 +35,25 @@ export const staffLoginSchema = z.strictObject({
 });
 export type StaffLoginInput = z.infer<typeof staffLoginSchema>;
 
+/**
+ * The public demo's two logins (ADR 0016's 2026-11-24 note). Everyone using the demo shares one
+ * shop, so its password is public on purpose: the banner shows it, because the lock screen and the
+ * owner's-OK dialogs ask for it. It protects nothing real.
+ */
+export const DEMO_PASSWORD = 'kirana-demo-2026';
+export const DEMO_CASHIER_USERNAME = 'cashier';
+
+/** `POST /api/demo/login`: "Try as the owner" or "Try as a cashier". */
+export const demoLoginSchema = z.strictObject({
+  as: z.enum(['owner', 'cashier'], { error: 'invalid' }),
+});
+export type DemoLoginInput = z.infer<typeof demoLoginSchema>;
+
+/** `GET /api/demo`: whether the login page offers the two demo buttons. */
+export interface DemoStatus {
+  enabled: boolean;
+}
+
 /** A new password (Module 00 #7, ADR 0035): never trimmed, at least 10 characters, no forced symbols. */
 export const newPassword = () =>
   z
@@ -141,6 +160,8 @@ export interface ActiveSession {
   state: 'active' | 'locked';
   user: { id: string; role: 'owner' | 'staff'; name: string };
   business: { id: string; name: string };
+  /** Present, and true, only in the public demo shop: the web app shows its banner. */
+  demo?: true;
   /** The branch this computer is in: everything done here is recorded there (P1.6, ADR 0045). */
   branch: { id: string; code: string; name: string };
   /** The owner's count of active branches, so screens hide branch things with one; absent for staff. */

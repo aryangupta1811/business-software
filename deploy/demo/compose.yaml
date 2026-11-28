@@ -40,6 +40,8 @@ services:
     environment:
       # Every interface inside the container; nothing publishes port 3000 on the server.
       HOST: 0.0.0.0
+      # This server is the public demo (ADR 0016's 2026-11-24 note): the one-click demo login.
+      DEMO_ENABLED: 'true'
       # SES credentials: the mail-only role's, from the host (mail-credentials.sh), never the
       # server's own role, which containers can't reach (metadata hop limit 1).
       AWS_REGION: ap-south-1
@@ -69,6 +71,9 @@ services:
     command: [node, dist/worker.js]
     # The queue's connection string is the worker's alone: the api never gets it (ADR 0022).
     env_file: [/run/business-software/runtime.env, /run/business-software/queue.env]
+    environment:
+      # A new demo shop when the newest is a week old, checked at every start (apps/api/src/demo).
+      DEMO_ENABLED: 'true'
     restart: unless-stopped
     depends_on:
       migrate:

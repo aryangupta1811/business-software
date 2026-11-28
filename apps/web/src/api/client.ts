@@ -39,6 +39,15 @@ export function onAuthError(listener: (code: string) => void): () => void {
   return () => authListeners.delete(listener);
 }
 
+// Told when the public demo shop refuses something (ADR 0016's 2026-11-24 note), so one banner can
+// say why instead of every screen having to.
+const demoListeners = new Set<() => void>();
+
+export function onDemoRefused(listener: () => void): () => void {
+  demoListeners.add(listener);
+  return () => demoListeners.delete(listener);
+}
+
 const AUTH_CODES = new Set(['locked', 'not_logged_in', 'session_ended']);
 
 /** Sends JSON to the API and reads JSON back. Every failure becomes an `ApiError`. */
@@ -71,6 +80,9 @@ export async function apiRequest<T>(method: string, path: string, body?: unknown
     const lostPermission = response.status === 403 && code === 'forbidden';
     if (lostAuth || lostPermission) {
       for (const listener of authListeners) listener(code);
+    }
+    if (response.status === 403 && code === 'demo_refused') {
+      for (const listener of demoListeners) listener();
     }
     const retryAfter = Number.parseInt(response.headers.get('retry-after') ?? '', 10);
     throw new ApiError(

@@ -1,5 +1,6 @@
 // Logins and sessions (ADR 0009; P1.4 design, sections 3–7; Module 00 #21, #27–#29, #34,
 // #37–#41). Every lookup after login-by-email runs under RLS for the business in the cookie.
+import { NotFoundException } from '@nestjs/common';
 import {
   alsoInBusiness,
   and,
@@ -22,6 +23,7 @@ import {
   type Transaction,
 } from '@business-software/db';
 import {
+  DEMO_CASHIER_USERNAME,
   effectiveDiscountLimit,
   effectivePermissions,
   IDLE_GRACE_MS,
@@ -34,6 +36,8 @@ import {
 import type { IncomingMessage } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import type { Caller } from '../http/session.js';
+import { refuseInDemo } from '../demo/demo-rules.js';
+import { findDemoBusiness } from '../demo/registry.js';
 import type { Clock } from './clock.js';
 import {
   cookieNames,
@@ -182,6 +186,8 @@ interface StartOptions {
    */
   device: FoundDevice | null;
   newDeviceBranchId?: string | undefined;
+  /** The public demo's one-click login: a staff login's computer is remembered too (P1.20). */
+  demo?: true;
 }
 
 export function throwUnless(verdict: Verdict): void {
@@ -304,6 +310,54 @@ export class SessionService {
     return withBusiness(this.database.db, businessId, async (tx) => {
       await rehash?.(tx, user.id);
       return this.startIn(tx, { businessId, userId: user.id, role: 'staff', device }, context);
+    });
+  }
+
+  /**
+   * The demo's "Try as the owner" and "Try as a cashier" (ADR 0016's 2026-11-24 note): a session
+   * in the newest demo business with no password, which is safe only because that business is
+   * public by design and every route that could change its logins refuses (demo-rules.ts). The
+   * computer is always registered at the head office, so a branch a visitor opened can't strand
+   * the next one, and a browser that already has a computer there keeps it.
+   */
+  async loginDemo(as: 'owner' | 'cashier', context: RequestContext): Promise<LoginResult> {
+    throwUnless(this.limits.ip.hit(context.ip));
+    const found = await findDemoBusiness(this.database);
+    if (found === undefined) throw new NotFoundException({ code: 'demo_unavailable' });
+    const businessId = found.businessId;
+    return withBusiness(this.database.db, businessId, async (tx) => {
+      const [user] = await tx
+        .select({ id: users.id, deactivatedAt: users.deactivatedAt })
+        .from(users)
+        .where(
+          as === 'owner'
+            ? eq(users.role, 'owner')
+            : and(eq(users.role, 'staff'), eq(users.username, DEMO_CASHIER_USERNAME)),
+        );
+      if (user?.deactivatedAt !== null) {
+        throw new NotFoundException({ code: 'demo_unavailable' });
+      }
+      const [head] = await tx
+        .select({ id: branches.id })
+        .from(branches)
+        .where(isNull(branches.archivedAt))
+        .orderBy(asc(branches.createdAt), asc(branches.id))
+        .limit(1);
+      if (head === undefined) throw new Error('Business has no active branch');
+      const known = await this.findDeviceIn(tx, businessId, context);
+      const device = known?.branchId === head.id ? known : null;
+      return this.startIn(
+        tx,
+        {
+          businessId,
+          userId: user.id,
+          role: as === 'owner' ? 'owner' : 'staff',
+          device,
+          newDeviceBranchId: head.id,
+          demo: true,
+        },
+        context,
+      );
     });
   }
 
@@ -480,6 +534,9 @@ export class SessionService {
     reason: 'reset' | 'password_changed',
     keep?: string,
   ): Promise<void> {
+    // Every password change ends here, so the demo shop can't have its password changed by a
+    // path nobody thought to guard (ADR 0016's 2026-11-24 note).
+    await refuseInDemo(tx);
     await tx
       .update(users)
       .set({ passwordHash, passwordChangedAt: this.clock.now() })
@@ -681,7 +738,7 @@ export class SessionService {
       // No Max-Age: the session ends when Chrome closes (#40).
       serializeCookie(this.names.session, formatCookieToken({ businessId, token }), { secure }),
     ];
-    if (options.role === 'owner') {
+    if (options.role === 'owner' || options.demo === true) {
       // Renewed at each owner login (#44).
       setCookies.push(
         serializeCookie(this.names.device, formatCookieToken(device.cookie), {
@@ -909,6 +966,7 @@ export class SessionService {
         staffIdleMinutes: businesses.staffIdleMinutes,
         emailConfirmedAt: users.emailConfirmedAt,
         storedDiscountLimit: users.discountLimitBasisPoints,
+        demo: businesses.demo,
       })
       .from(users)
       .innerJoin(businesses, eq(businesses.id, users.businessId))
@@ -922,6 +980,7 @@ export class SessionService {
       state: caller.locked ? 'locked' : 'active',
       user: { id: caller.userId, role: caller.role, name: row.name },
       business: { id: caller.businessId, name: row.businessName },
+      ...(row.demo && { demo: true as const }),
       branch: { id: caller.branchId, code: row.branchCode, name: row.branchName },
       ...(caller.role === 'owner' && { branchCount: await this.activeBranchCountIn(tx) }),
       csrfToken,

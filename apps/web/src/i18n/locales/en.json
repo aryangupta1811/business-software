@@ -1523,5 +1523,18 @@
     "removeReason": "Reason (optional)",
     "removeConfirm": "Remove holiday",
     "removed": "{{name}} removed."
+  },
+  "demo": {
+    "label": "Public demo",
+    "title": "Just looking around?",
+    "lead": "Open the shared demo shop, full of sample data. No sign-up needed.",
+    "owner": "Try as the owner",
+    "cashier": "Try as a cashier",
+    "opening": "Opening…",
+    "unavailable": "The demo isn't available right now. Try again in a minute.",
+    "bannerTitle": "Public demo.",
+    "banner": "Anyone can see what you type, and it resets regularly. Don't enter real data.",
+    "passwords": "Screens that ask for a password (the lock screen, the owner's OK) take:",
+    "refused": "This is switched off in the public demo, so the next visitor isn't locked out."
   }
 }

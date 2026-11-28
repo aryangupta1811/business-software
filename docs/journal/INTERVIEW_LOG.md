@@ -2212,3 +2212,21 @@ Entry format:
 - **Why / what I learned:** the Code Integrity log says which file was blocked and by whom; the popup doesn't. Smart App Control can't make an exception for one app.
 - **Say it in an interview:** "I looked up the blocked file in the event log before touching the security setting."
 - **Follow-ups to expect:** why not switch it off? (it protects the whole computer, for one editor's update).
+
+### 2026-11-28 — An opening balance entered late still counts as the oldest `#backend` `#udhaar` `#architecture`
+- **What happened:** the owner wanted the old notebook's balance to be enterable at any time, not only before a customer's first entry. Because "oldest bills first" is computed when the ledger is read (ADR 0050), the fix was one stable sort in `unpaidEntries` that puts the opening entry first, and one query change in `moveUdhaar` so only a second opening is refused. No stored balance, no migration. The test came first: a bill, a payment, then an opening, with the payment clearing the opening before the bill.
+- **Why / what I learned:** a value you compute on read can be reinterpreted later without migrating anything. Had the allocation of payments to bills been stored, a late opening would have meant rewriting old rows.
+- **Say it in an interview:** "I chose to compute which bills are unpaid instead of storing it. When the owner changed the opening-balance rule, I changed a sort and a query, and no data."
+- **Follow-ups to expect:** what stops two openings at once? (the account row lock, and a unique index on opening entries per customer).
+
+### 2026-11-28 — A new Tailwind text size was silently dropped by tailwind-merge `#frontend` `#gotcha`
+- **What happened:** I added a `text-display` size for a customer's balance next to `text-warning`. A test on the rendered class list showed the size was missing: `tailwind-merge` reads an unknown `text-*` as a colour, so the later colour class replaced it. The project already tells its merge function about its own sizes; `display` was not in the list.
+- **Why / what I learned:** when a design token shares a prefix with another group, tell the class merger about it, and test the rendered class instead of trusting the stylesheet. The Hindi line-height test keeps the same list of sizes, so it learned the new size too.
+- **Say it in an interview:** "A custom font size vanished in the browser because the class merger took it for a colour; a test that asked for the class found it."
+- **Follow-ups to expect:** why a custom size at all? (the design system has a fixed scale, and Hindi needs a taller line for each size).
+
+### 2026-11-28 — The shortcut registry refused a plain `P` `#frontend` `#process`
+- **What happened:** the design said "Record payment (`P`)". The registry throws at once for a letter without Ctrl or Alt, because it would fire while someone types a name or an amount. The page uses Alt+P and the design notes the change.
+- **Why / what I learned:** a rule enforced in one place (the registry) beats a rule each screen has to remember. When a design and a guard disagree, change the design and write down why.
+- **Say it in an interview:** "Keyboard shortcuts go through one registry that rejects keys which clash with typing, so a screen can't add a bug by picking a bad one."
+- **Follow-ups to expect:** what about a Hindi keyboard layout? (letters match the physical key, so Alt+P works where that key types another letter).

@@ -21,11 +21,13 @@ const CONTEXT: BillingContext = {
   branchStateCode: '27',
   features: [],
   negativeStock: 'warn',
+  overCreditLimit: 'warn',
   canViewStock: true,
   canManageItems: true,
   canViewCustomers: true,
   canManageCustomers: true,
   canDiscount: true,
+  canGiveUdhaar: true,
 };
 
 const salt = catalogueItem({ sellingPrice: 10_000 });

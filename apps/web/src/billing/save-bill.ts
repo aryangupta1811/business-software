@@ -1,5 +1,6 @@
 import type { BillDraft, SavedBillView } from '@business-software/shared';
 import { ApiError, apiRequest } from '../api/client';
+import type { CreditApproval } from './credit';
 import type { PaymentRow } from './payment-panel';
 import type { Approval } from './discounts';
 import type { OpenBill } from './open-bill';
@@ -14,8 +15,9 @@ export type SaveRequest = Omit<BillDraft, 'placeOfSupplyStateCode'> & {
 };
 
 /**
- * The save request: the open bill, its payments and the total the cashier saw. The owner's OK
- * and the held bill only go along when they belong to this very bill.
+ * The save request: the open bill, its payments and the total the cashier saw. The owner's OKs
+ * (a discount's, and a credit limit's when there is udhaar) and the held bill only go along when
+ * they belong to this very bill.
  */
 export function billDraft(
   bill: OpenBill,
@@ -23,12 +25,15 @@ export function billDraft(
   grandTotalPaise: number,
   approval: Approval | null,
   held: { id: string; billKey: string } | null,
+  credit: CreditApproval | null = null,
 ): SaveRequest {
+  const hasUdhaar = payments.some((row) => row.mode === 'udhaar');
   return {
     ...bill,
     payments: [...payments],
     shownGrandTotalPaise: grandTotalPaise,
     ...(approval?.billKey === bill.billKey && { approvalId: approval.approvalId }),
+    ...(hasUdhaar && credit?.billKey === bill.billKey && { creditApprovalId: credit.approvalId }),
     ...(held?.billKey === bill.billKey && { heldBillId: held.id }),
   };
 }

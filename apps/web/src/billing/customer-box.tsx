@@ -1,6 +1,7 @@
 import {
   customerSchema,
   fieldErrors,
+  formatPaise,
   INDIAN_STATES,
   normalizePhone,
   stateByCode,
@@ -21,6 +22,8 @@ import { Kbd } from '../components/ui/kbd';
 import { Select } from '../components/ui/select';
 import { Textarea } from '../components/ui/textarea';
 import { useFieldError } from '../lib/field-error';
+import { useStanding } from '../udhaar/api';
+import { BalanceBadge } from '../udhaar/balance';
 
 /** The customer on the open bill: what the bill and the footer need, not the whole record. */
 export interface BillCustomer {
@@ -410,6 +413,8 @@ function OnThisBill({
   const stateName = useStateName();
   const { branchStateCode } = context;
   const switchId = useId();
+  // What this customer owes and may owe (P1.18 design §5); needs `customers.view`.
+  const standing = useStanding(customer?.id ?? null, context.canViewCustomers).data;
   // Question 9 A: a business customer from another state is IGST unless the goods are handed
   // over at the counter.
   const businessState = customer?.gstin ? customer.stateCode : null;
@@ -445,6 +450,16 @@ function OnThisBill({
                   .join(' · ')}
               </p>
             </>
+          )}
+          {standing !== undefined && (
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-label">
+              <BalanceBadge paise={standing.balancePaise} />
+              <span className="text-muted">
+                {standing.creditLimitPaise === null
+                  ? t('billing.customer.noLimit')
+                  : t('billing.customer.limit', { amount: formatPaise(standing.creditLimitPaise) })}
+              </span>
+            </p>
           )}
           <p className="mt-1 font-medium">{taxText(placeOfSupplyStateCode, branchStateCode)}</p>
         </div>

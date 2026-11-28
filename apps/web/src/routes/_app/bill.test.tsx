@@ -30,11 +30,13 @@ const CONTEXT: BillingContext = {
   branchStateCode: '27',
   features: ['wholesale_price'],
   negativeStock: 'warn',
+  overCreditLimit: 'warn',
   canViewStock: true,
   canManageItems: true,
   canViewCustomers: true,
   canManageCustomers: true,
   canDiscount: true,
+  canGiveUdhaar: true,
 };
 
 // Made-up items and codes.
@@ -375,6 +377,7 @@ describe('saving the bill at the counter', () => {
     grandTotalPaise: 2_800,
     changePaise: 0,
     warnings: [],
+    creditWarning: null,
   };
   const storedKey = () =>
     (
@@ -629,5 +632,220 @@ describe('saving the bill at the counter', () => {
     await user.keyboard('{Enter}');
     expect(await screen.findByText(message)).toBeInTheDocument();
     expect(screen.queryByText(/Bill saved/)).not.toBeInTheDocument();
+  });
+});
+
+describe('udhaar at the counter (P1.18 design §5)', () => {
+  const MEENA = '00000000-0000-4000-8000-0000000000c1';
+  const SAVED = {
+    id: '00000000-0000-4000-8000-0000000000f1',
+    number: 'ABC/26-27/42',
+    document: 'tax_invoice',
+    businessDate: '2026-11-22',
+    grandTotalPaise: 2_800,
+    changePaise: 0,
+    warnings: [],
+    creditWarning: null,
+  };
+  const customerRoute = {
+    'GET /api/customers?phone=9876500001': {
+      body: [
+        {
+          id: MEENA,
+          name: 'Meena Stores',
+          phone: '9876500001',
+          gstin: null,
+          legalName: null,
+          address: null,
+          pinCode: null,
+          stateCode: null,
+          creditLimitPaise: null,
+          dueDays: 30,
+          version: 1,
+        },
+      ],
+    },
+  };
+  const standing = (balancePaise: number, creditLimitPaise: number | null) => ({
+    [`GET /api/udhaar/customers/${MEENA}`]: {
+      body: { customerId: MEENA, balancePaise, creditLimitPaise, dueDays: 30 },
+    },
+  });
+  const CASHIER_WITH_UDHAAR: ActiveSession = {
+    ...STAFF_SESSION,
+    permissions: [
+      'session.own',
+      'billing.sell',
+      'billing.udhaar',
+      'customers.view',
+      'customers.manage',
+    ],
+  };
+
+  /** Scans a salt, picks Meena at F3 and opens the payment panel (F10). */
+  async function atPayment(
+    user: ReturnType<typeof userEvent.setup>,
+    session: ActiveSession,
+    routes: Parameters<typeof fakeApi>[1],
+  ) {
+    const api = counter(session, { ...customerRoute, ...routes });
+    await user.type(await search(), '8901234567890{Enter}');
+    await user.keyboard('{F3}');
+    await user.type(
+      await screen.findByRole('combobox', { name: 'Phone number or name' }),
+      '9876500001',
+    );
+    await screen.findByRole('option', { name: /Meena Stores/ });
+    await user.keyboard('{Enter}');
+    await screen.findByText('Meena Stores');
+    await user.keyboard('{F10}');
+    await screen.findByRole('textbox', { name: 'Cash received' });
+    return api;
+  }
+
+  test('puts the bill on the customer account, and sends it as udhaar', async () => {
+    const user = userEvent.setup();
+    const api = await atPayment(user, OWNER_SESSION, {
+      ...standing(0, 500_000),
+      'POST /api/bills': { status: 201, body: SAVED },
+    });
+    await user.keyboard('{Alt>}5{/Alt}');
+    expect(screen.getByRole('button', { name: /^Udhaar/, pressed: true })).toBeInTheDocument();
+    await user.keyboard('{Enter}');
+    await screen.findByText('Paid. Ready to save.');
+    await user.keyboard('{Enter}');
+    await screen.findByText('Bill saved, ABC/26-27/42');
+    const [sent] = api.sent('POST', '/api/bills');
+    expect(sent?.body).toMatchObject({
+      customerId: MEENA,
+      payments: [{ mode: 'udhaar', amountPaise: 2_800 }],
+    });
+    expect(sent?.body).not.toHaveProperty('creditApprovalId');
+  });
+
+  test('a cashier without Give udhaar is not offered it', async () => {
+    const user = userEvent.setup();
+    await atPayment(
+      user,
+      {
+        ...CASHIER_WITH_UDHAAR,
+        permissions: ['session.own', 'billing.sell', 'customers.view', 'customers.manage'],
+      },
+      standing(0, null),
+    );
+    expect(screen.queryByRole('button', { name: /^Udhaar/ })).not.toBeInTheDocument();
+  });
+
+  test('a walk-in bill says udhaar needs a customer', async () => {
+    const user = userEvent.setup();
+    counter(OWNER_SESSION);
+    await user.type(await search(), '8901234567890{Enter}');
+    await user.keyboard('{F10}');
+    await screen.findByRole('textbox', { name: 'Cash received' });
+    expect(screen.queryByRole('button', { name: /^Udhaar/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/Udhaar needs a customer with a name and phone number/)).toBeVisible();
+  });
+
+  test('offers From advance when the customer has one', async () => {
+    const user = userEvent.setup();
+    const api = await atPayment(user, OWNER_SESSION, {
+      ...standing(-1_000, null),
+      'POST /api/bills': { status: 201, body: SAVED },
+    });
+    await user.keyboard('{Alt>}6{/Alt}');
+    expect(screen.getByText('Advance available: ₹10.00.')).toBeInTheDocument();
+    const amount = screen.getByRole('textbox', { name: 'Amount' });
+    await user.clear(amount);
+    await user.type(amount, '10');
+    await user.keyboard('{Alt>}a{/Alt}{Alt>}1{/Alt}{Enter}');
+    await screen.findByText('Paid. Ready to save.');
+    await user.keyboard('{Enter}');
+    await screen.findByText('Bill saved, ABC/26-27/42');
+    expect(api.sent('POST', '/api/bills')[0]?.body).toMatchObject({
+      payments: [
+        { mode: 'advance', amountPaise: 1_000 },
+        { mode: 'cash', amountPaise: 1_800 },
+      ],
+    });
+  });
+
+  test('staff past the limit need the owner password: it is asked at Done and goes with the bill', async () => {
+    const user = userEvent.setup();
+    const api = await atPayment(user, CASHIER_WITH_UDHAAR, {
+      ...standing(0, 1_000),
+      'POST /api/billing/approvals': {
+        status: 201,
+        body: {
+          approvalId: '00000000-0000-4000-8000-0000000000d7',
+          expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
+        },
+      },
+      'POST /api/bills': { status: 201, body: SAVED },
+    });
+    await user.keyboard('{Alt>}5{/Alt}');
+    expect(screen.getByText(/The owner's password is asked when you press Done/)).toBeVisible();
+    await user.keyboard('{Enter}');
+    const dialog = await screen.findByRole('dialog', { name: "Owner's OK for udhaar" });
+    expect(
+      within(dialog).getByText(/Meena Stores would owe ₹28.00, over the limit of ₹10.00/),
+    ).toBeVisible();
+    await user.type(within(dialog).getByLabelText("Owner's password"), 'made-up-password');
+    await user.click(within(dialog).getByRole('button', { name: 'Allow this udhaar' }));
+    await screen.findByText('Paid. Ready to save.');
+    const approval = api.sent('POST', '/api/billing/approvals')[0]?.body as { billKey: string };
+    expect(approval).toEqual({
+      billKey: expect.any(String) as unknown,
+      kind: 'credit_limit',
+      amountPaise: 2_800,
+      ownerPassword: 'made-up-password',
+    });
+    await user.keyboard('{Enter}');
+    await screen.findByText('Bill saved, ABC/26-27/42');
+    expect(api.sent('POST', '/api/bills')[0]?.body).toMatchObject({
+      billKey: approval.billKey,
+      creditApprovalId: '00000000-0000-4000-8000-0000000000d7',
+    });
+  });
+
+  test('the owner past the limit in warn mode is only warned, and the saved bill says so', async () => {
+    const user = userEvent.setup();
+    const api = await atPayment(user, OWNER_SESSION, {
+      ...standing(0, 1_000),
+      'POST /api/bills': {
+        status: 201,
+        body: { ...SAVED, creditWarning: { balanceAfterPaise: 2_800, limitPaise: 1_000 } },
+      },
+    });
+    await user.keyboard('{Alt>}5{/Alt}');
+    expect(
+      screen.getByText(
+        /Over the credit limit: Meena Stores would owe ₹28.00, limit ₹10.00. The bill will still save./,
+      ),
+    ).toBeVisible();
+    await user.keyboard('{Enter}');
+    await screen.findByText('Paid. Ready to save.');
+    expect(api.sent('POST', '/api/billing/approvals')).toHaveLength(0);
+    await user.keyboard('{Enter}');
+    await screen.findByText('Bill saved, ABC/26-27/42');
+    expect(
+      screen.getByText('Over the credit limit: the customer now owes ₹28.00, limit ₹10.00.'),
+    ).toBeInTheDocument();
+  });
+
+  test('a limit that changed meanwhile is refused by the server: the bill goes back to payment', async () => {
+    const user = userEvent.setup();
+    await atPayment(user, OWNER_SESSION, {
+      ...standing(0, null),
+      'POST /api/bills': {
+        status: 409,
+        body: { code: 'over_credit_limit', balancePaise: 100_000, limitPaise: 1_000 },
+      },
+    });
+    await user.keyboard('{Alt>}5{/Alt}{Enter}');
+    await screen.findByText('Paid. Ready to save.');
+    await user.keyboard('{Enter}');
+    expect(await screen.findByText(/over the customer's credit limit/)).toBeInTheDocument();
+    expect(screen.queryByText('Paid. Ready to save.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Pay/ })).toBeEnabled();
   });
 });

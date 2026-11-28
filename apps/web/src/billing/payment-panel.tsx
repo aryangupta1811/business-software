@@ -7,7 +7,7 @@ import {
   type PaymentMode,
   type PaymentRule,
 } from '@business-software/shared';
-import { Check, X } from 'lucide-react';
+import { Check, ShieldAlert, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../components/ui/button';
@@ -15,8 +15,11 @@ import { Field } from '../components/ui/field';
 import { Input } from '../components/ui/input';
 import { Kbd, KbdGroup } from '../components/ui/kbd';
 import { cn } from '../lib/cn';
+import { rupeesText } from '../lib/rupees';
 import { isTypingTarget } from '../shortcuts/keys';
 import { useShortcut } from '../shortcuts/use-shortcut';
+import { creditCheck } from '../udhaar/standing';
+import { NO_UDHAAR, type UdhaarAccess } from './udhaar-access';
 
 /** One payment on the bill, in whole paise. The same shape as a payment in the save request. */
 export interface PaymentRow {
@@ -30,6 +33,12 @@ export interface PaymentRow {
 
 /** The most payments one bill takes (the save request's limit). */
 const MAX_ROWS = 10;
+
+/** Every mode in key order: 1 to 4 are money, 5 is udhaar and 6 is the customer's advance (P1.18 §5). */
+const ALL_MODES = [...MONEY_PAYMENT_MODES, 'udhaar', 'advance'] as const;
+type ModeKey = (typeof ALL_MODES)[number];
+/** Udhaar and advance move no money: no cash handed over, no reference (`02` #11). */
+const isLedgerMode = (mode: PaymentMode) => mode === 'udhaar' || mode === 'advance';
 
 type AmountError = 'invalid' | 'too_small' | 'too_big';
 
@@ -50,19 +59,17 @@ interface Priced {
   error: AmountError | undefined;
 }
 
-/** 14150 → "141.50", 14100 → "141": the form `parseRupees` reads back. */
-function rupeesText(paise: Paise): string {
-  const rupees = Math.floor(paise / 100);
-  const rest = paise % 100;
-  return rest === 0 ? String(rupees) : `${String(rupees)}.${String(rest).padStart(2, '0')}`;
-}
-
 /**
  * Reads the rows top to bottom. A payment settles at most what's left of the bill: cash handed
  * over beyond that is change, and any other mode beyond it is an error (design §8).
  */
-function price(drafts: readonly Draft[], totalPaise: Paise): { rows: Priced[]; paid: Paise } {
+function price(
+  drafts: readonly Draft[],
+  totalPaise: Paise,
+  advancePaise: Paise,
+): { rows: Priced[]; paid: Paise } {
   let paid = 0;
+  let advanceUsed = 0;
   const rows = drafts.map((draft): Priced => {
     const typed = parseRupees(draft.text);
     const left = Math.max(totalPaise - paid, 0);
@@ -79,7 +86,10 @@ function price(drafts: readonly Draft[], totalPaise: Paise): { rows: Priced[]; p
       amountPaise = typed;
       if (typed === 0) error = 'too_small';
       else if (typed > left) error = 'too_big';
+      // The advance can't be used for more than the customer has.
+      else if (draft.mode === 'advance' && advanceUsed + typed > advancePaise) error = 'too_big';
     }
+    if (error === undefined && draft.mode === 'advance') advanceUsed += amountPaise;
     if (error === undefined) paid += amountPaise;
     else amountPaise = 0;
     return { draft, amountPaise, tenderedPaise, error };
@@ -95,14 +105,20 @@ function price(drafts: readonly Draft[], totalPaise: Paise): { rows: Priced[]; p
 export function PaymentPanel({
   open,
   totalPaise,
+  udhaar = NO_UDHAAR,
   onClose,
+  onNeedCustomer,
   onReady,
 }: {
   open: boolean;
   /** The bill's grand total. */
   totalPaise: Paise;
+  /** What of the customer's account this login may use (design §5). */
+  udhaar?: UdhaarAccess;
   /** Esc or Cancel. */
   onClose: () => void;
+  /** "Add the customer": closes the panel and opens the customer box (F3). */
+  onNeedCustomer?: () => void;
   /** Enter on a fully paid bill. */
   onReady: (payments: PaymentRow[]) => void;
 }) {
@@ -131,7 +147,14 @@ export function PaymentPanel({
       className="m-auto max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-surface p-6 text-foreground shadow-card backdrop:bg-foreground/40"
     >
       {open && (
-        <Panel titleId={titleId} totalPaise={totalPaise} onClose={onClose} onReady={onReady} />
+        <Panel
+          titleId={titleId}
+          totalPaise={totalPaise}
+          udhaar={udhaar}
+          onClose={onClose}
+          onNeedCustomer={onNeedCustomer}
+          onReady={onReady}
+        />
       )}
     </dialog>
   );
@@ -140,12 +163,16 @@ export function PaymentPanel({
 function Panel({
   titleId,
   totalPaise,
+  udhaar,
   onClose,
+  onNeedCustomer,
   onReady,
 }: {
   titleId: string;
   totalPaise: Paise;
+  udhaar: UdhaarAccess;
   onClose: () => void;
+  onNeedCustomer: (() => void) | undefined;
   onReady: (payments: PaymentRow[]) => void;
 }) {
   const { t } = useTranslation();
@@ -159,7 +186,20 @@ function Panel({
   const [activeId, setActiveId] = useState(0);
   const [attempted, setAttempted] = useState(false);
 
-  const { rows, paid } = price(drafts, totalPaise);
+  // The modes this bill may use: money always, udhaar once there is a customer to put it on,
+  // and the advance only when they have one.
+  const offered = ALL_MODES.filter(
+    (mode) =>
+      !isLedgerMode(mode) ||
+      (mode === 'udhaar' && udhaar.state === 'ready') ||
+      (mode === 'advance' && udhaar.state === 'ready' && udhaar.advancePaise > 0),
+  );
+  // The key handler below is set up once, so it reads the modes through a ref.
+  const offeredRef = useRef<readonly ModeKey[]>(offered);
+  useEffect(() => {
+    offeredRef.current = offered;
+  });
+  const { rows, paid } = price(drafts, totalPaise, udhaar.advancePaise);
   const left = totalPaise - paid;
   const changePaise = rows.reduce(
     (sum, row) => sum + (row.tenderedPaise === undefined ? 0 : row.tenderedPaise - row.amountPaise),
@@ -173,6 +213,15 @@ function Panel({
     issues.some((issue) => issue.field === 'reference' && readable[issue.index] === row);
   const mismatch = issues.some((issue) => issue.code === 'payments_mismatch');
   const canFinish = rows.every((row) => row.error === undefined) && issues.length === 0;
+  const check =
+    udhaar.standing === null
+      ? null
+      : creditCheck({
+          payments: readable.map((row) => ({ mode: row.draft.mode, amountPaise: row.amountPaise })),
+          standing: udhaar.standing,
+          who: udhaar.who,
+          setting: udhaar.setting,
+        });
 
   useEffect(() => {
     if (refocus.current === null) return;
@@ -208,6 +257,7 @@ function Panel({
   }
 
   const setMode = (mode: PaymentMode) => {
+    if (!offered.some((one) => one === mode)) return;
     update(activeId, { mode });
   };
   useShortcut({
@@ -247,6 +297,24 @@ function Panel({
     inDialog: true,
   });
   useShortcut({
+    keys: 'Alt+5',
+    description: 'billing.payment.modes.udhaar',
+    group: 'general',
+    action: () => {
+      setMode('udhaar');
+    },
+    inDialog: true,
+  });
+  useShortcut({
+    keys: 'Alt+6',
+    description: 'billing.payment.modes.advance',
+    group: 'general',
+    action: () => {
+      setMode('advance');
+    },
+    inDialog: true,
+  });
+  useShortcut({
     keys: 'Alt+A',
     description: 'billing.payment.add',
     group: 'general',
@@ -266,11 +334,9 @@ function Panel({
     };
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.altKey || event.ctrlKey || event.metaKey || isTypingTarget(event.target)) return;
-      const mode = /^[1-4]$/.test(event.key)
-        ? MONEY_PAYMENT_MODES[Number(event.key) - 1]
-        : undefined;
+      const mode = /^[1-6]$/.test(event.key) ? ALL_MODES[Number(event.key) - 1] : undefined;
       const row = event.target === null ? null : rowOf(event.target);
-      if (mode === undefined || row === null) return;
+      if (mode === undefined || row === null || !offeredRef.current.includes(mode)) return;
       event.preventDefault();
       setDrafts((current) =>
         current.map((draft) => (draft.id === Number(row.dataset.row) ? { ...draft, mode } : draft)),
@@ -316,6 +382,8 @@ function Panel({
           <PaymentRowCard
             key={row.draft.id}
             row={row}
+            modes={offered}
+            udhaar={udhaar}
             number={index + 1}
             removable={index > 0}
             attempted={attempted}
@@ -339,6 +407,39 @@ function Panel({
           </KbdGroup>
         </Button>
       </div>
+
+      {udhaar.state === 'needs_customer' && (
+        <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-label text-muted">
+          {t('billing.payment.udhaar.needsCustomer')}
+          {onNeedCustomer !== undefined && (
+            <Button variant="ghost" size="sm" onClick={onNeedCustomer}>
+              {t('billing.payment.udhaar.addCustomer')}
+            </Button>
+          )}
+        </p>
+      )}
+      {check !== null && (check.kind === 'warn' || check.kind === 'needs_approval') && (
+        <p
+          role="status"
+          className="mt-3 flex items-start gap-2 rounded-lg border border-warning bg-warning-soft p-3"
+        >
+          <ShieldAlert aria-hidden className="mt-0.5 size-4 shrink-0 text-warning" />
+          <span>
+            {t(
+              check.limitPaise === null
+                ? 'billing.payment.udhaar.noLimit'
+                : check.kind === 'warn'
+                  ? 'billing.payment.udhaar.warn'
+                  : 'billing.payment.udhaar.needsOwner',
+              {
+                name: udhaar.customerName,
+                after: formatPaise(check.balanceAfterPaise),
+                limit: check.limitPaise === null ? '' : formatPaise(check.limitPaise),
+              },
+            )}
+          </span>
+        </p>
+      )}
 
       <dl className="mt-5 grid grid-cols-3 gap-3 rounded-lg border border-border bg-surface-muted p-4">
         <Figure label={t('billing.payment.paid')} value={formatPaise(paid)} />
@@ -387,6 +488,8 @@ function Panel({
 
 function PaymentRowCard({
   row,
+  modes,
+  udhaar,
   number,
   removable,
   attempted,
@@ -395,6 +498,8 @@ function PaymentRowCard({
   onRemove,
 }: {
   row: Priced;
+  modes: readonly ModeKey[];
+  udhaar: UdhaarAccess;
   number: number;
   removable: boolean;
   attempted: boolean;
@@ -405,6 +510,7 @@ function PaymentRowCard({
   const { t } = useTranslation();
   const { draft } = row;
   const cash = draft.mode === 'cash';
+  const ledger = isLedgerMode(draft.mode);
   const amountError = row.error !== undefined && (attempted || row.error === 'too_big');
   const changeHere = row.tenderedPaise === undefined ? 0 : row.tenderedPaise - row.amountPaise;
 
@@ -431,8 +537,8 @@ function PaymentRowCard({
         )}
       </div>
 
-      <div className="mt-2 grid grid-cols-4 gap-2">
-        {MONEY_PAYMENT_MODES.map((mode, index) => (
+      <div className={cn('mt-2 grid gap-2', modes.length > 4 ? 'grid-cols-3' : 'grid-cols-4')}>
+        {modes.map((mode) => (
           <Button
             key={mode}
             variant={draft.mode === mode ? 'primary' : 'secondary'}
@@ -444,7 +550,7 @@ function PaymentRowCard({
             {t(`billing.payment.modes.${mode}`)}
             <KbdGroup aria-hidden>
               <Kbd>Alt</Kbd>
-              <Kbd>{index + 1}</Kbd>
+              <Kbd>{ALL_MODES.indexOf(mode) + 1}</Kbd>
             </KbdGroup>
           </Button>
         ))}
@@ -473,7 +579,7 @@ function PaymentRowCard({
             />
           )}
         </Field>
-        {!cash && (
+        {!cash && !ledger && (
           <Field
             label={
               draft.mode === 'cheque'
@@ -498,6 +604,17 @@ function PaymentRowCard({
           </Field>
         )}
       </div>
+
+      {draft.mode === 'udhaar' && (
+        <p className="mt-3 text-label text-muted">
+          {t('billing.payment.udhaar.onAccount', { name: udhaar.customerName })}
+        </p>
+      )}
+      {draft.mode === 'advance' && (
+        <p className="mt-3 text-label text-muted">
+          {t('billing.payment.udhaar.advanceHas', { amount: formatPaise(udhaar.advancePaise) })}
+        </p>
+      )}
 
       {cash && changeHere > 0 && (
         <p className="mt-3 text-body font-medium tabular-nums text-success">
@@ -536,6 +653,9 @@ function Figure({
   );
 }
 
+/** UPI, card and cheque carry a reference; cash, udhaar and advance don't. */
+const takesReference = (mode: PaymentMode) => mode !== 'cash' && !isLedgerMode(mode);
+
 /** The payment row a control sits in. */
 function rowOf(target: EventTarget): HTMLElement | null {
   return target instanceof Element ? target.closest<HTMLElement>('[data-row]') : null;
@@ -543,7 +663,7 @@ function rowOf(target: EventTarget): HTMLElement | null {
 
 /** A row as the shared rules read it. */
 function rule(row: Priced): PaymentRule {
-  const reference = row.draft.mode === 'cash' ? '' : row.draft.reference.trim();
+  const reference = takesReference(row.draft.mode) ? row.draft.reference.trim() : '';
   return {
     mode: row.draft.mode,
     amountPaise: row.amountPaise,
@@ -554,7 +674,7 @@ function rule(row: Priced): PaymentRule {
 
 /** The same, without the keys that have nothing to say. */
 function toPaymentRow(row: Priced): PaymentRow {
-  const reference = row.draft.mode === 'cash' ? '' : row.draft.reference.trim();
+  const reference = takesReference(row.draft.mode) ? row.draft.reference.trim() : '';
   return {
     mode: row.draft.mode,
     amountPaise: row.amountPaise,

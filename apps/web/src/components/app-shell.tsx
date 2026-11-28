@@ -2,6 +2,7 @@ import type { ActiveSession, Permission } from '@business-software/shared';
 import { Link, useMatches, useNavigate } from '@tanstack/react-router';
 import {
   CalendarCheck,
+  HandCoins,
   House,
   IndianRupee,
   Keyboard,
@@ -30,6 +31,7 @@ const HOME_KEYS = 'Alt+H';
 const BILLING_KEYS = 'Alt+B';
 const ITEMS_KEYS = 'Alt+I';
 const ATTENDANCE_KEYS = 'Alt+T';
+const CUSTOMERS_KEYS = 'Alt+C';
 const NAV_LINK =
   'flex min-h-10 items-center gap-2.5 rounded-lg px-2 text-muted hover:bg-surface-muted data-[status=active]:bg-surface-muted data-[status=active]:font-semibold data-[status=active]:text-foreground';
 
@@ -79,6 +81,15 @@ export function AppShell({
     group: 'navigation',
     action: () => {
       if (may('items.view')) void navigate({ to: '/items' });
+    },
+  });
+
+  useShortcut({
+    keys: CUSTOMERS_KEYS,
+    description: 'shortcuts.goCustomers',
+    group: 'navigation',
+    action: () => {
+      if (may('customers.view')) void navigate({ to: '/customers' });
     },
   });
 
@@ -140,6 +151,17 @@ export function AppShell({
                 <span className="flex-1">{t('nav.items')}</span>
                 <KbdGroup aria-hidden="true">
                   {keyLabels(ITEMS_KEYS).map((label) => (
+                    <Kbd key={label}>{label}</Kbd>
+                  ))}
+                </KbdGroup>
+              </Link>
+            )}
+            {may('customers.view') && (
+              <Link to="/customers" aria-keyshortcuts={CUSTOMERS_KEYS} className={NAV_LINK}>
+                <HandCoins aria-hidden="true" className="size-4" />
+                <span className="flex-1">{t('nav.customers')}</span>
+                <KbdGroup aria-hidden="true">
+                  {keyLabels(CUSTOMERS_KEYS).map((label) => (
                     <Kbd key={label}>{label}</Kbd>
                   ))}
                 </KbdGroup>

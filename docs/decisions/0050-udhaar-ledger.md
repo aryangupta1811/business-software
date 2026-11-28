@@ -36,8 +36,12 @@ It puts the same guarantees on money owed that ADR 0007 puts on stock: one write
 
 - `moveUdhaar`, `lockUdhaarAccount` and `findUdhaarMismatches` live in `packages/db/src/udhaar.ts`; `unpaidEntries` and `creditLimitVerdict` in `packages/shared/src/udhaar.ts`. Tests run the mismatch check after every udhaar test.
 - A bill can need two owner approvals (a discount and a credit limit), so `bills` has `credit_approval_id` (unique) beside `approval_id`.
-- An opening balance (the old notebook) is only taken before a customer's first entry, so it is always the oldest.
+- An opening balance (the old notebook) is taken once per customer, at any time, and `unpaidEntries` counts it as the oldest entry wherever it sits in the ledger (changed 2026-11-28; see the note below).
 - P1.16 (cancel a bill) adds a `bill_cancelled` entry kind; P1.19 reads `unpaidEntries` for the buckets and reminders.
+
+## Note, 2026-11-28: the opening balance at any time
+
+The first build refused an opening balance after a customer's first entry, so that it would always be the oldest in the list. The owner changed that on 2026-11-24 (`03` #20): it can be entered once per customer at any time, because a cashier may give udhaar before the owner has typed in the old notebook, and the owner would otherwise be locked out for good. It still has to count as the oldest, so that payments clear it first. That works because "oldest first" is computed when the ledger is read: `unpaidEntries` puts an `opening` entry first (a stable sort) before it walks the newest entries back from the balance. Nothing stored changes, which is the point of Option A. The code change is one query in `moveUdhaar` (a second `opening` is still refused, now by looking for an `opening` entry rather than for any entry; the unique index `udhaar_entries_opening_unique` backs it) and one sort in `unpaidEntries`. The opening entry's due date counts from its "as of" day; entries made before it keep their own.
 
 ## Interview note
 

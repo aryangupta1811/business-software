@@ -17,11 +17,13 @@ const CONTEXT: BillingContext = {
   branchStateCode: '27',
   features: [],
   negativeStock: 'warn',
+  overCreditLimit: 'warn',
   canViewStock: true,
   canManageItems: true,
   canViewCustomers: true,
   canManageCustomers: true,
   canDiscount: true,
+  canGiveUdhaar: true,
 };
 
 // Made-up customers, phones and GSTINs.
@@ -91,7 +93,14 @@ function setup(
   } = {},
   routes: Record<string, FakeAnswer | ((body: unknown) => FakeAnswer)> = {},
 ) {
-  const api = fakeApi(OWNER_SESSION, routes);
+  // Every customer on a bill has an account to read: nothing owed, no limit, unless a test says.
+  const nothingOwed = Object.fromEntries(
+    [MEENA, SHARMAJI, KARNATAKA].map((who) => [
+      `GET /api/udhaar/customers/${who.id}`,
+      { body: { customerId: who.id, balancePaise: 0, creditLimitPaise: null, dueDays: 30 } },
+    ]),
+  );
+  const api = fakeApi(OWNER_SESSION, { ...nothingOwed, ...routes });
   const onChange = vi.fn<(customer: BillCustomer | null, placeOfSupply: string) => void>();
   const onClose = vi.fn();
   render(
@@ -435,5 +444,34 @@ describe('the footer summary', () => {
     expect(screen.getByText(/Kaveri Agencies/)).toBeInTheDocument();
     expect(screen.getByText(/9876500009/)).toBeInTheDocument();
     expect(screen.getByText('IGST, supplied to Karnataka')).toBeInTheDocument();
+  });
+});
+
+describe('what the customer owes', () => {
+  const standingRoute = (balancePaise: number, creditLimitPaise: number | null) => ({
+    [`GET /api/udhaar/customers/${KARNATAKA.id}`]: {
+      body: { customerId: KARNATAKA.id, balancePaise, creditLimitPaise, dueDays: 30 },
+    },
+  });
+
+  test('shows the balance and the credit limit of the customer on the bill', async () => {
+    setup({ customer: KARNATAKA_BILL }, standingRoute(124_000, 500_000));
+    expect(await screen.findByText('Owes ₹1,240.00')).toBeInTheDocument();
+    expect(screen.getByText('Credit limit ₹5,000.00')).toBeInTheDocument();
+  });
+
+  test('shows an advance, and "no credit limit set" when there is none', async () => {
+    setup({ customer: KARNATAKA_BILL }, standingRoute(-30_000, null));
+    expect(await screen.findByText('Advance ₹300.00')).toBeInTheDocument();
+    expect(screen.getByText('No credit limit set')).toBeInTheDocument();
+  });
+
+  test('asks nothing when this login cannot see customers', async () => {
+    const { api } = setup(
+      { customer: KARNATAKA_BILL, context: { canViewCustomers: false } },
+      standingRoute(124_000, null),
+    );
+    await screen.findByText('On this bill');
+    expect(api.sent('GET', `/api/udhaar/customers/${KARNATAKA.id}`)).toHaveLength(0);
   });
 });

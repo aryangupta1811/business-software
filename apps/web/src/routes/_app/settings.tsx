@@ -14,6 +14,7 @@ import {
   settingsInvoicesSchema,
   settingsSecuritySchema,
   settingsStockSchema,
+  settingsUdhaarSchema,
   type BusinessType,
   type Feature,
   type SettingsAlertsInput,
@@ -22,6 +23,7 @@ import {
   type SettingsInvoicesInput,
   type SettingsSecurityInput,
   type SettingsStockInput,
+  type SettingsUdhaarInput,
   type SettingsView,
 } from '@business-software/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -107,6 +109,7 @@ function Settings() {
         <FeaturesCard saved={view.features} businessType={view.business.businessType} />
         <SecurityCard saved={view.security} />
         <StockCard saved={view.stock} />
+        <UdhaarCard saved={view.udhaar} />
         <InvoicesCard saved={view.invoices} next={view.nextInvoice} />
         <AlertsCard saved={view.alerts} />
         <PasswordCard />
@@ -124,7 +127,7 @@ function Settings() {
  * case) and updates the page's copy, so the other cards see the new business type.
  */
 function useSave<Form extends FieldValues>(
-  card: 'business' | 'features' | 'security' | 'stock' | 'alerts' | 'invoices',
+  card: 'business' | 'features' | 'security' | 'stock' | 'alerts' | 'invoices' | 'udhaar',
   setError: UseFormSetError<Form>,
   onSaved: (view: SettingsView) => void,
   /** API answers that belong to one field, by code: shown on that field, not as a failed save. */
@@ -474,6 +477,44 @@ function StockCard({ saved }: { saved: SettingsStockInput }) {
           { value: 'block', title: t('settings.stock.block'), hint: t('settings.stock.blockHint') },
         ]}
         inputProps={form.register('negativeStock')}
+      />
+    </SettingsCard>
+  );
+}
+
+/** Module 03 #9: past a credit limit the owner is warned, or needs their password (P1.18 design §7). */
+function UdhaarCard({ saved }: { saved: SettingsUdhaarInput }) {
+  const { t } = useTranslation();
+  const errorText = useFieldError();
+  const form = useForm<SettingsUdhaarInput>({
+    resolver: zodResolver(settingsUdhaarSchema),
+    defaultValues: saved,
+  });
+  const { save, state } = useSave<SettingsUdhaarInput>('udhaar', form.setError, (view) => {
+    form.reset(view.udhaar);
+  });
+
+  return (
+    <SettingsCard
+      title={t('settings.udhaar.title')}
+      lead={t('settings.udhaar.lead')}
+      state={state}
+      dirty={form.formState.isDirty}
+      submitting={form.formState.isSubmitting}
+      onSubmit={() => void form.handleSubmit(save)()}
+    >
+      <ChoiceCards
+        label={t('settings.udhaar.overLimit')}
+        error={errorText('overCreditLimit', form.formState.errors.overCreditLimit?.message)}
+        choices={[
+          { value: 'warn', title: t('settings.udhaar.warn'), hint: t('settings.udhaar.warnHint') },
+          {
+            value: 'block',
+            title: t('settings.udhaar.block'),
+            hint: t('settings.udhaar.blockHint'),
+          },
+        ]}
+        inputProps={form.register('overCreditLimit')}
       />
     </SettingsCard>
   );

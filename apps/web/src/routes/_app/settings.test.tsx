@@ -211,6 +211,19 @@ test('switches negative stock at billing from warn to block', async () => {
   expect(stock.getByRole('radio', { name: /^Block/ })).toBeChecked();
 });
 
+test('switches udhaar past the credit limit from warn to block', async () => {
+  const fetchMock = stubApi({ status: 200, body: VIEW });
+  renderSettings();
+  const user = userEvent.setup();
+  const udhaar = within(await card('Udhaar'));
+  expect(udhaar.getByRole('radio', { name: /^Warn/ })).toBeChecked();
+  await user.click(udhaar.getByRole('radio', { name: /^Block/ }));
+  await user.click(udhaar.getByRole('button', { name: 'Save' }));
+  expect(await udhaar.findByRole('status')).toHaveTextContent('Saved');
+  expect(putsTo(fetchMock, 'udhaar')).toEqual([{ overCreditLimit: 'block' }]);
+  expect(udhaar.getByRole('radio', { name: /^Block/ })).toBeChecked();
+});
+
 test('switches an alert type off for the app and saves the list that is left', async () => {
   const fetchMock = stubApi({ status: 200, body: VIEW });
   renderSettings();

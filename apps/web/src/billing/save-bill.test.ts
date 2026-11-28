@@ -85,6 +85,39 @@ describe('billDraft', () => {
   });
 });
 
+describe('billDraft with udhaar', () => {
+  const credit = {
+    approvalId: '00000000-0000-4000-8000-0000000000d2',
+    billKey: '',
+    amountPaise: 6_600,
+    expiresAt: '2026-11-22T10:00:00.000Z',
+  };
+
+  test("carries the owner's credit OK only on a bill with udhaar, and only for this bill", () => {
+    const bill = open();
+    const udhaar = [
+      { mode: 'cash' as const, amountPaise: 600 },
+      { mode: 'udhaar' as const, amountPaise: 6_000 },
+    ];
+    const withOk = billDraft({ ...bill, customerId: HELD }, udhaar, 6_600, null, null, {
+      ...credit,
+      billKey: bill.billKey,
+    });
+    expect(withOk).toMatchObject({ creditApprovalId: credit.approvalId });
+    expect(billDraftSchema.safeParse(withOk).success).toBe(true);
+    // Another bill's OK, or no udhaar on this bill, sends nothing.
+    expect(billDraft(bill, udhaar, 6_600, null, null, credit)).not.toHaveProperty(
+      'creditApprovalId',
+    );
+    expect(
+      billDraft(bill, [{ mode: 'cash', amountPaise: 6_600 }], 6_600, null, null, {
+        ...credit,
+        billKey: bill.billKey,
+      }),
+    ).not.toHaveProperty('creditApprovalId');
+  });
+});
+
 describe('saveBill', () => {
   const draft = billDraft(open(), [{ mode: 'cash', amountPaise: 6_600 }], 6_600, null, null);
 

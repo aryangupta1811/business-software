@@ -2212,3 +2212,39 @@ Entry format:
 - **Why / what I learned:** the Code Integrity log says which file was blocked and by whom; the popup doesn't. Smart App Control can't make an exception for one app.
 - **Say it in an interview:** "I looked up the blocked file in the event log before touching the security setting."
 - **Follow-ups to expect:** why not switch it off? (it protects the whole computer, for one editor's update).
+
+### 2026-11-28 — An opening balance entered late still counts as the oldest `#backend` `#udhaar` `#architecture`
+- **What happened:** the owner wanted the old notebook's balance to be enterable at any time, not only before a customer's first entry. Because "oldest bills first" is computed when the ledger is read (ADR 0050), the fix was one stable sort in `unpaidEntries` that puts the opening entry first, and one query change in `moveUdhaar` so only a second opening is refused. No stored balance, no migration. The test came first: a bill, a payment, then an opening, with the payment clearing the opening before the bill.
+- **Why / what I learned:** a value you compute on read can be reinterpreted later without migrating anything. Had the allocation of payments to bills been stored, a late opening would have meant rewriting old rows.
+- **Say it in an interview:** "I chose to compute which bills are unpaid instead of storing it. When the owner changed the opening-balance rule, I changed a sort and a query, and no data."
+- **Follow-ups to expect:** what stops two openings at once? (the account row lock, and a unique index on opening entries per customer).
+
+### 2026-11-28 — A new Tailwind text size was silently dropped by tailwind-merge `#frontend` `#gotcha`
+- **What happened:** I added a `text-display` size for a customer's balance next to `text-warning`. A test on the rendered class list showed the size was missing: `tailwind-merge` reads an unknown `text-*` as a colour, so the later colour class replaced it. The project already tells its merge function about its own sizes; `display` was not in the list.
+- **Why / what I learned:** when a design token shares a prefix with another group, tell the class merger about it, and test the rendered class instead of trusting the stylesheet. The Hindi line-height test keeps the same list of sizes, so it learned the new size too.
+- **Say it in an interview:** "A custom font size vanished in the browser because the class merger took it for a colour; a test that asked for the class found it."
+- **Follow-ups to expect:** why a custom size at all? (the design system has a fixed scale, and Hindi needs a taller line for each size).
+
+### 2026-11-28 — The shortcut registry refused a plain `P` `#frontend` `#process`
+- **What happened:** the design said "Record payment (`P`)". The registry throws at once for a letter without Ctrl or Alt, because it would fire while someone types a name or an amount. The page uses Alt+P and the design notes the change.
+- **Why / what I learned:** a rule enforced in one place (the registry) beats a rule each screen has to remember. When a design and a guard disagree, change the design and write down why.
+- **Say it in an interview:** "Keyboard shortcuts go through one registry that rejects keys which clash with typing, so a screen can't add a bug by picking a bad one."
+- **Follow-ups to expect:** what about a Hindi keyboard layout? (letters match the physical key, so Alt+P works where that key types another letter).
+
+### 2026-11-28 — Overdue buckets read the same function as the ledger page `#backend` `#udhaar` `#testing`
+- **What happened:** the overdue buckets, "who to remind" and the customer's unpaid list all call `unpaidEntries`, so they cannot disagree. The API test builds a customer who has an old notebook balance, a bill from today and a payment: the payment clears the notebook first, so part of it is still late and the whole bill is not. The same test would fail if a bucket were read from a stored allocation of payments to bills.
+- **Why / what I learned:** when several views need the same derived fact, one tested function beats several queries. A test with a late-entered opening balance proves the fact is derived and not stored.
+- **Say it in an interview:** "The overdue report, the reminder list and the statement all use one function that works out which bills are unpaid. A test with a payment landing on an old balance shows they agree."
+- **Follow-ups to expect:** what does it cost to read every entry of every customer who owes? (fine for a shop; the next step would be a per-customer cache or a SQL window, measured first).
+
+### 2026-11-28 — Two branches that need the same file: copy it byte for byte `#git` `#process`
+- **What happened:** P1.19 needs a WhatsApp link builder, and P1.15's open branch already has `packages/shared/src/whatsapp.ts` that isn't on `main` yet. Instead of inventing a second one, I copied that file and its test unchanged. If both branches add the identical file, git merges them without a conflict; only the one line in `index.ts` needs a look.
+- **Why / what I learned:** when two lanes need one helper before either has merged, agree on the name and make the second copy identical, then say so in the pull request. A different version would be an add/add conflict for the owner to solve.
+- **Say it in an interview:** "Two parallel branches needed the same helper. I took the other branch's exact file, so the merge is a no-op."
+- **Follow-ups to expect:** what if the other branch changes the file before merging? (the second PR to merge takes theirs; the tests of both pass against it).
+
+### 2026-11-28 — A 204 answer broke the test helper, not the route `#testing` `#gotcha`
+- **What happened:** the reminder log route answers `204 No Content`. The integration test's `call` helper always did `response.json()`, which throws on an empty body, so the first run failed with "Unexpected end of JSON input" even though the route was right. The helper now reads text first and returns `null` for an empty body.
+- **Why / what I learned:** the first new status code of a kind finds the helpers that assumed every answer is JSON. The web client already handled 204; the test helper did not.
+- **Say it in an interview:** "A new 204 route failed in the test helper, which assumed a JSON body. I fixed the helper, not the route."
+- **Follow-ups to expect:** why 204 here? (the screen needs nothing back, and the owner's WhatsApp must open whatever the log does).

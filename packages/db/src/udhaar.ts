@@ -128,11 +128,11 @@ export async function moveUdhaar(tx: Transaction, input: MoveUdhaarInput): Promi
     }
   }
   if (kind === 'opening') {
-    // The old notebook comes first: once there is any entry, an opening would sit out of order.
+    // Once per customer, whenever it is entered (03 #20); `unpaidEntries` counts it as the oldest.
     const [existing] = await tx
       .select({ id: udhaarEntries.id })
       .from(udhaarEntries)
-      .where(eq(udhaarEntries.customerId, customerId))
+      .where(and(eq(udhaarEntries.customerId, customerId), eq(udhaarEntries.kind, 'opening')))
       .limit(1);
     if (existing !== undefined) throw new UdhaarRuleError('opening_exists', customerId);
   }

@@ -4,12 +4,15 @@ import { expect, test, vi } from 'vitest';
 import { changeLanguage } from '../i18n';
 import { ShortcutProvider } from '../shortcuts/shortcut-provider';
 import { PaymentPanel } from './payment-panel';
+import type { UdhaarAccess } from './udhaar-access';
 
 const TOTAL = 14_150; // ₹141.50
 
 function panel(props: {
   open: boolean;
   totalPaise: number;
+  udhaar?: UdhaarAccess;
+  onNeedCustomer?: () => void;
   onClose: () => void;
   onReady: () => void;
 }) {
@@ -20,14 +23,31 @@ function panel(props: {
   );
 }
 
-function open(props: { totalPaise?: number } = {}) {
+function open(props: { totalPaise?: number; udhaar?: UdhaarAccess } = {}) {
   const onClose = vi.fn();
   const onReady = vi.fn();
+  const onNeedCustomer = vi.fn();
   const view = render(
-    panel({ open: true, totalPaise: props.totalPaise ?? TOTAL, onClose, onReady }),
+    panel({
+      open: true,
+      totalPaise: props.totalPaise ?? TOTAL,
+      ...(props.udhaar && { udhaar: props.udhaar }),
+      onNeedCustomer,
+      onClose,
+      onReady,
+    }),
   );
-  return { onClose, onReady, ...view };
+  return { onClose, onReady, onNeedCustomer, ...view };
 }
+
+const ACCOUNT: UdhaarAccess = {
+  state: 'ready',
+  customerName: 'Meena Stores',
+  advancePaise: 0,
+  standing: { balancePaise: 20_000, creditLimitPaise: 50_000 },
+  who: 'owner',
+  setting: 'warn',
+};
 
 const received = () => screen.getByRole('textbox', { name: 'Cash received' });
 const alt = (key: string) => userEvent.keyboard(`{Alt>}${key}{/Alt}`);
@@ -213,4 +233,100 @@ test('speaks Hindi', async () => {
   open();
   expect(screen.getByRole('dialog', { name: 'भुगतान' })).toBeInTheDocument();
   expect(screen.getByRole('textbox', { name: 'नकद मिला' })).toBeInTheDocument();
+});
+
+// ---- Udhaar and the advance (P1.18 design §5) ----
+
+test('without udhaar rights the panel offers only the four ways of paying', () => {
+  open();
+  expect(screen.queryByRole('button', { name: /^Udhaar/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /^From advance/ })).not.toBeInTheDocument();
+});
+
+test('with a customer, Udhaar is the fifth mode, on key 5, and takes no reference', async () => {
+  const { onReady } = open({ udhaar: ACCOUNT });
+  expect(screen.queryByRole('button', { name: /^From advance/ })).not.toBeInTheDocument();
+  await userEvent.keyboard('{Alt>}1{/Alt}100');
+  await alt('a');
+  await alt('5');
+  expect(screen.getByRole('button', { name: /^Udhaar/, pressed: true })).toBeInTheDocument();
+  expect(screen.getByText("Goes on Meena Stores's account.")).toBeInTheDocument();
+  expect(screen.queryByRole('textbox', { name: /^Reference/ })).not.toBeInTheDocument();
+  await userEvent.keyboard('{Enter}');
+  expect(onReady).toHaveBeenCalledWith([
+    { mode: 'cash', amountPaise: 10_000 },
+    { mode: 'udhaar', amountPaise: 4_150 },
+  ]);
+});
+
+test('a plain 5 sets the mode while a mode button has the focus', async () => {
+  open({ udhaar: ACCOUNT });
+  screen.getByRole('button', { name: /^Card/ }).focus();
+  await userEvent.keyboard('5');
+  expect(screen.getByRole('button', { name: /^Udhaar/, pressed: true })).toBeInTheDocument();
+});
+
+test('with no customer yet it says so and sends the cashier to add one', async () => {
+  const { onNeedCustomer } = open({ udhaar: { ...ACCOUNT, state: 'needs_customer' } });
+  expect(screen.queryByRole('button', { name: /^Udhaar/ })).not.toBeInTheDocument();
+  await alt('5');
+  expect(screen.getByRole('button', { name: /^Cash/, pressed: true })).toBeInTheDocument();
+  expect(screen.getByText(/Udhaar needs a customer with a name and phone number/)).toBeVisible();
+  await userEvent.click(screen.getByRole('button', { name: /Add the customer's name and phone/ }));
+  expect(onNeedCustomer).toHaveBeenCalledOnce();
+});
+
+test('From advance shows only with an advance, key 6, and never takes more than the advance', async () => {
+  const { onReady } = open({
+    totalPaise: 10_000,
+    udhaar: {
+      ...ACCOUNT,
+      advancePaise: 3_000,
+      standing: { balancePaise: -3_000, creditLimitPaise: null },
+    },
+  });
+  await userEvent.keyboard('{Alt>}1{/Alt}');
+  await alt('6');
+  expect(screen.getByRole('button', { name: /^From advance/, pressed: true })).toBeInTheDocument();
+  expect(screen.getByText('Advance available: ₹30.00.')).toBeInTheDocument();
+  const amount = screen.getByRole('textbox', { name: 'Amount' });
+  await userEvent.clear(amount);
+  await userEvent.type(amount, '50');
+  expect(screen.getByText('Only cash can be more than what’s left')).toBeInTheDocument();
+  await userEvent.clear(amount);
+  await userEvent.type(amount, '30');
+  await alt('a');
+  await userEvent.keyboard('{Enter}');
+  expect(onReady).toHaveBeenCalledWith([
+    { mode: 'advance', amountPaise: 3_000 },
+    { mode: 'cash', amountPaise: 7_000 },
+  ]);
+});
+
+test('warns the owner when the udhaar goes past the credit limit, but lets the bill save', async () => {
+  const { onReady } = open({
+    totalPaise: 40_000,
+    udhaar: { ...ACCOUNT, standing: { balancePaise: 20_000, creditLimitPaise: 50_000 } },
+  });
+  await alt('5');
+  expect(
+    screen.getByText(/Over the credit limit: Meena Stores would owe ₹600.00, limit ₹500.00/),
+  ).toBeInTheDocument();
+  await userEvent.keyboard('{Enter}');
+  expect(onReady).toHaveBeenCalledWith([{ mode: 'udhaar', amountPaise: 40_000 }]);
+});
+
+test('tells staff the owner is asked for a password when the udhaar goes past the limit', async () => {
+  open({
+    totalPaise: 40_000,
+    udhaar: { ...ACCOUNT, who: 'staff' },
+  });
+  await alt('5');
+  expect(screen.getByText(/The owner's password is asked when you press Done/)).toBeInTheDocument();
+});
+
+test('speaks Hindi about udhaar', async () => {
+  await changeLanguage('hi');
+  open({ udhaar: ACCOUNT });
+  expect(screen.getByRole('button', { name: /^उधार/ })).toBeInTheDocument();
 });

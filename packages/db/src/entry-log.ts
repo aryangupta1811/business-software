@@ -70,6 +70,8 @@ export const ENTRY_ACTIONS = {
   'udhaar.payment_recorded': { reasonRequired: false },
   'udhaar.payment_reversed': { reasonRequired: true },
   'udhaar.opening_set': { reasonRequired: true },
+  // P1.19 (`03` #15, ADR 0049): the owner opened WhatsApp with a reminder. Prepared, not delivered.
+  'udhaar.reminder_prepared': { reasonRequired: false },
 } as const satisfies Record<string, { reasonRequired: boolean }>;
 
 export type EntryAction = keyof typeof ENTRY_ACTIONS;

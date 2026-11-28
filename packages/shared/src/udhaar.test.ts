@@ -118,6 +118,20 @@ describe('unpaidEntries (design §4: oldest bills first, computed)', () => {
     ]);
   });
 
+  it('counts an opening balance entered after other entries as the oldest (03 #20)', () => {
+    const bill = entry('bill', 1_000);
+    const p = entry('payment', -400);
+    const opening = entry('opening', 800);
+    // The payment clears the notebook's old udhaar first, so the newer bill is the one still owed.
+    expect(owed([bill, p, opening], 1_400)).toEqual([
+      [opening.id, 400],
+      [bill.id, 1_000],
+    ]);
+    // Paid down past the opening, the bill is eaten into last.
+    const second = entry('payment', -1_000);
+    expect(owed([bill, p, opening, second], 400)).toEqual([[bill.id, 400]]);
+  });
+
   it('keeps each entry as given, with its own due date', () => {
     const a = entry('bill', 100, { dueDate: '2026-12-31' });
     expect(unpaidEntries([a], 100)).toEqual([{ entry: a, unpaidPaise: 100 }]);

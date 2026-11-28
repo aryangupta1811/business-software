@@ -13,6 +13,7 @@ import { Button } from '../components/ui/button';
 import { Dialog, DialogActions } from '../components/ui/dialog';
 import { Field } from '../components/ui/field';
 import { Input } from '../components/ui/input';
+import type { CreditApproval } from './credit';
 import { discountText, parseDiscount, type Approval } from './discounts';
 
 const percentText = (basisPoints: number) => `${String(basisPoints / 100)}%`;
@@ -165,6 +166,67 @@ export function ApprovalDialog({
           })}
         </p>
       )}
+    </OwnerPasswordDialog>
+  );
+}
+
+/**
+ * Udhaar past a customer's credit limit (`03` #9, #18): the owner types their password for this
+ * bill, and the OK covers up to `udhaarPaise` of udhaar for 30 minutes. Same dialog as a
+ * discount's, its own approval.
+ */
+export function CreditApprovalDialog({
+  open,
+  billKey,
+  customerName,
+  udhaarPaise,
+  balanceAfterPaise,
+  limitPaise,
+  onApproved,
+  onClose,
+}: {
+  open: boolean;
+  billKey: string;
+  customerName: string;
+  udhaarPaise: number;
+  balanceAfterPaise: number;
+  /** Null: the customer has no limit set (`03` #17). */
+  limitPaise: number | null;
+  onApproved: (approval: CreditApproval) => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const ask = async (ownerPassword: string) => {
+    const answer = await apiRequest<ApprovalView>('POST', '/api/billing/approvals', {
+      billKey,
+      kind: 'credit_limit',
+      amountPaise: udhaarPaise,
+      ownerPassword,
+    });
+    onApproved({ ...answer, billKey, amountPaise: udhaarPaise });
+  };
+  return (
+    <OwnerPasswordDialog
+      open={open}
+      title={t('billing.creditApproval.title')}
+      confirm={t('billing.creditApproval.confirm')}
+      failedText={t('billing.approval.failed')}
+      onSubmit={ask}
+      onClose={onClose}
+    >
+      <p className="text-muted">
+        {t(
+          limitPaise === null
+            ? 'billing.creditApproval.bodyNoLimit'
+            : 'billing.creditApproval.body',
+          {
+            name: customerName,
+            after: formatPaise(balanceAfterPaise),
+            limit: limitPaise === null ? '' : formatPaise(limitPaise),
+            amount: formatPaise(udhaarPaise),
+          },
+        )}
+      </p>
     </OwnerPasswordDialog>
   );
 }

@@ -1704,6 +1704,52 @@
     "notFound": {
       "title": "No such customer",
       "body": "They may have been typed wrong. Open them from the customers list."
+    },
+    "tabs": {
+      "label": "Customers views",
+      "all": "All customers",
+      "reminders": "Reminders"
+    },
+    "views": {
+      "title": "Udhaar at a glance",
+      "loadFailed": "Couldn't load the overview. Check the connection and try again.",
+      "notDue": "Not due yet",
+      "buckets": {
+        "days_1_30": "1 to 30 days late",
+        "days_31_60": "31 to 60 days late",
+        "days_61_90": "61 to 90 days late",
+        "days_over_90": "Over 90 days late"
+      },
+      "customers_one": "{{count}} customer",
+      "customers_other": "{{count}} customers",
+      "overdue": {
+        "title": "Overdue",
+        "of": "Past its due date, of {{owed}} owed in all"
+      },
+      "collected": {
+        "title": "Collected in the last 7 days",
+        "payments_one": "{{count}} payment",
+        "payments_other": "{{count}} payments",
+        "range": "{{from}} to {{to}}"
+      },
+      "top": {
+        "title": "Who owes the most",
+        "none": "Nobody owes anything.",
+        "overdue": "{{amount}} overdue"
+      }
+    },
+    "reminders": {
+      "title": "Customers to remind",
+      "lead": "Everyone with something past its due date, the longest overdue first. Review the list, then send each reminder yourself: WhatsApp opens with the message filled in and you press send there.",
+      "message": "Hello {{name}}, this is {{shop}}. You owe us {{amount}}, the oldest part was due on {{date}}. Please pay when you can. Thank you.",
+      "columns": {
+        "overdue": "Overdue",
+        "since": "Oldest due date"
+      },
+      "send": "Send on WhatsApp",
+      "sendNamed": "Send {{name}} a reminder on WhatsApp",
+      "opened": "WhatsApp opened",
+      "none": "Nobody is past their due date."
     }
   }
 }

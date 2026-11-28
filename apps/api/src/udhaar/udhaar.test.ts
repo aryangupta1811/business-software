@@ -18,6 +18,7 @@ import {
   type UdhaarCustomersView,
   type UdhaarLedgerView,
   type UdhaarMoveView,
+  type UdhaarSummaryView,
 } from '@business-software/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../app.js';
@@ -64,7 +65,9 @@ describe('udhaar', () => {
       },
       ...(body !== undefined && { body: JSON.stringify(body) }),
     });
-    return { status: response.status, body: (await response.json()) as T };
+    // A 204 has no body.
+    const text = await response.text();
+    return { status: response.status, body: (text === '' ? null : JSON.parse(text)) as T };
   }
 
   async function shop(): Promise<Caller> {
@@ -1155,6 +1158,199 @@ describe('udhaar', () => {
         name: 'Sunita C',
       });
       expect(kept.body).toMatchObject({ creditLimitPaise: 250_000, dueDays: 15 });
+    });
+  });
+
+  describe('the udhaar views (P1.19; Module 03 #12, #13, #15)', () => {
+    const summary = (caller: Caller) => call<UdhaarSummaryView>('GET', '/udhaar/summary', caller);
+
+    /** The old notebook's balance for `who`, already `daysLate` days past its due date (30 days terms). */
+    const owedFor = (caller: Caller, who: CustomerView, amountPaise: number, daysLate: number) =>
+      call<UdhaarMoveView>('POST', '/udhaar/opening', caller, {
+        requestKey: crypto.randomUUID(),
+        customerId: who.id,
+        amountPaise,
+        asOf: addDays(today, -(30 + daysLate)),
+        reason: 'Old notebook',
+      });
+
+    /** Moves a payment's day, as if it were taken `daysAgo` days ago (the ledger itself is untouched). */
+    const backdate = (who: CustomerView, daysAgo: number) =>
+      admin.pool.query(
+        `update udhaar_entries set business_date = $2
+          where customer_id = $1 and kind = 'payment'`,
+        [who.id, addDays(today, -daysAgo)],
+      );
+
+    it('sorts what is owed into buckets from the unpaid entries, and lists who to remind', async () => {
+      const a = await shop();
+      const item = await rice(a);
+      const anil = await customer(a, { name: 'Anil' });
+      const bina = await customer(a, { name: 'Bina' });
+      const chetan = await customer(a, { name: 'Chetan' });
+      const dev = await customer(a, { name: 'Dev' });
+      const esha = await customer(a, { name: 'Esha' });
+      const farid = await customer(a, { name: 'Farid' });
+      const gita = await customer(a, { name: 'Gita' });
+      const hari = await customer(a, { name: 'Hari' });
+      const indu = await customer(a, { name: 'Indu' });
+      const jaya = await customer(a, { name: 'Jaya' });
+      // Late by 10, 45, 75 and 200 days.
+      await owedFor(a, anil, 10_000, 10);
+      await owedFor(a, bina, 20_000, 45);
+      await owedFor(a, chetan, 30_000, 75);
+      await owedFor(a, dev, 40_000, 200);
+      await pay(a, dev, 15_000);
+      // Not due yet.
+      await save(a, bill(item, esha, 1, [udhaar(RICE)]));
+      // Only an advance, and a payment that was taken back: neither owes anything.
+      await pay(a, farid, 5_000);
+      const mistake = await pay(a, jaya, 7_000);
+      expect(
+        (
+          await call('POST', `/udhaar/payments/${mistake.body.entry.id}/reverse`, a, {
+            reason: 'Wrong customer',
+            ownerPassword: PASSWORD,
+          })
+        ).status,
+      ).toBe(201);
+      // 90 days late on the notebook, then a bill today; the payment clears the notebook first,
+      // so 5,000 of it is still late and the whole bill is not.
+      await owedFor(a, gita, 8_000, 90);
+      await save(a, bill(item, gita, 1, [udhaar(RICE)]));
+      await pay(a, gita, 3_000);
+      // Payments six and seven days ago: only the first is in "the last seven days".
+      await pay(a, hari, 2_000);
+      await backdate(hari, 6);
+      await pay(a, indu, 4_000);
+      await backdate(indu, 7);
+
+      const seen = await summary(a);
+      expect(seen.status).toBe(200);
+      expect(seen.body).toMatchObject({
+        today,
+        owedPaise: 10_000 + 20_000 + 30_000 + 25_000 + RICE + (5_000 + RICE),
+        notDuePaise: RICE + RICE,
+        overduePaise: 10_000 + 20_000 + 30_000 + 25_000 + 5_000,
+        collected: {
+          fromDate: addDays(today, -6),
+          toDate: today,
+          paise: 15_000 + 5_000 + 3_000 + 2_000,
+          payments: 4,
+        },
+      });
+      expect(seen.body.buckets).toEqual([
+        { bucket: 'days_1_30', paise: 10_000, customers: 1 },
+        { bucket: 'days_31_60', paise: 20_000, customers: 1 },
+        { bucket: 'days_61_90', paise: 30_000 + 5_000, customers: 2 },
+        { bucket: 'days_over_90', paise: 25_000, customers: 1 },
+      ]);
+      expect(
+        seen.body.topOwing.map((row) => [row.name, row.balancePaise, row.overduePaise]),
+      ).toEqual([
+        ['Chetan', 30_000, 30_000],
+        ['Dev', 25_000, 25_000],
+        ['Bina', 20_000, 20_000],
+        ['Gita', 5_000 + RICE, 5_000],
+        ['Esha', RICE, 0],
+      ]);
+      expect(
+        seen.body.reminders.map((row) => [
+          row.name,
+          row.daysLate,
+          row.oldestDueDate,
+          row.overduePaise,
+        ]),
+      ).toEqual([
+        ['Dev', 200, addDays(today, -200), 25_000],
+        ['Gita', 90, addDays(today, -90), 5_000],
+        ['Chetan', 75, addDays(today, -75), 30_000],
+        ['Bina', 45, addDays(today, -45), 20_000],
+        ['Anil', 10, addDays(today, -10), 10_000],
+      ]);
+      expect(seen.body.reminders[0]).toMatchObject({
+        id: dev.id,
+        phone: dev.phone,
+      });
+    });
+
+    it('is all zero for a business with nothing owed, and keeps businesses apart', async () => {
+      const a = await shop();
+      const b = await shop();
+      await owedFor(b, await customer(b), 9_000, 40);
+      const empty = await summary(a);
+      expect(empty.body).toMatchObject({
+        today,
+        owedPaise: 0,
+        notDuePaise: 0,
+        overduePaise: 0,
+        collected: { paise: 0, payments: 0 },
+        topOwing: [],
+        reminders: [],
+      });
+      expect(empty.body.buckets.map((row) => row.paise)).toEqual([0, 0, 0, 0]);
+      expect((await summary(b)).body.overduePaise).toBe(9_000);
+    });
+
+    it('follows a customer’s own due days, fixed when each entry was made', async () => {
+      const a = await shop();
+      const sunita = await terms(a, await customer(a), { dueDays: 10 });
+      // 10 due days: the notebook as of 25 days ago fell due 15 days ago.
+      await call('POST', '/udhaar/opening', a, {
+        requestKey: crypto.randomUUID(),
+        customerId: sunita.id,
+        amountPaise: 4_000,
+        asOf: addDays(today, -25),
+        reason: 'Old notebook',
+      });
+      const seen = await summary(a);
+      expect(seen.body.reminders.map((row) => row.daysLate)).toEqual([15]);
+      // Changing the terms later does not move the entry that was already made.
+      await terms(a, sunita, { dueDays: 90 });
+      expect((await summary(a)).body.reminders.map((row) => row.daysLate)).toEqual([15]);
+    });
+
+    it('needs customers.view', async () => {
+      const a = await shop();
+      expect((await summary(cashier(a))).status).toBe(403);
+      expect((await summary(creditCashier(a))).status).toBe(200);
+    });
+
+    it('logs that a reminder was prepared, who did it and what it said', async () => {
+      const a = await shop();
+      const sunita = await customer(a);
+      await owedFor(a, sunita, 4_000, 20);
+      const done = await call('POST', '/udhaar/reminders/prepared', creditCashier(a), {
+        customerId: sunita.id,
+      });
+      expect(done.status).toBe(204);
+      const [entry] = await logOf(a, 'udhaar.reminder_prepared');
+      expect(entry).toMatchObject({
+        entity_id: sunita.id,
+        after: { balancePaise: 4_000, overduePaise: 4_000, daysLate: 20 },
+      });
+    });
+
+    it('refuses a reminder for a customer who owes nothing, or who belongs to another business', async () => {
+      const a = await shop();
+      const b = await shop();
+      const sunita = await customer(a);
+      const theirs = await customer(b);
+      await owedFor(b, theirs, 4_000, 20);
+      expect(
+        (await call('POST', '/udhaar/reminders/prepared', a, { customerId: sunita.id })).status,
+      ).toBe(409);
+      expect(
+        (await call('POST', '/udhaar/reminders/prepared', a, { customerId: theirs.id })).status,
+      ).toBe(404);
+      expect(
+        (await call('POST', '/udhaar/reminders/prepared', cashier(a), { customerId: sunita.id }))
+          .status,
+      ).toBe(403);
+      expect(
+        (await call('POST', '/udhaar/reminders/prepared', a, { customerId: 'x' })).status,
+      ).toBe(400);
+      expect(await logOf(a, 'udhaar.reminder_prepared')).toEqual([]);
     });
   });
 });

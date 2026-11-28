@@ -11,16 +11,51 @@ import { useDateWords } from '../lib/dates';
 import { useShortcut } from '../shortcuts/use-shortcut';
 import { useUdhaarCustomers } from './api';
 import { BalanceBadge } from './balance';
+import { Overview } from './overview';
+import { Reminders } from './reminders';
 import { daysOverdue } from './standing';
 
 const SEARCH_DELAY_MS = 250;
 
+export type CustomersTab = 'all' | 'reminders';
+
 /**
  * The Customers page (P1.18 design §7): everyone with what they owe, the credit limit and the
- * oldest due date; "Owes money" keeps only those with a balance. Customers are added at the
- * counter (F3), where the bill needs them.
+ * oldest due date; "Owes money" keeps only those with a balance. P1.19 adds the overview above
+ * the list and the Reminders tab. Customers are added at the counter (F3), where the bill needs them.
  */
-export function CustomersPage() {
+export function CustomersPage({ tab }: { tab: CustomersTab }) {
+  const { t } = useTranslation();
+  const tabs: CustomersTab[] = ['all', 'reminders'];
+  return (
+    <div className="flex flex-col gap-5">
+      <div role="tablist" aria-label={t('udhaar.tabs.label')} className="flex gap-1">
+        {tabs.map((name) => (
+          <Link
+            key={name}
+            to="/customers"
+            search={name === 'all' ? {} : { tab: name }}
+            role="tab"
+            aria-selected={tab === name}
+            className="rounded-lg px-3 py-1.5 text-muted hover:bg-surface-muted aria-selected:bg-surface-muted aria-selected:font-semibold aria-selected:text-foreground"
+          >
+            {t(`udhaar.tabs.${name}`)}
+          </Link>
+        ))}
+      </div>
+      {tab === 'all' ? (
+        <>
+          <Overview />
+          <CustomerList />
+        </>
+      ) : (
+        <Reminders />
+      )}
+    </div>
+  );
+}
+
+function CustomerList() {
   const { t } = useTranslation();
   const searchRef = useRef<HTMLInputElement>(null);
   const searchId = useId();

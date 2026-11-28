@@ -2230,3 +2230,21 @@ Entry format:
 - **Why / what I learned:** a rule enforced in one place (the registry) beats a rule each screen has to remember. When a design and a guard disagree, change the design and write down why.
 - **Say it in an interview:** "Keyboard shortcuts go through one registry that rejects keys which clash with typing, so a screen can't add a bug by picking a bad one."
 - **Follow-ups to expect:** what about a Hindi keyboard layout? (letters match the physical key, so Alt+P works where that key types another letter).
+
+### 2026-11-28 — Overdue buckets read the same function as the ledger page `#backend` `#udhaar` `#testing`
+- **What happened:** the overdue buckets, "who to remind" and the customer's unpaid list all call `unpaidEntries`, so they cannot disagree. The API test builds a customer who has an old notebook balance, a bill from today and a payment: the payment clears the notebook first, so part of it is still late and the whole bill is not. The same test would fail if a bucket were read from a stored allocation of payments to bills.
+- **Why / what I learned:** when several views need the same derived fact, one tested function beats several queries. A test with a late-entered opening balance proves the fact is derived and not stored.
+- **Say it in an interview:** "The overdue report, the reminder list and the statement all use one function that works out which bills are unpaid. A test with a payment landing on an old balance shows they agree."
+- **Follow-ups to expect:** what does it cost to read every entry of every customer who owes? (fine for a shop; the next step would be a per-customer cache or a SQL window, measured first).
+
+### 2026-11-28 — Two branches that need the same file: copy it byte for byte `#git` `#process`
+- **What happened:** P1.19 needs a WhatsApp link builder, and P1.15's open branch already has `packages/shared/src/whatsapp.ts` that isn't on `main` yet. Instead of inventing a second one, I copied that file and its test unchanged. If both branches add the identical file, git merges them without a conflict; only the one line in `index.ts` needs a look.
+- **Why / what I learned:** when two lanes need one helper before either has merged, agree on the name and make the second copy identical, then say so in the pull request. A different version would be an add/add conflict for the owner to solve.
+- **Say it in an interview:** "Two parallel branches needed the same helper. I took the other branch's exact file, so the merge is a no-op."
+- **Follow-ups to expect:** what if the other branch changes the file before merging? (the second PR to merge takes theirs; the tests of both pass against it).
+
+### 2026-11-28 — A 204 answer broke the test helper, not the route `#testing` `#gotcha`
+- **What happened:** the reminder log route answers `204 No Content`. The integration test's `call` helper always did `response.json()`, which throws on an empty body, so the first run failed with "Unexpected end of JSON input" even though the route was right. The helper now reads text first and returns `null` for an empty body.
+- **Why / what I learned:** the first new status code of a kind finds the helpers that assumed every answer is JSON. The web client already handled 204; the test helper did not.
+- **Say it in an interview:** "A new 204 route failed in the test helper, which assumed a JSON body. I fixed the helper, not the route."
+- **Follow-ups to expect:** why 204 here? (the screen needs nothing back, and the owner's WhatsApp must open whatever the log does).

@@ -1704,6 +1704,52 @@
     "notFound": {
       "title": "Aisa koi customer nahin",
       "body": "Shayad pata galat likha gaya. Customers ki list se kholein."
+    },
+    "tabs": {
+      "label": "Customers ke drishya",
+      "all": "Sabhi customers",
+      "reminders": "Yaad dilana"
+    },
+    "views": {
+      "title": "Udhaar ek nazar mein",
+      "loadFailed": "Saransh load nahin ho saka. Connection dekhkar phir koshish karein.",
+      "notDue": "Abhi due nahin",
+      "buckets": {
+        "days_1_30": "1 se 30 din late",
+        "days_31_60": "31 se 60 din late",
+        "days_61_90": "61 se 90 din late",
+        "days_over_90": "90 din se zyada late"
+      },
+      "customers_one": "{{count}} customer",
+      "customers_other": "{{count}} customers",
+      "overdue": {
+        "title": "Due tareekh nikal chuki",
+        "of": "Kul {{owed}} baaki mein se due tareekh ke baad ka"
+      },
+      "collected": {
+        "title": "Pichhle 7 din mein vasoola",
+        "payments_one": "{{count}} bhugtaan",
+        "payments_other": "{{count}} bhugtaan",
+        "range": "{{from}} se {{to}}"
+      },
+      "top": {
+        "title": "Sabse zyada baaki kis par",
+        "none": "Kisi par kuch baaki nahin.",
+        "overdue": "{{amount}} due tareekh ke baad"
+      }
+    },
+    "reminders": {
+      "title": "Jinhein yaad dilana hai",
+      "lead": "Jin par due tareekh ke baad ka baaki hai, sabse purane pehle. List dekhein, phir har yaad dilana khud bhejein: WhatsApp message bharkar khulta hai aur bhejna aap wahin dabate hain.",
+      "message": "Namaste {{name}}, yeh {{shop}} se hai. Aap par {{amount}} baaki hai, sabse purana hissa {{date}} ko due tha. Kripya jab ho sake chuka dein. Dhanyavaad.",
+      "columns": {
+        "overdue": "Due tareekh ke baad",
+        "since": "Sabse purani due tareekh"
+      },
+      "send": "WhatsApp par bhejein",
+      "sendNamed": "{{name}} ko WhatsApp par yaad dilayein",
+      "opened": "WhatsApp khula",
+      "none": "Kisi ki bhi due tareekh nahin nikli."
     }
   }
 }

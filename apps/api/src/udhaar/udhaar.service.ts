@@ -28,8 +28,18 @@ import {
 } from '@business-software/db';
 import {
   businessDate,
+  collectedFrom,
+  daysBetween,
+  OVERDUE_BUCKETS,
+  overdueBreakdown,
+  TOP_OWING_COUNT,
   UDHAAR_PAGE_SIZE,
   unpaidEntries,
+  type OverdueBreakdown,
+  type ReminderPreparedInput,
+  type UdhaarOwingRow,
+  type UdhaarReminderRow,
+  type UdhaarSummaryView,
   type LedgerEntry,
   type UdhaarCustomerRow,
   type UdhaarCustomersQuery,
@@ -76,6 +86,21 @@ const asLedgerEntry = (row: EntryRow): LedgerEntry & EntryRow => ({
   ...row,
   kind: row.kind as UdhaarEntryKind,
 });
+
+/** What a customer's ledger says is unpaid, split by how late it is on `today` (P1.19). */
+function breakdownOf(
+  entries: readonly EntryRow[],
+  balancePaise: number,
+  today: string,
+): OverdueBreakdown {
+  return overdueBreakdown(
+    unpaidEntries(entries.map(asLedgerEntry), balancePaise).map(({ entry, unpaidPaise }) => ({
+      dueDate: entry.dueDate,
+      unpaidPaise,
+    })),
+    today,
+  );
+}
 
 /** What a rule of the ledger refused, as the screen's answer. */
 function answerRule(error: unknown): never {
@@ -164,6 +189,148 @@ export class UdhaarService {
         })),
         more: rows.length > UDHAAR_PAGE_SIZE,
       };
+    });
+  }
+
+  /**
+   * The udhaar views (P1.19; `03` #12, #13, #15): what is owed by how late it is, what was
+   * collected in the last seven days, who owes the most, and who to remind. Every figure reads
+   * `unpaidEntries` of the customer's ledger, never a stored allocation (ADR 0050). It reads every
+   * entry of every customer who owes, which is fine at a shop's size.
+   */
+  summary(caller: Caller): Promise<UdhaarSummaryView> {
+    return inBusiness(this.database, caller, async (tx) => {
+      const today = businessDate(this.clock.now());
+      const owing = await tx
+        .select({
+          id: customers.id,
+          name: customers.name,
+          phone: customers.phone,
+          balancePaise: udhaarAccounts.balancePaise,
+        })
+        .from(udhaarAccounts)
+        .innerJoin(customers, eq(customers.id, udhaarAccounts.customerId))
+        .where(gt(udhaarAccounts.balancePaise, 0));
+      const entries =
+        owing.length === 0
+          ? []
+          : await tx
+              .select()
+              .from(udhaarEntries)
+              .where(
+                inArray(
+                  udhaarEntries.customerId,
+                  owing.map((row) => row.id),
+                ),
+              )
+              .orderBy(asc(udhaarEntries.id));
+      const byCustomer = new Map<string, EntryRow[]>();
+      for (const entry of entries) {
+        byCustomer.set(entry.customerId, [...(byCustomer.get(entry.customerId) ?? []), entry]);
+      }
+
+      let owedPaise = 0;
+      let notDuePaise = 0;
+      let overduePaise = 0;
+      const bucketPaise = new Map<string, number>();
+      const bucketCustomers = new Map<string, number>();
+      const rows: UdhaarOwingRow[] = [];
+      const reminders: UdhaarReminderRow[] = [];
+      for (const row of owing) {
+        const breakdown = breakdownOf(byCustomer.get(row.id) ?? [], row.balancePaise, today);
+        owedPaise += row.balancePaise;
+        notDuePaise += breakdown.notDuePaise;
+        overduePaise += breakdown.overduePaise;
+        for (const bucket of OVERDUE_BUCKETS) {
+          const paise = breakdown.buckets[bucket];
+          bucketPaise.set(bucket, (bucketPaise.get(bucket) ?? 0) + paise);
+          if (paise > 0) bucketCustomers.set(bucket, (bucketCustomers.get(bucket) ?? 0) + 1);
+        }
+        const withOverdue: UdhaarOwingRow = { ...row, overduePaise: breakdown.overduePaise };
+        rows.push(withOverdue);
+        if (breakdown.oldestOverdueDueDate !== null) {
+          reminders.push({
+            ...withOverdue,
+            oldestDueDate: breakdown.oldestOverdueDueDate,
+            daysLate: daysBetween(breakdown.oldestOverdueDueDate, today),
+          });
+        }
+      }
+
+      // A payment that was reversed never happened, so neither it nor its reversal counts.
+      const from = collectedFrom(today);
+      const { rows: collected } = await tx.execute<{ paise: string; payments: string }>(sql`
+        select coalesce(sum(-e.amount_paise), 0) as paise, count(*) as payments
+          from udhaar_entries e
+         where e.kind = 'payment'
+           and e.business_date between ${from} and ${today}
+           and not exists (select 1 from udhaar_entries r where r.reverses_entry_id = e.id)`);
+
+      return {
+        today,
+        owedPaise,
+        notDuePaise,
+        overduePaise,
+        buckets: OVERDUE_BUCKETS.map((bucket) => ({
+          bucket,
+          paise: bucketPaise.get(bucket) ?? 0,
+          customers: bucketCustomers.get(bucket) ?? 0,
+        })),
+        collected: {
+          fromDate: from,
+          toDate: today,
+          paise: Number(collected[0]?.paise ?? 0),
+          payments: Number(collected[0]?.payments ?? 0),
+        },
+        topOwing: rows
+          .toSorted((a, b) => b.balancePaise - a.balancePaise || a.name.localeCompare(b.name))
+          .slice(0, TOP_OWING_COUNT),
+        reminders: reminders.toSorted(
+          (a, b) => b.daysLate - a.daysLate || a.name.localeCompare(b.name),
+        ),
+      };
+    });
+  }
+
+  /**
+   * The owner opened WhatsApp with a reminder (`03` #15, ADR 0049): the entry log says it was
+   * prepared, by whom and for how much, never that it was delivered.
+   */
+  reminderPrepared(caller: Caller, input: ReminderPreparedInput): Promise<void> {
+    return inBusiness(this.database, caller, async (tx) => {
+      const [customer] = await tx
+        .select({ id: customers.id })
+        .from(customers)
+        .where(eq(customers.id, input.customerId));
+      if (customer === undefined) throw new NotFoundException({ code: 'customer_not_found' });
+      const [account] = await tx
+        .select({ balancePaise: udhaarAccounts.balancePaise })
+        .from(udhaarAccounts)
+        .where(eq(udhaarAccounts.customerId, input.customerId));
+      const balancePaise = account?.balancePaise ?? 0;
+      if (balancePaise <= 0) throw new ConflictException({ code: 'nothing_owed' });
+      const today = businessDate(this.clock.now());
+      const entries = await tx
+        .select()
+        .from(udhaarEntries)
+        .where(eq(udhaarEntries.customerId, input.customerId))
+        .orderBy(asc(udhaarEntries.id));
+      const breakdown = breakdownOf(entries, balancePaise, today);
+      await recordEntry(tx, {
+        actorId: caller.userId,
+        action: 'udhaar.reminder_prepared',
+        entityType: 'customer',
+        entityId: input.customerId,
+        branchId: caller.branchId,
+        after: {
+          balancePaise,
+          overduePaise: breakdown.overduePaise,
+          daysLate:
+            breakdown.oldestOverdueDueDate === null
+              ? 0
+              : daysBetween(breakdown.oldestOverdueDueDate, today),
+        },
+      });
     });
   }
 

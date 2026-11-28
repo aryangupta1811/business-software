@@ -1,10 +1,12 @@
-import { Body, Controller, Get, Inject, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Inject, Param, Post, Query } from '@nestjs/common';
 import {
+  reminderPreparedSchema,
   udhaarCustomersQuerySchema,
   udhaarLedgerQuerySchema,
   udhaarOpeningSchema,
   udhaarPaymentSchema,
   udhaarReversalSchema,
+  type ReminderPreparedInput,
   type UdhaarCustomersQuery,
   type UdhaarCustomersView,
   type UdhaarLedgerQuery,
@@ -13,6 +15,7 @@ import {
   type UdhaarOpeningInput,
   type UdhaarPaymentInput,
   type UdhaarReversalInput,
+  type UdhaarSummaryView,
 } from '@business-software/shared';
 import { answer } from '../auth/session.controller.js';
 import { CurrentCaller, Permission } from '../http/permission.decorator.js';
@@ -25,6 +28,24 @@ import { UdhaarService } from './udhaar.service.js';
 @Controller('udhaar')
 export class UdhaarController {
   constructor(@Inject(UdhaarService) private readonly udhaar: UdhaarService) {}
+
+  /** Overdue buckets, collected this week, who owes the most, who to remind (P1.19). */
+  @Permission('customers.view')
+  @Get('summary')
+  summary(@CurrentCaller() caller: Caller): Promise<UdhaarSummaryView> {
+    return this.udhaar.summary(caller);
+  }
+
+  /** The owner opened WhatsApp with a reminder: logged as prepared, never as delivered (ADR 0049). */
+  @Permission('customers.view')
+  @Post('reminders/prepared')
+  @HttpCode(204)
+  async reminderPrepared(
+    @CurrentCaller() caller: Caller,
+    @Body(new ZodBodyPipe(reminderPreparedSchema)) body: ReminderPreparedInput,
+  ): Promise<void> {
+    await this.udhaar.reminderPrepared(caller, body);
+  }
 
   @Permission('customers.view')
   @Get('customers')

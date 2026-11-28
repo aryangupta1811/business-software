@@ -4,6 +4,7 @@ import type {
   UdhaarCustomersView,
   UdhaarLedgerView,
   UdhaarMoveView,
+  UdhaarSummaryView,
 } from '@business-software/shared';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../api/client';
@@ -16,6 +17,7 @@ export const udhaarKeys = {
   customers: (filters: object) => [...UDHAAR_KEY, 'customers', filters] as const,
   ledger: (id: string) => [...UDHAAR_KEY, 'ledger', id] as const,
   standing: (id: string) => [...UDHAAR_KEY, 'standing', id] as const,
+  summary: [...UDHAAR_KEY, 'summary'] as const,
 };
 
 // A 401 or a 403 won't fix itself in a second; the page shows Try again instead.
@@ -77,6 +79,18 @@ export const useStanding = (customerId: string | null, enabled: boolean) =>
     staleTime: 0,
     ...once,
   });
+
+/** The overdue buckets, what was collected lately, who owes the most and who to remind (P1.19). */
+export const useSummary = () =>
+  useQuery({
+    queryKey: udhaarKeys.summary,
+    queryFn: () => apiRequest<UdhaarSummaryView>('GET', '/api/udhaar/summary'),
+    ...once,
+  });
+
+/** The owner opened WhatsApp with this customer's reminder: logged as prepared (ADR 0049). */
+export const markReminderPrepared = (customerId: string) =>
+  apiRequest<null>('POST', '/api/udhaar/reminders/prepared', { customerId });
 
 export const recordPayment = (body: {
   requestKey: string;

@@ -3,6 +3,7 @@ import type {
   UdhaarCustomersView,
   UdhaarEntryView,
   UdhaarLedgerView,
+  UdhaarSummaryView,
 } from '@business-software/shared';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -39,6 +40,62 @@ const LIST: UdhaarCustomersView = {
     },
   ],
   more: false,
+};
+
+const SUMMARY: UdhaarSummaryView = {
+  today: '2026-11-28',
+  owedPaise: 154_000,
+  notDuePaise: 12_000,
+  overduePaise: 142_000,
+  buckets: [
+    { bucket: 'days_1_30', paise: 10_000, customers: 1 },
+    { bucket: 'days_31_60', paise: 0, customers: 0 },
+    { bucket: 'days_61_90', paise: 35_000, customers: 2 },
+    { bucket: 'days_over_90', paise: 97_000, customers: 1 },
+  ],
+  collected: { fromDate: '2026-11-22', toDate: '2026-11-28', paise: 23_000, payments: 3 },
+  topOwing: [
+    {
+      id: SUNITA,
+      name: 'Sunita Devi',
+      phone: '9876500001',
+      balancePaise: 124_000,
+      overduePaise: 124_000,
+    },
+    {
+      id: KAMAL,
+      name: 'Kamal Singh',
+      phone: '9876500002',
+      balancePaise: 30_000,
+      overduePaise: 18_000,
+    },
+  ],
+  reminders: [
+    {
+      id: SUNITA,
+      name: 'Sunita Devi',
+      phone: '9876500001',
+      balancePaise: 124_000,
+      overduePaise: 124_000,
+      oldestDueDate: '2026-06-01',
+      daysLate: 180,
+    },
+    {
+      id: KAMAL,
+      name: 'Kamal Singh',
+      phone: null,
+      balancePaise: 30_000,
+      overduePaise: 18_000,
+      oldestDueDate: '2026-10-20',
+      daysLate: 39,
+    },
+  ],
+};
+
+/** The list and the overview the Customers page reads. */
+const PAGE = {
+  'GET /api/udhaar/customers': { body: LIST },
+  'GET /api/udhaar/summary': { body: SUMMARY },
 };
 
 const entry = (extra: Partial<UdhaarEntryView> & Pick<UdhaarEntryView, 'id' | 'kind'>) =>
@@ -114,7 +171,7 @@ const nav = () => screen.getByRole('navigation', { name: 'Main' });
 
 describe('the Customers page', () => {
   test('lists customers with their balance, limit and oldest due date, and a way in to each', async () => {
-    fakeApi(OWNER_SESSION, { 'GET /api/udhaar/customers': { body: LIST } });
+    fakeApi(OWNER_SESSION, PAGE);
     renderAt('/customers');
     expect(await screen.findByRole('heading', { level: 1, name: 'Customers' })).toBeInTheDocument();
     const rows = within(await screen.findByRole('table'))
@@ -140,7 +197,7 @@ describe('the Customers page', () => {
 
   test('"Owes money" and the search box ask the server', async () => {
     const user = userEvent.setup();
-    const api = fakeApi(OWNER_SESSION, { 'GET /api/udhaar/customers': { body: LIST } });
+    const api = fakeApi(OWNER_SESSION, PAGE);
     renderAt('/customers');
     await screen.findByRole('table');
     await user.click(screen.getByRole('checkbox', { name: 'Owes money' }));
@@ -161,6 +218,7 @@ describe('the Customers page', () => {
 
   test('says so when nobody matches, and when there are no customers at all', async () => {
     fakeApi(OWNER_SESSION, {
+      ...PAGE,
       'GET /api/udhaar/customers': { body: { customers: [], more: false } },
     });
     renderAt('/customers');
@@ -168,7 +226,7 @@ describe('the Customers page', () => {
   });
 
   test('is in the sidebar for anyone who may see customers, and not for anyone else', async () => {
-    fakeApi(CASHIER, { 'GET /api/udhaar/customers': { body: LIST } });
+    fakeApi(CASHIER, PAGE);
     renderAt('/customers');
     await screen.findByRole('table');
     expect(within(nav()).getByRole('link', { name: /Customers/ })).toHaveAttribute(
@@ -186,7 +244,7 @@ describe('the Customers page', () => {
 
   test('Alt+C goes to the page', async () => {
     const user = userEvent.setup();
-    fakeApi(OWNER_SESSION, { 'GET /api/udhaar/customers': { body: LIST } });
+    fakeApi(OWNER_SESSION, PAGE);
     const history = renderAt('/');
     await screen.findByRole('heading', { level: 1, name: 'Home' });
     await user.keyboard('{Alt>}c{/Alt}');
@@ -197,7 +255,7 @@ describe('the Customers page', () => {
 
   test('speaks Hindi', async () => {
     await changeLanguage('hi');
-    fakeApi(OWNER_SESSION, { 'GET /api/udhaar/customers': { body: LIST } });
+    fakeApi(OWNER_SESSION, PAGE);
     renderAt('/customers');
     expect(await screen.findByRole('heading', { level: 1, name: 'ग्राहक' })).toBeInTheDocument();
     expect(await screen.findByText('₹1,240.00 बकाया')).toBeInTheDocument();
@@ -651,5 +709,178 @@ describe("a customer's page", () => {
     expect(await screen.findByRole('heading', { name: 'Sunita Devi' })).toBeInTheDocument();
     expect(screen.getByText('Aapka baaki')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Bhugtaan darj karein/ })).toBeInTheDocument();
+  });
+});
+
+describe('the overview and the reminders (P1.19)', () => {
+  test('shows what is overdue by bucket, what was collected, and who owes the most', async () => {
+    fakeApi(OWNER_SESSION, PAGE);
+    renderAt('/customers');
+    expect(await screen.findByTestId('overdue-total')).toHaveTextContent('₹1,420.00');
+    expect(screen.getByText('Past its due date, of ₹1,540.00 owed in all')).toBeInTheDocument();
+    expect(screen.getByTestId('days_1_30')).toHaveTextContent('1 to 30 days late');
+    expect(screen.getByTestId('days_1_30')).toHaveTextContent('₹100.00');
+    expect(screen.getByTestId('days_1_30')).toHaveTextContent('1 customer');
+    expect(screen.getByTestId('days_31_60')).toHaveTextContent('₹0.00');
+    expect(screen.getByTestId('days_61_90')).toHaveTextContent('2 customers');
+    expect(screen.getByTestId('days_over_90')).toHaveTextContent('Over 90 days late');
+    expect(screen.getByTestId('days_over_90')).toHaveTextContent('₹970.00');
+    expect(screen.getByText('Not due yet')).toBeInTheDocument();
+    expect(screen.getByTestId('collected')).toHaveTextContent('₹230.00');
+    expect(screen.getByText('3 payments')).toBeInTheDocument();
+    expect(screen.getByText('22 Nov 2026 to 28 Nov 2026')).toBeInTheDocument();
+
+    const top = screen
+      .getByRole('heading', { name: 'Who owes the most' })
+      .closest('div')?.parentElement;
+    if (top == null) throw new Error('The top list is missing');
+    const items = within(top).getAllByRole('listitem');
+    expect(items[0]).toHaveTextContent('Sunita Devi');
+    expect(items[0]).toHaveTextContent('₹1,240.00');
+    expect(items[0]).toHaveTextContent('₹1,240.00 overdue');
+    expect(items[1]).toHaveTextContent('Kamal Singh');
+    const [, second] = items;
+    if (second === undefined) throw new Error('The second row is missing');
+    expect(within(second).getByRole('link', { name: 'Kamal Singh' })).toHaveAttribute(
+      'href',
+      `/customers/${KAMAL}`,
+    );
+  });
+
+  test('says so when nobody owes anything', async () => {
+    fakeApi(OWNER_SESSION, {
+      ...PAGE,
+      'GET /api/udhaar/summary': {
+        body: {
+          ...SUMMARY,
+          owedPaise: 0,
+          notDuePaise: 0,
+          overduePaise: 0,
+          topOwing: [],
+          reminders: [],
+          buckets: SUMMARY.buckets.map((bucket) => ({ ...bucket, paise: 0, customers: 0 })),
+        },
+      },
+    });
+    renderAt('/customers');
+    expect(await screen.findByText('Nobody owes anything.')).toBeInTheDocument();
+    expect(screen.getByTestId('overdue-total')).not.toHaveClass('text-danger');
+  });
+
+  test('a failed overview says so with Try again, and the list still shows', async () => {
+    fakeApi(OWNER_SESSION, { ...PAGE, 'GET /api/udhaar/summary': { status: 500, body: {} } });
+    renderAt('/customers');
+    expect(await screen.findByText(/Couldn't load the overview/)).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Kamal Singh' })).toBeInTheDocument();
+  });
+
+  test('the Reminders tab lists who is late, the longest first, and Send on WhatsApp opens the chat', async () => {
+    const user = userEvent.setup();
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    const api = fakeApi(OWNER_SESSION, {
+      ...PAGE,
+      'POST /api/udhaar/reminders/prepared': { status: 204, body: null },
+    });
+    renderAt('/customers');
+    await user.click(await screen.findByRole('tab', { name: 'Reminders' }));
+    const rows = within(await screen.findByRole('table', { name: 'Customers to remind' }))
+      .getAllByRole('row')
+      .slice(1);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent('Sunita Devi');
+    expect(rows[0]).toHaveTextContent('₹1,240.00');
+    expect(rows[0]).toHaveTextContent('1 Jun 2026');
+    expect(rows[0]).toHaveTextContent('180 days late');
+
+    await user.click(
+      screen.getByRole('button', { name: 'Send Sunita Devi a reminder on WhatsApp' }),
+    );
+    expect(open).toHaveBeenCalledOnce();
+    const [link, target, features] = open.mock.calls[0] as [string, string, string];
+    expect(target).toBe('_blank');
+    expect(features).toBe('noopener');
+    const [base, text] = link.split('?text=') as [string, string];
+    expect(base).toBe('https://wa.me/919876500001');
+    // The message names the customer, the shop, the balance and the oldest due date.
+    expect(decodeURIComponent(text)).toBe(
+      'Hello Sunita Devi, this is Sharma Medical. You owe us ₹1,240.00, the oldest part was due on 1 Jun 2026. Please pay when you can. Thank you.',
+    );
+    await waitFor(() => {
+      expect(api.sent('POST', '/api/udhaar/reminders/prepared')[0]?.body).toEqual({
+        customerId: SUNITA,
+      });
+    });
+    expect(await screen.findByText('WhatsApp opened')).toBeInTheDocument();
+    open.mockRestore();
+  });
+
+  test('a customer with no phone number cannot be sent a reminder', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    fakeApi(OWNER_SESSION, PAGE);
+    renderAt('/customers?tab=reminders');
+    const button = await screen.findByRole('button', {
+      name: 'Send Kamal Singh a reminder on WhatsApp',
+    });
+    expect(button).toBeDisabled();
+    expect(open).not.toHaveBeenCalled();
+    open.mockRestore();
+  });
+
+  test('a failed log does not stop the reminder', async () => {
+    const user = userEvent.setup();
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    fakeApi(OWNER_SESSION, {
+      ...PAGE,
+      'POST /api/udhaar/reminders/prepared': { status: 500, body: {} },
+    });
+    renderAt('/customers?tab=reminders');
+    await user.click(
+      await screen.findByRole('button', { name: 'Send Sunita Devi a reminder on WhatsApp' }),
+    );
+    expect(open).toHaveBeenCalledOnce();
+    expect(await screen.findByText('WhatsApp opened')).toBeInTheDocument();
+    open.mockRestore();
+  });
+
+  test('the message follows the language in use', async () => {
+    await changeLanguage('hi');
+    const user = userEvent.setup();
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    fakeApi(OWNER_SESSION, {
+      ...PAGE,
+      'POST /api/udhaar/reminders/prepared': { status: 204, body: null },
+    });
+    renderAt('/customers?tab=reminders');
+    await user.click(
+      await screen.findByRole('button', { name: 'Sunita Devi को व्हाट्सऐप पर याद दिलाएँ' }),
+    );
+    const [link] = open.mock.calls[0] as [string];
+    expect(decodeURIComponent(link.split('?text=')[1] ?? '')).toMatch(
+      /^नमस्ते Sunita Devi, यह Sharma Medical से है/,
+    );
+    open.mockRestore();
+  });
+
+  test('says so when nobody is past their due date', async () => {
+    fakeApi(OWNER_SESSION, {
+      ...PAGE,
+      'GET /api/udhaar/summary': { body: { ...SUMMARY, reminders: [] } },
+    });
+    renderAt('/customers?tab=reminders');
+    expect(await screen.findByText('Nobody is past their due date.')).toBeInTheDocument();
+  });
+
+  test('a cashier who may see customers sees the views too', async () => {
+    fakeApi(CASHIER, PAGE);
+    renderAt('/customers');
+    expect(await screen.findByTestId('overdue-total')).toBeInTheDocument();
+  });
+
+  test('speaks Hindi and Hinglish', async () => {
+    await changeLanguage('hi');
+    fakeApi(OWNER_SESSION, PAGE);
+    renderAt('/customers');
+    expect(await screen.findByText('सबसे ज़्यादा बकाया किस पर')).toBeInTheDocument();
+    expect(screen.getByTestId('days_over_90')).toHaveTextContent('90 दिन से ज़्यादा लेट');
   });
 });

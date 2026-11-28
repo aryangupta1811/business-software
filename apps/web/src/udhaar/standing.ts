@@ -3,6 +3,7 @@
 // server decides again on every save, so this only keeps the screen in step with it.
 import {
   creditLimitVerdict,
+  daysBetween,
   type OverCreditLimitSetting,
   type Paise,
   type PaymentMode,
@@ -83,6 +84,5 @@ export function limitUsedPercent(balancePaise: Paise, limitPaise: Paise | null):
  * before it. Calendar days, so no time zone or daylight saving gets in.
  */
 export function daysOverdue(dueDate: string, today: string): number {
-  const days = (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${dueDate}T00:00:00Z`)) / 86_400_000;
-  return Math.max(0, Math.round(days));
+  return Math.max(0, daysBetween(dueDate, today));
 }

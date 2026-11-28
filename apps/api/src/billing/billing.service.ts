@@ -36,6 +36,7 @@ import {
   type Feature,
   type ItemKind,
   type NegativeStockSetting,
+  type OverCreditLimitSetting,
   type TaxScheme,
 } from '@business-software/shared';
 import { CLOCK, type Clock } from '../auth/clock.js';
@@ -69,6 +70,7 @@ export class BillingService {
           gstStatus: businesses.gstStatus,
           features: businesses.features,
           negativeStock: businesses.negativeStock,
+          overCreditLimit: businesses.overCreditLimit,
         })
         .from(businesses);
       const [branch] = await tx
@@ -86,11 +88,13 @@ export class BillingService {
         branchStateCode: branch.stateCode,
         features: business.features as Feature[],
         negativeStock: business.negativeStock as NegativeStockSetting,
+        overCreditLimit: business.overCreditLimit as OverCreditLimitSetting,
         canViewStock: can('stock.view'),
         canManageItems: can('items.manage'),
         canViewCustomers: can('customers.view'),
         canManageCustomers: can('customers.manage'),
         canDiscount: can('billing.discount'),
+        canGiveUdhaar: can('billing.udhaar'),
       };
     });
   }

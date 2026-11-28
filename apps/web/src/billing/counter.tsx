@@ -39,9 +39,19 @@ import { stockText } from '../items/stock-form';
 import { printSavedBill, sendOnWhatsApp } from '../printing/actions';
 import { useShortcut } from '../shortcuts/use-shortcut';
 import { PaymentPanel, type PaymentRow } from './payment-panel';
+import type { UdhaarAccess } from './udhaar-access';
+import { UDHAAR_KEY, useStanding } from '../udhaar/api';
+import { advanceOf, creditCheck, ledgerParts } from '../udhaar/standing';
+import { creditApprovalCovers, type CreditApproval } from './credit';
 import type { CatalogueCopy } from './catalogue-copy';
 import { CustomerBox, CustomerSummary, type BillCustomer } from './customer-box';
-import { ApprovalDialog, DiscountDialog, HeldBillsDialog, HoldDialog } from './dialogs';
+import {
+  ApprovalDialog,
+  CreditApprovalDialog,
+  DiscountDialog,
+  HeldBillsDialog,
+  HoldDialog,
+} from './dialogs';
 import {
   approvalNeeded,
   clearApproval,
@@ -148,6 +158,15 @@ export function Counter({
     loadCustomer(bill.billKey, bill.customerId),
   );
   const [paying, setPaying] = useState(false);
+  /** The owner's OK for udhaar over the limit (design §5); asked once Done is pressed. */
+  const [creditApproval, setCreditApproval] = useState<CreditApproval | null>(null);
+  /** Payments waiting for that OK: the owner's password asked, the panel already closed. */
+  const [creditAsk, setCreditAsk] = useState<{
+    payments: PaymentRow[];
+    udhaarPaise: number;
+    balanceAfterPaise: number;
+    limitPaise: number | null;
+  } | null>(null);
   /** The payments of a fully paid bill, for the total they were taken against. */
   const [ready, setReady] = useState<{
     billKey: string;
@@ -171,6 +190,22 @@ export function Counter({
   const locked = saving || problem?.kind === 'network';
   const queryClient = useQueryClient();
   const now = useNow(30_000);
+  // The customer's balance and limit, read fresh when the payment panel opens (design §5).
+  const standing = useStanding(customer?.id ?? null, context.canViewCustomers);
+  // Udhaar needs a customer with a name and a phone (`03` #1).
+  const withPhone = customer !== null && customer.phone !== null && customer.name !== '';
+  const udhaarAccess: UdhaarAccess = {
+    state: !session.permissions.includes('billing.udhaar')
+      ? 'hidden'
+      : withPhone
+        ? 'ready'
+        : 'needs_customer',
+    customerName: customer?.name ?? '',
+    advancePaise: advanceOf(standing.data?.balancePaise ?? 0),
+    standing: standing.data ?? null,
+    who: session.user.role === 'owner' ? 'owner' : 'staff',
+    setting: context.overCreditLimit,
+  };
   const held = useQuery({
     queryKey: HELD_KEY,
     queryFn: () => apiRequest<HeldBillView[]>('GET', '/api/held-bills'),
@@ -479,6 +514,11 @@ export function Counter({
   }
 
   function chooseCustomer(chosen: BillCustomer | null, placeOfSupplyStateCode: string) {
+    // Payments on another customer's account, and an OK for it, don't carry over.
+    if (chosen?.id !== customer?.id) {
+      setReady(null);
+      setCreditApproval(null);
+    }
     saveCustomer(bill.billKey, chosen);
     setCustomer(chosen);
     setBill({ ...bill, customerId: chosen?.id ?? null, placeOfSupplyStateCode });
@@ -487,8 +527,47 @@ export function Counter({
   /** F10: payment, once the owner has OK'd any discount above the limit (design §6, §8). */
   function pay() {
     if (priced === null || locked) return;
-    if (needed !== null) setAsking(true);
-    else setPaying(true);
+    if (needed !== null) {
+      setAsking(true);
+      return;
+    }
+    // Read the account afresh: another counter may have moved it since the customer was chosen.
+    if (customer !== null) void standing.refetch();
+    setPaying(true);
+  }
+
+  /**
+   * Done in the payment panel. Udhaar over the limit needs the owner's password first (design
+   * 5): this login's own role decides, as it does on the server, which decides again on save.
+   */
+  function paymentsDone(payments: PaymentRow[]) {
+    const total = priced?.grandTotalPaise ?? 0;
+    const check =
+      standing.data === undefined
+        ? ({ kind: 'none' } as const)
+        : creditCheck({
+            payments,
+            standing: standing.data,
+            who: udhaarAccess.who,
+            setting: context.overCreditLimit,
+          });
+    const { udhaarPaise } = ledgerParts(payments);
+    setPaying(false);
+    setProblem(null);
+    if (
+      check.kind === 'needs_approval' &&
+      !creditApprovalCovers(creditApproval, bill.billKey, udhaarPaise, Date.now())
+    ) {
+      setCreditAsk({
+        payments,
+        udhaarPaise,
+        balanceAfterPaise: check.balanceAfterPaise,
+        limitPaise: check.limitPaise,
+      });
+      return;
+    }
+    setReady({ billKey: bill.billKey, totalPaise: total, payments });
+    searchRef.current?.focus();
   }
 
   const paid =
@@ -510,9 +589,12 @@ export function Counter({
     setProblem(null);
     try {
       const view = await saveBill(
-        billDraft(bill, paid, priced.grandTotalPaise, approval, heldFrom),
+        billDraft(bill, paid, priced.grandTotalPaise, approval, heldFrom, creditApproval),
       );
       clearApproval(bill.billKey);
+      setCreditApproval(null);
+      // The balance moved: every udhaar view reads it again.
+      void queryClient.invalidateQueries({ queryKey: UDHAAR_KEY });
       saveCustomer(bill.billKey, null);
       startNew(view);
       // `02` #30: on by default, so the receipt is out before the next customer steps up.
@@ -538,9 +620,16 @@ export function Counter({
         case 'approval_invalid':
           clearApproval(bill.billKey);
           setApproval(null);
+          setCreditApproval(null);
+          break;
+        case 'over_credit_limit':
+        case 'advance_changed':
+          // Another counter moved the account: read it again, and take payment again.
+          setReady(null);
+          setCreditApproval(null);
+          void queryClient.invalidateQueries({ queryKey: UDHAAR_KEY });
           break;
         case 'payments_mismatch':
-        case 'advance_changed':
           setReady(null);
           break;
         case 'held_bill_invalid':
@@ -934,14 +1023,38 @@ export function Counter({
       <PaymentPanel
         open={paying}
         totalPaise={priced?.grandTotalPaise ?? 0}
-        onReady={(payments) => {
-          setReady({ billKey: bill.billKey, totalPaise: priced?.grandTotalPaise ?? 0, payments });
+        udhaar={udhaarAccess}
+        onNeedCustomer={() => {
           setPaying(false);
-          setProblem(null);
+          setChoosingCustomer(true);
+        }}
+        onReady={paymentsDone}
+        onClose={() => {
+          setPaying(false);
+          searchRef.current?.focus();
+        }}
+      />
+      <CreditApprovalDialog
+        open={creditAsk !== null}
+        billKey={bill.billKey}
+        customerName={customer?.name ?? ''}
+        udhaarPaise={creditAsk?.udhaarPaise ?? 0}
+        balanceAfterPaise={creditAsk?.balanceAfterPaise ?? 0}
+        limitPaise={creditAsk?.limitPaise ?? null}
+        onApproved={(given) => {
+          setCreditApproval(given);
+          if (creditAsk !== null) {
+            setReady({
+              billKey: bill.billKey,
+              totalPaise: priced?.grandTotalPaise ?? 0,
+              payments: creditAsk.payments,
+            });
+          }
+          setCreditAsk(null);
           searchRef.current?.focus();
         }}
         onClose={() => {
-          setPaying(false);
+          setCreditAsk(null);
           searchRef.current?.focus();
         }}
       />
@@ -1012,6 +1125,14 @@ function SavedPanel({
       {saved.changePaise > 0 && (
         <p className="text-section font-semibold tabular-nums">
           {t('billing.save.change', { amount: formatPaise(saved.changePaise) })}
+        </p>
+      )}
+      {saved.creditWarning !== null && (
+        <p className="text-warning">
+          {t('billing.save.creditWarning', {
+            after: formatPaise(saved.creditWarning.balanceAfterPaise),
+            limit: formatPaise(saved.creditWarning.limitPaise),
+          })}
         </p>
       )}
       {saved.warnings.map((warning) => {

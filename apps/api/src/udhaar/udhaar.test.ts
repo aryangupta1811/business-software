@@ -898,15 +898,24 @@ describe('udhaar', () => {
       ]);
     });
 
-    it('is refused after the first bill or payment, to staff, and may be an advance', async () => {
+    it('is allowed after the first bill, still once, and counts as the oldest (03 #20)', async () => {
       const a = await shop();
       const item = await rice(a);
       const billed = await customer(a);
       await save(a, bill(item, billed, 1, [udhaar(RICE)]));
+      const late = await opening(a, billed, { amountPaise: 4_000 });
+      expect(late.status).toBe(201);
+      expect(late.body.balancePaise).toBe(4_000 + RICE);
       expect(await opening(a, billed)).toMatchObject({
         status: 409,
         body: { code: 'opening_exists' },
       });
+      const view = await ledger(a, billed);
+      expect(view.body.unpaid.map((unpaid) => unpaid.entry.kind)).toEqual(['opening', 'bill']);
+    });
+
+    it('is refused to staff, bad bodies and future days, and may be an advance', async () => {
+      const a = await shop();
       const sunita = await customer(a);
       const everything = PERMISSIONS.filter((permission) => permission !== 'settings.manage');
       expect((await opening(staff(a, [...everything]), sunita)).status).toBe(403);
@@ -989,6 +998,13 @@ describe('udhaar', () => {
         creditLimitPaise: null,
         dueDays: 30,
         next: null,
+        // The customer's own record comes with it: the page names them and edits their terms.
+        customer: {
+          id: sunita.id,
+          name: sunita.name,
+          phone: sunita.phone,
+          version: sunita.version,
+        },
       });
       expect(
         seen.body.entries.map((entry) => [entry.kind, entry.amountPaise, entry.balanceAfterPaise]),

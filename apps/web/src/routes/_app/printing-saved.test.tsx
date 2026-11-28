@@ -23,11 +23,13 @@ const CONTEXT: BillingContext = {
   branchStateCode: '27',
   features: [],
   negativeStock: 'warn',
+  overCreditLimit: 'warn',
   canViewStock: true,
   canManageItems: true,
   canViewCustomers: true,
   canManageCustomers: true,
   canDiscount: true,
+  canGiveUdhaar: true,
 };
 
 const CATALOGUE: CatalogueView = {

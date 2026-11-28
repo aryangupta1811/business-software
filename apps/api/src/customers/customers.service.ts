@@ -33,7 +33,7 @@ type CustomerRecord = typeof customers.$inferSelect;
 /** At most this many answers to a search; the counter shows a short list. */
 const SEARCH_LIMIT = 20;
 
-function toView(row: CustomerRecord): CustomerView {
+export function toView(row: CustomerRecord): CustomerView {
   return {
     id: row.id,
     name: row.name,

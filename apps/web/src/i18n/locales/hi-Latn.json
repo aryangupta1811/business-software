@@ -14,6 +14,7 @@
     "staff": "Staff",
     "attendance": "Hazri",
     "myAttendance": "Meri hazri",
+    "customers": "Grahak",
     "bills": "Bills"
   },
   "theme": {
@@ -45,6 +46,9 @@
     "billPay": "Payment lein",
     "openAlerts": "Alerts kholein",
     "goAttendance": "Hazri par jaayein",
+    "goCustomers": "Grahakon par jaayein",
+    "searchCustomers": "Grahak khojein",
+    "recordPayment": "Bhugtaan darj karein",
     "goBills": "Bills par jaayein",
     "billPrintReceipt": "Save hua bill receipt ke roop mein chhaapein",
     "billPrintA4": "Save hua bill A4 par chhaapein",
@@ -467,6 +471,15 @@
       "hint": "4 tak bade akshar ya ank, jaise ABC. Prefix na chahiye to khaali chhodein.",
       "example": "Aapka agla bill: {{number}}",
       "branches": "Do ya zyada chaalu branch hone par har bill apni branch ke code se shuru hota hai (jaise {{number}}), aur yeh prefix istemal nahin hota."
+    },
+    "udhaar": {
+      "title": "Udhaar",
+      "lead": "Jab udhaar se customer credit seema se upar chala jaaye, tab billing kya kare.",
+      "overLimit": "Jab bill credit seema se upar jaaye",
+      "warn": "Chetavani dein",
+      "warnHint": "Aapka bill chetavani ke saath save hota hai. Seema se upar staff ko hamesha aapka password chahiye.",
+      "block": "Roken",
+      "blockHint": "Seema se upar har bill, aapka bhi, counter par aapka password maangta hai."
     },
     "printing": {
       "title": "Chhapai",
@@ -1072,6 +1085,15 @@
         "required": "Cheque number likhein",
         "cash_only": "Sirf cash zyada diya ja sakta hai",
         "payments_mismatch": "Bhugtaan ka jod bill ke kul ke barabar hona chahiye"
+      },
+      "udhaar": {
+        "needsCustomer": "Udhaar ke liye naam aur phone number wala customer chahiye.",
+        "addCustomer": "Customer ka naam aur phone jodein",
+        "noLimit": "{{name}} ki credit seema tay nahin hai, isliye \"Ho gaya\" dabane par is udhaar ke liye malik ka password chahiye.",
+        "warn": "Credit seema se upar: {{name}} par {{after}} baaki hoga, seema {{limit}}. Bill phir bhi save hoga.",
+        "needsOwner": "Credit seema se upar: {{name}} par {{after}} baaki hoga, seema {{limit}}. \"Ho gaya\" dabane par malik ka password maanga jaayega.",
+        "onAccount": "Yeh {{name}} ke khaate mein jaayega.",
+        "advanceHas": "Maujood advance: {{amount}}."
       }
     },
     "customer": {
@@ -1119,7 +1141,9 @@
         "credit_terms_owner_only": "Credit seema aur bhugtaan ke din sirf malik tay kar sakta hai.",
         "failed": "Customer save nahin ho saka. Connection dekhein aur phir koshish karein."
       },
-      "onHeldBill": "Bill ke saath save kiya gaya customer"
+      "onHeldBill": "Bill ke saath save kiya gaya customer",
+      "limit": "Credit seema {{amount}}",
+      "noLimit": "Credit seema tay nahin"
     },
     "pay": "Payment",
     "readyToSave": "Payment ho gaya. Save karne ke liye taiyaar.",
@@ -1155,12 +1179,19 @@
         "network": "Connection nahin hai. Ho sakta hai bill save ho chuka ho. Jaanchne ke liye Enter dabayein: bill do baar save nahin hoga. Tab tak bill badla nahin ja sakta.",
         "failed": "Bill save nahin ho saka. Phir koshish karein; baar-baar ho to connection jaanchein."
       },
+      "creditWarning": "Credit seema se upar: customer par ab {{after}} baaki hai, seema {{limit}}.",
       "printReceipt": "Receipt chhaapein ({{size}} mm)",
       "printA4": "A4 invoice chhaapein",
       "whatsApp": "WhatsApp par bhejein",
       "printFailed": "Chhap nahin paaya. Connection aur printer dekhein, phir dobara koshish karein.",
       "noPhone": "Is bill mein grahak ka phone number nahin hai. Pehle grahak (F3) mein number jodein.",
       "whatsAppFailed": "WhatsApp nahin khul paaya. Connection dekhein aur dobara koshish karein."
+    },
+    "creditApproval": {
+      "title": "Udhaar ke liye malik ki manzoori",
+      "confirm": "Yeh udhaar manzoor karein",
+      "body": "{{name}} par {{after}} baaki hoga, jo {{limit}} ki seema se upar hai. Is bill par {{amount}} ka udhaar manzoor karne ke liye malik ka password likhein.",
+      "bodyNoLimit": "{{name}} ki credit seema tay nahin hai. Is bill par {{amount}} ka udhaar manzoor karne ke liye malik ka password likhein."
     }
   },
   "notAllowed": {
@@ -1566,6 +1597,157 @@
     "removeReason": "Kaaran (optional)",
     "removeConfirm": "Chhutti hatayein",
     "removed": "{{name}} hata di gayi."
+  },
+  "udhaar": {
+    "loading": "Load ho raha hai…",
+    "loadFailed": "Udhaar load nahin ho saka. Connection dekhkar phir koshish karein.",
+    "retry": "Phir koshish karein",
+    "noLimit": "Seema tay nahin",
+    "noPhone": "Phone number nahin",
+    "back": "Sabhi customers",
+    "daysLate_one": "{{count}} din late",
+    "daysLate_other": "{{count}} din late",
+    "balance": {
+      "owes": "{{amount}} baaki",
+      "advance": "{{amount}} advance",
+      "settled": "Kuch baaki nahin",
+      "amountOwed": "{{amount}} baaki",
+      "amountAdvance": "{{amount}} advance"
+    },
+    "list": {
+      "search": "Naam ya phone se customer khojein",
+      "searchPlaceholder": "Naam ya phone number",
+      "owingOnly": "Jin par baaki hai",
+      "columns": {
+        "name": "Customer",
+        "phone": "Phone",
+        "balance": "Baaki",
+        "limit": "Credit seema",
+        "due": "Sabse purani due tareekh"
+      },
+      "noMatches": "Koi customer nahin mila.",
+      "empty": "Abhi koi customer nahin hai. Billing counter par customer jodein (F3), woh yahan dikhenge.",
+      "more": "Aur dikhayein"
+    },
+    "page": {
+      "title": "Customer",
+      "balanceLabel": {
+        "owes": "Aapka baaki",
+        "advance": "Advance diya hai",
+        "settled": "Baaki"
+      },
+      "limitUsed": "Istemaal hui credit seema",
+      "limitUsedText": "Seema ka {{percent}} pratishat"
+    },
+    "terms": {
+      "title": "Credit seema aur due din",
+      "limit": "Credit seema",
+      "limitHint": "Customer par zyada se zyada kitna baaki ho sakta hai, rupayon mein. Khaali chhodein to seema tay nahin.",
+      "days": "Due din",
+      "daysHint": "Bill se uski due tareekh tak ke din. Naye bill ise lete hain; purane billon ki tareekh nahin badalti.",
+      "daysValue_one": "{{count}} din",
+      "daysValue_other": "{{count}} din",
+      "edit": "Badlein",
+      "save": "Save karein",
+      "saving": "Save ho raha hai…",
+      "errors": {
+        "limit": "5000 jaisi rakam likhein, ya khaali chhodein.",
+        "days": "0 se 365 din likhein.",
+        "failed": "Save nahin ho saka. Connection dekhkar phir koshish karein.",
+        "stale": "Is beech kisi ne is customer ko badal diya. Page dobara kholkar phir koshish karein."
+      }
+    },
+    "unpaid": {
+      "title": "Bina chukaye bill",
+      "none": "Kuch bhi baaki nahin hai.",
+      "advance": "Kuch baaki nahin hai. Is customer ne advance diya hai.",
+      "given": "{{date}} ko diya",
+      "due": "Due {{date}}",
+      "of": "{{amount}} mein se"
+    },
+    "ledger": {
+      "title": "Khaata",
+      "columns": {
+        "date": "Tareekh",
+        "what": "Kya",
+        "owed": "Udhaar",
+        "paid": "Chukaya",
+        "balance": "Iske baad baaki",
+        "actions": "Karrvaai"
+      },
+      "empty": "Khaate mein abhi kuch nahin hai.",
+      "older": "Purani entry dikhayein",
+      "reversed": "Wapas liya",
+      "reference": "Reference {{reference}}"
+    },
+    "entry": {
+      "bill": "Bill {{number}}",
+      "billPlain": "Bill",
+      "advanceUsed": "Bill {{number}} par advance istemaal hua",
+      "advanceUsedPlain": "Bill par advance istemaal hua",
+      "payment": "Bhugtaan, {{mode}}",
+      "reversal": "Bhugtaan wapas liya",
+      "opening": "Shuruaati baaki (purani copy)"
+    },
+    "payment": {
+      "button": "Bhugtaan darj karein",
+      "title": "{{name}} se bhugtaan",
+      "owes": "{{amount}} baaki hai.",
+      "hasAdvance": "{{amount}} ka advance hai. Aur paisa usmein judega.",
+      "owesNothing": "Kuch baaki nahin hai. Abhi liya paisa advance banega.",
+      "amount": "Mili rakam",
+      "amountHint": "Koi bhi rakam. Baaki se zyada hui to agle bill ke liye advance banegi.",
+      "fullBalance": "Poora baaki",
+      "mode": "Bhugtaan ka tarika",
+      "save": "Bhugtaan save karein",
+      "saving": "Save ho raha hai…",
+      "network": "Connection nahin hai. Ho sakta hai bhugtaan save ho chuka ho: jaanchne ke liye phir \"Bhugtaan save karein\" dabayein, yeh do baar darj nahin hoga.",
+      "failed": "Bhugtaan save nahin ho saka. Phir koshish karein.",
+      "errors": {
+        "invalid": "500 ya 141.50 jaisi rakam likhein",
+        "too_small": "Zero se zyada rakam likhein",
+        "too_big": "Yeh bahut zyada hai"
+      }
+    },
+    "reverse": {
+      "button": "Wapas lein",
+      "title": "Yeh bhugtaan wapas lein",
+      "body": "Bhugtaan khaate mein rehta hai aur ek ulti entry judti hai. Jin billon ko usne chukaya tha, woh phir baaki ho jaate hain.",
+      "reason": "Kyon",
+      "reasonHint": "Jaise: galat customer, ya rakam galat likhi gayi.",
+      "confirm": "Bhugtaan wapas lein",
+      "failed": "Bhugtaan wapas nahin ho saka. Shayad pehle hi wapas ho chuka hai. Page dobara kholein."
+    },
+    "opening": {
+      "button": "Shuruaati baaki",
+      "title": "Shuruaati baaki",
+      "lead": "Purani copy ke hisaab se is customer par kitna baaki hai. Ise kabhi bhi, ek baar hi daala ja sakta hai, aur yeh unka sabse purana udhaar ginaa jaata hai: bhugtaan pehle ise chukate hain.",
+      "direction": "Copy mein likha hai",
+      "owes": "Customer par hamara baaki hai",
+      "advance": "Customer ne advance diya hai",
+      "amount": "Rakam",
+      "asOf": "Kis tareekh ka",
+      "asOfHint": "Due tareekh yahin se ginee jaati hai, customer ke due dinon ke hisaab se.",
+      "note": "Note",
+      "save": "Shuruaati baaki save karein",
+      "saving": "Save ho raha hai…",
+      "errors": {
+        "amount": "Zero se zyada rakam likhein, jaise 2500",
+        "date": "Aaj ya usse pehle ki tareekh chunein",
+        "exists": "Is customer ka shuruaati baaki pehle se darj hai.",
+        "failed": "Save nahin ho saka. Connection dekhkar phir koshish karein."
+      }
+    },
+    "notice": {
+      "paymentSaved": "Bhugtaan save ho gaya, ab baaki {{amount}}",
+      "reversed": "Bhugtaan wapas liya, ab baaki {{amount}}",
+      "openingSaved": "Shuruaati baaki save hua, ab baaki {{amount}}",
+      "termsSaved": "Credit seema aur due din save hue"
+    },
+    "notFound": {
+      "title": "Aisa koi customer nahin",
+      "body": "Shayad pata galat likha gaya. Customers ki list se kholein."
+    }
   },
   "printing": {
     "whatsapp": "{{shop}}: aapka bill {{number}}, {{total}} ka. Dhanyavaad!"

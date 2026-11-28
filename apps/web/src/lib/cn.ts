@@ -5,7 +5,9 @@ import { extendTailwindMerge } from 'tailwind-merge';
 // `text-body` as a colour and drops it when a `text-muted` comes later, or the reverse.
 const twMerge = extendTailwindMerge({
   extend: {
-    classGroups: { 'font-size': [{ text: ['label', 'body', 'section', 'title', 'figure'] }] },
+    classGroups: {
+      'font-size': [{ text: ['label', 'body', 'section', 'title', 'figure', 'display'] }],
+    },
   },
 });
 

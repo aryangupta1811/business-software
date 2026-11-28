@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import styles from '../styles.css?raw';
 
-const SIZES = ['label', 'body', 'section', 'title', 'figure'];
+const SIZES = ['label', 'body', 'section', 'title', 'figure', 'display'];
 
 // Each text-* class sets its own line height, so a line height on <body> alone doesn't
 // reach buttons, labels or titles. Hindi must raise every size's own variable.

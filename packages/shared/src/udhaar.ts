@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { isCalendarDate } from './attendance.js';
 import { ownerPasswordSchema } from './auth.js';
 import { MAX_BILL_PAISE, MONEY_PAYMENT_MODES } from './billing.js';
+import type { CustomerView } from './customers.js';
 import { optionalText, text, uuid } from './fields.js';
 
 /**
@@ -61,7 +62,8 @@ export interface UnpaidEntry<E extends LedgerEntry> {
  * The entries still unpaid, oldest first, for a customer who owes `balancePaise` (`03` #4:
  * every payment clears the oldest bill first). `entries` are all of the customer's entries,
  * oldest first. A reversed payment never happened, so it and its reversal are left out; the bills
- * it had paid are owed again. Then the newest entries above 0 that add up to the balance are the
+ * it had paid are owed again. An opening balance counts as the oldest entry, wherever it sits in
+ * the list. Then the newest entries above 0 that add up to the balance are the
  * unpaid ones, the last taken possibly only in part: everything older was paid. The only place
  * this rule lives; the ledger page, the overdue buckets and the reminders all call it.
  */
@@ -79,6 +81,9 @@ export function unpaidEntries<E extends LedgerEntry>(
   const standing = entries.filter(
     (entry) => entry.kind !== 'payment_reversal' && !reversed.has(entry.id),
   );
+  // The old notebook is the oldest udhaar, however late the owner typed it in (03 #20), so it
+  // goes first and every payment clears it first. The sort is stable.
+  standing.sort((a, b) => Number(b.kind === 'opening') - Number(a.kind === 'opening'));
   const unpaid: UnpaidEntry<E>[] = [];
   let left = balancePaise;
   for (let at = standing.length - 1; at >= 0 && left > 0; at -= 1) {
@@ -242,6 +247,8 @@ export interface UdhaarUnpaidView {
 
 export interface UdhaarLedgerView {
   customerId: string;
+  /** The customer's record, as `GET /api/customers` shows it: the page names them and edits their terms. */
+  customer: CustomerView;
   balancePaise: number;
   creditLimitPaise: number | null;
   dueDays: number;

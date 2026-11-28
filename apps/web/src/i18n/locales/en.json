@@ -14,6 +14,7 @@
     "staff": "Staff",
     "attendance": "Attendance",
     "myAttendance": "My attendance",
+    "customers": "Customers",
     "bills": "Bills"
   },
   "theme": {
@@ -45,6 +46,9 @@
     "billPay": "Take payment",
     "openAlerts": "Open the alerts",
     "goAttendance": "Go to Attendance",
+    "goCustomers": "Go to Customers",
+    "searchCustomers": "Search customers",
+    "recordPayment": "Record a payment",
     "goBills": "Go to Bills",
     "billPrintReceipt": "Print the saved bill as a receipt",
     "billPrintA4": "Print the saved bill on A4",
@@ -467,6 +471,15 @@
       "hint": "Up to 4 capital letters or digits, like ABC. Leave it empty for no prefix.",
       "example": "Your next bill: {{number}}",
       "branches": "With two or more active branches, every bill starts with its branch's code instead (for example {{number}}), and this prefix is not used."
+    },
+    "udhaar": {
+      "title": "Udhaar",
+      "lead": "What billing does when udhaar would take a customer past their credit limit.",
+      "overLimit": "When a bill goes past the credit limit",
+      "warn": "Warn",
+      "warnHint": "Your bill saves, with a warning. Staff always need your password past the limit.",
+      "block": "Block",
+      "blockHint": "Every bill past the limit, yours too, needs your password at the counter."
     },
     "printing": {
       "title": "Printing",
@@ -1072,6 +1085,15 @@
         "required": "Enter the cheque number",
         "cash_only": "Only cash can be handed over",
         "payments_mismatch": "The payments must add up to the bill total"
+      },
+      "udhaar": {
+        "needsCustomer": "Udhaar needs a customer with a name and phone number.",
+        "addCustomer": "Add the customer's name and phone",
+        "noLimit": "{{name}} has no credit limit set, so this udhaar needs the owner's password when you press Done.",
+        "warn": "Over the credit limit: {{name}} would owe {{after}}, limit {{limit}}. The bill will still save.",
+        "needsOwner": "Over the credit limit: {{name}} would owe {{after}}, limit {{limit}}. The owner's password is asked when you press Done.",
+        "onAccount": "Goes on {{name}}'s account.",
+        "advanceHas": "Advance available: {{amount}}."
       }
     },
     "customer": {
@@ -1119,7 +1141,9 @@
         "credit_terms_owner_only": "Only the owner can set a credit limit or due days.",
         "failed": "Couldn’t save the customer. Check the connection and try again."
       },
-      "onHeldBill": "Customer saved with the bill"
+      "onHeldBill": "Customer saved with the bill",
+      "limit": "Credit limit {{amount}}",
+      "noLimit": "No credit limit set"
     },
     "pay": "Pay",
     "readyToSave": "Paid. Ready to save.",
@@ -1155,12 +1179,19 @@
         "network": "No connection. The bill may already be saved. Press Enter to check: it will never be saved twice. The bill can't be changed until then.",
         "failed": "The bill couldn't be saved. Try again; if it keeps failing, check the connection."
       },
+      "creditWarning": "Over the credit limit: the customer now owes {{after}}, limit {{limit}}.",
       "printReceipt": "Print receipt ({{size}} mm)",
       "printA4": "Print A4 invoice",
       "whatsApp": "Send on WhatsApp",
       "printFailed": "Couldn't print. Check the connection and the printer, then try again.",
       "noPhone": "This bill has no customer phone number. Add one to the customer (F3) first.",
       "whatsAppFailed": "Couldn't open WhatsApp. Check the connection and try again."
+    },
+    "creditApproval": {
+      "title": "Owner's OK for udhaar",
+      "confirm": "Allow this udhaar",
+      "body": "{{name}} would owe {{after}}, over the limit of {{limit}}. Enter the owner's password to allow {{amount}} of udhaar on this bill.",
+      "bodyNoLimit": "{{name}} has no credit limit set. Enter the owner's password to allow {{amount}} of udhaar on this bill."
     }
   },
   "notAllowed": {
@@ -1566,6 +1597,157 @@
     "removeReason": "Reason (optional)",
     "removeConfirm": "Remove holiday",
     "removed": "{{name}} removed."
+  },
+  "udhaar": {
+    "loading": "Loading…",
+    "loadFailed": "Couldn't load the udhaar. Check the connection and try again.",
+    "retry": "Try again",
+    "noLimit": "No limit set",
+    "noPhone": "No phone number",
+    "back": "All customers",
+    "daysLate_one": "{{count}} day late",
+    "daysLate_other": "{{count}} days late",
+    "balance": {
+      "owes": "Owes {{amount}}",
+      "advance": "Advance {{amount}}",
+      "settled": "Nothing owed",
+      "amountOwed": "{{amount}} owed",
+      "amountAdvance": "{{amount}} advance"
+    },
+    "list": {
+      "search": "Search customers by name or phone",
+      "searchPlaceholder": "Name or phone number",
+      "owingOnly": "Owes money",
+      "columns": {
+        "name": "Customer",
+        "phone": "Phone",
+        "balance": "Balance",
+        "limit": "Credit limit",
+        "due": "Oldest due date"
+      },
+      "noMatches": "No customers match.",
+      "empty": "No customers yet. Add a customer at the billing counter (F3) and they appear here.",
+      "more": "Show more"
+    },
+    "page": {
+      "title": "Customer",
+      "balanceLabel": {
+        "owes": "Owes you",
+        "advance": "Paid in advance",
+        "settled": "Balance"
+      },
+      "limitUsed": "Credit limit used",
+      "limitUsedText": "{{percent}} percent of the limit"
+    },
+    "terms": {
+      "title": "Credit limit and due days",
+      "limit": "Credit limit",
+      "limitHint": "The most this customer may owe, in rupees. Leave empty for no limit set.",
+      "days": "Due days",
+      "daysHint": "Days from a bill to its due date. New bills use this; old bills keep their date.",
+      "daysValue_one": "{{count}} day",
+      "daysValue_other": "{{count}} days",
+      "edit": "Change",
+      "save": "Save",
+      "saving": "Saving…",
+      "errors": {
+        "limit": "Enter an amount like 5000, or leave it empty.",
+        "days": "Enter 0 to 365 days.",
+        "failed": "Couldn't save. Check the connection and try again.",
+        "stale": "Someone changed this customer meanwhile. Reload the page and try again."
+      }
+    },
+    "unpaid": {
+      "title": "Unpaid bills",
+      "none": "Nothing is unpaid.",
+      "advance": "Nothing is unpaid. This customer has paid in advance.",
+      "given": "Given on {{date}}",
+      "due": "Due {{date}}",
+      "of": "of {{amount}}"
+    },
+    "ledger": {
+      "title": "Ledger",
+      "columns": {
+        "date": "Date",
+        "what": "What",
+        "owed": "Owed",
+        "paid": "Paid",
+        "balance": "Balance after",
+        "actions": "Actions"
+      },
+      "empty": "Nothing in the ledger yet.",
+      "older": "Show older entries",
+      "reversed": "Reversed",
+      "reference": "Reference {{reference}}"
+    },
+    "entry": {
+      "bill": "Bill {{number}}",
+      "billPlain": "Bill",
+      "advanceUsed": "Advance used on bill {{number}}",
+      "advanceUsedPlain": "Advance used on a bill",
+      "payment": "Payment, {{mode}}",
+      "reversal": "Payment taken back",
+      "opening": "Opening balance (old notebook)"
+    },
+    "payment": {
+      "button": "Record payment",
+      "title": "Payment from {{name}}",
+      "owes": "Owes {{amount}}.",
+      "hasAdvance": "Has an advance of {{amount}}. More money adds to it.",
+      "owesNothing": "Owes nothing. Money taken now becomes an advance.",
+      "amount": "Amount received",
+      "amountHint": "Any amount. More than is owed becomes an advance for the next bill.",
+      "fullBalance": "Full balance",
+      "mode": "Paid by",
+      "save": "Save payment",
+      "saving": "Saving…",
+      "network": "No connection. The payment may already be saved: press Save payment again to check, it is never recorded twice.",
+      "failed": "The payment couldn't be saved. Try again.",
+      "errors": {
+        "invalid": "Enter an amount like 500 or 141.50",
+        "too_small": "Enter an amount above zero",
+        "too_big": "That is too much"
+      }
+    },
+    "reverse": {
+      "button": "Reverse",
+      "title": "Reverse this payment",
+      "body": "The payment stays in the ledger and a reversing line is added. The bills it had paid are owed again.",
+      "reason": "Why",
+      "reasonHint": "For example: wrong customer, or the amount was typed wrong.",
+      "confirm": "Reverse payment",
+      "failed": "Couldn't reverse the payment. It may already be reversed. Reload the page."
+    },
+    "opening": {
+      "button": "Opening balance",
+      "title": "Opening balance",
+      "lead": "What the old notebook says this customer owes. It can be entered once, at any time, and counts as their oldest udhaar: payments clear it first.",
+      "direction": "The notebook says",
+      "owes": "The customer owes us",
+      "advance": "The customer paid in advance",
+      "amount": "Amount",
+      "asOf": "As of",
+      "asOfHint": "The due date counts from here, using the customer’s due days.",
+      "note": "Note",
+      "save": "Save opening balance",
+      "saving": "Saving…",
+      "errors": {
+        "amount": "Enter an amount above zero, like 2500",
+        "date": "Pick a day that is not in the future",
+        "exists": "This customer already has an opening balance.",
+        "failed": "Couldn't save. Check the connection and try again."
+      }
+    },
+    "notice": {
+      "paymentSaved": "Payment saved, balance now {{amount}}",
+      "reversed": "Payment reversed, balance now {{amount}}",
+      "openingSaved": "Opening balance saved, balance now {{amount}}",
+      "termsSaved": "Credit limit and due days saved"
+    },
+    "notFound": {
+      "title": "No such customer",
+      "body": "They may have been typed wrong. Open them from the customers list."
+    }
   },
   "printing": {
     "whatsapp": "{{shop}}: your bill {{number}} for {{total}}. Thank you!"

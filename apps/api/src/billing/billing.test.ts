@@ -297,11 +297,13 @@ describe('billing counter', () => {
         branchStateCode: '27',
         features: expect.any(Array) as unknown,
         negativeStock: 'warn',
+        overCreditLimit: 'warn',
         canViewStock: true,
         canManageItems: true,
         canViewCustomers: true,
         canManageCustomers: true,
         canDiscount: true,
+        canGiveUdhaar: true,
       },
     });
     const cashier = staff(a, ['session.own', 'billing.sell']);

@@ -33,6 +33,7 @@ import { DEFAULT_APP_URL, type ApiConfig } from './config.js';
 import { CustomersController } from './customers/customers.controller.js';
 import { CustomersService } from './customers/customers.service.js';
 import { DATABASE, DatabaseModule } from './database.module.js';
+import { DEMO_ENABLED, DemoController } from './demo/demo.controller.js';
 import { UnhandledErrorFilter } from './error-filter.js';
 import { HealthController } from './health.controller.js';
 import { createMailer, MAILER, type Mailer } from './mail/mailer.js';
@@ -82,6 +83,7 @@ export const API_CONTROLLERS = [
   AttendanceController,
   HolidaysController,
   UdhaarController,
+  DemoController,
 ];
 
 export interface AppOptions {
@@ -108,6 +110,7 @@ class ApiModule {
         AccountService,
         DevicesService,
         { provide: CLOCK, useValue: options.clock ?? SYSTEM_CLOCK },
+        { provide: DEMO_ENABLED, useValue: config.demoEnabled ?? false },
         {
           provide: MAILER,
           useFactory: () => options.mailer ?? createMailer(config.mail ?? { transport: 'none' }),

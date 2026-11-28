@@ -14,6 +14,7 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '../../api/client';
 import { loginOwner, loginStaff, setSession, useSession } from '../../api/session';
+import { DemoLogin } from '../../components/demo-login';
 import { PasswordInput } from '../../components/password-input';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
@@ -47,6 +48,7 @@ function Login() {
             <p className="text-muted">{t('login.counterOf', { business: device.businessName })}</p>
           )}
         </div>
+        <DemoLoginSection />
         {device !== null && (
           <div role="group" aria-label={t('login.who')} className="grid grid-cols-2 gap-2">
             {(['staff', 'owner'] as const).map((option) => (
@@ -82,6 +84,11 @@ function Login() {
       </CardContent>
     </Card>
   );
+}
+
+function DemoLoginSection() {
+  const finish = useFinishLogin();
+  return <DemoLogin onLoggedIn={finish} />;
 }
 
 /** The words for a failed login: wrong details, too many tries, or the connection. */

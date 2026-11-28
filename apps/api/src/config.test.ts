@@ -14,6 +14,7 @@ describe('loadConfig', () => {
       mail: { transport: 'none' },
       appUrl: 'http://127.0.0.1:5173',
       emailLimited: false,
+      demoEnabled: false,
     });
   });
 
@@ -30,7 +31,17 @@ describe('loadConfig', () => {
       mail: { transport: 'none' },
       appUrl: 'http://127.0.0.1:5173',
       emailLimited: false,
+      demoEnabled: false,
     });
+  });
+
+  // ADR 0016's 2026-11-24 note: only the public demo server turns the demo on.
+  it('reads DEMO_ENABLED, off unless set, and refuses anything but true or false', () => {
+    expect(loadConfig({ DATABASE_URL }).demoEnabled).toBe(false);
+    expect(loadConfig({ DATABASE_URL, DEMO_ENABLED: 'true' }).demoEnabled).toBe(true);
+    expect(() => loadConfig({ DATABASE_URL, DEMO_ENABLED: 'yes' })).toThrow(
+      'DEMO_ENABLED must be true or false',
+    );
   });
 
   // Plain-HTTP local development only (ADR 0009 note).

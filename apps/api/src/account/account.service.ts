@@ -33,6 +33,7 @@ import {
   WrongRecoveryKeyError,
 } from './account.errors.js';
 import { EMAIL_LINKS, lockUserIn, type EmailLinks } from './email-links.js';
+import { isDemo, refuseDemoFor, refuseInDemo } from '../demo/demo-rules.js';
 
 interface Account {
   email: string | null;
@@ -68,6 +69,8 @@ export class AccountService {
   async sendConfirmation(caller: Caller): Promise<void> {
     throwUnless(this.sessions.limits.recoveryByAccount.hit(`confirm:${caller.userId}`));
     const sent = await withBusiness(this.database.db, caller.businessId, async (tx) => {
+      // Nothing is sent from the demo shop (ADR 0016's 2026-11-24 note).
+      await refuseInDemo(tx);
       const [user] = await tx
         .select({ email: users.email, confirmedAt: users.emailConfirmedAt })
         .from(users)
@@ -111,6 +114,8 @@ export class AccountService {
     const found = await this.sessions.findOwnerLogin(email);
     if (found === undefined) return;
     const token = await withBusiness(this.database.db, found.businessId, async (tx) => {
+      // The demo shop sends no email; the answer stays the same, so it tells nothing.
+      if (await isDemo(tx)) return null;
       const [user] = await tx
         .select({ id: users.id })
         .from(users)
@@ -209,6 +214,7 @@ export class AccountService {
 
   /** "Make a new recovery key" (needs the owner's password, section 6). Owners only. */
   async newRecoveryKey(caller: Caller, ownerPassword: string): Promise<string> {
+    await refuseDemoFor(this.database, caller);
     await this.sessions.requireOwnerPassword(caller, ownerPassword);
     const next = makeRecoveryKey();
     await withBusiness(this.database.db, caller.businessId, async (tx) => {
@@ -235,6 +241,7 @@ export class AccountService {
 
   /** #46: needs the current password; every other session of this login ends. */
   async changePassword(caller: Caller, currentPassword: string, newPassword: string) {
+    await refuseDemoFor(this.database, caller);
     await this.sessions.requireOwnPassword(caller, currentPassword);
     const account = await withBusiness(this.database.db, caller.businessId, (tx) =>
       accountOf(tx, caller.userId),

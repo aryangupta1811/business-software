@@ -23,6 +23,7 @@ import {
   type SessionService,
 } from '../auth/session.service.js';
 import { DATABASE } from '../database.module.js';
+import { refuseDemoFor } from '../demo/demo-rules.js';
 import type { Caller } from '../http/session.js';
 
 @Injectable()
@@ -128,6 +129,7 @@ export class DevicesService {
     ownerPassword: string,
     context: RequestContext,
   ): Promise<{ thisComputer: boolean }> {
+    await refuseDemoFor(this.database, caller);
     await this.sessions.requireOwnerPassword(caller, ownerPassword);
     return withBusiness(this.database.db, caller.businessId, async (tx) => {
       const [revoked] = await tx

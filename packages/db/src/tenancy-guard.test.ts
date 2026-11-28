@@ -243,6 +243,11 @@ const DEFINER_ALLOWED: string[] = [
   'app_find_owner_login',
   // P1.4: signup registers its own owner's email; RLS limits it to the current business.
   'app_register_owner_login',
+  // P1.20: the one-click demo login and the demo reset come before any business is known. The
+  // three return or archive only demo businesses' IDs and times, never a row of tenant data.
+  'app_register_demo_business',
+  'app_find_demo_business',
+  'app_archive_demo_businesses',
 ];
 
 // The policy function's body exactly as migration 0001 writes it (ADR 0027).

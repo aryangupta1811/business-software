@@ -15,6 +15,11 @@ export interface ApiConfig {
   appUrl?: string;
   /** Module 00 #45: the demo's SES sandbox reaches verified addresses only. */
   emailLimited?: boolean;
+  /**
+   * ADR 0016's 2026-11-24 note: this server is the public demo. It offers the one-click demo
+   * login and lets the worker build a fresh demo shop each week. Off everywhere else.
+   */
+  demoEnabled?: boolean;
 }
 
 /** ADR 0040: Mailpit through SMTP on this computer, SES on the server, or no email at all. */
@@ -114,6 +119,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): ApiConfig {
     mail: readMail(env),
     appUrl: readAppUrl(env),
     emailLimited: readFlag(env, 'EMAIL_LIMITED', false),
+    demoEnabled: readFlag(env, 'DEMO_ENABLED', false),
   };
 }
 

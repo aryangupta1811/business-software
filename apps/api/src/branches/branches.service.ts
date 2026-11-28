@@ -27,6 +27,7 @@ import type { BranchInput, BranchRef, BranchView } from '@business-software/shar
 import { CLOCK, type Clock } from '../auth/clock.js';
 import { SESSION_SERVICE, type SessionService } from '../auth/session.service.js';
 import { DATABASE } from '../database.module.js';
+import { refuseDemoFor } from '../demo/demo-rules.js';
 import type { Caller } from '../http/session.js';
 import { changes, inBusiness } from '../items/conflicts.js';
 
@@ -132,6 +133,7 @@ export class BranchesService {
    * it home. Its computers are forgotten and every session on them ends; stock and history stay.
    */
   async archive(caller: Caller, id: string, ownerPassword: string): Promise<BranchView> {
+    await refuseDemoFor(this.database, caller);
     await this.sessions.requireOwnerPassword(caller, ownerPassword);
     return inBusiness(this.database, caller, async (tx) => {
       const current = await this.lock(tx, id);

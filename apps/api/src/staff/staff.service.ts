@@ -56,6 +56,7 @@ import {
 import { CLOCK, type Clock } from '../auth/clock.js';
 import { SESSION_SERVICE, type SessionService } from '../auth/session.service.js';
 import { DATABASE } from '../database.module.js';
+import { refuseDemoFor, refuseInDemo } from '../demo/demo-rules.js';
 import type { Caller } from '../http/session.js';
 import { changes, inBusiness } from '../items/conflicts.js';
 
@@ -232,6 +233,8 @@ export class StaffService {
    * salary becomes the first rate, from this month or the joining month if that is later.
    */
   async create(caller: Caller, input: NewStaffInput): Promise<StaffView> {
+    // A record is fine in the demo; a login is not (ADR 0016's 2026-11-24 note).
+    if (input.username !== undefined) await refuseDemoFor(this.database, caller);
     const login = await this.prepareLogin(caller, input);
     const today = businessDate(this.clock.now());
     const joiningDate = input.joiningDate ?? today;
@@ -285,6 +288,7 @@ export class StaffService {
 
   /** Gives a record without a login its username and password. Needs the owner's password. */
   async addLogin(caller: Caller, id: string, input: StaffAddLoginInput): Promise<StaffView> {
+    await refuseDemoFor(this.database, caller);
     const login = await this.prepareLogin(caller, input);
     if (login === null) throw new Error('A login needs a username and a password');
     return inBusiness(this.database, caller, async (tx) => {
@@ -404,6 +408,7 @@ export class StaffService {
     id: string,
     input: StaffPermissionsInput,
   ): Promise<StaffView> {
+    await refuseDemoFor(this.database, caller);
     refuseBadSwitches(input.permissions);
     await this.sessions.requireOwnerPassword(caller, input.ownerPassword);
     const { added, removed } = differenceFromDefaults(input.permissions as Permission[]);
@@ -442,6 +447,7 @@ export class StaffService {
 
   /** The owner sets a forgotten password (#33): every session of that login ends. */
   async resetPassword(caller: Caller, id: string, input: StaffPasswordInput): Promise<void> {
+    await refuseDemoFor(this.database, caller);
     const phone = await this.phoneOf(caller);
     const target = await inBusiness(this.database, caller, (tx) => this.load(tx, id));
     refuseWeak(
@@ -467,6 +473,7 @@ export class StaffService {
   /** Takes access away at once: the login's open sessions end in the same transaction. */
   deactivate(caller: Caller, id: string, input: StaffDeactivateInput): Promise<StaffView> {
     return inBusiness(this.database, caller, async (tx) => {
+      await refuseInDemo(tx);
       const current = await this.load(tx, id, true);
       if (!current.active) return current;
       await tx.update(users).set({ deactivatedAt: this.clock.now() }).where(eq(users.id, id));
@@ -489,6 +496,7 @@ export class StaffService {
    * cashier notices; the session service reads the list with the permissions.
    */
   async setBranches(caller: Caller, id: string, input: StaffBranchesInput): Promise<StaffView> {
+    await refuseDemoFor(this.database, caller);
     await this.sessions.requireOwnerPassword(caller, input.ownerPassword);
     return inBusiness(this.database, caller, async (tx) => {
       const current = await this.load(tx, id, true);
@@ -535,6 +543,7 @@ export class StaffService {
 
   /** Brings a login back with the permissions it had. Needs the owner's password. */
   async reactivate(caller: Caller, id: string, ownerPassword: string): Promise<StaffView> {
+    await refuseDemoFor(this.database, caller);
     await this.sessions.requireOwnerPassword(caller, ownerPassword);
     return inBusiness(this.database, caller, async (tx) => {
       const current = await this.load(tx, id, true);

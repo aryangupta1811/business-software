@@ -19,6 +19,7 @@ import { hasPicker } from '../branches/branch-scope-context';
 import { keyLabels } from '../shortcuts/keys';
 import { useOpenShortcutHelp, useShortcut } from '../shortcuts/use-shortcut';
 import { ConnectionBadge } from './connection-badge';
+import { DemoBanner } from './demo-banner';
 import { EmailBanner } from './email-banner';
 import { LanguageSwitcher } from './language-switcher';
 import { SessionPanel } from './session-panel';
@@ -206,6 +207,7 @@ export function AppShell({
               <ThemeToggle />
             </div>
           </header>
+          {session !== null && <DemoBanner session={session} />}
           {session !== null && <EmailBanner session={session} />}
           <main className="flex-1 px-8 py-6">{children}</main>
         </div>

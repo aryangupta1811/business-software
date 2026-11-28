@@ -171,6 +171,7 @@ export class BillsService {
         negativeStock: businesses.negativeStock,
         overCreditLimit: businesses.overCreditLimit,
         invoicePrefix: businesses.invoicePrefix,
+        phone: businesses.phone,
       })
       .from(businesses);
     const [branch] = await tx.select().from(branches).where(eq(branches.id, caller.branchId));
@@ -333,6 +334,7 @@ export class BillsService {
         buyer,
         seller: {
           businessName: business.name,
+          phone: business.phone,
           branchName: branch.name,
           address: branch.address,
           pinCode: branch.pinCode,

@@ -22,6 +22,8 @@ import { BranchesController } from './branches/branches.controller.js';
 import { BranchesService } from './branches/branches.service.js';
 import { BillingController } from './billing/billing.controller.js';
 import { BillsController } from './bills/bills.controller.js';
+import { BillsReadController } from './bills/bills-read.controller.js';
+import { BillsReadService } from './bills/bills-read.service.js';
 import { BillsService } from './bills/bills.service.js';
 import { BillingService } from './billing/billing.service.js';
 import { HeldBillsController } from './billing/held-bills.controller.js';
@@ -75,6 +77,7 @@ export const API_CONTROLLERS = [
   BillingController,
   HeldBillsController,
   BillsController,
+  BillsReadController,
   CustomersController,
   StaffController,
   BranchesController,
@@ -129,6 +132,7 @@ class ApiModule {
         BillingService,
         HeldBillsService,
         BillsService,
+        BillsReadService,
         CustomersService,
         StaffService,
         BranchesService,

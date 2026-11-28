@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Bill templates run in the browser (printing) and in Node (the worker's PDFs, PR 2), so
+    // neither one's globals are allowed.
+    "types": [],
+    "jsx": "react-jsx"
+  },
+  "include": ["src", "vitest.config.ts"]
+}

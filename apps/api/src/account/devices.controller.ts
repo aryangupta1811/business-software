@@ -14,9 +14,11 @@ import {
 import {
   deviceBranchSchema,
   deviceNameSchema,
+  devicePrintingSchema,
   ownerPasswordSchema,
   type DeviceBranchInput,
   type DeviceNameInput,
+  type DevicePrintingInput,
   type DeviceView,
   type OwnerPasswordInput,
 } from '@business-software/shared';
@@ -51,6 +53,18 @@ export class DevicesController {
     @Req() request: IncomingMessage,
   ): Promise<DeviceView> {
     return this.devices.rename(caller, id, body.name, this.sessions.contextOf(request));
+  }
+
+  /** `02` #29, #30: this counter's receipt paper and auto-print. */
+  @Permission('settings.manage')
+  @Put(':id/printing')
+  setPrinting(
+    @CurrentCaller() caller: Caller,
+    @Param('id', UuidPipe) id: string,
+    @Body(new ZodBodyPipe(devicePrintingSchema)) body: DevicePrintingInput,
+    @Req() request: IncomingMessage,
+  ): Promise<DeviceView> {
+    return this.devices.setPrinting(caller, id, body, this.sessions.contextOf(request));
   }
 
   /**

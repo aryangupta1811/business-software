@@ -27,6 +27,7 @@ import {
   IDLE_GRACE_MS,
   PERMISSIONS,
   type ActiveSession,
+  type ReceiptSize,
   type BranchRef,
   type PermissionDifference,
   type SessionView,
@@ -918,6 +919,15 @@ export class SessionService {
       )
       .where(eq(users.id, caller.userId));
     if (row === undefined) throw new Error('Session user not found');
+    // A session with no remembered computer prints the defaults: 80 mm, printing at once.
+    const [computer] = await tx
+      .select({ receiptSize: devices.receiptSize, autoPrint: devices.autoPrint })
+      .from(sessions)
+      .innerJoin(
+        devices,
+        and(eq(devices.businessId, sessions.businessId), eq(devices.id, sessions.deviceId)),
+      )
+      .where(eq(sessions.id, caller.sessionId));
     return {
       state: caller.locked ? 'locked' : 'active',
       user: { id: caller.userId, role: caller.role, name: row.name },
@@ -935,6 +945,10 @@ export class SessionService {
         row.storedDiscountLimit,
       ),
       permissions: [...caller.permissions],
+      printing: {
+        receiptSize: (computer?.receiptSize ?? 80) as ReceiptSize,
+        autoPrint: computer?.autoPrint ?? true,
+      },
     };
   }
 }

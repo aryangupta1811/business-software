@@ -45,8 +45,8 @@ import {
 } from '@business-software/shared';
 import { CLOCK, type Clock } from '../auth/clock.js';
 import { SESSION_SERVICE, type SessionService } from '../auth/session.service.js';
-import { likeText } from '../customers/customers.service.js';
 import { DATABASE } from '../database.module.js';
+import { likeText } from '../http/like.js';
 import { inBusiness } from '../items/conflicts.js';
 import type { Caller } from '../http/session.js';
 

@@ -152,6 +152,7 @@ describe('settings', () => {
         stock: { negativeStock: 'warn' },
         alerts: { types: ['low_stock', 'out_of_stock'] },
         invoices: { invoicePrefix: null },
+        printing: { billLanguage: 'en', footerNote: null },
         udhaar: { overCreditLimit: 'warn' },
         // No bill yet in this branch's counter: the first number is 1.
         nextInvoice: { financialYear: thisYear(), sequence: 1 },
@@ -251,6 +252,70 @@ describe('settings', () => {
     });
   });
 
+  it('saves the bill language and footer note, and logs them as a printing change', async () => {
+    const saved = await call('PUT', '/settings/printing', a, {
+      billLanguage: 'hi',
+      footerNote: '  Goods once sold will not be taken back.  ',
+    });
+    expect((saved.body as { printing: unknown }).printing).toEqual({
+      billLanguage: 'hi',
+      footerNote: 'Goods once sold will not be taken back.',
+    });
+    const { rows } = await admin.pool.query<{ before: unknown; after: unknown }>(
+      "select before, after from entry_log where business_id = $1 and action = 'settings.printing_changed'",
+      [a.businessId],
+    );
+    expect(rows).toEqual([
+      {
+        before: { billLanguage: 'en', footerNote: null },
+        after: { billLanguage: 'hi', footerNote: 'Goods once sold will not be taken back.' },
+      },
+    ]);
+  });
+
+  it('writes nothing when the printing settings did not change, and clears the note when blank', async () => {
+    const count = async () =>
+      (
+        await admin.pool.query<{ n: string }>(
+          "select count(*) as n from entry_log where business_id = $1 and action = 'settings.printing_changed'",
+          [a.businessId],
+        )
+      ).rows[0]?.n;
+    const before = await count();
+    await call('PUT', '/settings/printing', a, {
+      billLanguage: 'hi',
+      footerNote: 'Goods once sold will not be taken back.',
+    });
+    expect(await count()).toBe(before);
+    const cleared = await call('PUT', '/settings/printing', a, {
+      billLanguage: 'hi',
+      footerNote: '   ',
+    });
+    expect((cleared.body as { printing: { footerNote: null } }).printing.footerNote).toBeNull();
+  });
+
+  it('refuses a bad language or a footer note over 200 characters', async () => {
+    const language = await call('PUT', '/settings/printing', a, {
+      billLanguage: 'fr',
+      footerNote: null,
+    });
+    expect(language.status).toBe(400);
+    const long = await call('PUT', '/settings/printing', a, {
+      billLanguage: 'en',
+      footerNote: 'x'.repeat(201),
+    });
+    expect(long.status).toBe(400);
+    expect((await call('GET', '/settings', a)).body).toMatchObject({
+      printing: { billLanguage: 'hi' },
+    });
+  });
+
+  it("keeps one business's printing settings out of another's", async () => {
+    expect((await call('GET', '/settings', b)).body).toMatchObject({
+      printing: { billLanguage: 'en', footerNote: null },
+    });
+  });
+
   it('keeps businesses apart', async () => {
     const seen = (await call('GET', '/settings', b)).body as { business: { businessName: string } };
     expect(seen.business.businessName).toBe('Shop B');
@@ -290,5 +355,9 @@ describe('settings', () => {
     const viewer = { ...b, permissions: ['settings.view' as const] };
     expect((await call('GET', '/settings', viewer)).status).toBe(200);
     expect((await call('PUT', '/settings/features', viewer, { features: [] })).status).toBe(403);
+    expect(
+      (await call('PUT', '/settings/printing', viewer, { billLanguage: 'en', footerNote: null }))
+        .status,
+    ).toBe(403);
   });
 });

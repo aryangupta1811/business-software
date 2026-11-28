@@ -26,6 +26,7 @@
     "vitest": "catalog:"
   },
   "dependencies": {
+    "@business-software/print": "workspace:*",
     "@business-software/shared": "workspace:*",
     "@fontsource/ibm-plex-sans": "^5.3.0",
     "@fontsource/ibm-plex-sans-devanagari": "^5.3.0",

@@ -25,6 +25,7 @@ import {
 } from '@business-software/shared';
 import { DATABASE } from '../database.module.js';
 import { changes, inBusiness } from '../items/conflicts.js';
+import { likeText } from '../http/like.js';
 import type { Caller } from '../http/session.js';
 
 type CustomerRecord = typeof customers.$inferSelect;
@@ -91,9 +92,6 @@ function columns(input: CustomerInput) {
     stateCode: input.stateCode,
   };
 }
-
-/** `%`, `_` and `\` typed in a search are letters, not LIKE wildcards. */
-export const likeText = (text: string) => `%${text.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
 
 /** Customers at the billing counter (P1.13 design §7, §14). Archived, never deleted. */
 @Injectable()

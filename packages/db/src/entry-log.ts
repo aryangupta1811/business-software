@@ -65,6 +65,10 @@ export const ENTRY_ACTIONS = {
   'staff.login_added': { reasonRequired: false }, // a record without a login was given one
   'holiday.added': { reasonRequired: false },
   'holiday.removed': { reasonRequired: false },
+  // P1.15 (`02` #29, #32, #33): the bill language and footer, a computer's printer, a reprint.
+  'settings.printing_changed': { reasonRequired: false },
+  'device.printing_changed': { reasonRequired: false },
+  'bill.reprinted': { reasonRequired: false },
   // P1.18 (`03` #9, #11, #20, #21): the owner's OK past a credit limit, payments, the old notebook.
   'credit_limit.approved': { reasonRequired: false },
   'udhaar.payment_recorded': { reasonRequired: false },

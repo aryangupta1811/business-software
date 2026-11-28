@@ -23,6 +23,7 @@ export const OWNER_SESSION: ActiveSession = {
   emailLimited: false,
   discountLimitBasisPoints: null,
   permissions: [...PERMISSIONS],
+  printing: { receiptSize: 80, autoPrint: true },
 };
 
 export const STAFF_SESSION: ActiveSession = {
